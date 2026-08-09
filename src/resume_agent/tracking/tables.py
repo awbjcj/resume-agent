@@ -46,7 +46,9 @@ class Job(SQLModel, table=True):
     dedup_key: str | None = Field(default=None, index=True)
     jd_text: str = ""
     criteria_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
-    analysis_meta_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    analysis_meta_json: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
     fit_score: int | None = None
     fit_rationale: str | None = None
     status: str = Field(default=JobStatus.raw.value, index=True)
@@ -74,8 +76,16 @@ class ResumeVersion(SQLModel, table=True):
     pdf_path: str | None = None
     review_score: int | None = None
     fact_check_passed: bool = False
-    critique_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
-    skill_uses_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
+    critique_json: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
+    evidence_portfolio_json: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
+    evidence_portfolio_status: str | None = None
+    skill_uses_json: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
     # The configured gate reviewer names active for THIS round (provenance is
     # always a gate and is never included here). None means "unknown" - a row
     # written before this column existed - and read-side callers fall back to
@@ -86,7 +96,9 @@ class ResumeVersion(SQLModel, table=True):
     tailor_model: str | None = None
     origin: str = Field(default="tailor", index=True)
     instruction: str | None = None
-    parent_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
+    parent_version_id: int | None = Field(
+        default=None, foreign_key="resume_versions.id"
+    )
     schema_version: int = 1
     created_at: datetime = Field(default_factory=utcnow)
 
@@ -96,7 +108,9 @@ class Application(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="jobs.id", index=True)
-    resume_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
+    resume_version_id: int | None = Field(
+        default=None, foreign_key="resume_versions.id"
+    )
     cover_letter_id: int | None = Field(default=None, foreign_key="cover_letters.id")
     status: str = Field(default=ApplicationStatus.ready.value, index=True)
     submitted_at: datetime | None = None
@@ -111,9 +125,13 @@ class CoverLetter(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="jobs.id", index=True)
-    resume_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
+    resume_version_id: int | None = Field(
+        default=None, foreign_key="resume_versions.id"
+    )
     content_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
-    skill_uses_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
+    skill_uses_json: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
     pdf_path: str | None = None
     fact_check_passed: bool = False
     origin: str = Field(default="draft", index=True)

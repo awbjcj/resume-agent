@@ -12,7 +12,9 @@ def ensure_dedup_key_column(engine: Engine) -> None:
             return
         if "dedup_key" not in cols:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN dedup_key VARCHAR"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_jobs_dedup_key ON jobs (dedup_key)"))
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_jobs_dedup_key ON jobs (dedup_key)")
+        )
         rows = conn.execute(
             text("SELECT id, company, title FROM jobs WHERE dedup_key IS NULL")
         ).fetchall()
@@ -63,7 +65,9 @@ def ensure_reject_category_column(engine: Engine) -> None:
             )
         ).fetchall()
         for row_id, reason in rows:
-            category = "relevance" if str(reason).startswith("off-target role") else "filtered"
+            category = (
+                "relevance" if str(reason).startswith("off-target role") else "filtered"
+            )
             conn.execute(
                 text("UPDATE jobs SET reject_category = :c WHERE id = :i"),
                 {"c": category, "i": row_id},
@@ -92,7 +96,9 @@ def ensure_content_fingerprint_column(engine: Engine) -> None:
         if not cols:
             return
         if "content_fingerprint" not in cols:
-            conn.execute(text("ALTER TABLE jobs ADD COLUMN content_fingerprint VARCHAR"))
+            conn.execute(
+                text("ALTER TABLE jobs ADD COLUMN content_fingerprint VARCHAR")
+            )
         conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_jobs_content_fingerprint "
@@ -170,11 +176,19 @@ def ensure_resume_version_revision_columns(engine: Engine) -> None:
     with engine.begin() as conn:
         if "origin" not in cols:
             conn.execute(text("ALTER TABLE resume_versions ADD COLUMN origin VARCHAR"))
-            conn.execute(text("UPDATE resume_versions SET origin = 'tailor' WHERE origin IS NULL"))
+            conn.execute(
+                text(
+                    "UPDATE resume_versions SET origin = 'tailor' WHERE origin IS NULL"
+                )
+            )
         if "instruction" not in cols:
-            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN instruction VARCHAR"))
+            conn.execute(
+                text("ALTER TABLE resume_versions ADD COLUMN instruction VARCHAR")
+            )
         if "parent_version_id" not in cols:
-            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN parent_version_id INTEGER"))
+            conn.execute(
+                text("ALTER TABLE resume_versions ADD COLUMN parent_version_id INTEGER")
+            )
 
 
 def ensure_cover_letter_revision_columns(engine: Engine) -> None:
@@ -185,9 +199,13 @@ def ensure_cover_letter_revision_columns(engine: Engine) -> None:
     with engine.begin() as conn:
         if "origin" not in cols:
             conn.execute(text("ALTER TABLE cover_letters ADD COLUMN origin VARCHAR"))
-            conn.execute(text("UPDATE cover_letters SET origin = 'draft' WHERE origin IS NULL"))
+            conn.execute(
+                text("UPDATE cover_letters SET origin = 'draft' WHERE origin IS NULL")
+            )
         if "instruction" not in cols:
-            conn.execute(text("ALTER TABLE cover_letters ADD COLUMN instruction VARCHAR"))
+            conn.execute(
+                text("ALTER TABLE cover_letters ADD COLUMN instruction VARCHAR")
+            )
         if "parent_id" not in cols:
             conn.execute(text("ALTER TABLE cover_letters ADD COLUMN parent_id INTEGER"))
 
@@ -199,7 +217,9 @@ def ensure_application_cover_letter_id_column(engine: Engine) -> None:
         return
     if "cover_letter_id" not in cols:
         with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE applications ADD COLUMN cover_letter_id INTEGER"))
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN cover_letter_id INTEGER")
+            )
 
 
 def ensure_resume_version_attempt_columns(engine: Engine) -> None:
@@ -215,11 +235,17 @@ def ensure_resume_version_attempt_columns(engine: Engine) -> None:
     with engine.begin() as conn:
         if "attempt" not in cols:
             conn.execute(
-                text("ALTER TABLE resume_versions ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0")
+                text(
+                    "ALTER TABLE resume_versions ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0"
+                )
             )
-            conn.execute(text("UPDATE resume_versions SET attempt = 1 WHERE attempt = 0"))
+            conn.execute(
+                text("UPDATE resume_versions SET attempt = 1 WHERE attempt = 0")
+            )
         if "tailor_model" not in cols:
-            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN tailor_model VARCHAR"))
+            conn.execute(
+                text("ALTER TABLE resume_versions ADD COLUMN tailor_model VARCHAR")
+            )
 
 
 def ensure_resume_version_gate_reviewers_column(engine: Engine) -> None:
@@ -239,6 +265,28 @@ def ensure_resume_version_gate_reviewers_column(engine: Engine) -> None:
             )
 
 
+def ensure_resume_version_evidence_portfolio_columns(engine: Engine) -> None:
+    """Add nullable frozen portfolio fields; legacy rows intentionally stay NULL."""
+    cols = _table_columns(engine, "resume_versions")
+    if not cols:
+        return
+    with engine.begin() as conn:
+        if "evidence_portfolio_json" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE resume_versions ADD COLUMN "
+                    "evidence_portfolio_json JSON"
+                )
+            )
+        if "evidence_portfolio_status" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE resume_versions ADD COLUMN "
+                    "evidence_portfolio_status VARCHAR"
+                )
+            )
+
+
 def ensure_agent_metadata_columns(engine: Engine) -> None:
     """Idempotently add nullable skill and agent-run provenance columns."""
     jobs = _table_columns(engine, "jobs")
@@ -248,6 +296,10 @@ def ensure_agent_metadata_columns(engine: Engine) -> None:
         if jobs and "analysis_meta_json" not in jobs:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN analysis_meta_json JSON"))
         if resumes and "skill_uses_json" not in resumes:
-            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN skill_uses_json JSON"))
+            conn.execute(
+                text("ALTER TABLE resume_versions ADD COLUMN skill_uses_json JSON")
+            )
         if covers and "skill_uses_json" not in covers:
-            conn.execute(text("ALTER TABLE cover_letters ADD COLUMN skill_uses_json JSON"))
+            conn.execute(
+                text("ALTER TABLE cover_letters ADD COLUMN skill_uses_json JSON")
+            )

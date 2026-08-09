@@ -113,6 +113,8 @@ class ResumeVersionOut(CamelModel):
     critique_json: list[dict] | None
     created_at: datetime
     failed_gates: list[str] = Field(default_factory=list)
+    evidence_portfolio_status: str | None = None
+    has_evidence_portfolio: bool = False
     # The round's OWN recorded gate roster (`ResumeVersion.gate_reviewers_json`).
     # None means a row written before this field existed - unknown, not empty -
     # and `apply_gate_names` treats that as the signal to fall back to a
@@ -135,6 +137,7 @@ class ResumeVersionOut(CamelModel):
             [ReviewCritique.model_validate(c) for c in self.critique_json or []],
             self.gate_reviewers_json,
         )
+        self.has_evidence_portfolio = self.evidence_portfolio_status is not None
         return self
 
     def apply_gate_names(self, gate_names: Iterable[str]) -> None:
@@ -193,7 +196,9 @@ class H1BSponsorshipEvidenceOut(CamelModel):
     unavailable_reason: str | None = None
 
     @classmethod
-    def from_evidence(cls, evidence: H1BSponsorshipEvidence) -> H1BSponsorshipEvidenceOut:
+    def from_evidence(
+        cls, evidence: H1BSponsorshipEvidence
+    ) -> H1BSponsorshipEvidenceOut:
         return cls.model_validate(evidence.model_dump())
 
 

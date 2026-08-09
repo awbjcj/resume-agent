@@ -20,5 +20,10 @@
     }
   ],
   "must_cite": ["e1b1", "e1b2"],
+  "portfolio_expectation": {
+    "label": "safe_alias",
+    "mandatory_evidence_ids": ["e1b1", "e1b2", "e1b3"],
+    "forbidden_highlight_terms": ["Kafka"]
+  },
   "rubric": ["keyword coverage", "terminology fidelity", "relevance"]
 }

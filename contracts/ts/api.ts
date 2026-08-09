@@ -2217,6 +2217,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/resume-versions/{version_id}/evidence-portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Evidence Portfolio Endpoint */
+        get: operations["evidence_portfolio_endpoint_api_resume_versions__version_id__evidence_portfolio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/resume-versions/{version_id}/pdf": {
         parameters: {
             query?: never;
@@ -4029,6 +4046,46 @@ export interface components {
             /** Records */
             records?: components["schemas"]["ErrorRecordOut"][];
         };
+        /** EvidenceExcerptOut */
+        EvidenceExcerptOut: {
+            /** Factid */
+            factId: string;
+            /** Ownerid */
+            ownerId: string;
+            /**
+             * Ownerkind
+             * @enum {string}
+             */
+            ownerKind: "experience" | "project";
+            /** Text */
+            text: string;
+        };
+        /** EvidencePortfolioOut */
+        EvidencePortfolioOut: {
+            /** Evidenceexcerpts */
+            evidenceExcerpts?: components["schemas"]["EvidenceExcerptOut"][];
+            /** Highlightterms */
+            highlightTerms?: string[];
+            /** Omissions */
+            omissions?: components["schemas"]["PortfolioOmissionOut"][];
+            /** Realizedoutsidefactids */
+            realizedOutsideFactIds?: string[];
+            /** Requirements */
+            requirements?: components["schemas"]["PortfolioRequirementOut"][];
+            /** Sectionorder */
+            sectionOrder?: string[];
+            /** Selectedskillfactids */
+            selectedSkillFactIds?: string[];
+            /** Selections */
+            selections?: components["schemas"]["PortfolioSelectionOut"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "deterministic_fallback" | "inherited";
+            /** Warning */
+            warning?: string | null;
+        };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /**
@@ -4574,15 +4631,30 @@ export interface components {
         /** LengthBudget */
         LengthBudget: {
             /**
+             * Maxbulletsperproject
+             * @default 3
+             */
+            maxBulletsPerProject: number;
+            /**
              * Maxbulletsperrole
              * @default 5
              */
             maxBulletsPerRole: number;
             /**
+             * Maxevidenceowners
+             * @default 5
+             */
+            maxEvidenceOwners: number;
+            /**
              * Maxexperiences
              * @default 4
              */
             maxExperiences: number;
+            /**
+             * Maxprojects
+             * @default 2
+             */
+            maxProjects: number;
             /**
              * Targettotalbullets
              * @default 20
@@ -4993,6 +5065,77 @@ export interface components {
              * @default pending
              */
             status: string;
+        };
+        /** PortfolioOmissionOut */
+        PortfolioOmissionOut: {
+            /** Ownerid */
+            ownerId: string;
+            /**
+             * Ownerkind
+             * @enum {string}
+             */
+            ownerKind: "experience" | "project";
+            /** Rationale */
+            rationale: string;
+        };
+        /** PortfolioRequirementOut */
+        PortfolioRequirementOut: {
+            /** Approvedterms */
+            approvedTerms?: string[];
+            /**
+             * Core
+             * @default false
+             */
+            core: boolean;
+            /**
+             * Coverage
+             * @enum {string}
+             */
+            coverage: "covered" | "adjacent" | "gap";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "responsibility" | "seniority";
+            /** Priority */
+            priority: number;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
+            /** Supportingfactids */
+            supportingFactIds?: string[];
+            /** Text */
+            text: string;
+        };
+        /** PortfolioSelectionOut */
+        PortfolioSelectionOut: {
+            /**
+             * Bridge
+             * @default false
+             */
+            bridge: boolean;
+            /** Bulletbudget */
+            bulletBudget: number;
+            /** Ownerid */
+            ownerId: string;
+            /**
+             * Ownerkind
+             * @enum {string}
+             */
+            ownerKind: "experience" | "project";
+            /** Rank */
+            rank: number;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
+            /** Requirementtexts */
+            requirementTexts?: string[];
+            /** Selectedfactids */
+            selectedFactIds?: string[];
         };
         /** ProfileConfigDoc */
         ProfileConfigDoc: {
@@ -5563,10 +5706,17 @@ export interface components {
             critiqueJson: {
                 [key: string]: unknown;
             }[] | null;
+            /** Evidenceportfoliostatus */
+            evidencePortfolioStatus?: string | null;
             /** Factcheckpassed */
             factCheckPassed: boolean;
             /** Failedgates */
             failedGates?: string[];
+            /**
+             * Hasevidenceportfolio
+             * @default false
+             */
+            hasEvidencePortfolio: boolean;
             /** Id */
             id: number;
             /** Instruction */
@@ -5589,6 +5739,11 @@ export interface components {
         };
         /** ReviewConfigDoc */
         ReviewConfigDoc: {
+            /**
+             * Evidenceportfolioenabled
+             * @default false
+             */
+            evidencePortfolioEnabled: boolean;
             lengthBudget?: components["schemas"]["LengthBudget"] | null;
             /**
              * Maxrounds
@@ -12056,6 +12211,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evidence_portfolio_endpoint_api_resume_versions__version_id__evidence_portfolio_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidencePortfolioOut"];
                 };
             };
             /** @description Validation Error */

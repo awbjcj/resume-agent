@@ -1,0 +1,19 @@
+{
+  "aliases": {
+    "aws": "amazon web services",
+    "amazon web services": "amazon web services",
+    "ci cd": "continuous integration",
+    "continuous integration": "continuous integration"
+  },
+  "domain_of": {
+    "django": "python-web",
+    "fastapi": "python-web",
+    "flask": "python-web"
+  },
+  "domain_label": {
+    "python-web": "Python web frameworks"
+  },
+  "category_of": {
+    "python-web": "frameworks"
+  }
+}

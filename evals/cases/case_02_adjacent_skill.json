@@ -20,5 +20,10 @@
     }
   ],
   "must_cite": ["e1", "e1b1", "s_py"],
+  "portfolio_expectation": {
+    "label": "direct_vs_adjacent",
+    "mandatory_evidence_ids": ["e1b1"],
+    "forbidden_highlight_terms": ["Flask"]
+  },
   "rubric": ["relevance", "impact", "concision"]
 }

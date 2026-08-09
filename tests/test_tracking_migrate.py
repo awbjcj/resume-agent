@@ -6,6 +6,7 @@ from resume_agent.tracking.migrate import (
     ensure_application_cover_letter_id_column,
     ensure_cover_letter_revision_columns,
     ensure_resume_version_attempt_columns,
+    ensure_resume_version_evidence_portfolio_columns,
     ensure_resume_version_gate_reviewers_column,
     ensure_resume_version_revision_columns,
 )
@@ -21,21 +22,29 @@ def test_revision_migrations_backfill_origins():
                 "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
             )
         )
-        conn.execute(text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)"))
+        conn.execute(
+            text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)")
+        )
         conn.execute(
             text("CREATE TABLE cover_letters (id INTEGER PRIMARY KEY, job_id INTEGER)")
         )
         conn.execute(text("INSERT INTO cover_letters (id, job_id) VALUES (1, 1)"))
-        conn.execute(text("CREATE TABLE applications (id INTEGER PRIMARY KEY, job_id INTEGER)"))
+        conn.execute(
+            text("CREATE TABLE applications (id INTEGER PRIMARY KEY, job_id INTEGER)")
+        )
 
     ensure_resume_version_revision_columns(engine)
     ensure_cover_letter_revision_columns(engine)
     ensure_application_cover_letter_id_column(engine)
 
     with engine.begin() as conn:
-        resume_origin = conn.execute(text("SELECT origin FROM resume_versions")).scalar()
+        resume_origin = conn.execute(
+            text("SELECT origin FROM resume_versions")
+        ).scalar()
         cover_origin = conn.execute(text("SELECT origin FROM cover_letters")).scalar()
-        app_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(applications)"))]
+        app_cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(applications)"))
+        ]
 
     assert resume_origin == "tailor"
     assert cover_origin == "draft"
@@ -46,9 +55,15 @@ def test_init_db_creates_revision_columns():
     engine = make_engine("sqlite://")
     init_db(engine)
     with engine.begin() as conn:
-        resume_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
-        cover_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(cover_letters)"))]
-        app_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(applications)"))]
+        resume_cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
+        cover_cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(cover_letters)"))
+        ]
+        app_cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(applications)"))
+        ]
 
     assert {"origin", "instruction", "parent_version_id"}.issubset(resume_cols)
     assert {"origin", "instruction", "parent_id"}.issubset(cover_cols)
@@ -64,12 +79,16 @@ def test_attempt_migration_backfills_existing_rows_to_attempt_one():
                 "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
             )
         )
-        conn.execute(text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)"))
+        conn.execute(
+            text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)")
+        )
 
     ensure_resume_version_attempt_columns(engine)
 
     with engine.begin() as conn:
-        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
+        cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
         attempt = conn.execute(text("SELECT attempt FROM resume_versions")).scalar()
         model = conn.execute(text("SELECT tailor_model FROM resume_versions")).scalar()
 
@@ -85,7 +104,9 @@ def test_init_db_creates_attempt_columns():
     engine = make_engine("sqlite://")
     init_db(engine)
     with engine.begin() as conn:
-        resume_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
+        resume_cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
 
     assert {"attempt", "tailor_model"}.issubset(resume_cols)
 
@@ -99,12 +120,16 @@ def test_gate_reviewers_migration_leaves_existing_rows_null():
                 "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
             )
         )
-        conn.execute(text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)"))
+        conn.execute(
+            text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)")
+        )
 
     ensure_resume_version_gate_reviewers_column(engine)
 
     with engine.begin() as conn:
-        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
+        cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
         gate_reviewers = conn.execute(
             text("SELECT gate_reviewers_json FROM resume_versions")
         ).scalar()
@@ -133,9 +158,42 @@ def test_init_db_creates_gate_reviewers_column():
     engine = make_engine("sqlite://")
     init_db(engine)
     with engine.begin() as conn:
-        resume_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
+        resume_cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
 
     assert "gate_reviewers_json" in resume_cols
+
+
+def test_evidence_portfolio_migration_is_additive_null_and_idempotent():
+    engine = make_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE resume_versions ("
+                "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
+            )
+        )
+        conn.execute(
+            text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)")
+        )
+
+    ensure_resume_version_evidence_portfolio_columns(engine)
+    ensure_resume_version_evidence_portfolio_columns(engine)
+
+    with engine.begin() as conn:
+        cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
+        values = conn.execute(
+            text(
+                "SELECT evidence_portfolio_json, evidence_portfolio_status "
+                "FROM resume_versions"
+            )
+        ).one()
+
+    assert {"evidence_portfolio_json", "evidence_portfolio_status"}.issubset(cols)
+    assert values == (None, None)
 
 
 def test_agent_metadata_migration_is_additive_and_idempotent():
@@ -144,8 +202,12 @@ def test_agent_metadata_migration_is_additive_and_idempotent():
     init_db(engine)
     with engine.begin() as conn:
         jobs = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
-        resumes = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
-        covers = [row[1] for row in conn.execute(text("PRAGMA table_info(cover_letters)"))]
+        resumes = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
+        covers = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(cover_letters)"))
+        ]
         table = conn.execute(
             text(
                 "SELECT name FROM sqlite_master WHERE type='table' "

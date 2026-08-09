@@ -1,4 +1,5 @@
 import re
+import json
 from pathlib import Path
 
 import typst
@@ -40,6 +41,7 @@ def render_pdf(
     min_zoom: float = 0.82,
     zoom_step: float = 0.03,
     root: str | Path | None = None,
+    highlight_terms: list[str] | None = None,
 ) -> Path:
     """Compile the Typst template with the resume JSON into a PDF file.
 
@@ -57,11 +59,14 @@ def render_pdf(
 
     zoom = 1.0
     while True:
+        sys_inputs = {"data": data, "zoom": f"{zoom:.4f}"}
+        if highlight_terms is not None:
+            sys_inputs["highlight_terms"] = json.dumps(highlight_terms)
         typst.compile(
             str(source),
             output=str(out),
             root=str(resolved_root),
-            sys_inputs={"data": data, "zoom": f"{zoom:.4f}"},
+            sys_inputs=sys_inputs,
         )
         if fit_pages is None or _page_count(out) <= fit_pages or zoom <= min_zoom:
             return out

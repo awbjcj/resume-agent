@@ -35,6 +35,7 @@ from resume_agent.tailor.agents import (
     model_for_tier,
 )
 from resume_agent.tailor.match_plan import build_match_plan_agent
+from resume_agent.tailor.portfolio_planner import build_evidence_portfolio_agent
 from resume_agent.tailor.panel import MERGED_ADVISORY
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import Canonicalizer
@@ -56,6 +57,7 @@ class TailorBundle:
     reviewers: Mapping[str, Runner]
     revision: Runner
     match_plan: Runner | None = None
+    evidence_portfolio: Runner | None = None
 
 
 @dataclass
@@ -74,7 +76,9 @@ def build_discovery_bundle(
     else:
         extract = build_extract_agent(
             skill=registry.require(
-                "job-description-analyzer", family=AgentFamily.JOB_ANALYSIS, use="extract"
+                "job-description-analyzer",
+                family=AgentFamily.JOB_ANALYSIS,
+                use="extract",
             )
         )
         fit = build_fit_agent(
@@ -178,16 +182,24 @@ def build_tailor_bundle(
             skill=selected_revision,
         )
 
+    portfolio_enabled = bool(
+        getattr(config, "portfolio_enabled", False)
+        or getattr(config, "evidence_portfolio_enabled", False)
+        or getattr(config, "match_plan_enabled", False)
+    )
+    portfolio_agent = (
+        build_evidence_portfolio_agent(style_guide=style_guide)
+        if portfolio_enabled
+        else None
+    )
     return TailorBundle(
         tailor=tailor,
         reviser=reviser,
         reviewers=reviewers,
         revision=revision,
-        match_plan=(
-            build_match_plan_agent(style_guide=style_guide)
-            if getattr(config, "match_plan_enabled", False)
-            else None
-        ),
+        # One-release runtime alias for adapters that still read `match_plan`.
+        match_plan=portfolio_agent,
+        evidence_portfolio=portfolio_agent,
     )
 
 
@@ -203,7 +215,11 @@ def build_cover_letter_bundle(
             revision=build_cover_letter_revision_agent(),
         )
     registry = registry or CareerSkillRegistry.from_settings(get_settings())
-    selected_name = skill.value if isinstance(skill, CoverLetterSkillName) else skill or "cover-letter-generator"
+    selected_name = (
+        skill.value
+        if isinstance(skill, CoverLetterSkillName)
+        else skill or "cover-letter-generator"
+    )
     selected = registry.require(
         selected_name, family=AgentFamily.COVER_LETTER, use="draft"
     )
@@ -215,16 +231,28 @@ def build_cover_letter_bundle(
 
 
 __all__ = [
-    "DiscoveryBundle", "TailorBundle", "CoverLetterBundle",
-    "build_discovery_bundle", "build_tailor_bundle", "build_cover_letter_bundle",
+    "DiscoveryBundle",
+    "TailorBundle",
+    "CoverLetterBundle",
+    "build_discovery_bundle",
+    "build_tailor_bundle",
+    "build_cover_letter_bundle",
     "build_url_extract_agent",
     # re-exported so tests can monkeypatch them on this module:
-    "build_extract_agent", "build_fit_agent", "build_relevance_agent",
+    "build_extract_agent",
+    "build_fit_agent",
+    "build_relevance_agent",
     "build_industry_classifier",
-    "build_tailor_agent", "build_reviser_agent", "build_revision_agent", "build_reviewer_agent",
+    "build_tailor_agent",
+    "build_reviser_agent",
+    "build_revision_agent",
+    "build_reviewer_agent",
     "build_merged_advisory_agent",
     "build_match_plan_agent",
-    "build_cover_letter_agent", "build_cover_letter_reviser_agent",
+    "build_evidence_portfolio_agent",
+    "build_cover_letter_agent",
+    "build_cover_letter_reviser_agent",
     "build_cover_letter_revision_agent",
-    "model_for_tier", "build_skill_canonicalizer",
+    "model_for_tier",
+    "build_skill_canonicalizer",
 ]

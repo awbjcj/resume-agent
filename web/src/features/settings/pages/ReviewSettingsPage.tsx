@@ -28,7 +28,14 @@ type ReviewerEntry = NonNullable<ReviewDoc["reviewers"]>[number];
 
 const MODEL_TIERS = ["cheap", "mid", "premium"];
 
-const DEFAULT_LENGTH_BUDGET = { maxExperiences: 4, maxBulletsPerRole: 5, targetTotalBullets: 20 };
+const DEFAULT_LENGTH_BUDGET = {
+  maxExperiences: 4,
+  maxProjects: 2,
+  maxEvidenceOwners: 5,
+  maxBulletsPerRole: 5,
+  maxBulletsPerProject: 3,
+  targetTotalBullets: 20,
+};
 
 export function ReviewSettingsPage() {
   const { data } = useConfig("/api/config/review");
@@ -88,6 +95,22 @@ export function ReviewSettingsPage() {
             </FieldLabel>
             <FieldDescription>
               Faster and cheaper; turn off to run each advisory reviewer separately.
+            </FieldDescription>
+          </div>
+        </Field>
+        <Field orientation="horizontal">
+          <Switch
+            id="evidence-portfolio-enabled"
+            checked={draft.evidencePortfolioEnabled}
+            onCheckedChange={(checked: boolean) =>
+              setDraft({ ...draft, evidencePortfolioEnabled: checked })}
+          />
+          <div className="flex flex-col gap-0.5">
+            <FieldLabel htmlFor="evidence-portfolio-enabled">
+              Evidence portfolio planning
+            </FieldLabel>
+            <FieldDescription>
+              Experimental: rank requirements and freeze the work and project evidence used by the writer.
             </FieldDescription>
           </div>
         </Field>
@@ -190,7 +213,7 @@ export function ReviewSettingsPage() {
           </div>
         </Field>
         {draft.lengthBudget && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field>
               <FieldLabel htmlFor="maxExperiences">Max experiences</FieldLabel>
               <Input id="maxExperiences" type="number" value={draft.lengthBudget.maxExperiences}
@@ -200,11 +223,35 @@ export function ReviewSettingsPage() {
                 })} />
             </Field>
             <Field>
+              <FieldLabel htmlFor="maxProjects">Max projects</FieldLabel>
+              <Input id="maxProjects" type="number" value={draft.lengthBudget.maxProjects}
+                onChange={(e) => setDraft({
+                  ...draft,
+                  lengthBudget: { ...draft.lengthBudget!, maxProjects: Number(e.target.value || 0) },
+                })} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="maxEvidenceOwners">Max work and project entries</FieldLabel>
+              <Input id="maxEvidenceOwners" type="number" value={draft.lengthBudget.maxEvidenceOwners}
+                onChange={(e) => setDraft({
+                  ...draft,
+                  lengthBudget: { ...draft.lengthBudget!, maxEvidenceOwners: Number(e.target.value || 0) },
+                })} />
+            </Field>
+            <Field>
               <FieldLabel htmlFor="maxBulletsPerRole">Max bullets per role</FieldLabel>
               <Input id="maxBulletsPerRole" type="number" value={draft.lengthBudget.maxBulletsPerRole}
                 onChange={(e) => setDraft({
                   ...draft,
                   lengthBudget: { ...draft.lengthBudget!, maxBulletsPerRole: Number(e.target.value || 0) },
+                })} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="maxBulletsPerProject">Max bullets per project</FieldLabel>
+              <Input id="maxBulletsPerProject" type="number" value={draft.lengthBudget.maxBulletsPerProject}
+                onChange={(e) => setDraft({
+                  ...draft,
+                  lengthBudget: { ...draft.lengthBudget!, maxBulletsPerProject: Number(e.target.value || 0) },
                 })} />
             </Field>
             <Field>

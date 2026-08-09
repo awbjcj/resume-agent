@@ -92,6 +92,18 @@ def test_target_defaults_to_resume():
     assert case.target == "resume"
 
 
+def test_portfolio_expectation_roundtrips():
+    case = load_case(Path("evals/cases/case_10_keyword_mismatch.json"))
+
+    assert case.portfolio_expectation is not None
+    assert case.portfolio_expectation.label == "safe_alias"
+    assert case.portfolio_expectation.mandatory_evidence_ids == [
+        "e1b1",
+        "e1b2",
+        "e1b3",
+    ]
+
+
 def test_cover_letter_target_roundtrips(tmp_path: Path):
     data = _case_dict()
     data["target"] = "cover_letter"

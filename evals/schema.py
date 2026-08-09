@@ -24,6 +24,20 @@ class Trap(BaseModel):
     probe_provenance: NonEmptyStr
 
 
+class PortfolioExpectation(BaseModel):
+    label: Literal[
+        "competing_roles",
+        "stronger_projects",
+        "career_change",
+        "overlong_profile",
+        "direct_vs_adjacent",
+        "safe_alias",
+    ]
+    mandatory_evidence_ids: list[NonEmptyStr] = Field(min_length=1)
+    forbidden_evidence_ids: list[NonEmptyStr] = Field(default_factory=list)
+    forbidden_highlight_terms: list[NonEmptyStr] = Field(default_factory=list)
+
+
 class EvalCase(BaseModel):
     id: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
     profile_ref: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
@@ -32,6 +46,7 @@ class EvalCase(BaseModel):
     criteria: JobCriteria | None = None
     traps: list[Trap] = Field(default_factory=list)
     must_cite: list[str] = Field(default_factory=list)
+    portfolio_expectation: PortfolioExpectation | None = None
     rubric: list[NonEmptyStr] = Field(min_length=1)
 
     @model_validator(mode="after")

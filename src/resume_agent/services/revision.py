@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlmodel import Session
 
 from resume_agent.models.resume import ResumeContent
+from resume_agent.models.evidence_portfolio import EvidencePortfolio
 from resume_agent.career_skills.provenance import append_skill_use
 from resume_agent.profile.store import load_facts
 from resume_agent.render.export import export_job_artifacts
@@ -15,7 +16,11 @@ from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.revision import apply_revision, compose_user_revision_input
 from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.tailor.verdict import aggregate
-from resume_agent.tracking.repository import get_job, get_resume_version, save_resume_version
+from resume_agent.tracking.repository import (
+    get_job,
+    get_resume_version,
+    save_resume_version,
+)
 from resume_agent.tracking.tables import ResumeVersion
 
 from resume_agent.tenancy.paths import (
@@ -62,7 +67,9 @@ def revise_resume_version(
 
     if re_review and provenance.passed and job is not None:
         assert config is not None
-        critiques.extend(run_panel(revised, facts, job.jd_text, config, bundle.reviewers))
+        critiques.extend(
+            run_panel(revised, facts, job.jd_text, config, bundle.reviewers)
+        )
         verdict = aggregate(critiques, config)
         review_score = verdict.aggregate_score
         fact_check_passed = verdict.gate_passed
@@ -71,6 +78,11 @@ def revise_resume_version(
     skill_uses = parent.skill_uses_json
     if getattr(bundle.revision, "run_meta", None) is not None:
         skill_uses = append_skill_use(skill_uses, bundle.revision, "revised")
+    inherited_portfolio = None
+    if parent.evidence_portfolio_json is not None:
+        inherited_portfolio = EvidencePortfolio.model_validate(
+            parent.evidence_portfolio_json
+        ).model_copy(update={"status": "inherited"})
     child = save_resume_version(
         session,
         ResumeVersion(
@@ -80,6 +92,14 @@ def revise_resume_version(
             review_score=review_score,
             fact_check_passed=fact_check_passed,
             critique_json=[c.model_dump(mode="json") for c in critiques],
+            evidence_portfolio_json=(
+                inherited_portfolio.model_dump(mode="json")
+                if inherited_portfolio is not None
+                else None
+            ),
+            evidence_portfolio_status=(
+                inherited_portfolio.status if inherited_portfolio is not None else None
+            ),
             gate_reviewers_json=gate_reviewers,
             origin="revision",
             instruction=instruction,

@@ -1,7 +1,11 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec, load_review_config
+from resume_agent.tailor.review_config import (
+    ReviewConfig,
+    ReviewerSpec,
+    load_review_config,
+)
 
 
 def test_defaults():
@@ -23,7 +27,9 @@ def test_load_from_yaml(tmp_path):
     cfg = load_review_config(f)
     assert cfg.max_rounds == 2
     assert len(cfg.reviewers) == 2
-    assert cfg.reviewers[0] == ReviewerSpec(name="fact-check", gate=True, weight=0, model_tier="premium")
+    assert cfg.reviewers[0] == ReviewerSpec(
+        name="fact-check", gate=True, weight=0, model_tier="premium"
+    )
     assert cfg.reviewers[1].gate is False  # default
 
 
@@ -39,6 +45,22 @@ def test_fast_mode_fields_default_to_legacy_behavior():
     assert cfg.merged_advisory is False
     assert cfg.tailor_tier == "premium"
     assert cfg.reviser_tier == "premium"
+    assert cfg.evidence_portfolio_enabled is False
+
+
+def test_evidence_portfolio_flag_accepts_the_one_release_legacy_alias():
+    canonical = ReviewConfig(evidence_portfolio_enabled=True)
+    legacy = ReviewConfig(match_plan_enabled=True)
+
+    assert canonical.evidence_portfolio_enabled is True
+    assert canonical.match_plan_enabled is True
+    assert legacy.evidence_portfolio_enabled is True
+    assert legacy.match_plan_enabled is True
+
+
+def test_evidence_portfolio_flag_rejects_conflicting_alias_values():
+    with pytest.raises(ValidationError, match="conflicts with legacy"):
+        ReviewConfig(evidence_portfolio_enabled=True, match_plan_enabled=False)
 
 
 def test_fast_mode_fields_load_from_yaml(tmp_path):

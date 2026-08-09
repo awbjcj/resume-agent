@@ -21,8 +21,7 @@ def _surfaced_record(result: CaseResult) -> RoundRecord:
         if round_.round_num == result.surfaced_round_num:
             return round_
     raise ValueError(
-        f"case {result.case_id!r} surfaced unknown round "
-        f"{result.surfaced_round_num}"
+        f"case {result.case_id!r} surfaced unknown round {result.surfaced_round_num}"
     )
 
 
@@ -53,18 +52,14 @@ def render_report(
         "",
         "| case | quality | trap_ok | prov_ok | cite_ok | budget_ok | "
         "bullets/target | rounds | surfaced_round | needs_attention | regressed | "
-        "calls | total_tokens | cost |",
+        "portfolio | mandatory | forbidden | calls | total_tokens | cost |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | "
-        "--- | --- | --- |",
+        "--- | --- | --- | --- | --- | --- |",
     ]
     for result in results:
         rounds_used, _ = convergence(result.rounds)
         surfaced = _surfaced_record(result)
-        cost = (
-            "unknown"
-            if result.usage.cost is None
-            else f"${result.usage.cost:.4f}"
-        )
+        cost = "unknown" if result.usage.cost is None else f"${result.usage.cost:.4f}"
         lines.append(
             f"| {result.case_id} | {result.final_quality} | "
             f"{result.trap_avoided} | {result.provenance_ok} | "
@@ -73,16 +68,36 @@ def render_report(
             f"{config.length_budget.target_total_bullets} | "
             f"{rounds_used} | {result.surfaced_round_num} | "
             f"{result.needs_attention} | {result.regressed} | "
+            f"{result.portfolio_status or 'off'} | "
+            f"{result.portfolio_mandatory_hits}/{result.portfolio_mandatory_total} | "
+            f"{len(result.portfolio_forbidden_hits)} | "
             f"{result.usage.calls} | "
             f"{result.usage.total_tokens} | {cost} |"
         )
 
-    mean_quality = round(mean(result.final_quality for result in results)) if results else 0
+    mean_quality = (
+        round(mean(result.final_quality for result in results)) if results else 0
+    )
     total_tokens = sum(result.usage.total_tokens for result in results)
     cache_read_tokens = sum(result.usage.cache_read_tokens for result in results)
     cache_write_tokens = sum(result.usage.cache_write_tokens for result in results)
     known_cost = sum(result.usage.cost or 0.0 for result in results)
     unknown_costs = sum(result.usage.cost is None for result in results)
+    mandatory_hits = sum(result.portfolio_mandatory_hits for result in results)
+    mandatory_total = sum(result.portfolio_mandatory_total for result in results)
+    forbidden_hits = sum(len(result.portfolio_forbidden_hits) for result in results)
+    portfolio_results = [
+        result for result in results if result.portfolio_status is not None
+    ]
+    fallback_count = sum(
+        result.portfolio_status == "deterministic_fallback"
+        for result in portfolio_results
+    )
+    elapsed_seconds = sum(
+        sum((round_.phase_seconds or {}).values())
+        for result in results
+        for round_ in result.rounds
+    )
     probes = [probe for result in results for probe in result.probes]
     completed_probes = [probe for probe in probes if probe.detected is not None]
     recall = fact_check_trap_recall(probes)
@@ -96,8 +111,17 @@ def render_report(
         f"**Total tokens:** {total_tokens}",
         f"**Cache read tokens:** {cache_read_tokens}",
         f"**Cache write tokens:** {cache_write_tokens}",
-        f"**Known provider cost:** ${known_cost:.4f} "
-        f"({unknown_costs} unknown case(s))",
+        f"**Known provider cost:** ${known_cost:.4f} ({unknown_costs} unknown case(s))",
+        f"**Portfolio mandatory-evidence recall:** "
+        f"{mandatory_hits / mandatory_total:.2%} ({mandatory_hits}/{mandatory_total})"
+        if mandatory_total
+        else "**Portfolio mandatory-evidence recall:** not labeled",
+        f"**Portfolio forbidden claims/highlights:** {forbidden_hits}",
+        f"**Portfolio fallback rate:** "
+        f"{fallback_count / len(portfolio_results):.2%} ({fallback_count}/{len(portfolio_results)})"
+        if portfolio_results
+        else "**Portfolio fallback rate:** feature off",
+        f"**Measured tailoring latency:** {elapsed_seconds:.2f}s",
         "",
         "## Reviewer panel_agreement",
         "",
@@ -134,7 +158,9 @@ def render_report(
     if recall_rankable:
         assert recall is not None
         ranked.append(("fact-check", recall))
-    weakest = min(ranked, key=lambda item: item[1])[0] if ranked else "insufficient data"
+    weakest = (
+        min(ranked, key=lambda item: item[1])[0] if ranked else "insufficient data"
+    )
     lines += ["", f"**Weakest reviewer:** {weakest}", ""]
     if metadata:
         lines += [

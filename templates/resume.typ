@@ -84,6 +84,17 @@
   ks
 }
 
+// New portfolio-backed renders provide the validated core terms separately.
+// A missing input means a legacy version, which retains the previous visual
+// behavior of highlighting all selected skills/project tech. An explicit empty
+// list means the portfolio found no evidence-backed core term to emphasize.
+#let supplied-highlight-terms = sys.inputs.at("highlight_terms", default: none)
+#let highlight-keywords = if supplied-highlight-terms == none {
+  tech-keywords
+} else {
+  json(bytes(supplied-highlight-terms))
+}
+
 #let maybe-join(values) = values.filter(x => x != none and x != "").join(", ")
 
 // Two-row subheading: row1 is bold (entity — dates), row2 is italic
@@ -127,7 +138,7 @@
   if summary != none and summary != "" {
     [
       #section-title("Summary")
-      #highlight(summary, tech-keywords)
+      #highlight(summary, highlight-keywords)
     ]
   }
 }
@@ -144,7 +155,7 @@
           e.title,
           e.at("location", default: none),
         )
-        #for b in e.at("bullets", default: ()) [ - #highlight(b.text, tech-keywords) ]
+        #for b in e.at("bullets", default: ()) [ - #highlight(b.text, highlight-keywords) ]
         #v(0.2em)
       ]
     ]
@@ -189,7 +200,7 @@
         *#p.name* \
         #if tech.len() > 0 [*#tech.join("  |  ")* \ ]
         #if p.at("description", default: none) != none [#p.description \ ]
-        #for b in p.at("bullets", default: ()) [ - #highlight(b.text, tech-keywords) ]
+        #for b in p.at("bullets", default: ()) [ - #highlight(b.text, highlight-keywords) ]
         #v(0.2em)
       ]
     ]
@@ -202,7 +213,7 @@
     [
       #section-title("Skills")
       #for (category, items) in skills [
-        *#category:* #items.map(s => s.name).join(", ") \
+        *#category:* #items.map(s => highlight(s.name, highlight-keywords)).join(", ") \
       ]
     ]
   }
@@ -276,8 +287,8 @@
           vol.at("role", default: none),
           none,
         )
-        #if vol.at("description", default: none) != none [ #highlight(vol.description, tech-keywords) \ ]
-        #for b in vol.at("bullets", default: ()) [ - #highlight(b.text, tech-keywords) ]
+        #if vol.at("description", default: none) != none [ #highlight(vol.description, highlight-keywords) \ ]
+        #for b in vol.at("bullets", default: ()) [ - #highlight(b.text, highlight-keywords) ]
         #v(0.2em)
       ]
     ]

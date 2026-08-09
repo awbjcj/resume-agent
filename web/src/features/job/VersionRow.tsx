@@ -20,6 +20,7 @@ import {
   latestArtifactRun,
   runCreatedArtifact,
 } from "./artifact-runs";
+import { EvidencePortfolioDisclosure } from "./EvidencePortfolioDisclosure";
 
 type ResumeVersion = components["schemas"]["ResumeVersionOut"] & {
   origin?: string;
@@ -229,6 +230,10 @@ export function VersionRow({
           </Button>
         </div>
       ) : null}
+      <EvidencePortfolioDisclosure
+        versionId={version.id}
+        available={version.hasEvidencePortfolio}
+      />
     </li>
   );
 }

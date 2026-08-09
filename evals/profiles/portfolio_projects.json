@@ -1,0 +1,43 @@
+{
+  "contact": {"name": "Riley Chen", "email": "riley@example.com"},
+  "summary": "Software engineer focused on applied machine learning.",
+  "experience": [
+    {
+      "id": "e_general",
+      "company": "General Systems",
+      "title": "Software Engineer",
+      "start": "2024",
+      "current": true,
+      "bullets": [
+        {"id": "e_general_b1", "text": "Maintained internal account administration screens."}
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "id": "p_ml",
+      "name": "Feature Store Platform",
+      "description": "Designed a Python feature pipeline for machine-learning inference.",
+      "tech": ["Python", "FastAPI"],
+      "highlights": [
+        "Cut feature computation time 55% through vectorized processing.",
+        "Published versioned feature APIs used by three prediction services."
+      ],
+      "start": "2025",
+      "end": "2026"
+    },
+    {
+      "id": "p_blog",
+      "name": "Personal Blog",
+      "description": "Static personal website.",
+      "tech": ["HTML"],
+      "highlights": ["Published occasional technical notes."],
+      "start": "2023",
+      "end": "2023"
+    }
+  ],
+  "skills": {
+    "languages": [{"id": "s_python", "name": "Python"}],
+    "frameworks": [{"id": "s_fastapi", "name": "FastAPI"}]
+  }
+}

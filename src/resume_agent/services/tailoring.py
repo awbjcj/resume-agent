@@ -93,7 +93,9 @@ def tailor(
         bundle.reviewers,
         bundle.reviser,
         reporter=reporter,
-        match_plan_agent=bundle.match_plan,
+        # Compatibility keyword for adapters/tests written before the
+        # evidence-portfolio rename. `tailor_jobs` resolves it as the planner.
+        match_plan_agent=bundle.evidence_portfolio or bundle.match_plan,
         skill_matrix=skill_matrix,
         cluster_map=cluster_map,
         model=model,

@@ -19,5 +19,10 @@
     }
   ],
   "must_cite": ["e1b1"],
+  "portfolio_expectation": {
+    "label": "career_change",
+    "mandatory_evidence_ids": ["e1b1", "e1b3"],
+    "forbidden_highlight_terms": ["Kubernetes"]
+  },
   "rubric": ["structure", "summary targeting", "relevance"]
 }

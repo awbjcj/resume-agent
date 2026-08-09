@@ -21,6 +21,7 @@ from resume_agent.tracking.migrate import (
     ensure_posted_at_column,
     ensure_reject_category_column,
     ensure_resume_version_attempt_columns,
+    ensure_resume_version_evidence_portfolio_columns,
     ensure_resume_version_gate_reviewers_column,
     ensure_resume_version_revision_columns,
     ensure_url_index,
@@ -31,7 +32,7 @@ def _ensure_sqlite_dir(url: str) -> None:
     """Create the parent directory for a sqlite file URL if needed."""
     prefix = "sqlite:///"
     if url.startswith(prefix):
-        db_path = url[len(prefix):]
+        db_path = url[len(prefix) :]
         if db_path and db_path != ":memory:":
             Path(db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
 
@@ -92,6 +93,7 @@ def init_db(engine: Engine) -> None:
     ensure_resume_version_revision_columns(engine)
     ensure_resume_version_attempt_columns(engine)
     ensure_resume_version_gate_reviewers_column(engine)
+    ensure_resume_version_evidence_portfolio_columns(engine)
     ensure_cover_letter_revision_columns(engine)
     ensure_application_cover_letter_id_column(engine)
     ensure_agent_metadata_columns(engine)

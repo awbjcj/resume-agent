@@ -1,0 +1,27 @@
+{
+  "id": "case_13_competing_roles",
+  "profile_ref": "portfolio_competing",
+  "jd_text": "Backend Engineer. Required: Python and PostgreSQL. Build high-volume data APIs and improve database performance.",
+  "criteria": {
+    "seniority": "mid",
+    "tech_stack": ["Python", "PostgreSQL"],
+    "must_have_skills": ["Python", "PostgreSQL"]
+  },
+  "traps": [
+    {
+      "id": "kubernetes-missing",
+      "kind": "missing_skill",
+      "forbidden_terms": ["Kubernetes"],
+      "description": "The profile has no Kubernetes evidence.",
+      "probe_claim": "Deployed the Python services to Kubernetes.",
+      "probe_provenance": "e_backend_b1"
+    }
+  ],
+  "must_cite": ["e_backend_b1", "e_backend_b2"],
+  "portfolio_expectation": {
+    "label": "competing_roles",
+    "mandatory_evidence_ids": ["e_backend_b1", "e_backend_b2"],
+    "forbidden_evidence_ids": ["e_support_b1"]
+  },
+  "rubric": ["evidence selection", "relevance", "concision"]
+}
