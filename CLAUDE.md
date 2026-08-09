@@ -621,10 +621,15 @@ reaches the run result, the log, and the dashboard.
   It is handed `ats-keyword` and `hiring-manager` critiques, which are entirely
   about fit, so without the JD it was being asked to fix complaints it could not
   read. `compose_revise_input` orders stable context (profile, JD) before
-  volatile context (current resume, this round's critiques) to keep the stable
-  composition order intact across rounds. A revision builds on `_best_base` — the
-  best round so far by (gate-clean, score) — not the last, so a regressed round
-  cannot become the base for the next one.
+  volatile context (revision base, latest reviewed attempt, latest verdict) to
+  keep the stable composition order intact across rounds. A revision builds on
+  `_best_base` — the best round so far by (gate-clean, score) — not the last, so
+  a regressed round cannot become the base for the next one. Feedback is always
+  taken from the immediately preceding round, however; if that round is not the
+  selected base, its resume is included as diagnostic-only context. Reviewer
+  pass/fail, score, summary, issues, suggestions, and failed-gate names all reach
+  the reviser, and a failed gate with no issue detail remains an explicit
+  blocking item rather than disappearing from the loop.
 - **A citation slip is not a quality round.** A round that fails _only_ on
   provenance ids does not consume one of `max_rounds`, up to
   `ReviewConfig.provenance_retry_budget` (default 1; `0` reproduces the old

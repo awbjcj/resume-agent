@@ -656,9 +656,176 @@ def test_revision_builds_on_the_best_round_not_the_last():
 
     assert [r.verdict.aggregate_score for r in rounds] == [80, 60, 90]
     # Round 2 (score 60) regressed from round 1 (score 80), so the third round's
-    # revision is composed from round 1's content, not round 2's.
-    assert "draft" in reviser.received[1]
-    assert "revision-1" not in reviser.received[1]
+    # revision is composed from round 1's content. Round 2 is present only as
+    # diagnostic context for its latest review feedback.
+    base_section, latest_section = reviser.received[1].split(
+        "LATEST REVIEWED ATTEMPT", maxsplit=1
+    )
+    assert '"name":"draft"' in base_section
+    assert "revision-1" not in base_section
+    assert '"name":"revision-1"' in latest_section
+
+
+class _ClosedLoopFactCheck:
+    def __init__(self):
+        self.calls = 0
+
+    def run(self, prompt):
+        self.calls += 1
+        if self.calls == 2:
+            return _Result(
+                ReviewCritique(
+                    reviewer="fact-check",
+                    score=0,
+                    passed=False,
+                    summary="Round two introduced an unsupported metric",
+                    issues=[
+                        ReviewIssue(
+                            severity=Severity.blocking,
+                            message="Remove the unsupported 400-hour claim",
+                        )
+                    ],
+                )
+            )
+        return _Result(
+            ReviewCritique(
+                reviewer="fact-check",
+                score=100,
+                passed=True,
+                summary=f"fact-check-clean-round-{self.calls}",
+            )
+        )
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+class _ClosedLoopScores:
+    def __init__(self):
+        self.scores = iter([80, 90, 96])
+
+    def run(self, prompt):
+        score = next(self.scores)
+        return _Result(
+            ReviewCritique(
+                reviewer="ats-keyword",
+                score=score,
+                passed=score >= 95,
+                summary=f"ats-score-{score}",
+            )
+        )
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+class _ClosedLoopDraft:
+    def __init__(self, name):
+        self.name = name
+
+    def run(self, prompt):
+        return _Result(ResumeContent(contact=Contact(name=self.name)))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+class _ClosedLoopReviser:
+    def __init__(self, prefix):
+        self.prefix = prefix
+        self.calls = 0
+        self.received = []
+
+    def run(self, prompt):
+        self.received.append(prompt)
+        self.calls += 1
+        return _Result(
+            ResumeContent(contact=Contact(name=f"{self.prefix}-{self.calls}"))
+        )
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def _closed_loop_config():
+    return ReviewConfig(
+        max_rounds=3,
+        score_threshold=95,
+        early_stop_on_regression=False,
+        reviewers=[
+            ReviewerSpec(name="fact-check", gate=True, weight=0),
+            ReviewerSpec(name="ats-keyword", weight=1),
+        ],
+    )
+
+
+def test_regressed_round_uses_best_base_with_latest_fact_check_feedback():
+    reviser = _ClosedLoopReviser("revision")
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        _closed_loop_config(),
+        _ClosedLoopDraft("safe-draft"),
+        {
+            "fact-check": _ClosedLoopFactCheck(),
+            "ats-keyword": _ClosedLoopScores(),
+        },
+        reviser,
+    )
+
+    assert [round_.verdict.aggregate_score for round_ in rounds] == [80, 90, 96]
+    third_round_prompt = reviser.received[1]
+    assert "REVISION BASE RESUME (round 1)" in third_round_prompt
+    assert '"name":"safe-draft"' in third_round_prompt
+    assert (
+        "LATEST REVIEWED ATTEMPT (round 2; diagnostic reference only)"
+        in third_round_prompt
+    )
+    assert '"name":"revision-1"' in third_round_prompt
+    assert "Failed gates: fact-check" in third_round_prompt
+    assert "Round two introduced an unsupported metric" in third_round_prompt
+    assert "Remove the unsupported 400-hour claim" in third_round_prompt
+    assert "ats-score-90" in third_round_prompt
+    assert "fact-check-clean-round-1" not in third_round_prompt
+
+
+def test_async_regressed_round_uses_best_base_with_latest_fact_check_feedback():
+    import asyncio
+
+    from resume_agent.tailor.workflow import arun_tailor_review
+
+    reviser = _ClosedLoopReviser("async-revision")
+
+    async def go():
+        return await arun_tailor_review(
+            "jd",
+            JobCriteria(),
+            ProfileFacts(contact=Contact(name="Ada")),
+            _closed_loop_config(),
+            _ClosedLoopDraft("async-safe-draft"),
+            {
+                "fact-check": _ClosedLoopFactCheck(),
+                "ats-keyword": _ClosedLoopScores(),
+            },
+            reviser,
+            sem=asyncio.Semaphore(4),
+        )
+
+    rounds = asyncio.run(go())
+
+    assert [round_.verdict.aggregate_score for round_ in rounds] == [80, 90, 96]
+    third_round_prompt = reviser.received[1]
+    assert "REVISION BASE RESUME (round 1)" in third_round_prompt
+    assert '"name":"async-safe-draft"' in third_round_prompt
+    assert (
+        "LATEST REVIEWED ATTEMPT (round 2; diagnostic reference only)"
+        in third_round_prompt
+    )
+    assert '"name":"async-revision-1"' in third_round_prompt
+    assert "Failed gates: fact-check" in third_round_prompt
+    assert "Round two introduced an unsupported metric" in third_round_prompt
+    assert "Remove the unsupported 400-hour claim" in third_round_prompt
 
 
 def test_revision_base_is_unchanged_when_rounds_improve():

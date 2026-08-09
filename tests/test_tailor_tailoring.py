@@ -6,6 +6,7 @@ from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFact
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, ReviewIssue
 from resume_agent.tailor.tailoring import (
+    RevisionRoundContext,
     compose_revise_input,
     compose_tailor_input,
     revise,
@@ -47,7 +48,9 @@ def test_compose_tailor_input_includes_budget_when_given():
         "Backend role",
         JobCriteria(),
         _facts(),
-        LengthBudget(max_experiences=3, max_bullets_per_role=4, target_total_bullets=15),
+        LengthBudget(
+            max_experiences=3, max_bullets_per_role=4, target_total_bullets=15
+        ),
     )
     assert "single page" in text
     assert "3" in text
@@ -88,6 +91,64 @@ def test_compose_revise_input_includes_issue_messages():
     assert "Tighten the summary around backend systems" in text
 
 
+def test_compose_revise_input_keeps_complete_latest_round_feedback():
+    base = ResumeContent(contact=Contact(name="safe-base"))
+    latest = ResumeContent(contact=Contact(name="regressed-attempt"))
+    critiques = [
+        ReviewCritique(
+            reviewer="fact-check",
+            score=0,
+            passed=False,
+            summary="Unsupported quantified claim remains",
+        ),
+        ReviewCritique(
+            reviewer="ats-keyword",
+            score=74,
+            passed=False,
+            summary="Core platform evidence is still too weak",
+            issues=[
+                ReviewIssue(
+                    severity=Severity.major,
+                    message="Missing platform ownership evidence",
+                    suggestion="Emphasize the supported migration fact",
+                )
+            ],
+            suggestions=["Lead with the supported migration result"],
+        ),
+    ]
+
+    text = compose_revise_input(
+        base,
+        critiques,
+        _facts(),
+        "Backend role",
+        round_context=RevisionRoundContext(
+            base_round_num=1,
+            feedback_round_num=2,
+            reviewed_content=latest,
+            passed=False,
+            gate_passed=False,
+            aggregate_score=74,
+            failed_gates=("fact-check",),
+        ),
+    )
+
+    assert "REVISION BASE RESUME (round 1)" in text
+    assert "LATEST REVIEWED ATTEMPT (round 2; diagnostic reference only)" in text
+    assert '"name":"regressed-attempt"' in text
+    assert "Latest round: FAILED; gate status: FAILED; aggregate score: 74/100" in text
+    assert "Failed gates: fact-check" in text
+    assert (
+        "[fact-check] FAILED; score=0/100; summary=Unsupported quantified claim remains"
+        in text
+    )
+    assert "[fact-check] FAILED with no detailed issues supplied" in text
+    assert "Core platform evidence is still too weak" in text
+    assert "Missing platform ownership evidence" in text
+    assert "Emphasize the supported migration fact" in text
+    assert "Lead with the supported migration result" in text
+
+
 def test_compose_revise_input_includes_budget_when_given():
     rc = ResumeContent(contact=Contact(name="Ada"))
     text = compose_revise_input(rc, [], _facts(), "Backend role", LengthBudget())
@@ -122,7 +183,9 @@ def _facts_with_unrenderable_skill():
 
 
 def test_writer_input_omits_facts_the_gate_forbids_rendering():
-    text = compose_tailor_input("Backend role", JobCriteria(), _facts_with_unrenderable_skill())
+    text = compose_tailor_input(
+        "Backend role", JobCriteria(), _facts_with_unrenderable_skill()
+    )
     assert "forbidden" not in text
     assert "Stakeholder Communication" not in text
     assert "Python" in text  # renderable skills still offered

@@ -32,6 +32,7 @@ from resume_agent.tailor.provenance import PROVENANCE_REVIEWER, provenance_criti
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.skill_naming import skill_naming_critique
 from resume_agent.tailor.tailoring import (
+    RevisionRoundContext,
     arevise,
     atailor,
     compose_revise_input,
@@ -268,6 +269,39 @@ def _best_base(rounds: list[TailorRound]) -> TailorRound:
     )
 
 
+def _compose_next_revision_input(
+    rounds: list[TailorRound],
+    profile_facts: ProfileFacts,
+    jd_text: str,
+    config: ReviewConfig,
+    coverage: str,
+    portfolio: EvidencePortfolio | None,
+) -> str:
+    """Build from the safest round while acting on the latest round's verdict."""
+    latest = rounds[-1]
+    base = _best_base(rounds)
+    config_gates = {reviewer.name for reviewer in config.reviewers if reviewer.gate}
+    failed_gates = tuple(failing_gate_names(latest.verdict.critiques, config_gates))
+    return compose_revise_input(
+        base.content,
+        latest.verdict.critiques,
+        profile_facts,
+        jd_text,
+        config.length_budget,
+        coverage,
+        portfolio,
+        round_context=RevisionRoundContext(
+            base_round_num=base.round_num,
+            feedback_round_num=latest.round_num,
+            reviewed_content=latest.content,
+            passed=latest.verdict.passed,
+            gate_passed=latest.verdict.gate_passed,
+            aggregate_score=latest.verdict.aggregate_score,
+            failed_gates=failed_gates,
+        ),
+    )
+
+
 def run_tailor_review(
     jd_text: str,
     criteria: JobCriteria,
@@ -349,14 +383,12 @@ def run_tailor_review(
         if config.early_stop_on_regression and _has_regressed(rounds):
             break
         started = time.monotonic()
-        base = _best_base(rounds)
         content = revise(
-            compose_revise_input(
-                base.content,
-                base.verdict.critiques,
+            _compose_next_revision_input(
+                rounds,
                 profile_facts,
                 jd_text,
-                config.length_budget,
+                config,
                 coverage,
                 portfolio,
             ),
@@ -450,14 +482,12 @@ async def arun_tailor_review(
         if config.early_stop_on_regression and _has_regressed(rounds):
             break
         started = time.monotonic()
-        base = _best_base(rounds)
         content = await arevise(
-            compose_revise_input(
-                base.content,
-                base.verdict.critiques,
+            _compose_next_revision_input(
+                rounds,
                 profile_facts,
                 jd_text,
-                config.length_budget,
+                config,
                 coverage,
                 portfolio,
             ),

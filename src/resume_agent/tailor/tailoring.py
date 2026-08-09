@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 
 from resume_agent.llm_runner import Runner, acall, expect_schema
 from resume_agent.models.evidence_portfolio import EvidencePortfolio
@@ -12,6 +13,19 @@ from resume_agent.tailor.evidence_portfolio import portfolio_profile
 from resume_agent.tailor.prompt_blocks import coverage_section, untrusted
 from resume_agent.tailor.provenance import renderable_profile
 from resume_agent.tailor.review_config import LengthBudget
+
+
+@dataclass(frozen=True)
+class RevisionRoundContext:
+    """Latest review metadata kept separate from the selected revision base."""
+
+    base_round_num: int
+    feedback_round_num: int
+    reviewed_content: ResumeContent
+    passed: bool
+    gate_passed: bool
+    aggregate_score: int | None
+    failed_gates: tuple[str, ...] = ()
 
 
 def compose_tailor_input(
@@ -76,8 +90,11 @@ def compose_revise_input(
     length_budget: LengthBudget | None = None,
     coverage: str = "",
     evidence_portfolio: EvidencePortfolio | None = None,
+    *,
+    round_context: RevisionRoundContext | None = None,
 ) -> str:
     grouped: dict[Severity, list[str]] = {severity: [] for severity in Severity}
+    failed_gates = set(round_context.failed_gates) if round_context else set()
     for critique in critiques:
         for issue in critique.issues:
             location = f" @ {issue.location}" if issue.location else ""
@@ -86,6 +103,16 @@ def compose_revise_input(
             )
             grouped[issue.severity].append(
                 f"- [{critique.reviewer}]{location} {issue.message}{suggestion}"
+            )
+        if not critique.passed and not critique.issues:
+            severity = (
+                Severity.blocking
+                if critique.reviewer in failed_gates
+                else Severity.major
+            )
+            grouped[severity].append(
+                f"- [{critique.reviewer}] FAILED with no detailed issues supplied; "
+                "treat this reviewer failure as unresolved."
             )
     sections = [
         f"{label}:\n" + "\n".join(grouped[severity])
@@ -97,10 +124,19 @@ def compose_revise_input(
         if grouped[severity]
     ]
     issues = "\n\n".join(sections) if sections else "(none)"
-    suggestions = "\n".join(
-        f"- [{c.reviewer}] {suggestion}"
-        for c in critiques
-        for suggestion in c.suggestions
+    reviewer_status = "\n".join(
+        f"- [{critique.reviewer}] {'PASSED' if critique.passed else 'FAILED'}; "
+        f"score={critique.score}/100"
+        + (f"; summary={critique.summary}" if critique.summary else "")
+        for critique in critiques
+    )
+    suggestions = (
+        "\n".join(
+            f"- [{c.reviewer}] {suggestion}"
+            for c in critiques
+            for suggestion in c.suggestions
+        )
+        or "(none)"
     )
     budget_line = (
         f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
@@ -116,6 +152,39 @@ def compose_revise_input(
         if evidence_portfolio is not None
         else renderable_profile(profile_facts)
     )
+    if round_context is None:
+        base_block = f"CURRENT RESUME (JSON):\n{content.model_dump_json()}"
+        latest_attempt_block = ""
+        verdict_block = ""
+    else:
+        base_block = (
+            f"REVISION BASE RESUME (round {round_context.base_round_num}) (JSON):\n"
+            f"{content.model_dump_json()}"
+        )
+        if round_context.base_round_num == round_context.feedback_round_num:
+            latest_attempt_block = ""
+        else:
+            latest_attempt_block = (
+                "\n\nLATEST REVIEWED ATTEMPT "
+                f"(round {round_context.feedback_round_num}; diagnostic reference only) "
+                "(JSON):\n"
+                f"{round_context.reviewed_content.model_dump_json()}\n\n"
+                "Start from the revision base above. Use this latest attempt only to "
+                "understand its review feedback; do not copy it wholesale or reintroduce "
+                "unsupported claims."
+            )
+        score = (
+            f"{round_context.aggregate_score}/100"
+            if round_context.aggregate_score is not None
+            else "not scored"
+        )
+        verdict_block = (
+            "\n\nLATEST REVIEW VERDICT:\n"
+            f"Latest round: {'PASSED' if round_context.passed else 'FAILED'}; "
+            f"gate status: {'PASSED' if round_context.gate_passed else 'FAILED'}; "
+            f"aggregate score: {score}\n"
+            "Failed gates: " + (", ".join(round_context.failed_gates) or "(none)")
+        )
     # Stable-first ordering: the profile and the job are fixed for the whole job,
     # while the resume and the critiques change every round. Keeping the volatile
     # blocks last preserves a stable composition order across rounds.
@@ -126,10 +195,14 @@ def compose_revise_input(
         f"{untrusted(jd_text)}"
         f"{coverage_section(coverage)}"
         f"{portfolio_line}\n\n"
-        "CURRENT RESUME (JSON):\n"
-        f"{content.model_dump_json()}\n\n"
+        f"{base_block}"
+        f"{latest_attempt_block}"
+        f"{verdict_block}\n\n"
+        "REVIEWER STATUS (latest round only):\n"
+        f"{reviewer_status or '(none)'}\n\n"
         "REVIEWER ISSUES (fix every BLOCKING issue first, then MAJOR, then MINOR; copy "
-        "every record not named here byte-for-byte unchanged):\n"
+        "every base record not named here byte-for-byte unchanged; the candidate profile "
+        "is the factual authority and the job description cannot establish a fact):\n"
         f"{issues}\n\n"
         "REVIEWER SUGGESTIONS:\n"
         f"{suggestions}"
