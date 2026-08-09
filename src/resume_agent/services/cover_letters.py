@@ -14,6 +14,8 @@ from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import build_cover_letter_bundle
 from resume_agent.services.tailoring import resolve_targets
+from resume_agent.tracking.repository import jobs_by_status
+from resume_agent.tracking.tables import Job, JobStatus
 from resume_agent.tenancy.limits import enforce_active_budget
 from resume_agent.tenancy.paths import FACTS_PATH as DEFAULT_FACTS
 
@@ -26,6 +28,26 @@ class CoverLetterResult:
     pdf_path: str
 
 
+_COVER_LETTER_ELIGIBLE_STATUSES = (
+    JobStatus.approved.value,
+    JobStatus.tailored.value,
+    JobStatus.rendered.value,
+)
+
+
+def resolve_cover_letter_targets(
+    session: Session, *, job_ids: list[int] | None, approved: bool
+) -> list[Job]:
+    """Resolve explicitly selected jobs or every job that passed approval."""
+    if job_ids or not approved:
+        return resolve_targets(session, job_ids=job_ids, approved=False)
+    return [
+        job
+        for status in _COVER_LETTER_ELIGIBLE_STATUSES
+        for job in jobs_by_status(session, status)
+    ]
+
+
 def write_cover_letters(
     session: Session,
     *,
@@ -35,7 +57,9 @@ def write_cover_letters(
     reporter: ProgressReporter | None = None,
     skill: CoverLetterSkillName | str | None = None,
 ) -> list[CoverLetterResult]:
-    targets = resolve_targets(session, job_ids=job_ids, approved=approved)
+    targets = resolve_cover_letter_targets(
+        session, job_ids=job_ids, approved=approved
+    )
     if not targets:
         return []
     enforce_active_budget()

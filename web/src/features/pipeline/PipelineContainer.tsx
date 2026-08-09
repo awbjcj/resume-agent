@@ -64,7 +64,10 @@ export function PipelineContainer() {
   const runs = useBulkRun();
   const redoRun = useRedoRun();
   const redoJobIds = useSelectedJobIds("pipeline", selection, filter, redoOpen);
-  const launchJobs = useApprovedLaunchJobs(launchMode !== null);
+  const launchJobs = useApprovedLaunchJobs(
+    launchMode !== null,
+    launchMode === "coverLetter",
+  );
   const [view, setView] = useViewMode("pipeline-view");
   // Rows loaded by each open stage section, mirrored here so bulk selection and
   // the metric row can reason across the whole board.

@@ -7,16 +7,17 @@ import type { LaunchJob } from "./LaunchDialog";
 
 type PipelineItem = components["schemas"]["PipelineItem"];
 
-export function useApprovedLaunchJobs(enabled: boolean) {
+export function useApprovedLaunchJobs(enabled: boolean, includePostApproval = false) {
+  const statuses = includePostApproval ? "approved,tailored,rendered" : "approved";
   const query = useQuery({
-    queryKey: ["launch-jobs", "approved"],
+    queryKey: ["launch-jobs", statuses],
     enabled,
     queryFn: () =>
       fetchAllPages<PipelineItem>((page) =>
         api.GET("/api/pipeline", {
           params: {
             query: {
-              status: "approved",
+              status: statuses,
               sortBy: "recency",
               page,
               pageSize: 200,

@@ -41,4 +41,27 @@ describe("useApprovedLaunchJobs", () => {
     expect(pages).toEqual([1, 2]);
     expect(result.current.jobs.map((job) => job.jobId)).toEqual([1, 2]);
   });
+
+  it("loads approved and completed tailoring stages for cover letters", async () => {
+    let requestedStatus: string | null = null;
+    server.use(
+      http.get("/api/pipeline", ({ request }) => {
+        requestedStatus = new URL(request.url).searchParams.get("status");
+        return HttpResponse.json({
+          data: [
+            { jobId: 1, company: "Approved Co", title: "One", status: "approved" },
+            { jobId: 2, company: "Tailored Co", title: "Two", status: "tailored" },
+            { jobId: 3, company: "Rendered Co", title: "Three", status: "rendered" },
+          ],
+          pagination: { page: 1, pageSize: 200, totalItems: 3, totalPages: 1 },
+          total: 3,
+        });
+      }),
+    );
+
+    const { result } = renderHook(() => useApprovedLaunchJobs(true, true), { wrapper });
+
+    await waitFor(() => expect(result.current.jobs).toHaveLength(3));
+    expect(requestedStatus).toBe("approved,tailored,rendered");
+  });
 });

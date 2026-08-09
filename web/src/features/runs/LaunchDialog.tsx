@@ -117,7 +117,9 @@ function LaunchDialogBody({
           {mode === "tailor" ? "Tailor resumes" : "Write cover letters"}
         </DialogTitle>
         <DialogDescription>
-          Choose which approved jobs to process. All jobs start selected.
+          {mode === "tailor"
+            ? "Choose which approved jobs to process. All jobs start selected."
+            : "Choose jobs that have passed approval, including tailored or rendered jobs. All jobs start selected."}
         </DialogDescription>
       </DialogHeader>
 
@@ -143,13 +145,21 @@ function LaunchDialogBody({
       ) : jobs.length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>No approved jobs</EmptyTitle>
-            <EmptyDescription>Approve a job before launching this workflow.</EmptyDescription>
+            <EmptyTitle>
+              {mode === "tailor" ? "No approved jobs" : "No eligible jobs"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {mode === "tailor"
+                ? "Approve a job before launching this workflow."
+                : "Approve a job before writing its cover letter."}
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
         <FieldSet>
-          <FieldLegend variant="label">Approved jobs</FieldLegend>
+          <FieldLegend variant="label">
+            {mode === "tailor" ? "Approved jobs" : "Eligible jobs"}
+          </FieldLegend>
           <FieldGroup className="max-h-72 overflow-y-auto pr-1">
             {jobs.map((job) => {
               const inputId = `launch-job-${job.jobId}`;
