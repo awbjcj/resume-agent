@@ -11,7 +11,12 @@ from sqlmodel import Session
 from resume_agent.api.deps import get_engine, get_run_manager, get_session
 from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.schemas.match_gap import MatchGapOut, RefreshClustersIn
+from resume_agent.api.schemas.match_gap import (
+    MatchGapOut,
+    RefreshClustersIn,
+    RestoreSkillsIn,
+    RestoreSkillsOut,
+)
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
 from resume_agent.models.profile import Contact, ProfileFacts
@@ -78,6 +83,14 @@ def build_match_gap_payload(session: Session) -> MatchGapOut:
             "suggestion_statuses": suggestion_statuses(
                 session, graph, profile_skill_tokens(facts)
             ),
+            "retired_skills": [
+                {
+                    "key": key,
+                    "reason": retired.reason,
+                    "retired_at": retired.retired_at,
+                }
+                for key, retired in sorted(taxonomy_state.retired_skills.items())
+            ],
         }
     )
 
@@ -119,6 +132,7 @@ def refresh_match_gap_clusters(
     def work(reporter):
         from resume_agent.services.match_gap import refresh_clusters
         from resume_agent.tracking.canonicalize import (
+            build_escalation_themer_agent,
             build_incremental_canonicalizer_agent,
             build_incremental_themer_agent,
         )
@@ -143,6 +157,7 @@ def refresh_match_gap_clusters(
                 extra_tokens=extra_tokens,
                 corrections_path=resolve_tenant_path(corrections_file_path()),
                 skill_keys=scoped_keys,
+                escalation_themer=build_escalation_themer_agent(),
             )
         result["matrixRegenerated"] = _regenerate_bound_matrix(facts, facts_path)
         return result
@@ -154,6 +169,22 @@ def refresh_match_gap_clusters(
         singleton_key=f"refreshClusters:{fingerprint}",
         meta={"skillKeys": sorted(scoped_keys) if scoped_keys is not None else None},
     )
+
+
+@router.post("/match-gap/restore-skills", response_model=RestoreSkillsOut)
+def restore_match_gap_skills(body: RestoreSkillsIn):
+    """Un-retire skills so the next regroup treats them as real again.
+
+    Deliberately synchronous: this only edits the taxonomy state file, so a run
+    record and an SSE stream would be pure ceremony.
+    """
+
+    from resume_agent.services.match_gap import restore_skills
+
+    result = restore_skills(
+        path=resolve_tenant_path(_CLUSTER_PATH), skill_keys=set(body.skill_keys)
+    )
+    return RestoreSkillsOut.model_validate(result)
 
 
 @router.post("/match-gap/maintain-taxonomy", response_model=RunOut, status_code=202)

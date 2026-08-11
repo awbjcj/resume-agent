@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping
 
 from resume_agent.concurrency import gather_isolated
@@ -33,6 +33,11 @@ class ClassificationFailure:
     phase: ClassificationPhase
     tokens: tuple[str, ...]
     message: str
+    # Whether the provider call itself failed, or it answered and the answer
+    # was unusable.  These need opposite handling -- an outage must be retried,
+    # a refusal must not be -- and the message text cannot carry the difference
+    # because it is the raised exception's own text whenever one was raised.
+    kind: Literal["call", "output"] = "output"
 
 
 @dataclass(frozen=True)
@@ -50,6 +55,8 @@ class ClassificationOutcome:
     additions: ClusterMap
     failures: tuple[ClassificationFailure, ...]
     metrics: ClassificationMetrics
+    not_skills: frozenset[str] = frozenset()
+    fallback_categories: dict[str, str] = field(default_factory=dict)
 
 
 class ReconcileError(RuntimeError):
@@ -75,6 +82,11 @@ class _DomainIntent:
 class _DomainBatchResult:
     assignments: dict[str, _DomainIntent]
     failed_tokens: frozenset[str]
+    not_skills: frozenset[str] = frozenset()
+    # Best-effort category for a token the model described but would not commit
+    # to.  It is never an assignment; it only tells a caller where a placement
+    # floor should put the token instead of dropping it back into the backlog.
+    fallback_categories: dict[str, str] = field(default_factory=dict)
 
 
 class _FlightMeter:
@@ -143,11 +155,19 @@ def _project_domains(
     existing_domain_ids: set[str],
     full_categories: set[str],
     allowed_domain_ids: set[str] | None = None,
+    enforce_candidates: bool = True,
+    category_of: Mapping[str, str] | None = None,
 ) -> _DomainBatchResult:
     if not isinstance(content, IncrementalSkillDomains):
         return _DomainBatchResult({}, frozenset(batch))
     assignments: dict[str, _DomainIntent] = {}
     rejected: set[str] = set()
+    fallback_categories: dict[str, str] = {}
+    not_skills = {
+        token
+        for raw in content.not_skills
+        if (token := normalize_skill(raw)) in batch
+    }
 
     for group in content.domains:
         if not isinstance(group, IncrementalDomainGroup):
@@ -158,21 +178,26 @@ def _project_domains(
         confidence = group.confidence
         reason = group.reason.strip()
         valid_mode = (existing_id is None) != (new_label is None)
-        if existing_id is not None and (
-            new_category is not None
-            or existing_id not in existing_domain_ids
-            or (
-                allowed_domain_ids is not None and existing_id not in allowed_domain_ids
-            )
-        ):
-            valid_mode = False
+        if existing_id is not None:
+            if existing_id not in existing_domain_ids:
+                valid_mode = False
+            # Retrieval narrows what the model is shown; it may only *forbid*
+            # what it did not surface when it is trustworthy.  Under a degraded
+            # or lexical fallback the candidate slice is close to arbitrary, so
+            # vetoing against it rejects correct reuse far more often than it
+            # catches a hunch -- measured on a real taxonomy, the slice reached
+            # barely a third of existing domains.
+            elif (
+                enforce_candidates
+                and allowed_domain_ids is not None
+                and existing_id not in allowed_domain_ids
+            ):
+                valid_mode = False
         if new_label is not None:
             if not any(char.isalnum() for char in new_label):
                 valid_mode = False
             if new_category not in SKILL_GROUPS or new_category in full_categories:
                 valid_mode = False
-        if confidence != "high":
-            valid_mode = False
         intent = _DomainIntent(
             existing_domain_id=existing_id,
             new_label=new_label,
@@ -181,8 +206,20 @@ def _project_domains(
             reason=reason,
         )
         members = [normalize_skill(raw) for raw in group.skills]
-        authoritative = [token for token in members if token in batch]
-        if not valid_mode:
+        authoritative = [
+            token for token in members if token in batch and token not in not_skills
+        ]
+        # Keep the model's category even when the group itself is refused, so a
+        # placement floor can honour the intent rather than guessing "other".
+        hinted = (
+            new_category
+            if new_category in SKILL_GROUPS
+            else (category_of or {}).get(existing_id or "", "")
+        )
+        if hinted in SKILL_GROUPS:
+            for token in authoritative:
+                fallback_categories.setdefault(token, hinted)
+        if not valid_mode or confidence != "high":
             rejected.update(authoritative)
             continue
         for token in authoritative:
@@ -194,8 +231,13 @@ def _project_domains(
 
     for token in rejected:
         assignments.pop(token, None)
-    failed = batch - assignments.keys()
-    return _DomainBatchResult(assignments, frozenset(failed))
+    failed = batch - assignments.keys() - not_skills
+    return _DomainBatchResult(
+        assignments,
+        frozenset(failed),
+        frozenset(not_skills),
+        fallback_categories,
+    )
 
 
 def _category_context(
@@ -324,6 +366,7 @@ async def classify_incrementally(
     allow_category_growth: bool = False,
     min_new_domain_members: int = 1,
     category_hints: Mapping[str, str] | None = None,
+    enforce_candidates: bool = True,
 ) -> ClassificationOutcome:
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
@@ -410,6 +453,7 @@ async def classify_incrementally(
                         "canonicalize",
                         tuple(batch),
                         str(result.error or "model call failed"),
+                        kind="call",
                     )
                 )
                 continue
@@ -497,6 +541,8 @@ async def classify_incrementally(
     domain_backlog = demanded_canonicals - existing.domain_of.keys()
     domain_batches = _shard(domain_backlog, batch_size)
     domain_assignments: dict[str, _DomainIntent] = {}
+    not_skills: frozenset[str] = frozenset()
+    fallback_categories: dict[str, str] = {}
     existing_domain_ids = set(existing.domain_label) | set(existing.domain_of.values())
     base_category_context = _category_context(existing, category_cap)
     soft_target_by_slug = {
@@ -581,6 +627,8 @@ async def classify_incrementally(
             existing_domain_ids=existing_domain_ids,
             full_categories=full_categories,
             allowed_domain_ids=allowed_domain_ids,
+            enforce_candidates=enforce_candidates,
+            category_of=existing.category_of,
         )
 
     if domain_batches:
@@ -604,11 +652,17 @@ async def classify_incrementally(
             if not result.ok or result.value is None:
                 failures.append(
                     ClassificationFailure(
-                        "domain", tuple(batch), str(result.error or "model call failed")
+                        "domain",
+                        tuple(batch),
+                        str(result.error or "model call failed"),
+                        kind="call",
                     )
                 )
                 continue
             domain_assignments.update(result.value.assignments)
+            not_skills |= result.value.not_skills
+            for token, category in result.value.fallback_categories.items():
+                fallback_categories.setdefault(token, category)
             if result.value.failed_tokens:
                 failures.append(
                     ClassificationFailure(
@@ -673,4 +727,6 @@ async def classify_incrementally(
         ),
         failures=tuple(failures),
         metrics=metrics,
+        not_skills=not_skills,
+        fallback_categories=fallback_categories,
     )

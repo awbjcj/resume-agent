@@ -29,6 +29,21 @@ class RefreshClustersIn(CamelModel):
         return self
 
 
+class RestoreSkillsIn(RefreshClustersIn):
+    """Retired keys to return to the backlog; same bounds as a scoped regroup."""
+
+
+class RestoreSkillsOut(CamelModel):
+    restored: int
+    restored_skills: list[str]
+
+
+class RetiredSkillOut(CamelModel):
+    key: str
+    reason: str
+    retired_at: datetime
+
+
 class GroupingStatusOut(CamelModel):
     state: Literal["uncertain", "failed"]
     reason: str
@@ -112,3 +127,7 @@ class MatchGapOut(CamelModel):
     taxonomy_maintenance_due: bool = True
     unassigned_count: int = 0
     taxonomy_undo_available: bool = False
+    # Tokens the classifier judged to name no skill.  They are excluded from the
+    # backlog, so they must stay visible somewhere or a wrong call is invisible
+    # and irreversible.
+    retired_skills: list[RetiredSkillOut] = Field(default_factory=list)

@@ -65,6 +65,19 @@ class GroupingStatus(ExtensibleModel):
     last_attempted_at: str = Field(default_factory=_utcnow)
 
 
+class RetiredSkill(ExtensibleModel):
+    """A token the classifier judged to name no skill at all.
+
+    Retirement is a terminal disposition, not a failure: without one, a phrase
+    like ``8+ years of machine learning experience`` re-enters the backlog on
+    every run and buys another LLM call to reach the same answer.  It is always
+    reversible, so a real skill wrongly retired is one click from returning.
+    """
+
+    reason: str = "not a skill"
+    retired_at: str = Field(default_factory=_utcnow)
+
+
 class TaxonomyGeneration(ExtensibleModel):
     """A pre-maintenance snapshot that can restore one generated generation."""
 
@@ -79,6 +92,7 @@ class TaxonomyState(ExtensibleModel):
     maintenance_due: bool = True
     legacy_group_map_sha256: str | None = None
     grouping_status: dict[str, GroupingStatus] = Field(default_factory=dict)
+    retired_skills: dict[str, RetiredSkill] = Field(default_factory=dict)
     history: list[TaxonomyGeneration] = Field(default_factory=list)
 
     @property
@@ -98,6 +112,15 @@ def _clean_state(value: object) -> TaxonomyState:
         for raw_token, status in parsed.grouping_status.items()
         if (token := normalize_skill(raw_token))
     }
+    parsed.retired_skills = {
+        token: retired
+        for raw_token, retired in parsed.retired_skills.items()
+        if (token := normalize_skill(raw_token))
+    }
+    # A token cannot be both retired and awaiting classification; retirement is
+    # the terminal state, so it wins and the stale status is dropped.
+    for token in parsed.retired_skills:
+        parsed.grouping_status.pop(token, None)
     parsed.history = [
         item for item in parsed.history if item.id.strip() and item.snapshot.strip()
     ][-HISTORY_LIMIT:]
@@ -157,7 +180,10 @@ def set_grouping_statuses(
     *,
     assigned: set[str],
     statuses: dict[str, GroupingStatus],
+    retired: dict[str, str] | None = None,
 ) -> TaxonomyState:
+    """Record one grouping pass: what landed, what did not, and what retired."""
+
     state = load_taxonomy_state(cluster_path)
     for token in assigned:
         state.grouping_status.pop(normalize_skill(token), None)
@@ -165,7 +191,29 @@ def set_grouping_statuses(
         normalized = normalize_skill(token)
         if normalized:
             state.grouping_status[normalized] = status
+    for token, reason in (retired or {}).items():
+        normalized = normalize_skill(token)
+        if normalized:
+            state.retired_skills[normalized] = RetiredSkill(reason=reason)
+            state.grouping_status.pop(normalized, None)
     return save_taxonomy_state(state, cluster_path)
+
+
+def restore_retired_skills(
+    cluster_path: str | Path, tokens: set[str] | frozenset[str]
+) -> tuple[TaxonomyState, list[str]]:
+    """Return retired tokens to the backlog so the next pass reconsiders them."""
+
+    state = load_taxonomy_state(cluster_path)
+    restored = [
+        normalized
+        for token in tokens
+        if (normalized := normalize_skill(token))
+        and state.retired_skills.pop(normalized, None) is not None
+    ]
+    if not restored:
+        return state, []
+    return save_taxonomy_state(state, cluster_path), sorted(restored)
 
 
 def mark_legacy_group_map_imported(

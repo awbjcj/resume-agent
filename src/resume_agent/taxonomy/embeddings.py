@@ -26,14 +26,23 @@ from resume_agent.config import get_settings
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.state import taxonomy_root
+from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.match_gap import normalize_skill
 
 
 DEFAULT_EMBEDDING_MODEL = "openai:text-embedding-3-small"
 EMBEDDING_BATCH_SIZE = 256
+# A full taxonomy refresh embeds every canonical, every domain, and every query
+# descriptor -- tens of thousands of short strings, so dozens of provider calls.
+# They are independent, so run a bounded number concurrently rather than paying
+# the round trip serially.
+EMBEDDING_CONCURRENCY = 4
 CANONICAL_CANDIDATE_LIMIT = 8
 DOMAIN_CANDIDATE_LIMIT = 8
 PEER_CANDIDATE_LIMIT = 5
+# Weight applied to a query term matched in a candidate's supporting text
+# (a domain's member skills) rather than its identity (label + category).
+_SECONDARY_MATCH_WEIGHT = 0.6
 
 
 class EmbeddingUnavailable(RuntimeError):
@@ -190,17 +199,42 @@ def _save_cache(path: Path, cache: _EmbeddingCacheFile) -> None:
             temporary.unlink(missing_ok=True)
 
 
-async def cached_embeddings(
+@dataclass(frozen=True)
+class EmbeddingResult:
+    """Whatever could be embedded, plus why anything else could not."""
+
+    vectors: dict[str, tuple[float, ...]]
+    requested: int
+    failed: int
+    reason: str = ""
+
+    @property
+    def complete(self) -> bool:
+        return self.failed == 0
+
+
+async def embed_descriptors(
     *,
     cluster_path: str | Path,
     descriptors: Mapping[str, str],
     provider: EmbeddingProvider,
     batch_size: int = EMBEDDING_BATCH_SIZE,
-) -> dict[str, tuple[float, ...]]:
-    """Embed changed descriptors only, then atomically refresh the local cache."""
+    concurrency: int = EMBEDDING_CONCURRENCY,
+) -> EmbeddingResult:
+    """Embed changed descriptors concurrently and keep every batch that lands.
+
+    A full refresh needs dozens of provider calls.  Losing all of them because
+    the last one was rate-limited is what kept this cache permanently empty: the
+    next run then re-requested the identical work and lost it the same way, so
+    retrieval never once ran on real vectors.  Every successful shard is
+    therefore persisted regardless of its siblings, and a shard failure degrades
+    the result instead of discarding it.
+    """
 
     if batch_size < 1:
         raise ValueError("embedding batch_size must be positive")
+    if concurrency < 1:
+        raise ValueError("embedding concurrency must be positive")
     # The taxonomy contract deliberately limits provider calls to 256 short
     # descriptors.  Clamp rather than reject an injected caller so the cache
     # remains a safe boundary even outside Settings validation.
@@ -222,28 +256,69 @@ async def cached_embeddings(
         else:
             result[key] = decoded
 
-    for index in range(0, len(missing), batch_size):
-        shard = missing[index : index + batch_size]
-        vectors = await provider.embed([text for _key, text in shard])
-        if len(vectors) != len(shard):
+    shards = [
+        missing[index : index + batch_size]
+        for index in range(0, len(missing), batch_size)
+    ]
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def embed_shard(shard: list[tuple[str, str]]) -> list[list[float]]:
+        async with semaphore:
+            vectors = await provider.embed([text for _key, text in shard])
+        if len(vectors) != len(shard) or not all(vectors):
             raise EmbeddingUnavailable(
                 "embedding provider returned an incomplete batch"
             )
-        for (key, text), vector in zip(shard, vectors, strict=True):
-            if not vector:
-                raise EmbeddingUnavailable(
-                    "embedding provider returned an empty vector"
-                )
-            encoded = _EmbeddingRecord(
+        return vectors
+
+    from resume_agent.concurrency import gather_isolated
+
+    outcomes = await gather_isolated(shards, embed_shard)
+    failed = 0
+    landed = False
+    reasons: list[str] = []
+    for shard, outcome in zip(shards, outcomes, strict=True):
+        if not outcome.ok or outcome.value is None:
+            failed += len(shard)
+            reasons.append(str(outcome.error or "embedding batch failed"))
+            continue
+        landed = True
+        for (key, text), vector in zip(shard, outcome.value, strict=True):
+            cache.records[key] = _EmbeddingRecord(
                 descriptor_sha256=_descriptor_hash(text),
                 dimensions=len(vector),
                 vector_base64=_encode_vector(vector),
             )
-            cache.records[key] = encoded
             result[key] = tuple(float(value) for value in vector)
-    if missing:
+    if landed:
+        # Persist whatever arrived so the next run starts strictly closer.
         _save_cache(cache_path, cache)
-    return result
+    return EmbeddingResult(
+        vectors=result,
+        requested=len(descriptors),
+        failed=failed,
+        reason=reasons[0] if reasons else "",
+    )
+
+
+async def cached_embeddings(
+    *,
+    cluster_path: str | Path,
+    descriptors: Mapping[str, str],
+    provider: EmbeddingProvider,
+    batch_size: int = EMBEDDING_BATCH_SIZE,
+) -> dict[str, tuple[float, ...]]:
+    """Embed changed descriptors only, then atomically refresh the local cache."""
+
+    result = await embed_descriptors(
+        cluster_path=cluster_path,
+        descriptors=descriptors,
+        provider=provider,
+        batch_size=batch_size,
+    )
+    if not result.vectors and result.failed:
+        raise EmbeddingUnavailable(result.reason)
+    return result.vectors
 
 
 def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
@@ -257,33 +332,94 @@ def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
     return numerator / (left_norm * right_norm)
 
 
-def _terms(value: str) -> set[str]:
-    return {term for term in normalize_skill(value).split() if term}
+def _terms(value: str) -> frozenset[str]:
+    return frozenset(term for term in normalize_skill(value).split() if term)
 
 
-def _lexical_score(query: str, candidate: str) -> float:
-    left, right = _terms(query), _terms(candidate)
-    if not left or not right:
-        return 0.0
-    return len(left & right) / len(left | right)
+@dataclass(frozen=True)
+class _Candidate:
+    """A retrieval candidate split into what it *is* and what it contains."""
+
+    identity: frozenset[str]
+    support: frozenset[str]
+
+
+class _LexicalCorpus:
+    """IDF-weighted lexical retrieval used whenever embeddings are unavailable.
+
+    The previous fallback scored symmetric Jaccard over a whole descriptor.  A
+    domain descriptor lists up to 24 member skills, so the union denominator
+    grew with domain size and the *smallest* domain won almost every query --
+    measured against a real 155-domain taxonomy, one two-member domain ranked
+    first for 42 of 60 consecutive queries.  Scoring the query's own coverage
+    removes that size bias (a larger candidate can only ever help), and IDF
+    stops shared boilerplate from carrying a match on its own.
+    """
+
+    def __init__(self, entries: Mapping[str, tuple[str, str]]) -> None:
+        self._entries = {
+            key: _Candidate(identity=_terms(identity), support=_terms(support))
+            for key, (identity, support) in entries.items()
+        }
+        document_frequency: dict[str, int] = {}
+        for candidate in self._entries.values():
+            for term in candidate.identity | candidate.support:
+                document_frequency[term] = document_frequency.get(term, 0) + 1
+        total = len(self._entries)
+        self._unseen = math.log(1 + total)
+        self._idf = {
+            term: math.log(1 + total / (1 + count))
+            for term, count in document_frequency.items()
+        }
+
+    def _weight(self, term: str) -> float:
+        # A term no candidate holds is maximally specific: it can only ever
+        # lower a score by widening the denominator, never inflate one.
+        return self._idf.get(term, self._unseen)
+
+    def keys(self) -> list[str]:
+        return list(self._entries)
+
+    def score(self, query_terms: frozenset[str], key: str) -> float:
+        candidate = self._entries.get(key)
+        if candidate is None or not query_terms:
+            return 0.0
+        total = sum(self._weight(term) for term in query_terms)
+        if not total:
+            return 0.0
+        matched = 0.0
+        for term in query_terms:
+            if term in candidate.identity:
+                matched += self._weight(term)
+            elif term in candidate.support:
+                matched += self._weight(term) * _SECONDARY_MATCH_WEIGHT
+        return matched / total
 
 
 def _rank(
-    query: str,
+    query_terms: frozenset[str],
     *,
     query_vector: Sequence[float] | None,
-    candidates: Mapping[str, str],
+    corpus: _LexicalCorpus,
     candidate_vectors: Mapping[str, Sequence[float]],
     limit: int,
+    exclude: frozenset[str] = frozenset(),
 ) -> list[str]:
     scored = []
-    for key, descriptor in candidates.items():
+    for key in corpus.keys():
+        if key in exclude:
+            continue
         vector = candidate_vectors.get(key)
-        score = (
-            cosine_similarity(query_vector, vector)
-            if query_vector is not None and vector is not None
-            else _lexical_score(query, descriptor)
-        )
+        # Cosine and lexical coverage are different scales, so a partially
+        # embedded corpus must never rank the two against each other.  An
+        # embedded query competes only among embedded candidates; the rest wait
+        # for a warmer cache rather than being ordered by an incomparable score.
+        if query_vector is not None:
+            if vector is None:
+                continue
+            score = cosine_similarity(query_vector, vector)
+        else:
+            score = corpus.score(query_terms, key)
         scored.append((score, key))
     return [
         key
@@ -308,12 +444,42 @@ def domain_descriptor(domain_id: str, cmap: ClusterMap) -> str:
     return f"skill taxonomy category: {category}; domain: {label}; members: {', '.join(members[:24])}"
 
 
+def skill_lexical_parts(token: str, aliases: Mapping[str, str]) -> tuple[str, str]:
+    """Split a skill into its own name and the synonyms that merely support it."""
+
+    forms = sorted(alias for alias, canonical in aliases.items() if canonical == token)
+    return token, ", ".join(forms[:12])
+
+
+def domain_lexical_parts(domain_id: str, cmap: ClusterMap) -> tuple[str, str]:
+    """Split a domain into its identity (label + category) and its members.
+
+    The human category label is used rather than the slug because a query like
+    ``3d object detection`` shares real words with "AI & Machine Learning" and
+    none with ``ai-ml``.
+    """
+
+    members = sorted(
+        token for token, value in cmap.domain_of.items() if value == domain_id
+    )
+    category = cmap.category_of.get(domain_id, "other")
+    label = cmap.domain_label.get(domain_id, domain_id)
+    return f"{label} {SKILL_GROUPS.get(category, category)}", ", ".join(members[:24])
+
+
 @dataclass(frozen=True)
 class CandidateContext:
     mode: str
     canonical_candidates: dict[str, tuple[str, ...]]
     domain_candidates: dict[str, tuple[str, ...]]
     peer_candidates: dict[str, tuple[str, ...]]
+    # Why retrieval degraded, when it did.  Without this a total embedding
+    # outage is indistinguishable from a healthy run anywhere downstream.
+    reason: str = ""
+
+    @property
+    def degraded(self) -> bool:
+        return self.mode != "embedding"
 
 
 def _provider_from_settings() -> EmbeddingProvider | None:
@@ -350,25 +516,26 @@ async def build_candidate_context(
     resolved_provider = provider or _provider_from_settings()
     vectors: dict[str, tuple[float, ...]] = {}
     mode = "lexical"
+    reason = "no embedding provider is configured"
     if resolved_provider is not None:
-        try:
-            descriptors = {
-                **{
-                    f"skill:{key}": value
-                    for key, value in canonical_descriptors.items()
-                },
-                **{f"domain:{key}": value for key, value in domain_descriptors.items()},
-                **{f"query:{key}": value for key, value in new_descriptors.items()},
-            }
-            vectors = await cached_embeddings(
-                cluster_path=cluster_path,
-                descriptors=descriptors,
-                provider=resolved_provider,
-                batch_size=get_settings().skill_embedding_batch_size,
-            )
-            mode = "embedding"
-        except EmbeddingUnavailable:
-            vectors = {}
+        descriptors = {
+            **{f"skill:{key}": value for key, value in canonical_descriptors.items()},
+            **{f"domain:{key}": value for key, value in domain_descriptors.items()},
+            **{f"query:{key}": value for key, value in new_descriptors.items()},
+        }
+        outcome = await embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors=descriptors,
+            provider=resolved_provider,
+            batch_size=get_settings().skill_embedding_batch_size,
+        )
+        vectors = outcome.vectors
+        if outcome.complete:
+            mode, reason = "embedding", ""
+        elif outcome.vectors:
+            mode, reason = "partial", outcome.reason
+        else:
+            mode, reason = "lexical", outcome.reason
 
     canonical_vectors = {
         key: vectors[f"skill:{key}"]
@@ -380,42 +547,56 @@ async def build_candidate_context(
         for key in domain_ids
         if f"domain:{key}" in vectors
     }
+    peer_vectors = {
+        key: vectors[f"query:{key}"] for key in normalized if f"query:{key}" in vectors
+    }
+    # One corpus per axis, built once.  Peers exclude the query at rank time
+    # rather than rebuilding an n-1 corpus for every one of n tokens.
+    canonical_corpus = _LexicalCorpus(
+        {token: skill_lexical_parts(token, existing.aliases) for token in canonical_ids}
+    )
+    domain_corpus = _LexicalCorpus(
+        {
+            domain_id: domain_lexical_parts(domain_id, existing)
+            for domain_id in domain_ids
+        }
+    )
+    peer_corpus = _LexicalCorpus(
+        {token: skill_lexical_parts(token, existing.aliases) for token in normalized}
+    )
     canonical_candidates: dict[str, tuple[str, ...]] = {}
     domain_candidates: dict[str, tuple[str, ...]] = {}
     peer_candidates: dict[str, tuple[str, ...]] = {}
-    for token, descriptor in new_descriptors.items():
+    for token in new_descriptors:
         query_vector = vectors.get(f"query:{token}")
+        query_terms = _terms(token)
         canonical_candidates[token] = tuple(
-            key
-            for key in _rank(
-                descriptor,
+            _rank(
+                query_terms,
                 query_vector=query_vector,
-                candidates=canonical_descriptors,
+                corpus=canonical_corpus,
                 candidate_vectors=canonical_vectors,
                 limit=CANONICAL_CANDIDATE_LIMIT,
+                exclude=frozenset({token}),
             )
-            if key != token
         )
         domain_candidates[token] = tuple(
             _rank(
-                descriptor,
+                query_terms,
                 query_vector=query_vector,
-                candidates=domain_descriptors,
+                corpus=domain_corpus,
                 candidate_vectors=domain_vectors,
                 limit=DOMAIN_CANDIDATE_LIMIT,
             )
         )
-        peers = {key: value for key, value in new_descriptors.items() if key != token}
-        peer_vectors = {
-            key: vectors[f"query:{key}"] for key in peers if f"query:{key}" in vectors
-        }
         peer_candidates[token] = tuple(
             _rank(
-                descriptor,
+                query_terms,
                 query_vector=query_vector,
-                candidates=peers,
+                corpus=peer_corpus,
                 candidate_vectors=peer_vectors,
                 limit=PEER_CANDIDATE_LIMIT,
+                exclude=frozenset({token}),
             )
         )
     return CandidateContext(
@@ -423,6 +604,7 @@ async def build_candidate_context(
         canonical_candidates=canonical_candidates,
         domain_candidates=domain_candidates,
         peer_candidates=peer_candidates,
+        reason=reason,
     )
 
 
@@ -443,36 +625,40 @@ async def domain_neighbor_candidates(
     vectors: dict[str, tuple[float, ...]] = {}
     mode = "lexical"
     if resolved_provider is not None:
-        try:
-            vectors = await cached_embeddings(
-                cluster_path=cluster_path,
-                descriptors={
-                    f"maintenance-domain:{key}": value
-                    for key, value in descriptors.items()
-                },
-                provider=resolved_provider,
-                batch_size=get_settings().skill_embedding_batch_size,
-            )
-            mode = "embedding"
-        except EmbeddingUnavailable:
-            vectors = {}
+        outcome = await embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors={
+                f"maintenance-domain:{key}": value
+                for key, value in descriptors.items()
+            },
+            provider=resolved_provider,
+            batch_size=get_settings().skill_embedding_batch_size,
+        )
+        vectors = outcome.vectors
+        mode = (
+            "embedding"
+            if outcome.complete
+            else ("partial" if outcome.vectors else "lexical")
+        )
     candidate_vectors = {
         key: vectors[f"maintenance-domain:{key}"]
         for key in domain_ids
         if f"maintenance-domain:{key}" in vectors
     }
+    corpus = _LexicalCorpus(
+        {domain_id: domain_lexical_parts(domain_id, cmap) for domain_id in domain_ids}
+    )
     result: dict[str, tuple[str, ...]] = {}
-    for domain_id, descriptor in descriptors.items():
-        alternatives = {
-            key: value for key, value in descriptors.items() if key != domain_id
-        }
+    for domain_id in domain_ids:
+        identity, _support = domain_lexical_parts(domain_id, cmap)
         result[domain_id] = tuple(
             _rank(
-                descriptor,
+                _terms(identity),
                 query_vector=candidate_vectors.get(domain_id),
-                candidates=alternatives,
+                corpus=corpus,
                 candidate_vectors=candidate_vectors,
                 limit=limit,
+                exclude=frozenset({domain_id}),
             )
         )
     return mode, result

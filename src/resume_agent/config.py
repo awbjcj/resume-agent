@@ -93,6 +93,14 @@ class Settings(BaseSettings):
     # defensively so a hand-built Settings object cannot exceed this limit.
     skill_embedding_batch_size: int = Field(default=256, ge=1, le=256)
     taxonomy_maintenance_max_churn: float = Field(default=0.20, ge=0.01, le=1.0)
+    # Skills a first classification pass could not place are retried against the
+    # whole taxonomy with the premium model.  That is deliberately the expensive
+    # path, so it is bounded per run; anything past the bound keeps its recorded
+    # status and escalates on the next run, which still converges.
+    taxonomy_escalation_max_skills: int = Field(default=300, ge=0, le=5000)
+    # Every demanded skill ends a refresh with a home.  Disable only to restore
+    # the historical behaviour where an uncertain skill stays unassigned.
+    taxonomy_placement_floor: bool = True
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
     career_skill_root: Path = Path("skills")
