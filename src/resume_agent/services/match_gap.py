@@ -276,7 +276,10 @@ def refresh_clusters(
         escalation_cap = settings.taxonomy_escalation_max_skills
 
         async def classify_both() -> tuple[
-            ClassificationOutcome, ClassificationOutcome | None, ClusterMap
+            ClassificationOutcome,
+            ClassificationOutcome | None,
+            ClusterMap,
+            set[str],
         ]:
             first = await classify_incrementally(
                 demanded_tokens=first_pass,
@@ -295,11 +298,16 @@ def refresh_clusters(
                 enforce_candidates=enforce_candidates,
             )
             after_first = merge_cluster_map(existing, first.additions)
-            leftovers = sorted(
+            pending = sorted(
                 _unassigned(after_first, target_raw) - set(first.not_skills)
-            )[:escalation_cap]
+            )
+            # Escalation is the expensive path, so it is bounded per run.  What
+            # the bound defers is not "unplaceable" -- it simply has not been
+            # tried yet, so it must not be swept up by the placement floor.  It
+            # keeps its status and escalates first on the next run.
+            leftovers, deferred = pending[:escalation_cap], set(pending[escalation_cap:])
             if not leftovers:
-                return first, None, after_first
+                return first, None, after_first, deferred
             # These are canonical already; pinning identity aliases keeps the
             # escalation pass out of synonym reconciliation entirely.
             for canonical in leftovers:
@@ -321,14 +329,19 @@ def refresh_clusters(
                 min_new_domain_members=1,
                 category_hints=category_hints,
             )
-            return first, second, merge_cluster_map(after_first, second.additions)
+            return (
+                first,
+                second,
+                merge_cluster_map(after_first, second.additions),
+                deferred,
+            )
 
-        outcome, escalated, merged = asyncio.run(
+        outcome, escalated, merged, deferred = asyncio.run(
             run_with_cleanup(
                 classify_both(),
                 canonicalizer,
                 themer,
-                *( (escalation_themer,) if escalation_themer is not None else () ),
+                *((escalation_themer,) if escalation_themer is not None else ()),
             )
         )
         not_skills = set(outcome.not_skills) | set(
@@ -353,7 +366,7 @@ def refresh_clusters(
             merged,
             target_raw=target_raw,
             not_skills=not_skills,
-            call_failed=call_failed,
+            call_failed=call_failed | deferred,
             hints={
                 **outcome.fallback_categories,
                 **(escalated.fallback_categories if escalated else {}),
