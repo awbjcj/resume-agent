@@ -111,6 +111,7 @@ def test_refresh_clusters_run_completes(monkeypatch, tmp_path):
         canonicalize, "build_incremental_canonicalizer_agent", _AsyncCanonicalizer
     )
     monkeypatch.setattr(canonicalize, "build_incremental_themer_agent", _AsyncThemer)
+    monkeypatch.setattr(canonicalize, "build_escalation_themer_agent", _AsyncThemer)
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
 
@@ -136,6 +137,7 @@ def test_refresh_cluster_launches_are_coalesced_while_active(monkeypatch, tmp_pa
         lambda: canonicalizer,
     )
     monkeypatch.setattr(canonicalize, "build_incremental_themer_agent", _AsyncThemer)
+    monkeypatch.setattr(canonicalize, "build_escalation_themer_agent", _AsyncThemer)
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
 
@@ -158,6 +160,7 @@ def test_refresh_regenerates_matrix_from_bound_facts(monkeypatch, tmp_path):
         canonicalize, "build_incremental_canonicalizer_agent", _AsyncCanonicalizer
     )
     monkeypatch.setattr(canonicalize, "build_incremental_themer_agent", _AsyncThemer)
+    monkeypatch.setattr(canonicalize, "build_escalation_themer_agent", _AsyncThemer)
     facts_path = tmp_path / "facts.json"
     cluster_path = tmp_path / "cluster_map.json"
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(facts_path))
@@ -190,6 +193,7 @@ def test_scoped_refresh_processes_only_visible_unassigned_keys(monkeypatch, tmp_
         canonicalize, "build_incremental_canonicalizer_agent", _AsyncCanonicalizer
     )
     monkeypatch.setattr(canonicalize, "build_incremental_themer_agent", _AsyncThemer)
+    monkeypatch.setattr(canonicalize, "build_escalation_themer_agent", _AsyncThemer)
     cluster_path = tmp_path / "cluster_map.json"
     save_cluster_map(
         ClusterMap(
@@ -217,9 +221,11 @@ def test_scoped_refresh_processes_only_visible_unassigned_keys(monkeypatch, tmp_
     assert record["result"]["processedSkillKeys"] == ["k8s"]
     assert record["result"]["skippedAlreadyAssigned"] == ["react"]
     assert record["result"]["skippedUnknown"] == ["missing"]
+    # The scoped key now ends the refresh with a home rather than an
+    # explanation: one pass declining is no longer a terminal outcome.
     k8s = next(skill for skill in graph["skills"] if skill["key"] == "k8s")
-    assert k8s["groupingStatus"]["state"] == "uncertain"
-    assert k8s["groupingStatus"]["reason"]
+    assert k8s["groupingStatus"] is None
+    assert k8s["domainId"] is not None
     after = load_cluster_map(cluster_path)
     assert after.domain_of["react"] == "frontend"
     assert "react" not in after.aliases or after.aliases["react"] == "react"
@@ -233,6 +239,7 @@ def test_different_scoped_refresh_sets_are_not_coalesced(monkeypatch, tmp_path):
         lambda: _AsyncCanonicalizer(release),
     )
     monkeypatch.setattr(canonicalize, "build_incremental_themer_agent", _AsyncThemer)
+    monkeypatch.setattr(canonicalize, "build_escalation_themer_agent", _AsyncThemer)
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
     app = create_app(db_url="sqlite://", runs_root=tmp_path)
@@ -285,3 +292,45 @@ def test_maintenance_and_undo_runs_are_exposed_by_the_match_gap_api(
     assert maintained["result"]["changed"] is True
     assert restored["state"] == "done"
     assert load_cluster_map(cluster_path).domain_label["frontend"] == "Frontend"
+
+
+def test_retired_skills_are_visible_and_restorable(monkeypatch, tmp_path):
+    """A retirement leaves the backlog, so it must stay visible and reversible.
+
+    Retired tokens are subtracted from demand entirely; without a surface they
+    would be both invisible and permanent.
+    """
+
+    from resume_agent.taxonomy.state import load_taxonomy_state, set_grouping_statuses
+
+    cluster_path = tmp_path / "cluster_map.json"
+    save_cluster_map(ClusterMap(aliases={"python": "python"}), cluster_path)
+    set_grouping_statuses(
+        cluster_path,
+        assigned=set(),
+        statuses={},
+        retired={"ten years of experience": "not a skill"},
+    )
+
+    monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
+    monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
+
+    with TestClient(app) as client:
+        payload = client.get("/api/match-gap").json()
+        assert [item["key"] for item in payload["retiredSkills"]] == [
+            "ten years of experience"
+        ]
+
+        restored = client.post(
+            "/api/match-gap/restore-skills",
+            json={"skillKeys": ["Ten Years Of Experience"]},
+        )
+        assert restored.status_code == 200
+        assert restored.json() == {
+            "restored": 1,
+            "restoredSkills": ["ten years of experience"],
+        }
+        assert client.get("/api/match-gap").json()["retiredSkills"] == []
+
+    assert load_taxonomy_state(cluster_path).retired_skills == {}

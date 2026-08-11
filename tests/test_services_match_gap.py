@@ -556,3 +556,43 @@ def test_a_skill_that_failed_before_goes_straight_to_escalation(tmp_path):
     assert result["escalatedSkills"] == 1
     assert load_cluster_map(path).domain_of == {"python": "languages"}
     assert "python" not in load_taxonomy_state(path).grouping_status
+
+
+def test_the_escalation_cap_defers_instead_of_flooring(tmp_path, monkeypatch):
+    """What the per-run bound skips has not been judged, so it must not be filed.
+
+    The escalation cap exists to bound cost. Treating what it defers as
+    "unplaceable" would file skills the expensive pass never even saw.
+    """
+
+    from resume_agent.config import env_settings
+
+    monkeypatch.setenv("TAXONOMY_ESCALATION_MAX_SKILLS", "1")
+    env_settings.cache_clear()
+
+    engine = _engine_with_target_skills("Alpha Skill", "Beta Skill")
+    path = tmp_path / "cluster_map.json"
+
+    # The first pass refuses everything; only escalation can place a token.
+    def decline(_new, _categories):
+        return []
+
+    escalation = _AsyncThemer(_languages)
+    try:
+        with get_session(engine) as session:
+            result = refresh_clusters(
+                session,
+                canonicalizer=_AsyncCanonicalizer(),
+                themer=_AsyncThemer(decline),
+                escalation_themer=escalation,
+                path=path,
+            )
+    finally:
+        env_settings.cache_clear()
+
+    placed = load_cluster_map(path).domain_of
+    assert placed == {"alpha skill": "languages"}
+    assert result["escalatedSkills"] == 1
+    assert result["placedByFallback"] == 0
+    # The deferred token keeps a status so it escalates first next run.
+    assert "beta skill" in load_taxonomy_state(path).grouping_status

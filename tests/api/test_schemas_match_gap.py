@@ -107,6 +107,7 @@ def test_match_gap_out_shape():
         "taxonomyMaintenanceDue",
         "unassignedCount",
         "taxonomyUndoAvailable",
+        "retiredSkills",
     }
     assert dumped["suggestionStatuses"] == []
     assert dumped["taxonomyAlgorithmVersion"] == "legacy"
