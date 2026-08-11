@@ -11,6 +11,7 @@ export function RefreshClustersButton({
   onUndo,
   generation,
   maintenanceDue,
+  footer,
 }: {
   unassignedCount: number;
   onRegroup: () => Promise<boolean>;
@@ -19,6 +20,7 @@ export function RefreshClustersButton({
   onUndo: () => Promise<boolean>;
   generation: string | null | undefined;
   maintenanceDue: boolean;
+  footer?: React.ReactNode;
 }) {
   const [busy, setBusy] = useState<"regroup" | "maintain" | "undo" | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -53,14 +55,18 @@ export function RefreshClustersButton({
             ? "Regrouping…"
             : `Regroup unassigned (${unassignedCount})`}
         </Button>
+        {/* Named for what it does. This action merges, splits, renames and
+            reparents *domains*; it cannot assign an unassigned skill, and
+            calling it "Maintain taxonomy" next to Regroup implied it could. */}
         <Button
           variant="outline"
           size="sm"
           disabled={busy !== null}
           onClick={() => void start("maintain", onMaintain)}
+          title="Merge, split, rename and recategorize domains. Does not assign unassigned skills — use Regroup for that."
         >
           <HistoryIcon data-icon="inline-start" />
-          {busy === "maintain" ? "Maintaining…" : "Maintain taxonomy"}
+          {busy === "maintain" ? "Reorganizing…" : "Reorganize domains"}
         </Button>
         <Button
           variant="outline"
@@ -69,7 +75,7 @@ export function RefreshClustersButton({
           onClick={() => void start("undo", onUndo)}
         >
           <Undo2Icon data-icon="inline-start" />
-          {busy === "undo" ? "Restoring…" : "Undo last maintenance"}
+          {busy === "undo" ? "Restoring…" : "Undo last reorganize"}
         </Button>
       </div>
       {failed !== null && (
@@ -77,13 +83,16 @@ export function RefreshClustersButton({
           Couldn't start taxonomy {failed}.
         </span>
       )}
-      <span className="text-right text-xs text-muted-foreground">
-        {generation
-          ? `Taxonomy generation ${generation.slice(0, 8)}${maintenanceDue ? " · maintenance due" : ""}`
-          : maintenanceDue
-            ? "Taxonomy maintenance due"
-            : "No generated taxonomy version yet"}
-      </span>
+      <div className="flex items-center justify-end gap-2">
+        {footer}
+        <span className="text-right text-xs text-muted-foreground">
+          {generation
+            ? `Taxonomy generation ${generation.slice(0, 8)}${maintenanceDue ? " · reorganize due" : ""}`
+            : maintenanceDue
+              ? "Taxonomy reorganize due"
+              : "No generated taxonomy version yet"}
+        </span>
+      </div>
     </div>
   );
 }

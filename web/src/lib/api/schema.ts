@@ -1698,6 +1698,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/match-gap/restore-skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Match Gap Skills
+         * @description Un-retire skills so the next regroup treats them as real again.
+         *
+         *     Deliberately synchronous: this only edits the taxonomy state file, so a run
+         *     record and an SSE stream would be pure ceremony.
+         */
+        post: operations["restore_match_gap_skills_api_match_gap_restore_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/match-gap/undo-taxonomy-maintenance": {
         parameters: {
             query?: never;
@@ -4854,6 +4877,8 @@ export interface components {
             edges: components["schemas"]["DemandEdgeOut"][];
             /** Jobs */
             jobs: components["schemas"]["JobLiteOut"][];
+            /** Retiredskills */
+            retiredSkills?: components["schemas"]["RetiredSkillOut"][];
             /** Skills */
             skills: components["schemas"]["SkillNodeOut"][];
             /** Suggestionstatuses */
@@ -5797,6 +5822,21 @@ export interface components {
             url: string;
         };
         /**
+         * RestoreSkillsIn
+         * @description Retired keys to return to the backlog; same bounds as a scoped regroup.
+         */
+        RestoreSkillsIn: {
+            /** Skillkeys */
+            skillKeys: string[];
+        };
+        /** RestoreSkillsOut */
+        RestoreSkillsOut: {
+            /** Restored */
+            restored: number;
+            /** Restoredskills */
+            restoredSkills: string[];
+        };
+        /**
          * ResumeAuthoringSkillName
          * @enum {string}
          */
@@ -5842,6 +5882,18 @@ export interface components {
             reviewScore: number | null;
             /** Round */
             round: number;
+        };
+        /** RetiredSkillOut */
+        RetiredSkillOut: {
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Retiredat
+             * Format: date-time
+             */
+            retiredAt: string;
         };
         /** ReviewConfigDoc */
         ReviewConfigDoc: {
@@ -10992,6 +11044,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_match_gap_skills_api_match_gap_restore_skills_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreSkillsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreSkillsOut"];
                 };
             };
             /** @description Validation Error */

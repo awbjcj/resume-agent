@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
@@ -37,8 +37,10 @@ export function SearchConfigForm({
   // Kept fresh every render so the async normalize response below can patch
   // in canonical location text without clobbering an edit made while it was
   // in flight (the mutation closes over whatever `value` was at call time).
-  const locationsRef = useRef<string[]>([]);
-  locationsRef.current = value.locations ?? [];
+  const locationsRef = useRef<string[]>(value.locations ?? []);
+  useEffect(() => {
+    locationsRef.current = value.locations ?? [];
+  }, [value.locations]);
 
   const normalizeLocations = useMutation({
     mutationFn: (raw: string[]) =>

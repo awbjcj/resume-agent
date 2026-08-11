@@ -46,7 +46,7 @@ export function ChatComposer({
         placeholder={placeholder}
         rows={1}
         disabled={busy && !settling}
-        className="max-h-56 min-h-9 flex-1 resize-none overflow-y-auto border-0 bg-transparent shadow-none focus-visible:ring-0"
+        className="max-h-56 min-h-10 flex-1 resize-none overflow-y-auto border-0 bg-transparent text-base leading-6 shadow-none focus-visible:ring-0"
       />
       <TranscribeButton onText={(text) => onChange(value ? `${value} ${text}` : text)} disabled={busy && !settling} />
       {settling ? (

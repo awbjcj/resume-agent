@@ -38,7 +38,9 @@ describe("RefreshClustersButton", () => {
     );
 
     expect(screen.getByRole("button", { name: "Regroup unassigned (0)" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Maintain taxonomy" })).toBeEnabled();
+    // Named for what it does: this action reorganizes domains and cannot
+    // assign an unassigned skill, which "Maintain taxonomy" implied it could.
+    expect(screen.getByRole("button", { name: "Reorganize domains" })).toBeEnabled();
     expect(screen.getByText(/taxonomy generation abc12345/i)).toBeVisible();
   });
 });

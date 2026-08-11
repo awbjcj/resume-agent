@@ -23,6 +23,29 @@ function useTaxonomyMutation<V>(
   });
 }
 
+/**
+ * Restoring returns a small receipt rather than the whole graph, so this
+ * invalidates the match-gap query instead of writing it directly.
+ */
+export function useRestoreSkills() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (skillKeys: string[]) =>
+      unwrap(
+        api.POST("/api/match-gap/restore-skills", { body: { skillKeys } }),
+      ) as Promise<components["schemas"]["RestoreSkillsOut"]>,
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: MATCH_GAP_QUERY_KEY });
+      toast.success(
+        result.restored === 1
+          ? "Skill restored"
+          : `${result.restored} skills restored`,
+      );
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
 export function useMoveSkill() {
   return useTaxonomyMutation(
     (variables: {

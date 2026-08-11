@@ -61,9 +61,9 @@ export function ChatThread({
         ref={viewport}
         data-testid="chat-viewport"
         onScroll={onScroll}
-        className="h-full overflow-y-auto overscroll-contain px-1"
+        className="chat-scroll-fade h-full overflow-y-auto overscroll-contain px-1"
       >
-        <div className="w-full space-y-5 py-3 sm:px-2">
+        <div className="w-full space-y-6 py-4 sm:px-2 sm:py-5">
           {messages.map((message) => (
             <div key={message.id}>
               <ChatMessage

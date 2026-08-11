@@ -26,6 +26,7 @@ import {
 import { Filters } from "./Filters";
 import { RankedList } from "./RankedList";
 import { RefreshClustersButton } from "./RefreshClustersButton";
+import { RetiredSkills } from "./RetiredSkills";
 import { SelectionTray } from "./SelectionTray";
 import { SkillMap } from "./SkillMap";
 import { SkillModal } from "./SkillModal";
@@ -149,6 +150,7 @@ export function MatchGapContainer() {
               onUndo={undo}
               generation={data.taxonomyGeneration}
               maintenanceDue={data.taxonomyMaintenanceDue}
+              footer={<RetiredSkills skills={data.retiredSkills ?? []} />}
             />
           </section>
 

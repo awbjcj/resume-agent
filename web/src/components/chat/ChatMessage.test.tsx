@@ -46,6 +46,34 @@ describe("ChatMessage", () => {
     expect(screen.getByText("Checking evidence")).toBeVisible();
   });
 
+  it("groups consecutive reasoning and tool work into one activity region", () => {
+    render(
+      <ChatMessage
+        showReasoning
+        message={{
+          id: "a-activity",
+          role: "assistant",
+          parts: [
+            { kind: "reasoning", text: "Choosing sources" },
+            {
+              kind: "tool",
+              callId: "tool-activity",
+              name: "check_source",
+              argsPreview: "example.com",
+              resultPreview: "Verified",
+              ok: true,
+              done: true,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole("region", { name: "Agent activity" })).toHaveLength(1);
+    expect(screen.getByText("1 completed")).toBeInTheDocument();
+    expect(screen.getByText("Completed")).toBeVisible();
+  });
+
   it("does not add an assistant label to user messages", () => {
     render(
       <ChatMessage
