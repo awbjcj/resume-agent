@@ -182,7 +182,7 @@ def test_search_url_emits_native_filters():
     cfg = SearchConfig(
         titles=["AI Engineer"],
         locations=["Detroit, MI"],
-        remote_policy="remote",
+        remote_policy=["remote"],
         experience_levels=["mid-senior", "director"],
         employment_types=["full_time"],
         min_salary=130000,
@@ -201,6 +201,13 @@ def test_search_url_emits_native_filters():
     assert params["f_TPR"] == ["r2592000"]
     assert params["f_SB2"] == ["5"]
     assert params["sortBy"] == ["DD"]
+
+
+def test_search_url_joins_multiple_remote_policies():
+    cfg = SearchConfig(titles=["AI Engineer"], remote_policy=["remote", "hybrid", "remote"])
+    url = _search_url(cfg, geo_resolver=lambda loc: None)
+    params = parse_qs(urlsplit(url).query)
+    assert params["f_WT"] == ["2,3"]
 
 
 def test_search_url_falls_back_to_text_location_when_geo_unresolved():

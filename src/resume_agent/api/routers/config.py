@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 
 from resume_agent.api.schemas.config import (
+    NormalizeLocationsRequest,
+    NormalizeLocationsResponse,
     ProfileConfigDoc,
     PruneConfigDoc,
     RenderConfigDoc,
@@ -16,6 +18,7 @@ from resume_agent.api.deps import get_config_store
 from resume_agent.api.errors import ApiException
 from resume_agent.render.templates import TemplateNotFoundError, resolve_template
 from resume_agent.services.config_store import ConfigStore
+from resume_agent.taxonomy.location import format_free_location
 
 router = APIRouter()
 
@@ -32,6 +35,11 @@ def get_search(request: Request):
 @router.put("/config/search", response_model=SearchConfigDoc)
 def put_search(body: SearchConfigDoc, request: Request):
     return _store(request).put("search", body)
+
+
+@router.post("/config/search/normalize-locations", response_model=NormalizeLocationsResponse)
+def normalize_locations(body: NormalizeLocationsRequest):
+    return NormalizeLocationsResponse(normalized=[format_free_location(r) for r in body.raw])
 
 
 @router.get("/config/review", response_model=ReviewConfigDoc)

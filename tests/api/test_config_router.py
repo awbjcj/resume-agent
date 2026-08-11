@@ -28,12 +28,31 @@ def test_put_search_round_trip(client):
             "keywords": ["python"],
             "titles": ["ML Engineer"],
             "locations": ["Remote"],
-            "remotePolicy": "remote_only",
+            "remotePolicy": ["remote", "hybrid"],
             "sponsorshipRequired": True,
         },
     )
     assert resp.status_code == 200
-    assert client.get("/api/config/search").json()["keywords"] == ["python"]
+    body = client.get("/api/config/search").json()
+    assert body["keywords"] == ["python"]
+    assert body["remotePolicy"] == ["remote", "hybrid"]
+
+
+def test_put_search_coerces_legacy_bare_string_remote_policy(client, tmp_path):
+    (tmp_path / "config").mkdir(exist_ok=True)
+    (tmp_path / "config" / "search.yaml").write_text(
+        "remote_policy: remote\n", encoding="utf-8"
+    )
+    assert client.get("/api/config/search").json()["remotePolicy"] == ["remote"]
+
+
+def test_normalize_locations(client):
+    resp = client.post(
+        "/api/config/search/normalize-locations",
+        json={"raw": ["Austin, tex.", "Remote", "nyc"]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["normalized"] == ["Austin, TX", "Remote", "New York, NY"]
 
 
 def test_put_invalid_types_is_422(client):

@@ -7,9 +7,9 @@ serves these values, and the TUI/CLI keep reading the same YAML.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from resume_agent.api.schemas.base import CamelModel
 
@@ -18,7 +18,7 @@ class SearchConfigDoc(CamelModel):
     keywords: list[str] = Field(default_factory=list)
     titles: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
-    remote_policy: str | None = None
+    remote_policy: list[str] = Field(default_factory=list)
     min_salary: int | None = None
     yoe_min: int | None = None
     yoe_max: int | None = None
@@ -30,6 +30,25 @@ class SearchConfigDoc(CamelModel):
     max_days_old: int | None = None
     experience_levels: list[str] = Field(default_factory=list)
     employment_types: list[str] = Field(default_factory=list)
+
+    @field_validator("remote_policy", mode="before")
+    @classmethod
+    def _coerce_remote_policy(cls, v: Any) -> Any:
+        """Accept a legacy bare string (pre-multi-select `search.yaml`/dicts)."""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            v = v.strip()
+            return [] if v.lower() in ("", "any") else [v]
+        return v
+
+
+class NormalizeLocationsRequest(CamelModel):
+    raw: list[str] = Field(default_factory=list)
+
+
+class NormalizeLocationsResponse(CamelModel):
+    normalized: list[str] = Field(default_factory=list)
 
 
 class ReviewerEntry(CamelModel):

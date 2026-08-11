@@ -1,3 +1,6 @@
+import { useMutation } from "@tanstack/react-query";
+import { useRef } from "react";
+
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
@@ -5,6 +8,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { api, unwrap } from "@/lib/api/client";
 import type { paths } from "@/lib/api/schema";
 
 import { TagListInput } from "./TagListInput";
@@ -13,7 +17,7 @@ export type SearchDoc =
   paths["/api/config/search"]["get"]["responses"][200]["content"]["application/json"];
 
 const REMOTE_OPTIONS = [
-  { value: "remote_only", label: "Remote only" },
+  { value: "remote", label: "Remote" },
   { value: "hybrid", label: "Hybrid" },
   { value: "onsite", label: "On-site" },
 ];
@@ -30,7 +34,34 @@ export function SearchConfigForm({
   const set = <K extends keyof SearchDoc>(key: K, v: SearchDoc[K]) =>
     onChange({ ...value, [key]: v });
 
-  const remotePolicySelection = value.remotePolicy ? [value.remotePolicy] : [];
+  // Kept fresh every render so the async normalize response below can patch
+  // in canonical location text without clobbering an edit made while it was
+  // in flight (the mutation closes over whatever `value` was at call time).
+  const locationsRef = useRef<string[]>([]);
+  locationsRef.current = value.locations ?? [];
+
+  const normalizeLocations = useMutation({
+    mutationFn: (raw: string[]) =>
+      unwrap(
+        api.POST("/api/config/search/normalize-locations", { body: { raw } }),
+      ),
+  });
+
+  const handleLocationsChange = (next: string[]) => {
+    const prevCount = locationsRef.current.length;
+    set("locations", next);
+    if (next.length <= prevCount) return; // a removal; nothing to normalize
+    const added = next.slice(prevCount);
+    normalizeLocations.mutate(added, {
+      onSuccess: ({ normalized }) => {
+        const canonical = new Map(added.map((raw, i) => [raw, normalized[i]]));
+        set(
+          "locations",
+          locationsRef.current.map((loc) => canonical.get(loc) ?? loc),
+        );
+      },
+    });
+  };
 
   return (
     <FieldGroup>
@@ -47,16 +78,13 @@ export function SearchConfigForm({
       <Field>
         <FieldLabel htmlFor="locations">Locations</FieldLabel>
         <TagListInput id="locations" value={value.locations ?? []}
-          onChange={(v) => set("locations", v)} placeholder="Remote, Austin TX…" />
+          onChange={handleLocationsChange} placeholder="Remote, Austin TX…" />
       </Field>
       <Field>
         <FieldLabel>Remote policy</FieldLabel>
         <ToggleGroup
-          value={remotePolicySelection}
-          onValueChange={(next) => {
-            const added = next.find((v) => !remotePolicySelection.includes(v));
-            set("remotePolicy", added ?? null);
-          }}
+          value={value.remotePolicy ?? []}
+          onValueChange={(next) => set("remotePolicy", next)}
         >
           {REMOTE_OPTIONS.map((o) => (
             <ToggleGroupItem key={o.value} value={o.value}>{o.label}</ToggleGroupItem>

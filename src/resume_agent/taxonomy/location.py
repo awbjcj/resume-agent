@@ -208,3 +208,32 @@ def build_location(
         is_us=us,
         raw=raw,
     )
+
+
+def format_free_location(raw: str) -> str:
+    """Canonicalize a single free-text location tag to a regulated "City, ST" form.
+
+    Reuses `build_location`'s city/state split and normalization (state names,
+    AP abbreviations, metro aliases) rather than a second parser. `build_location`
+    only splits a comma-joined "City, ST"; this adds one more fallback for the
+    equally common space-joined "City ST" (the settings form's own placeholder
+    text uses that shape) by trying the last whitespace token as a state. A
+    value with no resolvable city or region (e.g. "Remote", a typo'd city, a
+    non-US place) passes through trimmed and unchanged — this regulates
+    *format*, not city spelling, and never invents a country for something
+    outside the US table.
+    """
+    trimmed = " ".join(raw.split())
+    if not trimmed:
+        return trimmed
+    loc = build_location(city=trimmed, region=None, country=None, raw=trimmed)
+    if loc.city and loc.region:
+        return f"{loc.city}, {loc.region}"
+    if loc.city and " " in loc.city:
+        head, _, tail = loc.city.rpartition(" ")
+        region = _region_to_usps(tail)
+        if head and region:
+            return f"{head}, {region}"
+    if loc.city:
+        return loc.city
+    return trimmed

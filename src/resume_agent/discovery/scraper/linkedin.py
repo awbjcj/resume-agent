@@ -121,9 +121,13 @@ def _source_searches(config: SearchConfig, limit: int | None) -> list[SearchConf
 def _linkedin_filter_params(config: SearchConfig) -> dict[str, str]:
     """Map config to LinkedIn's native filter params."""
     params: dict[str, str] = {}
-    workplace = _WT.get((config.remote_policy or "").strip().lower())
-    if workplace:
-        params["f_WT"] = workplace
+    workplace_codes: list[str] = []
+    for policy in config.remote_policy:
+        code = _WT.get(policy.strip().lower())
+        if code and code not in workplace_codes:
+            workplace_codes.append(code)
+    if workplace_codes:
+        params["f_WT"] = ",".join(workplace_codes)
 
     experience = [
         _EXP[value]

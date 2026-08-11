@@ -156,3 +156,28 @@ def test_foreign_country_region_not_reinterpreted_as_us_state():
     assert loc.country == "CA"
     assert loc.region == "CA"
     assert loc.is_us is False
+
+
+def test_format_free_location_canonicalizes_comma_separated():
+    assert location.format_free_location("Austin, tex.") == "Austin, TX"
+    assert location.format_free_location(" Seattle , wa ") == "Seattle, WA"
+
+
+def test_format_free_location_canonicalizes_space_separated():
+    # The settings form's own placeholder text uses this shape ("Austin TX").
+    assert location.format_free_location("Austin TX") == "Austin, TX"
+    assert location.format_free_location("New York NY") == "New York, NY"
+
+
+def test_format_free_location_expands_metro_alias():
+    assert location.format_free_location("nyc") == "New York, NY"
+
+
+def test_format_free_location_passes_through_unparseable():
+    assert location.format_free_location("Remote") == "Remote"
+    assert location.format_free_location("Somewhere, Nowhere") == "Somewhere, Nowhere"
+
+
+def test_format_free_location_collapses_whitespace_and_empties():
+    assert location.format_free_location("  Boston   ") == "Boston"
+    assert location.format_free_location("   ") == ""

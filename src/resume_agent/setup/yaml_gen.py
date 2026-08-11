@@ -55,7 +55,7 @@ def build_search(state: WizardState) -> str:
         "keywords": state.keywords,
         "titles": state.titles,
         "locations": state.locations,
-        "remote_policy": state.remote_policy,
+        "remote_policy": [] if state.remote_policy == "any" else [state.remote_policy],
         "min_salary": state.min_salary,
         "yoe_min": state.yoe_min,
         "yoe_max": state.yoe_max,

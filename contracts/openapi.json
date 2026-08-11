@@ -5480,6 +5480,32 @@
         "title": "NewDomainIn",
         "type": "object"
       },
+      "NormalizeLocationsRequest": {
+        "properties": {
+          "raw": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Raw",
+            "type": "array"
+          }
+        },
+        "title": "NormalizeLocationsRequest",
+        "type": "object"
+      },
+      "NormalizeLocationsResponse": {
+        "properties": {
+          "normalized": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Normalized",
+            "type": "array"
+          }
+        },
+        "title": "NormalizeLocationsResponse",
+        "type": "object"
+      },
       "NoteIn": {
         "properties": {
           "text": {
@@ -8593,15 +8619,11 @@
             "title": "Minsalary"
           },
           "remotePolicy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Remotepolicy"
+            "items": {
+              "type": "string"
+            },
+            "title": "Remotepolicy",
+            "type": "array"
           },
           "roleAnchors": {
             "items": {
@@ -15180,6 +15202,62 @@
           }
         },
         "summary": "Put Search"
+      }
+    },
+    "/api/config/search/normalize-locations": {
+      "post": {
+        "operationId": "normalize_locations_api_config_search_normalize_locations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NormalizeLocationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NormalizeLocationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Normalize Locations"
       }
     },
     "/api/config/style-guide": {

@@ -1026,6 +1026,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/search/normalize-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Normalize Locations */
+        post: operations["normalize_locations_api_config_search_normalize_locations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config/style-guide": {
         parameters: {
             query?: never;
@@ -4982,6 +4999,16 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** NormalizeLocationsRequest */
+        NormalizeLocationsRequest: {
+            /** Raw */
+            raw?: string[];
+        };
+        /** NormalizeLocationsResponse */
+        NormalizeLocationsResponse: {
+            /** Normalized */
+            normalized?: string[];
+        };
         /** NoteIn */
         NoteIn: {
             /** Text */
@@ -6148,7 +6175,7 @@ export interface components {
             /** Minsalary */
             minSalary?: number | null;
             /** Remotepolicy */
-            remotePolicy?: string | null;
+            remotePolicy?: string[];
             /** Roleanchors */
             roleAnchors?: string[];
             /**
@@ -9463,6 +9490,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchConfigDoc"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    normalize_locations_api_config_search_normalize_locations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NormalizeLocationsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NormalizeLocationsResponse"];
                 };
             };
             /** @description Validation Error */

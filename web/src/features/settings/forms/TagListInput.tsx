@@ -12,8 +12,16 @@ export function TagListInput({
   const [draft, setDraft] = useState("");
 
   const commit = () => {
-    const tag = draft.trim().replace(/,+$/, "");
-    if (tag && !value.includes(tag)) onChange([...value, tag]);
+    const seen = new Set(value);
+    const additions: string[] = [];
+    for (const raw of draft.split(",")) {
+      const tag = raw.trim();
+      if (tag && !seen.has(tag)) {
+        seen.add(tag);
+        additions.push(tag);
+      }
+    }
+    if (additions.length > 0) onChange([...value, ...additions]);
     setDraft("");
   };
 

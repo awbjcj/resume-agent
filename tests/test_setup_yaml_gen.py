@@ -80,7 +80,7 @@ def test_build_search_round_trips(tmp_path):
     assert cfg.keywords == ["python"]
     assert cfg.min_salary == 120000
     assert cfg.sponsorship_required is True
-    assert cfg.remote_policy == "remote"
+    assert cfg.remote_policy == ["remote"]
 
 
 # ── Task 6 ──────────────────────────────────────────────────────────────────

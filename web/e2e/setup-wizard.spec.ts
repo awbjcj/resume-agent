@@ -31,7 +31,7 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/config/search", (route) =>
     route.fulfill({
       json: {
-        keywords: [], titles: [], locations: [], remotePolicy: null,
+        keywords: [], titles: [], locations: [], remotePolicy: [],
         minSalary: null, yoeMin: null, yoeMax: null, sponsorshipRequired: false,
         roleAnchors: [], excludeTerms: [], targetRole: null,
         distance: null, maxDaysOld: null, experienceLevels: [], employmentTypes: [],

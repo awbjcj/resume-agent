@@ -8,7 +8,7 @@ titles:
 locations:
   - Remote
   - Seattle, WA
-remote_policy: remote        # remote | hybrid | onsite | any
+remote_policy: [remote]      # list of: remote | hybrid | onsite; [] means any
 min_salary: 120000
 yoe_min: 0
 yoe_max: 5
