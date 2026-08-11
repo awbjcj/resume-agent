@@ -53,7 +53,7 @@ export function SearchConfigForm({
     if (next.length <= prevCount) return; // a removal; nothing to normalize
     const added = next.slice(prevCount);
     normalizeLocations.mutate(added, {
-      onSuccess: ({ normalized }) => {
+      onSuccess: ({ normalized = [] }) => {
         const canonical = new Map(added.map((raw, i) => [raw, normalized[i]]));
         set(
           "locations",
