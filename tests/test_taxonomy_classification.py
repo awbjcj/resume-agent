@@ -536,3 +536,82 @@ def test_equal_new_labels_in_different_categories_get_distinct_ids():
 
     assert len(set(outcome.additions.domain_of.values())) == 2
     assert set(outcome.additions.category_of.values()) == {"languages", "cloud-infra"}
+
+
+def test_retrieval_only_vetoes_a_domain_when_it_is_trustworthy():
+    """A candidate slice may narrow the prompt; only a semantic one may forbid.
+
+    Retrieval exists to stop the model reaching across the whole taxonomy on a
+    hunch, which is legitimate when candidates are semantic.  Under the lexical
+    fallback the slice is close to arbitrary -- measured on a real taxonomy it
+    reached barely a third of existing domains -- so vetoing against it rejects
+    correct reuse far more often than it catches an invention.
+    """
+
+    from resume_agent.taxonomy.classification import _project_domains
+
+    response = IncrementalSkillDomains(
+        domains=[
+            IncrementalDomainGroup(
+                existing_domain_id="backend", confidence="high", skills=["fastapi"]
+            )
+        ]
+    )
+    arguments = {
+        "batch": {"fastapi"},
+        "existing_domain_ids": {"backend", "frontend"},
+        "full_categories": set(),
+        "allowed_domain_ids": {"frontend"},
+    }
+
+    degraded = _project_domains(response, **arguments, enforce_candidates=False)
+    assert degraded.assignments["fastapi"].existing_domain_id == "backend"
+    assert degraded.failed_tokens == frozenset()
+
+    semantic = _project_domains(response, **arguments, enforce_candidates=True)
+    assert semantic.assignments == {}
+    assert semantic.failed_tokens == frozenset({"fastapi"})
+
+    # A domain that does not exist is refused either way.
+    invented = _project_domains(
+        IncrementalSkillDomains(
+            domains=[
+                IncrementalDomainGroup(
+                    existing_domain_id="invented", confidence="high", skills=["fastapi"]
+                )
+            ]
+        ),
+        **arguments,
+        enforce_candidates=False,
+    )
+    assert invented.failed_tokens == frozenset({"fastapi"})
+
+
+def test_a_declined_group_still_records_its_category_for_the_placement_floor():
+    """An uncertain judgment is still a judgment about where a skill belongs."""
+
+    from resume_agent.taxonomy.classification import _project_domains
+
+    result = _project_domains(
+        IncrementalSkillDomains(
+            domains=[
+                IncrementalDomainGroup(
+                    new_label="Vision Systems",
+                    new_category="ai-ml",
+                    confidence="low",
+                    reason="unsure whether this warrants its own domain",
+                    skills=["depth estimation"],
+                )
+            ],
+            not_skills=["ten years of experience"],
+        ),
+        batch={"depth estimation", "ten years of experience"},
+        existing_domain_ids=set(),
+        full_categories=set(),
+    )
+
+    assert result.assignments == {}
+    assert result.fallback_categories == {"depth estimation": "ai-ml"}
+    assert result.not_skills == frozenset({"ten years of experience"})
+    # A retired token is not a failure to retry.
+    assert result.failed_tokens == frozenset({"depth estimation"})

@@ -85,6 +85,8 @@ class _AsyncThemer:
         response = self.respond(payload["new"], payload["categories"])
         if isinstance(response, Exception):
             raise response
+        if isinstance(response, IncrementalSkillDomains):
+            return SimpleNamespace(content=response)
         return SimpleNamespace(content=IncrementalSkillDomains(domains=response))
 
     def run(self, prompt):
@@ -183,7 +185,12 @@ def test_reconcile_failure_preserves_last_good_cluster_file(tmp_path):
     assert path.read_text(encoding="utf-8") == before
 
 
-def test_theme_failure_remains_unassigned_and_retries_next_refresh(tmp_path):
+def test_model_call_failure_is_never_placed_by_the_floor(tmp_path):
+    """An outage is not a judgment, so the placement floor must not absorb it.
+
+    Filing a skill because the request failed would convert a transient error
+    into a permanent misplacement, and would also hide the outage.
+    """
     engine = _engine_with_target_skills("Python", "Rust")
     path = tmp_path / "clusters.json"
     canonicalizer = _AsyncCanonicalizer()
@@ -375,7 +382,14 @@ def test_soft_target_allows_a_thirteenth_coherent_domain(tmp_path):
     assert after.domain_of["vision one"] == after.domain_of["vision two"]
 
 
-def test_singleton_new_domain_is_explicitly_recorded_as_uncertain(tmp_path):
+def test_singleton_new_domain_is_placed_by_the_escalation_pass(tmp_path):
+    """A lone new skill is the common case, so one pass declining is not the end.
+
+    The first pass still refuses to mint a domain for a single token, but the
+    escalation pass sees the whole taxonomy and may place it -- otherwise every
+    genuinely novel skill would be permanently unassignable.
+    """
+
     engine = _engine_with_target_skills("Niche Tool")
     path = tmp_path / "cluster_map.json"
 
@@ -387,11 +401,10 @@ def test_singleton_new_domain_is_explicitly_recorded_as_uncertain(tmp_path):
             path=path,
         )
 
-    assert load_cluster_map(path).domain_of == {}
-    status = load_taxonomy_state(path).grouping_status["niche tool"]
-    assert status.state == "uncertain"
-    assert "coherence gate" in status.reason
-    assert result["uncertainSkills"] == 1
+    assert load_cluster_map(path).domain_of == {"niche tool": "languages"}
+    assert "niche tool" not in load_taxonomy_state(path).grouping_status
+    assert result["uncertainSkills"] == 0
+    assert result["remainingUnassigned"] == 0
 
 
 def test_fifty_requested_skills_all_receive_an_outcome(tmp_path):
@@ -421,3 +434,125 @@ def test_fifty_requested_skills_all_receive_an_outcome(tmp_path):
     outcomes = set(after.domain_of) | set(statuses)
     assert set(cast(list[str], result["processedSkillKeys"])) == tokens
     assert tokens <= outcomes
+
+
+def _languages(new, _categories):
+    return [
+        IncrementalDomainGroup(
+            new_label="Languages", new_category="languages", skills=list(new)
+        )
+    ]
+
+
+def test_a_token_naming_no_skill_is_retired_and_leaves_the_backlog(tmp_path):
+    """Retirement is what stops the backlog from re-buying the same verdict.
+
+    Without a terminal disposition, a phrase like an experience requirement is
+    re-sent to the model on every single run, forever.
+    """
+
+    engine = _engine_with_target_skills("Python", "Ten Years Of Experience")
+    path = tmp_path / "cluster_map.json"
+
+    def respond(new, _categories):
+        real = [token for token in new if token == "python"]
+        return IncrementalSkillDomains(
+            domains=_languages(real, None) if real else [],
+            not_skills=[token for token in new if token != "python"],
+        )
+
+    with get_session(engine) as session:
+        first = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(respond),
+            path=path,
+        )
+
+    assert first["retiredSkills"] == ["ten years of experience"]
+    assert load_cluster_map(path).domain_of == {"python": "languages"}
+    assert "ten years of experience" in load_taxonomy_state(path).retired_skills
+
+    repeat = _AsyncThemer(respond)
+    with get_session(engine) as session:
+        second = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=repeat,
+            path=path,
+        )
+
+    assert second["processedSkillKeys"] == []
+    assert repeat.calls == 0
+
+
+def test_a_retired_skill_can_be_restored_to_the_backlog(tmp_path):
+    """A wrong retirement must be one call from being undone."""
+
+    from resume_agent.services.match_gap import restore_skills
+
+    engine = _engine_with_target_skills("Kubeflow")
+    path = tmp_path / "cluster_map.json"
+
+    def retire_everything(new, _categories):
+        return IncrementalSkillDomains(domains=[], not_skills=list(new))
+
+    with get_session(engine) as session:
+        refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(retire_everything),
+            path=path,
+        )
+    assert "kubeflow" in load_taxonomy_state(path).retired_skills
+
+    restored = restore_skills(path=path, skill_keys={"Kubeflow"})
+    assert restored == {"restored": 1, "restoredSkills": ["kubeflow"]}
+    assert load_taxonomy_state(path).retired_skills == {}
+
+    with get_session(engine) as session:
+        again = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(_languages),
+            path=path,
+        )
+    assert again["processedSkillKeys"] == ["kubeflow"]
+    assert load_cluster_map(path).domain_of == {"kubeflow": "languages"}
+
+
+def test_a_skill_that_failed_before_goes_straight_to_escalation(tmp_path):
+    """Repeat runs must differ, or clicking Regroup again is a pure replay.
+
+    A token carrying a recorded failure skips the first pass entirely and is
+    retried against the whole taxonomy with the escalation classifier.
+    """
+
+    engine = _engine_with_target_skills("Python")
+    path = tmp_path / "cluster_map.json"
+
+    with get_session(engine) as session:
+        refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(lambda new, categories: RuntimeError("themer down")),
+            path=path,
+        )
+    assert load_taxonomy_state(path).grouping_status["python"].state == "failed"
+
+    first_pass = _AsyncThemer(_languages)
+    escalation = _AsyncThemer(_languages)
+    with get_session(engine) as session:
+        result = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=first_pass,
+            escalation_themer=escalation,
+            path=path,
+        )
+
+    assert first_pass.calls == 0
+    assert escalation.calls == 1
+    assert result["escalatedSkills"] == 1
+    assert load_cluster_map(path).domain_of == {"python": "languages"}
+    assert "python" not in load_taxonomy_state(path).grouping_status

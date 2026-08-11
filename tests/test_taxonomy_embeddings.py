@@ -7,6 +7,7 @@ from resume_agent.taxonomy.embeddings import (
     OpenAIEmbeddingProvider,
     build_candidate_context,
     cached_embeddings,
+    embed_descriptors,
     embedding_cache_path,
 )
 
@@ -161,3 +162,98 @@ def test_openai_embedding_provider_records_usage_through_direct_usage_seam(
     assert recorded[0].provider == "openai"
     assert recorded[0].model == "text-embedding-3-small"
     assert recorded[0].input_tokens == 7
+
+
+def test_a_failed_shard_never_discards_the_batches_that_succeeded(tmp_path):
+    """Partial progress must survive, or the cache can never fill.
+
+    A full refresh needs dozens of provider calls.  Discarding all of them
+    because one was rate-limited is what kept this cache permanently empty:
+    the next run re-requested the identical work and lost it the same way, so
+    retrieval silently ran on the lexical fallback forever.
+    """
+
+    class _Flaky:
+        model_id = "openai:text-embedding-3-small"
+
+        def __init__(self) -> None:
+            self.calls: list[list[str]] = []
+            self.fail = True
+
+        async def embed(self, texts):
+            self.calls.append(list(texts))
+            if self.fail and any("boom" in text for text in texts):
+                raise EmbeddingUnavailable("rate limited")
+            return [[1.0, 0.0] for _ in texts]
+
+    cluster_path = tmp_path / "cluster_map.json"
+    descriptors = {"a": "alpha", "b": "boom"}
+
+    provider = _Flaky()
+    first = asyncio.run(
+        embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors=descriptors,
+            provider=provider,
+            batch_size=1,
+        )
+    )
+
+    assert set(first.vectors) == {"a"}
+    assert first.failed == 1
+    assert first.complete is False
+    assert "rate limited" in first.reason
+    assert embedding_cache_path(cluster_path).exists()
+
+    recovered = _Flaky()
+    recovered.fail = False
+    second = asyncio.run(
+        embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors=descriptors,
+            provider=recovered,
+            batch_size=1,
+        )
+    )
+
+    # Only the descriptor that failed is re-requested; the survivor was kept.
+    assert recovered.calls == [["boom"]]
+    assert set(second.vectors) == {"a", "b"}
+    assert second.complete is True
+
+
+def test_lexical_ranking_is_not_won_by_the_smallest_domain(tmp_path):
+    """The fallback must rank on shared meaning, not on descriptor length.
+
+    Symmetric Jaccard divided by the union, so a domain listing 24 members was
+    penalised for its own size and a two-member domain won almost everything --
+    on a real 155-domain taxonomy one domain ranked first for 42 of 60
+    consecutive queries.
+    """
+
+    existing = ClusterMap(
+        aliases={},
+        domain_of={
+            "object detection": "computer-vision",
+            "image segmentation": "computer-vision",
+            "image classification": "computer-vision",
+            "optical flow": "computer-vision",
+            "pose estimation": "computer-vision",
+            "payroll": "hr-tools",
+        },
+        domain_label={"computer-vision": "Computer Vision", "hr-tools": "HR"},
+        category_of={"computer-vision": "ai-ml", "hr-tools": "domain-knowledge"},
+    )
+
+    context = asyncio.run(
+        build_candidate_context(
+            cluster_path=tmp_path / "cluster_map.json",
+            tokens={"3d object detection"},
+            existing=existing,
+            provider=_UnavailableProvider(),
+        )
+    )
+
+    assert context.mode == "lexical"
+    assert context.degraded is True
+    assert context.domain_candidates["3d object detection"][0] == "computer-vision"
