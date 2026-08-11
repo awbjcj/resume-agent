@@ -5114,6 +5114,13 @@
             "title": "Jobs",
             "type": "array"
           },
+          "retiredSkills": {
+            "items": {
+              "$ref": "#/components/schemas/RetiredSkillOut"
+            },
+            "title": "Retiredskills",
+            "type": "array"
+          },
           "skills": {
             "items": {
               "$ref": "#/components/schemas/SkillNodeOut"
@@ -7667,6 +7674,46 @@
         "title": "ResourceOut",
         "type": "object"
       },
+      "RestoreSkillsIn": {
+        "description": "Retired keys to return to the backlog; same bounds as a scoped regroup.",
+        "properties": {
+          "skillKeys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Skillkeys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "skillKeys"
+        ],
+        "title": "RestoreSkillsIn",
+        "type": "object"
+      },
+      "RestoreSkillsOut": {
+        "properties": {
+          "restored": {
+            "title": "Restored",
+            "type": "integer"
+          },
+          "restoredSkills": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Restoredskills",
+            "type": "array"
+          }
+        },
+        "required": [
+          "restored",
+          "restoredSkills"
+        ],
+        "title": "RestoreSkillsOut",
+        "type": "object"
+      },
       "ResumeAuthoringSkillName": {
         "enum": [
           "academic-cv-builder",
@@ -7807,6 +7854,30 @@
           "createdAt"
         ],
         "title": "ResumeVersionOut",
+        "type": "object"
+      },
+      "RetiredSkillOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "retiredAt": {
+            "format": "date-time",
+            "title": "Retiredat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "reason",
+          "retiredAt"
+        ],
+        "title": "RetiredSkillOut",
         "type": "object"
       },
       "ReviewConfigDoc": {
@@ -17703,6 +17774,63 @@
           }
         },
         "summary": "Refresh Match Gap Clusters"
+      }
+    },
+    "/api/match-gap/restore-skills": {
+      "post": {
+        "description": "Un-retire skills so the next regroup treats them as real again.\n\nDeliberately synchronous: this only edits the taxonomy state file, so a run\nrecord and an SSE stream would be pure ceremony.",
+        "operationId": "restore_match_gap_skills_api_match_gap_restore_skills_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreSkillsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreSkillsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Match Gap Skills"
       }
     },
     "/api/match-gap/undo-taxonomy-maintenance": {
