@@ -7,6 +7,7 @@ import type { paths } from "@/lib/api/schema";
 export type ConfigPath =
   | "/api/config/search"
   | "/api/config/review"
+  | "/api/config/review-deep"
   | "/api/config/prune"
   | "/api/config/render"
   | "/api/config/style-guide"

@@ -130,6 +130,7 @@ class ProfileConfigDoc(CamelModel):
 DOMAIN_SCHEMAS: dict[str, type[CamelModel]] = {
     "search": SearchConfigDoc,
     "review": ReviewConfigDoc,
+    "review_deep": ReviewConfigDoc,
     "prune": PruneConfigDoc,
     "render": RenderConfigDoc,
     "style_guide": StyleGuideDoc,

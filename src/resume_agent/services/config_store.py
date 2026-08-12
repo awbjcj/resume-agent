@@ -26,6 +26,7 @@ class ConfigStore(Protocol):
 _FILES: dict[str, str] = {
     "search": "search.yaml",
     "review": "review.yaml",
+    "review_deep": "review_deep.yaml",
     "prune": "prune.yaml",
     "render": "render.yaml",
     "style_guide": "style_guide.md",

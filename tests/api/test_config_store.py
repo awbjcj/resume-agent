@@ -63,4 +63,12 @@ def test_search_doc_covers_search_config_fields():
 
 
 def test_domain_registry_contents():
-    assert set(DOMAIN_SCHEMAS) == {"search", "review", "prune", "render", "style_guide", "profile"}
+    assert set(DOMAIN_SCHEMAS) == {
+        "search",
+        "review",
+        "review_deep",
+        "prune",
+        "render",
+        "style_guide",
+        "profile",
+    }

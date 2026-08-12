@@ -133,7 +133,7 @@ export function MatchGapContainer() {
         <div className="space-y-6">
           <section
             aria-label="Dashboard controls"
-            className="sticky top-2 z-20 flex flex-wrap items-end justify-between gap-4 rounded-lg border bg-card/95 p-4 backdrop-blur"
+            className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card/95 p-4 backdrop-blur"
           >
             <Filters
               value={filters}
@@ -148,9 +148,8 @@ export function MatchGapContainer() {
               onMaintain={maintain}
               canUndo={data.taxonomyUndoAvailable}
               onUndo={undo}
-              generation={data.taxonomyGeneration}
               maintenanceDue={data.taxonomyMaintenanceDue}
-              footer={<RetiredSkills skills={data.retiredSkills ?? []} />}
+              trailing={<RetiredSkills skills={data.retiredSkills ?? []} />}
             />
           </section>
 

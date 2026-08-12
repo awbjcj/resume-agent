@@ -73,22 +73,26 @@ describe("EvidencePortfolioDisclosure", () => {
     renderDisclosure();
 
     expect(requested).not.toHaveBeenCalled();
-    const trigger = screen.getByRole("button", { name: "Why this evidence?" });
+    const trigger = screen.getByRole("button", { name: /why this experience was chosen/i });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(await screen.findByRole("region", { name: "Evidence portfolio explanation" })).toBeInTheDocument();
-    expect(await screen.findByText("Deterministic fallback")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Evidence selection explanation" })).toBeInTheDocument();
+    expect(await screen.findByText("Rule-based selection")).toBeInTheDocument();
+    expect(screen.getByText("How this version was tailored")).toBeInTheDocument();
+    expect(screen.getByText("Experience used — and why")).toBeInTheDocument();
+    expect(screen.getByText("What the job asks for")).toBeInTheDocument();
+    expect(screen.getByText("Why chosen:")).toBeInTheDocument();
     expect(screen.getByText("Built Python services")).toBeInTheDocument();
     expect(screen.getByText(/Weaker coverage/)).toBeInTheDocument();
-    expect(screen.getByText(/1 user-added profile fact/)).toBeInTheDocument();
+    expect(screen.getByText(/1 fact you added after the original evidence plan/)).toBeInTheDocument();
     expect(requested).toHaveBeenCalledTimes(1);
   });
 
   it("stays absent for legacy portfolio-less versions", () => {
     renderDisclosure(false);
-    expect(screen.queryByRole("button", { name: "Why this evidence?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /why this experience was chosen/i })).not.toBeInTheDocument();
   });
 
   it("shows an accessible error without closing the disclosure", async () => {
@@ -99,9 +103,9 @@ describe("EvidencePortfolioDisclosure", () => {
     );
     const user = userEvent.setup();
     renderDisclosure();
-    await user.click(screen.getByRole("button", { name: "Why this evidence?" }));
+    await user.click(screen.getByRole("button", { name: /why this experience was chosen/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Portfolio unavailable");
-    expect(screen.getByRole("button", { name: "Why this evidence?" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /why this experience was chosen/i })).toHaveAttribute("aria-expanded", "true");
   });
 });

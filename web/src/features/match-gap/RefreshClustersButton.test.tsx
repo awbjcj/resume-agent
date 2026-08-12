@@ -13,7 +13,6 @@ describe("RefreshClustersButton", () => {
         onMaintain={async () => true}
         canUndo={false}
         onUndo={async () => true}
-        generation={null}
         maintenanceDue
       />,
     );
@@ -32,7 +31,6 @@ describe("RefreshClustersButton", () => {
         onMaintain={async () => true}
         canUndo={false}
         onUndo={async () => true}
-        generation="abc12345"
         maintenanceDue={false}
       />,
     );
@@ -41,6 +39,5 @@ describe("RefreshClustersButton", () => {
     // Named for what it does: this action reorganizes domains and cannot
     // assign an unassigned skill, which "Maintain taxonomy" implied it could.
     expect(screen.getByRole("button", { name: "Reorganize domains" })).toBeEnabled();
-    expect(screen.getByText(/taxonomy generation abc12345/i)).toBeVisible();
   });
 });

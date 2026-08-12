@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -96,7 +97,7 @@ export function JobModal({
   return (
     <>
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="block max-h-[92vh] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:max-w-7xl">
+      <DialogContent className="block h-[calc(100svh-1rem)] max-h-[96svh] w-full max-w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:h-[94svh] sm:max-w-[min(1760px,calc(100vw-2rem))]">
         {navEnabled && (
           <>
             <Button
@@ -134,7 +135,7 @@ export function JobModal({
             <DrawerSkeleton />
           </div>
         ) : (
-          <div className="flex max-h-[92vh] flex-col">
+          <div className="flex h-full min-h-0 flex-col">
             {/* ── Gradient-mesh masthead ─────────────────────────────── */}
             <header className="jobmodal-mesh relative shrink-0 overflow-hidden border-b px-8 py-7 pr-16">
               <div className="relative">
@@ -181,133 +182,168 @@ export function JobModal({
               </div>
             </header>
 
-            {/* ── Two-pane body: rail (fit + meta + skills) | main (JD) ─ */}
-            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-              <aside className="shrink-0 space-y-6 overflow-y-auto border-b bg-muted/30 px-6 py-6 lg:w-[400px] lg:border-b-0 lg:border-r">
-                <div className="flex justify-center">
-                  <FitDial score={job.fitScore} />
+            {/* Job context and application work stay visible together on wide screens. */}
+            <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1.08fr)_minmax(34rem,0.92fr)]">
+              <section
+                aria-labelledby="job-brief-title"
+                className="min-w-0 overflow-y-auto border-b px-5 py-6 sm:px-8 xl:border-r xl:border-b-0"
+              >
+                <div className="mx-auto max-w-4xl">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                        Role context
+                      </p>
+                      <h2 id="job-brief-title" className="mt-1 font-heading text-2xl font-semibold">
+                        Job brief
+                      </h2>
+                    </div>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                      The source material used for tailoring
+                    </span>
+                  </div>
+
+                  <div className="grid gap-6 rounded-xl border bg-muted/20 p-4 sm:p-5 lg:grid-cols-[13rem_minmax(0,1fr)]">
+                    <div className="flex justify-center lg:border-r lg:pr-5">
+                      <FitDial score={job.fitScore} />
+                    </div>
+                    <JobMeta job={job} />
+                  </div>
+
+                  <div className="rise-in mt-6" style={{ "--rise-i": 4 } as React.CSSProperties}>
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Skills requested
+                    </h3>
+                    <SkillMatrix skills={job.skills} />
+                  </div>
+
+                  {(job.status === "rejected" || job.status === "filtered") &&
+                    job.rejectReason && (
+                    <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900 dark:bg-rose-950/40">
+                      <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+                        {job.status === "filtered" || job.rejectCategory === "filtered"
+                          ? "Filtered out during discovery"
+                          : "Rejected during discovery"}
+                      </span>
+                      <p className="mt-1.5 text-[15px] leading-7 text-rose-900 dark:text-rose-100">
+                        {job.rejectReason}
+                      </p>
+                    </div>
+                  )}
+
+                  {job.fitRationale && (
+                    <div className="mt-6 rounded-xl border bg-accent/35 p-5">
+                      <h3 className="text-sm font-semibold">Why this role fits</h3>
+                      <p className="mt-1.5 text-[15px] leading-7 text-foreground/80">
+                        {job.fitRationale}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-8 border-t pt-6">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Full job description
+                    </h3>
+                    <JdBody text={job.jdText} />
+                  </div>
                 </div>
-                <JobMeta job={job} />
-                <div className="rise-in" style={{ "--rise-i": 4 } as React.CSSProperties}>
-                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Skills
-                  </h3>
-                  <SkillMatrix skills={job.skills} />
+              </section>
+
+              <aside
+                aria-labelledby="application-workspace-title"
+                className="min-w-0 overflow-y-auto bg-muted/15 px-5 py-6 sm:px-6"
+              >
+                <div className="mx-auto max-w-3xl space-y-8">
+                  <section>
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                          Tailored application
+                        </p>
+                        <h2 id="application-workspace-title" className="mt-1 font-heading text-2xl font-semibold">
+                          Resume versions
+                        </h2>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          Compare each version, understand its evidence choices, and pick what you will send.
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="tabular-nums">
+                        {job.resumeVersions.length} version{job.resumeVersions.length === 1 ? "" : "s"}
+                      </Badge>
+                    </div>
+                    {job.resumeVersions.length === 0 && (
+                      <p className="mt-4 rounded-xl border border-dashed bg-background/60 p-5 text-sm text-muted-foreground">
+                        No tailored resume yet. Use Redo to create the first version.
+                      </p>
+                    )}
+                    <ul className="mt-4 space-y-3">
+                      {job.resumeVersions.map((v) => (
+                        <VersionRow
+                          key={v.id}
+                          jobId={jobId}
+                          version={v}
+                          appliedVersionId={closedLoopJob?.application?.resumeVersionId ?? null}
+                        />
+                      ))}
+                      <RevisionRunPlaceholders
+                        jobId={jobId}
+                        kind="revise"
+                        label="Resume revision"
+                      />
+                    </ul>
+                  </section>
+
+                  <section className="border-t pt-7" aria-label="Sponsorship information">
+                    <H1BSponsorshipPanel
+                      jobId={jobId}
+                      company={job.company}
+                      initialResult={job.h1BSponsorship}
+                    />
+                  </section>
+
+                  <section className="border-t pt-7" aria-labelledby="other-application-tools-title">
+                    <div className="mb-3">
+                      <h2 id="other-application-tools-title" className="font-heading text-xl font-semibold">
+                        Application tools
+                      </h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Draft supporting material, track progress, or prepare for interviews.
+                      </p>
+                    </div>
+                    <Tabs defaultValue="coverLetters">
+                      <TabsList className="h-auto w-full flex-wrap justify-start gap-2 rounded-lg border bg-background/70 p-1.5 group-data-horizontal/tabs:h-auto">
+                        <TabsTrigger value="coverLetters" className={tabTriggerClass}>
+                          Cover letters
+                          {coverLetters.length > 0 && (
+                            <span className={tabCountClass}>{coverLetters.length}</span>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="tracking" className={tabTriggerClass}>Tracking</TabsTrigger>
+                        <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
+                      </TabsList>
+                      <div className="mt-4">
+                        <TabsContent value="coverLetters" className="mt-0">
+                          <CoverLettersTab
+                            jobId={jobId}
+                            coverLetters={coverLetters}
+                            appliedId={closedLoopJob?.application?.coverLetterId ?? null}
+                          />
+                        </TabsContent>
+                        <TabsContent value="tracking" className="mt-0">
+                          <TrackingTab job={job} onDeleted={onClose} />
+                        </TabsContent>
+                        <TabsContent value="interview" className="mt-0">
+                          <InterviewTab
+                            jobId={jobId}
+                            versions={job.resumeVersions}
+                            hasJd={Boolean(job.jdText?.trim())}
+                          />
+                        </TabsContent>
+                      </div>
+                    </Tabs>
+                  </section>
                 </div>
               </aside>
-
-              <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <Tabs defaultValue="jd" className="flex min-h-0 flex-1 flex-col">
-                  <TabsList className="h-auto w-full shrink-0 flex-wrap justify-start gap-2 rounded-none border-b bg-muted/25 px-6 py-4 text-base group-data-horizontal/tabs:h-auto">
-                    <TabsTrigger value="jd" className={tabTriggerClass}>Job description</TabsTrigger>
-                    <TabsTrigger value="versions" className={tabTriggerClass}>
-                      Versions
-                      {job.resumeVersions.length > 0 && (
-                        <span className={tabCountClass}>
-                          {job.resumeVersions.length}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="coverLetters" className={tabTriggerClass}>
-                      Cover letters
-                      {coverLetters.length > 0 && (
-                        <span className={tabCountClass}>
-                          {coverLetters.length}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="tracking" className={tabTriggerClass}>Tracking</TabsTrigger>
-                    <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
-                    <TabsTrigger value="sponsorship" className={tabTriggerClass}>Sponsorship</TabsTrigger>
-                  </TabsList>
-
-                  <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-                    <TabsContent value="jd" className="mt-0">
-                      {(job.status === "rejected" || job.status === "filtered") &&
-                        job.rejectReason && (
-                        <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900 dark:bg-rose-950/40">
-                          <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
-                            {job.status === "filtered" || job.rejectCategory === "filtered"
-                              ? "Filtered out during discovery"
-                              : "Rejected during discovery"}
-                          </span>
-                          <p className="mt-1.5 text-[15px] leading-7 text-rose-900 dark:text-rose-100">
-                            {job.rejectReason}
-                          </p>
-                        </div>
-                      )}
-                      {job.fitRationale && (
-                        <p className="mb-5 rounded-xl border bg-accent/40 p-5 text-[15px] leading-7">
-                          {job.fitRationale}
-                        </p>
-                      )}
-                      <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Job description
-                      </h3>
-                      <JdBody text={job.jdText} />
-                    </TabsContent>
-
-                    <TabsContent value="versions" className="mt-0">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Resume versions
-                      </h3>
-                      {job.resumeVersions.length === 0 && (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Not tailored yet.
-                        </p>
-                      )}
-                      <ul className="mt-2 space-y-2">
-                        {job.resumeVersions.map((v) => (
-                          <VersionRow
-                            key={v.id}
-                            jobId={jobId}
-                            version={v}
-                            appliedVersionId={
-                              closedLoopJob?.application?.resumeVersionId ?? null
-                            }
-                          />
-                        ))}
-                        <RevisionRunPlaceholders
-                          jobId={jobId}
-                          kind="revise"
-                          label="Resume revision"
-                        />
-                      </ul>
-                    </TabsContent>
-
-                    <TabsContent value="coverLetters" className="mt-0">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Cover letters
-                      </h3>
-                      <CoverLettersTab
-                        jobId={jobId}
-                        coverLetters={coverLetters}
-                        appliedId={closedLoopJob?.application?.coverLetterId ?? null}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="tracking" className="mt-0">
-                      <TrackingTab job={job} onDeleted={onClose} />
-                    </TabsContent>
-
-                    <TabsContent value="interview" className="mt-0">
-                      <InterviewTab
-                        jobId={jobId}
-                        versions={job.resumeVersions}
-                        hasJd={Boolean(job.jdText?.trim())}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="sponsorship" className="mt-0">
-                      <H1BSponsorshipPanel
-                        jobId={jobId}
-                        company={job.company}
-                        initialResult={job.h1BSponsorship}
-                      />
-                    </TabsContent>
-                  </div>
-                </Tabs>
-              </section>
             </div>
           </div>
         )}

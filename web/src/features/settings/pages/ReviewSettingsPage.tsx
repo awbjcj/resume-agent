@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Field,
@@ -20,7 +22,7 @@ import {
 import type { paths } from "@/lib/api/schema";
 import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
-import { useConfig, useSaveConfig } from "../use-config";
+import { useConfig, useSaveConfig, type ConfigPath } from "../use-config";
 import { useDraft } from "../use-draft";
 
 type ReviewDoc = paths["/api/config/review"]["get"]["responses"][200]["content"]["application/json"];
@@ -37,18 +39,24 @@ const DEFAULT_LENGTH_BUDGET = {
   targetTotalBullets: 20,
 };
 
+const ROSTERS = [
+  {
+    id: "fast",
+    label: "Fast",
+    endpoint: "/api/config/review" as ConfigPath,
+    description: "Used by default when tailoring a resume.",
+  },
+  {
+    id: "deep",
+    label: "Deep",
+    endpoint: "/api/config/review-deep" as ConfigPath,
+    description: "Used when \"Deep review\" is checked at tailor time — a separate roster, saved separately.",
+  },
+] as const;
+
 export function ReviewSettingsPage() {
-  const { data } = useConfig("/api/config/review");
-  const save = useSaveConfig("/api/config/review");
-  const { draft, setDraft, dirty, reset } = useDraft(data as ReviewDoc | undefined);
-
-  if (!draft) return <Skeleton className="h-64 w-full" />;
-  const reviewers = draft.reviewers ?? [];
-
-  const setReviewer = (index: number, patch: Partial<ReviewerEntry>) => {
-    const next = reviewers.map((r, i) => (i === index ? { ...r, ...patch } : r));
-    setDraft({ ...draft, reviewers: next });
-  };
+  const [rosterId, setRosterId] = useState<(typeof ROSTERS)[number]["id"]>("fast");
+  const roster = ROSTERS.find((r) => r.id === rosterId) ?? ROSTERS[0];
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,6 +74,45 @@ export function ReviewSettingsPage() {
           Defaults are sensible — change reviewer weights only if you know why.
         </AlertDescription>
       </Alert>
+      <Field orientation="horizontal">
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Roster</FieldLabel>
+          <ToggleGroup
+            value={[rosterId]}
+            onValueChange={(values) => {
+              const next = values.at(-1) as (typeof ROSTERS)[number]["id"] | undefined;
+              if (next) setRosterId(next);
+            }}
+          >
+            {ROSTERS.map((r) => (
+              <ToggleGroupItem key={r.id} value={r.id} aria-label={`${r.label} roster`}>
+                {r.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        <FieldDescription>{roster.description}</FieldDescription>
+      </Field>
+      <ReviewRosterForm key={roster.id} endpoint={roster.endpoint} />
+    </div>
+  );
+}
+
+function ReviewRosterForm({ endpoint }: { endpoint: ConfigPath }) {
+  const { data } = useConfig(endpoint);
+  const save = useSaveConfig(endpoint);
+  const { draft, setDraft, dirty, reset } = useDraft(data as ReviewDoc | undefined);
+
+  if (!draft) return <Skeleton className="h-64 w-full" />;
+  const reviewers = draft.reviewers ?? [];
+
+  const setReviewer = (index: number, patch: Partial<ReviewerEntry>) => {
+    const next = reviewers.map((r, i) => (i === index ? { ...r, ...patch } : r));
+    setDraft({ ...draft, reviewers: next });
+  };
+
+  return (
+    <>
       <FieldGroup>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
@@ -267,6 +314,6 @@ export function ReviewSettingsPage() {
       </FieldSet>
       <SaveBar dirty={dirty} saving={save.isPending}
         onSave={() => save.mutate(draft)} onDiscard={reset} />
-    </div>
+    </>
   );
 }

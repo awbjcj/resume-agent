@@ -52,6 +52,16 @@ def put_review(body: ReviewConfigDoc, request: Request):
     return _store(request).put("review", body)
 
 
+@router.get("/config/review-deep", response_model=ReviewConfigDoc)
+def get_review_deep(request: Request):
+    return _store(request).get("review_deep")
+
+
+@router.put("/config/review-deep", response_model=ReviewConfigDoc)
+def put_review_deep(body: ReviewConfigDoc, request: Request):
+    return _store(request).put("review_deep", body)
+
+
 @router.get("/config/prune", response_model=PruneConfigDoc)
 def get_prune(request: Request):
     return _store(request).get("prune")

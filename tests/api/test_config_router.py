@@ -120,6 +120,21 @@ def test_review_provenance_retry_budget_survives_unrelated_saves(client):
     assert saved["mergedAdvisory"] is True
 
 
+def test_review_deep_is_a_separate_document_from_review(client):
+    """The deep roster is its own file — saving one must not touch the other."""
+    fast = client.get("/api/config/review").json()
+    deep = client.get("/api/config/review-deep").json()
+
+    response = client.put(
+        "/api/config/review-deep",
+        json={**deep, "evidencePortfolioEnabled": False, "mergedAdvisory": True},
+    )
+    assert response.status_code == 200
+    assert client.get("/api/config/review-deep").json()["mergedAdvisory"] is True
+    # review.yaml (fast roster) is untouched by the review-deep PUT.
+    assert client.get("/api/config/review").json() == fast
+
+
 def test_profile_repo_filters_round_trip_and_limit_is_bounded(client):
     response = client.put(
         "/api/config/profile",

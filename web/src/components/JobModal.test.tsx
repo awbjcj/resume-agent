@@ -181,7 +181,7 @@ describe("JobModal", () => {
     expect(screen.queryByRole("button", { name: /next job/i })).not.toBeInTheDocument();
   });
 
-  it("uses the wide modal size and a tight version count", async () => {
+  it("uses the expanded workspace canvas and shows the version count", async () => {
     server.use(
       http.get("/api/jobs/42", () =>
         HttpResponse.json(
@@ -200,13 +200,10 @@ describe("JobModal", () => {
       expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog.className).toContain("sm:max-w-7xl");
-
-    const versionsTab = screen.getByRole("tab", { name: /versions/i });
-    expect(versionsTab).toHaveTextContent("Versions3");
-    const count = versionsTab.querySelector("span");
-    expect(count?.className).not.toContain("ml-1.5");
-    expect(count?.className).toContain("leading-none");
+    expect(dialog.className).toContain("1760px");
+    expect(screen.getByRole("heading", { name: "Job brief" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Resume versions" })).toBeInTheDocument();
+    expect(screen.getByText("3 versions")).toBeInTheDocument();
   });
 
   it("opens redo for the single job it is showing", async () => {
@@ -222,26 +219,25 @@ describe("JobModal", () => {
     expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
   });
 
-  it("exposes tracking and sponsorship tabs and no legacy application or management tab", async () => {
+  it("keeps resume and sponsorship visible while secondary tools stay tabbed", async () => {
     server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
     wrap(<JobModal jobId={42} onClose={() => {}} />);
 
     expect(await screen.findByRole("tab", { name: "Tracking" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Sponsorship" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Resume versions" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Historical H-1B sponsorship" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Sponsorship" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Application" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Management" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("tab")).toHaveLength(6);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
   });
 
-  it("places H-1B research inside the Sponsorship tab", async () => {
+  it("shows H-1B research without requiring a tab change", async () => {
     server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
-    const user = userEvent.setup();
     wrap(<JobModal jobId={42} onClose={() => {}} />);
 
-    await user.click(await screen.findByRole("tab", { name: "Sponsorship" }));
-
     expect(
-      screen.getByRole("heading", { name: "Historical H-1B sponsorship" }),
+      await screen.findByRole("heading", { name: "Historical H-1B sponsorship" }),
     ).toBeInTheDocument();
   });
 });

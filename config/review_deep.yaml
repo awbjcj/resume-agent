@@ -1,7 +1,7 @@
 # Full review roster: legacy five-reviewer, three-round behavior.
 max_rounds: 3
 score_threshold: 85
-evidence_portfolio_enabled: false
+evidence_portfolio_enabled: true
 reviewers:
   - name: fact-check
     gate: true

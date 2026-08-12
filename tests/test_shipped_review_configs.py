@@ -29,7 +29,7 @@ def test_shipped_deep_config_matches_legacy_roster():
     assert cfg.max_rounds == 3
     assert cfg.tailor_tier == "premium"
     assert cfg.reviser_tier == "premium"
-    assert cfg.evidence_portfolio_enabled is False
+    assert cfg.evidence_portfolio_enabled is True
     assert len(cfg.reviewers) == 5
 
 
