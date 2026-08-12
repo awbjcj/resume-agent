@@ -8,7 +8,7 @@ export function RevisionRunPlaceholders({
   label,
 }: {
   jobId: number;
-  kind: "revise" | "coverLetterRevise";
+  kind: "revise" | "coverLetterRevise" | "coverLetter";
   label: string;
 }) {
   const runs = useRunStore((state) => state.runs);

@@ -121,6 +121,26 @@ export function useSelectResume(jobId: number) {
   });
 }
 
+export function useGenerateCoverLetter(jobId: number) {
+  const { launch } = useLaunchRun();
+  return useMutation({
+    mutationFn: () =>
+      launch(
+        "coverLetter",
+        () =>
+          unwrap(
+            api.POST("/api/cover-letters", {
+              body: { jobIds: [jobId], approved: false },
+            }),
+          ),
+        // Same call the Pipeline bulk action makes, so it keeps the same board
+        // invalidation: a new cover letter can change what a job's row reports.
+        undefined,
+        { jobId },
+      ),
+  });
+}
+
 export function useReviseCoverLetter(jobId: number) {
   const { launch } = useLaunchRun();
   return useMutation({

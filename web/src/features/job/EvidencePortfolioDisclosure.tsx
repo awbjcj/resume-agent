@@ -18,6 +18,15 @@ import { useEvidencePortfolio } from "./use-evidence-portfolio";
 
 type Requirement = components["schemas"]["PortfolioRequirementOut"];
 
+const COMPACT_LIMITS = {
+  selections: 3,
+  requirements: 5,
+  terms: 5,
+  omissions: 2,
+  excerpts: 2,
+  supportedNeeds: 3,
+} as const;
+
 const COVERAGE_LABEL: Record<Requirement["coverage"], string> = {
   covered: "Supported",
   adjacent: "Related experience",
@@ -53,6 +62,7 @@ export function EvidencePortfolioDisclosure({
   available: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showAllDetails, setShowAllDetails] = useState(false);
   const panelId = useId();
   const portfolio = useEvidencePortfolio(versionId, available && expanded);
 
@@ -64,11 +74,34 @@ export function EvidencePortfolioDisclosure({
   );
   const requirements = data?.requirements ?? [];
   const selections = data?.selections ?? [];
+  const highlightTerms = data?.highlightTerms ?? [];
   const omissions = data?.omissions ?? [];
   const outsideFactIds = data?.realizedOutsideFactIds ?? [];
   const supportedRequirements = requirements.filter(
     (requirement) => requirement.coverage === "covered",
   ).length;
+  const visibleSelections = showAllDetails
+    ? selections
+    : selections.slice(0, COMPACT_LIMITS.selections);
+  const visibleRequirements = showAllDetails
+    ? requirements
+    : requirements.slice(0, COMPACT_LIMITS.requirements);
+  const visibleTerms = showAllDetails
+    ? highlightTerms
+    : highlightTerms.slice(0, COMPACT_LIMITS.terms);
+  const visibleOmissions = showAllDetails
+    ? omissions
+    : omissions.slice(0, COMPACT_LIMITS.omissions);
+  const hasHiddenDetails =
+    selections.length > COMPACT_LIMITS.selections ||
+    requirements.length > COMPACT_LIMITS.requirements ||
+    highlightTerms.length > COMPACT_LIMITS.terms ||
+    omissions.length > COMPACT_LIMITS.omissions ||
+    selections.some(
+      (selection) =>
+        (selection.selectedFactIds?.length ?? 0) > COMPACT_LIMITS.excerpts ||
+        (selection.requirementTexts?.length ?? 0) > COMPACT_LIMITS.supportedNeeds,
+    );
 
   return (
     <div className="mt-4 border-t pt-4">
@@ -78,7 +111,10 @@ export function EvidencePortfolioDisclosure({
         className="h-auto w-full justify-between rounded-lg px-3 py-2.5 text-left active:scale-[0.99]"
         aria-expanded={expanded}
         aria-controls={panelId}
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => {
+          setExpanded((value) => !value);
+          if (expanded) setShowAllDetails(false);
+        }}
       >
         <span className="flex min-w-0 items-center gap-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
@@ -137,12 +173,17 @@ export function EvidencePortfolioDisclosure({
                         : "Planned selection"}
                   </Badge>
                 </div>
-                {(data.highlightTerms ?? []).length ? (
+                {highlightTerms.length ? (
                   <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Terms emphasized">
                     <span className="mr-1 text-xs font-medium text-muted-foreground">Emphasized:</span>
-                    {(data.highlightTerms ?? []).map((term) => (
+                    {visibleTerms.map((term) => (
                       <Badge key={term} variant="secondary">{term}</Badge>
                     ))}
+                    {!showAllDetails && highlightTerms.length > visibleTerms.length ? (
+                      <span className="text-xs text-muted-foreground">
+                        +{highlightTerms.length - visibleTerms.length} more
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
               </header>
@@ -165,10 +206,17 @@ export function EvidencePortfolioDisclosure({
                   </p>
                   {selections.length ? (
                     <ol className="mt-3 space-y-3">
-                      {selections.map((selection) => {
-                        const selectedExcerpts = (selection.selectedFactIds ?? [])
+                      {visibleSelections.map((selection) => {
+                        const allSelectedExcerpts = (selection.selectedFactIds ?? [])
                           .map((factId) => excerpts.get(factId))
                           .filter((excerpt) => excerpt !== undefined);
+                        const selectedExcerpts = showAllDetails
+                          ? allSelectedExcerpts
+                          : allSelectedExcerpts.slice(0, COMPACT_LIMITS.excerpts);
+                        const requirementTexts = selection.requirementTexts ?? [];
+                        const visibleRequirementTexts = showAllDetails
+                          ? requirementTexts
+                          : requirementTexts.slice(0, COMPACT_LIMITS.supportedNeeds);
                         return (
                           <li key={selection.ownerId} className="rounded-lg border bg-background p-3">
                             <div className="flex flex-wrap items-center gap-2">
@@ -185,12 +233,17 @@ export function EvidencePortfolioDisclosure({
                               <span className="font-medium">Why chosen: </span>
                               <span className="text-muted-foreground">{selection.rationale}</span>
                             </p>
-                            {(selection.requirementTexts ?? []).length ? (
+                            {requirementTexts.length ? (
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 <span className="text-xs font-medium text-muted-foreground">Supports</span>
-                                {(selection.requirementTexts ?? []).map((requirement) => (
+                                {visibleRequirementTexts.map((requirement) => (
                                   <Badge key={requirement} variant="secondary">{requirement}</Badge>
                                 ))}
+                                {!showAllDetails && requirementTexts.length > visibleRequirementTexts.length ? (
+                                  <span className="text-xs text-muted-foreground">
+                                    +{requirementTexts.length - visibleRequirementTexts.length} more
+                                  </span>
+                                ) : null}
                               </div>
                             ) : null}
                             {selectedExcerpts.length ? (
@@ -203,6 +256,11 @@ export function EvidencePortfolioDisclosure({
                                     <li key={excerpt.factId}>{excerpt.text}</li>
                                   ))}
                                 </ul>
+                                {!showAllDetails && allSelectedExcerpts.length > selectedExcerpts.length ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    +{allSelectedExcerpts.length - selectedExcerpts.length} more supporting fact{allSelectedExcerpts.length - selectedExcerpts.length === 1 ? "" : "s"}
+                                  </p>
+                                ) : null}
                               </div>
                             ) : null}
                           </li>
@@ -214,6 +272,11 @@ export function EvidencePortfolioDisclosure({
                       No work or project entries were selected for this version.
                     </p>
                   )}
+                  {!showAllDetails && selections.length > visibleSelections.length ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      +{selections.length - visibleSelections.length} more selected experience entr{selections.length - visibleSelections.length === 1 ? "y" : "ies"}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-5">
@@ -223,7 +286,7 @@ export function EvidencePortfolioDisclosure({
                       Ranked by importance, with honest coverage from your profile.
                     </p>
                     <ol className="mt-3 space-y-2">
-                      {requirements.map((requirement) => (
+                      {visibleRequirements.map((requirement) => (
                         <li key={`${requirement.priority}-${requirement.text}`} className="rounded-lg border bg-background p-3">
                           <div className="flex items-start gap-2">
                             <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-semibold tabular-nums">
@@ -243,6 +306,11 @@ export function EvidencePortfolioDisclosure({
                         </li>
                       ))}
                     </ol>
+                    {!showAllDetails && requirements.length > visibleRequirements.length ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        +{requirements.length - visibleRequirements.length} lower-priority requirement{requirements.length - visibleRequirements.length === 1 ? "" : "s"}
+                      </p>
+                    ) : null}
                   </div>
 
                   {omissions.length ? (
@@ -252,13 +320,18 @@ export function EvidencePortfolioDisclosure({
                         Relevant space was reserved for stronger matches.
                       </p>
                       <ul className="mt-2 space-y-2">
-                        {omissions.map((omission) => (
+                        {visibleOmissions.map((omission) => (
                           <li key={omission.ownerId} className="rounded-md border border-dashed bg-background/60 p-2.5 text-xs leading-5 text-muted-foreground">
                             <span className="font-medium capitalize text-foreground">Other {omission.ownerKind}: </span>
                             {omission.rationale}
                           </li>
                         ))}
                       </ul>
+                      {!showAllDetails && omissions.length > visibleOmissions.length ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          +{omissions.length - visibleOmissions.length} more omitted entr{omissions.length - visibleOmissions.length === 1 ? "y" : "ies"}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -268,6 +341,19 @@ export function EvidencePortfolioDisclosure({
                 <p className="border-t bg-background/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
                   This revision also includes {outsideFactIds.length} fact{outsideFactIds.length === 1 ? "" : "s"} you added after the original evidence plan.
                 </p>
+              ) : null}
+
+              {hasHiddenDetails ? (
+                <div className="border-t bg-background/60 px-4 py-3">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-expanded={showAllDetails}
+                    onClick={() => setShowAllDetails((value) => !value)}
+                  >
+                    {showAllDetails ? "Show concise evidence" : "Show full evidence details"}
+                  </Button>
+                </div>
               ) : null}
             </div>
           ) : null}

@@ -108,4 +108,52 @@ describe("EvidencePortfolioDisclosure", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Portfolio unavailable");
     expect(screen.getByRole("button", { name: /why this experience was chosen/i })).toHaveAttribute("aria-expanded", "true");
   });
+
+  it("keeps dense evidence concise until the user asks for full details", async () => {
+    const densePayload = {
+      ...payload,
+      highlightTerms: Array.from({ length: 7 }, (_, index) => `Skill ${index + 1}`),
+      requirements: Array.from({ length: 7 }, (_, index) => ({
+        ...payload.requirements[0],
+        priority: index + 1,
+        text: `Requirement ${index + 1}`,
+      })),
+      selections: [
+        {
+          ...payload.selections[0],
+          requirementTexts: ["Need 1", "Need 2", "Need 3", "Need 4"],
+          selectedFactIds: ["bullet-1", "bullet-2", "bullet-3"],
+        },
+      ],
+      evidenceExcerpts: [
+        payload.evidenceExcerpts[0],
+        { ...payload.evidenceExcerpts[0], factId: "bullet-2", text: "Led platform migration" },
+        { ...payload.evidenceExcerpts[0], factId: "bullet-3", text: "Reduced deployment time" },
+      ],
+    };
+    server.use(
+      http.get("/api/resume-versions/9/evidence-portfolio", () =>
+        HttpResponse.json(densePayload),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDisclosure();
+
+    await user.click(screen.getByRole("button", { name: /why this experience was chosen/i }));
+
+    const showAll = await screen.findByRole("button", { name: "Show full evidence details" });
+    expect(showAll).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Requirement 6")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reduced deployment time")).not.toBeInTheDocument();
+    expect(screen.getAllByText("+2 more").length).toBeGreaterThan(0);
+
+    await user.click(showAll);
+
+    expect(screen.getByText("Requirement 6")).toBeInTheDocument();
+    expect(screen.getByText("Reduced deployment time")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show concise evidence" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
 });

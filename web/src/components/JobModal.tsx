@@ -97,7 +97,7 @@ export function JobModal({
   return (
     <>
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="block h-[calc(100svh-1rem)] max-h-[96svh] w-full max-w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:h-[94svh] sm:max-w-[min(1760px,calc(100vw-2rem))]">
+      <DialogContent className="block max-h-[92vh] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:max-w-7xl">
         {navEnabled && (
           <>
             <Button
@@ -135,7 +135,7 @@ export function JobModal({
             <DrawerSkeleton />
           </div>
         ) : (
-          <div className="flex h-full min-h-0 flex-col">
+          <div className="flex max-h-[92vh] min-h-0 flex-col">
             {/* ── Gradient-mesh masthead ─────────────────────────────── */}
             <header className="jobmodal-mesh relative shrink-0 overflow-hidden border-b px-8 py-7 pr-16">
               <div className="relative">

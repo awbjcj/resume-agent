@@ -200,7 +200,8 @@ describe("JobModal", () => {
       expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog.className).toContain("1760px");
+    expect(dialog.className).toContain("sm:max-w-7xl");
+    expect(dialog.className).not.toContain("1760px");
     expect(screen.getByRole("heading", { name: "Job brief" })).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole("tab", { name: /resumes/i }));
