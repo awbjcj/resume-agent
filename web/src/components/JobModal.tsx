@@ -216,11 +216,11 @@ export function JobModal({
                     </span>
                   </div>
 
-                  <div className="grid gap-6 rounded-xl border bg-background/70 p-4 sm:p-5 lg:grid-cols-[13rem_minmax(16rem,0.75fr)_minmax(24rem,1.25fr)]">
-                    <div className="flex justify-center lg:border-r lg:pr-5">
-                      <FitDial score={job.fitScore} />
-                    </div>
-                    <div className="lg:border-r lg:pr-5">
+                  <div className="grid gap-6 rounded-xl border bg-background/70 p-4 sm:p-5 lg:grid-cols-[minmax(18rem,0.7fr)_minmax(28rem,1.3fr)]">
+                    <div className="space-y-5 lg:border-r lg:pr-6">
+                      <div className="flex justify-center">
+                        <FitDial score={job.fitScore} />
+                      </div>
                       <JobMeta job={job} />
                     </div>
                     <div className="rise-in" style={{ "--rise-i": 4 } as React.CSSProperties}>
