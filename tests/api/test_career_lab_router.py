@@ -1,6 +1,7 @@
 """Career Lab REST contract and run-backed lifecycle."""
 
 import time
+from typing import Literal
 
 from fastapi.testclient import TestClient
 
@@ -188,6 +189,191 @@ def test_start_uses_keys_from_the_effective_app_settings(monkeypatch, tmp_path):
         )
 
     assert response.status_code == 202, response.text
+
+
+def _seed_job(app, company: str) -> int:
+    from resume_agent.db import get_session
+    from resume_agent.tracking.tables import Job
+
+    with get_session(app.state.engine) as session:
+        job = Job(source="manual", jd_text="Build things.", company=company, title="Eng")
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        assert job.id is not None
+        return job.id
+
+
+def _start_for_job(client, job_id: int | None):
+    body: dict = {"message": "What should I ask about?", "skill": "salary-negotiation-prep"}
+    if job_id is not None:
+        body["context"] = {"jobId": job_id}
+    return client.post("/api/career-lab/sessions", json=body)
+
+
+def test_sessions_anchor_to_a_job_and_scope_the_active_conflict(monkeypatch, tmp_path):
+    """Two jobs may each hold an open thread; one job may not hold two."""
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key",
+        lambda _model, **_kwargs: "key",
+    )
+    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
+    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
+    client = _client(tmp_path)
+    with client:
+        first = _seed_job(client.app, "Acme")
+        second = _seed_job(client.app, "Globex")
+
+        started = _start_for_job(client, first)
+        assert started.status_code == 202, started.text
+        # The run names its job: a start has no session id yet, so this is the
+        # only thing that tells the Career Lab page the run is not its own.
+        assert started.json()["meta"]["jobId"] == first
+        first_session = _wait(client, started.json()["runId"])["result"]
+        assert first_session["jobId"] == first
+
+        # A different job is a different bucket, so this must be accepted.
+        other = _start_for_job(client, second)
+        assert other.status_code == 202, other.text
+        assert _wait(client, other.json()["runId"])["result"]["jobId"] == second
+
+        # The same job already has an open thread.
+        conflict = _start_for_job(client, first)
+        assert conflict.status_code == 409
+        assert conflict.json()["error"]["code"] == "SESSION_ACTIVE"
+        assert conflict.json()["error"]["details"]["sessionId"] == (
+            first_session["sessionId"]
+        )
+
+        # An un-anchored thread is its own bucket and stays available.
+        unanchored = _start_for_job(client, None)
+        assert unanchored.status_code == 202, unanchored.text
+        assert _wait(client, unanchored.json()["runId"])["result"]["jobId"] is None
+
+        listing = client.get("/api/career-lab/sessions", params={"jobId": first})
+        assert listing.status_code == 200
+        rows = listing.json()["sessions"]
+        assert [row["sessionId"] for row in rows] == [first_session["sessionId"]]
+        assert rows[0]["jobId"] == first
+        assert listing.json()["pagination"]["totalItems"] == 1
+        # Unfiltered still sees all three.
+        assert len(client.get("/api/career-lab/sessions").json()["sessions"]) == 3
+
+
+def test_deleting_a_job_removes_its_career_lab_threads(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key",
+        lambda _model, **_kwargs: "key",
+    )
+    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
+    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
+    client = _client(tmp_path)
+    with client:
+        job_id = _seed_job(client.app, "Acme")
+        started = _start_for_job(client, job_id)
+        assert started.status_code == 202, started.text
+        session_id = _wait(client, started.json()["runId"])["result"]["sessionId"]
+
+        assert client.delete(f"/api/jobs/{job_id}").status_code == 204
+        assert client.get(f"/api/career-lab/sessions/{session_id}").status_code == 404
+        assert client.get("/api/career-lab/sessions").json()["sessions"] == []
+
+
+def _write_session(
+    root,
+    session_id,
+    *,
+    started_at,
+    status: Literal["active", "ended"] = "active",
+    job_id=None,
+):
+    from resume_agent.career_lab.models import CareerLabSession
+    from resume_agent.career_lab.store import store
+
+    root.mkdir(parents=True, exist_ok=True)
+    store.write(
+        root,
+        CareerLabSession(
+            session_id=session_id,
+            started_at=started_at,
+            status=status,
+            ended_at=None if status == "active" else started_at,
+            job_id=job_id,
+        ).model_dump(mode="json"),
+    )
+
+
+def test_listing_puts_open_threads_first_then_newest(tmp_path):
+    """Page 1 must always hold the active thread, whatever the page size.
+
+    A job's Career Lab tab decides whether to offer Start from page 1 alone, so
+    an active thread stranded on a later page offered a Start the API then 409'd.
+    """
+    client = _client(tmp_path)
+    with client:
+        root = tmp_path / "data" / "career-lab"
+        # The open thread is the *oldest*: newer ones have since ended.
+        _write_session(root, "open-old", started_at="2026-08-01T00:00:00+00:00")
+        _write_session(root, "ended-new", started_at="2026-08-09T00:00:00+00:00", status="ended")
+        _write_session(root, "ended-mid", started_at="2026-08-05T00:00:00+00:00", status="ended")
+
+        rows = client.get("/api/career-lab/sessions").json()["sessions"]
+        assert [row["sessionId"] for row in rows] == ["open-old", "ended-new", "ended-mid"]
+
+        # And it survives a page size that would otherwise strand it.
+        first_page = client.get(
+            "/api/career-lab/sessions", params={"pageSize": 1}
+        ).json()["sessions"]
+        assert [row["sessionId"] for row in first_page] == ["open-old"]
+
+
+def test_listing_labels_anchored_threads_with_the_job(tmp_path):
+    client = _client(tmp_path)
+    with client:
+        job_id = _seed_job(client.app, "Globex")
+        root = tmp_path / "data" / "career-lab"
+        _write_session(root, "anchored", started_at="2026-08-09T00:00:00+00:00", job_id=job_id)
+        _write_session(root, "loose", started_at="2026-08-01T00:00:00+00:00")
+
+        rows = {
+            row["sessionId"]: row
+            for row in client.get("/api/career-lab/sessions").json()["sessions"]
+        }
+        assert rows["anchored"]["jobCompany"] == "Globex"
+        assert rows["anchored"]["jobTitle"] == "Eng"
+        # An un-anchored thread has no job to name.
+        assert rows["loose"]["jobCompany"] is None
+        assert rows["loose"]["jobTitle"] is None
+
+
+def test_listing_tolerates_a_thread_whose_job_is_gone(tmp_path):
+    """A stale anchor must not blank the page or 500 — it just has no label."""
+    client = _client(tmp_path)
+    with client:
+        root = tmp_path / "data" / "career-lab"
+        _write_session(root, "orphan", started_at="2026-08-09T00:00:00+00:00", job_id=4242)
+
+        rows = client.get("/api/career-lab/sessions").json()["sessions"]
+        assert [row["sessionId"] for row in rows] == ["orphan"]
+        assert rows[0]["jobId"] == 4242
+        assert rows[0]["jobCompany"] is None
+
+
+def test_job_delete_survives_a_corrupt_career_lab_session_file(tmp_path):
+    """The cascade runs after the job row is committed, so it must not 500.
+
+    A single unreadable file used to fail the whole scan, turning every future
+    job delete into a 500 for a job that had in fact already been removed.
+    """
+    client = _client(tmp_path)
+    with client:
+        job_id = _seed_job(client.app, "Acme")
+        career_lab_dir = tmp_path / "data" / "career-lab"
+        career_lab_dir.mkdir(parents=True, exist_ok=True)
+        (career_lab_dir / "session-bad.json").write_text("{not json", encoding="utf-8")
+
+        assert client.delete(f"/api/jobs/{job_id}").status_code == 204
+        assert client.get("/api/career-lab/sessions").json()["sessions"] == []
 
 
 def test_ambiguous_route_returns_selection_without_persisting(monkeypatch, tmp_path):

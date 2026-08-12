@@ -498,7 +498,7 @@ def career_lab_cmd(
     db_url: str | None = typer.Option(None, "--db-url"),
 ) -> None:
     """Draft career guidance in an interactive, resumable Career Lab session."""
-    from resume_agent.career_lab.store import active_session
+    from resume_agent.career_lab.store import active_session_for_job
     from resume_agent.career_skills.models import AgentFamily
     from resume_agent.career_skills.registry import CareerSkillRegistry, SkillUnavailable
     from resume_agent.services import career_lab as career_service
@@ -565,7 +565,11 @@ def career_lab_cmd(
         if not stream_enabled and view.get("turns"):
             typer.echo(f"\nCareer Lab: {view['turns'][-1]['text']}")
 
-    active = active_session(root)
+    # Scoped to the job asked about: `--job-id 7` resumes job 7's thread, and a
+    # bare invocation resumes the un-anchored one. Resuming "whatever is open"
+    # was exact only while one thread could exist at a time — now it could adopt
+    # a thread anchored to another job and append this job's context to it.
+    active = active_session_for_job(root, job_id)
     if active is None:
         initial = typer.prompt("You")
         if initial.strip().casefold() in {"end", "quit"}:

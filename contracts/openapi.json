@@ -1490,6 +1490,17 @@
             "title": "Goal",
             "type": "string"
           },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
           "sessionId": {
             "title": "Sessionid",
             "type": "string"
@@ -1570,6 +1581,39 @@
             "default": "",
             "title": "Goal",
             "type": "string"
+          },
+          "jobCompany": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobcompany"
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
+          "jobTitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobtitle"
           },
           "sessionId": {
             "title": "Sessionid",
@@ -13882,6 +13926,23 @@
               "default": false,
               "title": "Includearchived",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "jobId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jobid"
             }
           },
           {

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useRunStore } from "@/lib/runs/store";
 
-import { ACTIVE_RUN_STATUSES, latestArtifactRun } from "./artifact-runs";
+import { ACTIVE_RUN_STATUSES, latestJobRun } from "./artifact-runs";
 import { CoverLetterRow, type CoverLetterItem } from "./CoverLetterRow";
 import { RevisionRunPlaceholders } from "./RevisionRunPlaceholders";
 import { useGenerateCoverLetter } from "./use-job-mutations";
@@ -20,7 +20,7 @@ export function CoverLettersTab({
 }) {
   const generate = useGenerateCoverLetter(jobId);
   const runs = useRunStore((state) => state.runs);
-  const generateRun = latestArtifactRun(runs, "coverLetter", "jobId", jobId);
+  const generateRun = latestJobRun(runs, "coverLetter", jobId);
   // `generating` is the run-store truth; `isPending` is the brief window before
   // the accepted run reaches the store. Only the former replaces the empty
   // state, so the placeholder below takes over without a gap in between.
@@ -28,6 +28,13 @@ export function CoverLettersTab({
     generateRun !== undefined && ACTIVE_RUN_STATUSES.includes(generateRun.status);
   const busy = generate.isPending || generating;
   const empty = coverLetters.length === 0;
+  // One place knows what "busy" looks like, for both buttons below.
+  const icon = busy ? (
+    <Spinner data-icon="inline-start" />
+  ) : (
+    <FilePlus2 data-icon="inline-start" />
+  );
+  const label = (idle: string) => (busy ? "Generating…" : idle);
 
   return (
     <>
@@ -44,12 +51,8 @@ export function CoverLettersTab({
               disabled={busy}
               onClick={() => generate.mutate()}
             >
-              {busy ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <FilePlus2 data-icon="inline-start" />
-              )}
-              {busy ? "Generating…" : "Generate cover letter"}
+              {icon}
+              {label("Generate cover letter")}
             </Button>
           </li>
         ) : null}
@@ -80,12 +83,8 @@ export function CoverLettersTab({
             disabled={busy}
             onClick={() => generate.mutate()}
           >
-            {busy ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <FilePlus2 data-icon="inline-start" />
-            )}
-            {busy ? "Generating…" : "Generate another"}
+            {icon}
+            {label("Generate another")}
           </Button>
         </div>
       )}

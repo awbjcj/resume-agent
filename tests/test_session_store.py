@@ -113,6 +113,48 @@ def test_delete_removes_file_and_rejects_unknown(store, tmp_path):
         store.delete(tmp_path, "s1")
 
 
+def test_delete_where_removes_only_matches_including_archived(store, tmp_path):
+    _seed(store, tmp_path, "keep")
+    _seed(store, tmp_path, "drop-active")
+    _seed(store, tmp_path, "drop-archived", status="ended")
+    store.archive(tmp_path, "drop-archived")
+
+    removed = store.delete_where(tmp_path, lambda row: row["session_id"].startswith("drop"))
+
+    assert removed == 2
+    assert [row["session_id"] for row in store.list(tmp_path, include_archived=True)] == ["keep"]
+    # Idempotent: nothing left to match is zero, not an error.
+    assert store.delete_where(tmp_path, lambda row: row["session_id"].startswith("drop")) == 0
+
+
+def test_list_skips_an_unreadable_file_but_load_still_raises(store, tmp_path, caplog):
+    """One corrupt file must not take down enumeration for the whole workspace.
+
+    `load` is a request for one named session and stays strict; `list` backs
+    active-session checks and bulk deletes, where failing hard on an unrelated
+    bad file is worse than omitting it.
+    """
+    _seed(store, tmp_path, "good")
+    (tmp_path / "session-bad.json").write_text("{not json", encoding="utf-8")
+
+    with caplog.at_level("WARNING"):
+        rows = store.list(tmp_path)
+
+    assert [row["session_id"] for row in rows] == ["good"]
+    assert "session-bad.json" in caplog.text
+    with pytest.raises(ValueError, match="invalid probe session"):
+        store.load(tmp_path, "bad")
+
+
+def test_delete_where_survives_an_unreadable_sibling(store, tmp_path):
+    _seed(store, tmp_path, "drop-me")
+    (tmp_path / "session-bad.json").write_text("{not json", encoding="utf-8")
+
+    assert store.delete_where(tmp_path, lambda row: row["session_id"] == "drop-me") == 1
+    # The corrupt file is left alone rather than guessed about.
+    assert (tmp_path / "session-bad.json").exists()
+
+
 def test_rename_trims_and_validates_title(store, tmp_path):
     _seed(store, tmp_path, "s1")
     renamed = store.rename(tmp_path, "s1", "  Interview practice  ")

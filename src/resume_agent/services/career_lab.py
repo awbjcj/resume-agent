@@ -17,7 +17,7 @@ from resume_agent.career_lab.models import (
     CareerLabRoute,
 )
 from resume_agent.career_lab.store import (
-    active_session,
+    active_session_for_job,
     append_turns,
     create_session,
     end_session,
@@ -328,6 +328,7 @@ def _view(session: dict) -> dict:
         "endedAt": session.get("ended_at"),
         "status": session["status"],
         "archivedAt": session.get("archived_at"),
+        "jobId": session.get("job_id"),
         "turns": [
             {
                 "turnId": turn["turn_id"],
@@ -477,11 +478,15 @@ def run_start_turn(
     settings: Settings | None = None,
 ) -> dict:
     root = _career_lab_root(root)
-    if active_session(root) is not None:
+    refs = context_refs or CareerLabContextRefs()
+    # The router pre-flights this, but the run is async: by the time the worker
+    # starts, another thread for the same job may have opened. Scoped to the
+    # same job as the eventual `create_session` below, or the two disagree and
+    # a start pays for its agent calls before failing.
+    if active_session_for_job(root, refs.job_id) is not None:
         raise ValueError("an active Career Lab session already exists")
     text = _clean_message(message)
     goal = _clean_goal(goal)
-    refs = context_refs or CareerLabContextRefs()
     # The session is created only after route, persona, formatter, cancellation,
     # and schema validation pass. A rejected or stopped start leaves no file.
     session = {
@@ -508,7 +513,9 @@ def run_start_turn(
     if isinstance(prepared, dict):
         return prepared
     resolved, assistant_text, artifact, notice, meta = prepared
-    created = create_session(root, goal=goal, title=goal or text[:120])
+    created = create_session(
+        root, goal=goal, title=goal or text[:120], job_id=refs.job_id
+    )
     append_turns(
         root,
         created["session_id"],

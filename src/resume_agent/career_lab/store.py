@@ -23,16 +23,23 @@ def create_session(
     session_id: str | None = None,
     goal: str = "",
     title: str = "",
+    job_id: int | None = None,
 ) -> dict:
-    """Create one active session, rejecting a second active transcript."""
+    """Create one active session per job, rejecting a second for the same job.
+
+    Anchoring is per job because a thread about one role must not lock out a
+    thread about another. ``job_id=None`` is its own bucket: the un-anchored
+    Career Lab thread still allows only one at a time.
+    """
     with store.lock():
-        if store.active(root):
+        if active_session_for_job(root, job_id) is not None:
             raise ValueError("an active Career Lab session already exists")
         session = CareerLabSession(
             session_id=session_id or uuid.uuid4().hex,
             started_at=now_iso(),
             goal=goal.strip(),
             title=(title.strip() or goal.strip())[:120],
+            job_id=job_id,
         )
         store.write(root, session.model_dump(mode="json"))
         return store.load(root, session.session_id)
@@ -42,13 +49,29 @@ def load_session(root: Path | str, session_id: str) -> dict:
     return store.load(root, session_id)
 
 
-def list_sessions(root: Path | str, *, include_archived: bool = False) -> list[dict]:
-    return store.list(root, include_archived=include_archived)
+def list_sessions(
+    root: Path | str,
+    *,
+    job_id: int | None = None,
+    include_archived: bool = False,
+) -> list[dict]:
+    rows = store.list(root, include_archived=include_archived)
+    if job_id is not None:
+        rows = [row for row in rows if row.get("job_id") == job_id]
+    return rows
 
 
-def active_session(root: Path | str) -> dict | None:
-    rows = store.active(root)
-    return rows[0] if rows else None
+def active_session_for_job(root: Path | str, job_id: int | None) -> dict | None:
+    """The open thread for one job — or the un-anchored one when ``job_id`` is None."""
+    return next(
+        (row for row in store.active(root) if row.get("job_id") == job_id),
+        None,
+    )
+
+
+def delete_sessions_for_job(root: Path | str, job_id: int) -> int:
+    """Drop every thread anchored to a deleted job. Returns how many were removed."""
+    return store.delete_where(root, lambda row: row.get("job_id") == job_id)
 
 
 def rename_session(root: Path | str, session_id: str, title: str) -> dict:

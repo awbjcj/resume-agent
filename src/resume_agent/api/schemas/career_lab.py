@@ -119,6 +119,7 @@ class CareerLabSessionOut(CamelModel):
     ended_at: str | None = None
     status: Literal["active", "ended"]
     archived_at: str | None = None
+    job_id: int | None = None
     turns: list[CareerLabTurnOut] = Field(default_factory=list)
 
 
@@ -130,6 +131,13 @@ class CareerLabSessionSummaryOut(CamelModel):
     ended_at: str | None = None
     status: Literal["active", "ended"]
     archived_at: str | None = None
+    job_id: int | None = None
+    # The anchored job's current identity, resolved live rather than frozen into
+    # the session: Career Lab deliberately snapshots nothing, and without it
+    # several job-anchored threads are indistinguishable in a history list.
+    # `title` above is the *session* title, hence the `job_` prefix here.
+    job_company: str | None = None
+    job_title: str | None = None
     turn_count: int = 0
 
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Bot, FileText, ListChecks, MessageCircleMore, Sparkles, SquareCheckBig } from "lucide-react";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
@@ -56,10 +57,33 @@ const CAREER_LAB_ICON = <Sparkles className="size-4" aria-hidden="true" />;
 export function CareerLabPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const sessions = useCareerLabSessions(showArchived);
+  const [searchParams] = useSearchParams();
+  const sessions = useCareerLabSessions({ includeArchived: showArchived });
   const skills = useCareerLabSkills();
-  const activeSummary = sessions.data?.sessions?.find((row) => row.status === "active");
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  // Active threads are per job, so there can be several. `activeSummary` picks
+  // which one to *show* — the un-anchored thread this page owns, else the most
+  // recent — rather than whatever the directory scan listed first.
+  // `unanchoredActive` is a separate question: whether this page may *start* one.
+  // Gating creation on `activeSummary` conflated the two, so a single thread
+  // opened from any job modal hid the New-session button (and the empty state
+  // that also offers it), leaving no way to start an un-anchored thread the
+  // backend would happily accept — `job_id=None` is its own bucket.
+  const { activeSummary, unanchoredActive } = useMemo(() => {
+    const active = (sessions.data?.sessions ?? [])
+      .filter((row) => row.status === "active")
+      .sort((left, right) => right.startedAt.localeCompare(left.startedAt));
+    const unanchored = active.find((row) => row.jobId == null);
+    return { activeSummary: unanchored ?? active[0], unanchoredActive: unanchored };
+  }, [sessions.data?.sessions]);
+  // `?session=` is an opening selection, not a standing one — a job's Career Lab
+  // tab links here to name the thread to show. It seeds the selection instead of
+  // acting as a fallback beneath it, because a fallback outlives the action meant
+  // to clear it: deleting or archiving the linked thread resets
+  // `selectedSessionId`, and a still-present param would immediately re-select
+  // the row that no longer exists.
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    () => searchParams.get("session"),
+  );
   const displayedSessionId = selectedSessionId ?? activeSummary?.sessionId ?? null;
   const session = useCareerLabSession(displayedSessionId);
   const start = useStartCareerLab();
@@ -231,8 +255,15 @@ export function CareerLabPage() {
   const error = stream.error || runError;
   const historyItems: ChatSessionHistoryItem[] = useMemo(() => (sessions.data?.sessions ?? []).map((row) => ({
     id: row.sessionId,
+    // The anchored job leads the detail line: threads started from a job modal
+    // often share a title, and without it several were indistinguishable here.
+    detail: [
+      [row.jobCompany, row.jobTitle].filter(Boolean).join(" · "),
+      row.status === "active" ? "Drafting now" : "Completed",
+      `${row.turnCount} turns`,
+      new Date(row.startedAt).toLocaleDateString(),
+    ].filter(Boolean).join(" · "),
     title: row.title || row.goal || "Untitled Career Lab",
-    detail: `${row.status === "active" ? "Drafting now" : "Completed"} · ${row.turnCount} turns · ${new Date(row.startedAt).toLocaleDateString()}`,
     status: row.status,
     archived: Boolean(row.archivedAt),
   })), [sessions.data?.sessions]);
@@ -360,8 +391,8 @@ export function CareerLabPage() {
         isError={sessions.isError}
         onRetry={() => void sessions.refetch()}
         emptyMessage="No saved Career Lab sessions yet. Start one when you are ready to draft."
-        createLabel={activeSummary ? undefined : "New Career Lab session"}
-        onCreate={activeSummary ? undefined : () => setNewOpen(true)}
+        createLabel={unanchoredActive ? undefined : "New Career Lab session"}
+        onCreate={unanchoredActive ? undefined : () => setNewOpen(true)}
         onRename={(sessionId, title) => void rename.mutateAsync({ sessionId, title })}
         onArchive={(sessionId) => archive.mutate({ sessionId }, { onSuccess: () => { if (sessionId === displayedSessionId) setSelectedSessionId(null); } })}
         onUnarchive={(sessionId) => unarchive.mutate({ sessionId })}

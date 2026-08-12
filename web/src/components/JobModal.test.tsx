@@ -232,9 +232,10 @@ describe("JobModal", () => {
     expect(screen.getByRole("tab", { name: "Cover letters" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Tracking" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Interview" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Career Lab" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Application" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Management" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("tab")).toHaveLength(6);
+    expect(screen.getAllByRole("tab")).toHaveLength(7);
   });
 
   it("gives H-1B research the full sponsorship canvas", async () => {

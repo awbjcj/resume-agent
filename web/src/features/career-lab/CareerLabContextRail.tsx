@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { components } from "@/lib/api/schema";
 
 import {
   type CareerLabContext,
@@ -16,6 +17,7 @@ import {
 } from "./use-career-lab";
 
 type SkillsQuery = Pick<ReturnType<typeof useCareerLabSkills>, "data" | "isPending">;
+type ResumeVersion = components["schemas"]["ResumeVersionOut"];
 
 function jobMatchesSearch(job: CareerLabJob, query: string) {
   if (!query) return true;
@@ -66,6 +68,51 @@ export function CareerLabSkillPicker({
       </select>
       {!skill && rows.length > 0 ? <p className="text-xs leading-5 text-muted-foreground">Ambiguous requests will ask you to choose a skill.</p> : null}
       {unavailable ? <p className="text-xs leading-5 text-destructive">{unavailable.unavailableReason ?? "This skill is unavailable."}</p> : null}
+    </div>
+  );
+}
+
+/** The tailored-resume selector, shared with `CareerLabSetupDialog`.
+ *
+ *  Extracted because the two copies had already drifted apart on their focus
+ *  styles while otherwise being identical down to the option text. */
+export function CareerLabResumeVersionPicker({
+  id,
+  versions,
+  value,
+  onChange,
+  emptyLabel,
+  disabled = false,
+  hint,
+}: {
+  id: string;
+  versions: Pick<ResumeVersion, "id" | "round" | "origin">[];
+  value: number | undefined;
+  onChange: (value: number | undefined) => void;
+  emptyLabel: string;
+  disabled?: boolean;
+  hint?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>Resume version</Label>
+      <select
+        id={id}
+        disabled={disabled}
+        value={value ?? ""}
+        onChange={(event) =>
+          onChange(event.target.value ? Number(event.target.value) : undefined)
+        }
+        className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <option value="">{emptyLabel}</option>
+        {versions.map((version) => (
+          <option key={version.id} value={version.id}>
+            Round {version.round} · {version.origin}
+          </option>
+        ))}
+      </select>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -261,20 +308,19 @@ export function CareerLabContextRail({
                 {jobs.isError ? <p className="text-xs text-destructive">Jobs could not be loaded.</p> : null}
                 {!jobs.isPending && !jobs.isError && filteredJobs.length === 0 ? <p className="text-xs text-muted-foreground">No jobs match these filters.</p> : null}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="career-resume-version">Resume version</Label>
-                <select
-                  id="career-resume-version"
-                  disabled={!context.jobId || jobDetail.isPending}
-                  value={context.resumeVersionId ?? ""}
-                  onChange={(event) => updateContext({ resumeVersionId: event.target.value ? Number(event.target.value) : undefined })}
-                  className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="">{context.jobId ? "No resume version" : "Choose a job first"}</option>
-                  {(jobDetail.data?.resumeVersions ?? []).map((version) => <option key={version.id} value={version.id}>Round {version.round} · {version.origin}</option>)}
-                </select>
-                {context.jobId && jobDetail.data?.resumeVersions.length === 0 ? <p className="text-xs text-muted-foreground">This job has no tailored resume versions yet.</p> : null}
-              </div>
+              <CareerLabResumeVersionPicker
+                id="career-resume-version"
+                versions={jobDetail.data?.resumeVersions ?? []}
+                value={context.resumeVersionId ?? undefined}
+                onChange={(resumeVersionId) => updateContext({ resumeVersionId })}
+                emptyLabel={context.jobId ? "No resume version" : "Choose a job first"}
+                disabled={!context.jobId || jobDetail.isPending}
+                hint={
+                  context.jobId && jobDetail.data?.resumeVersions.length === 0
+                    ? "This job has no tailored resume versions yet."
+                    : undefined
+                }
+              />
             </div>
           </details>
 

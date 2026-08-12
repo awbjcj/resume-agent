@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./use-career-lab", () => ({
   useCareerLabSkills: () => mocks.skills(),
   useCareerLabSessions: () => mocks.sessions(),
-  useCareerLabSession: () => mocks.session(),
+  useCareerLabSession: (sessionId: string | null) => mocks.session(sessionId),
   useStartCareerLab: () => mocks.start(),
   useSendCareerLabMessage: () => mocks.send(),
   useEndCareerLab: () => mocks.end(),
@@ -47,14 +47,31 @@ vi.mock("@/lib/chat/useChatStream", () => ({
   },
 }));
 
-function renderPage() {
+function renderPage(initialEntry = "/career-lab") {
   const queryClient = new QueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>{children}</MemoryRouter>
     </QueryClientProvider>
   );
   return render(<CareerLabPage />, { wrapper });
+}
+
+function summary(overrides: Record<string, unknown> = {}) {
+  return {
+    sessionId: "s1",
+    title: "",
+    goal: "Plan",
+    startedAt: "2026-08-02T00:00:00Z",
+    endedAt: null,
+    status: "active",
+    archivedAt: null,
+    jobId: null,
+    jobCompany: null,
+    jobTitle: null,
+    turnCount: 2,
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
@@ -86,6 +103,127 @@ beforeEach(() => {
 });
 
 describe("CareerLabPage", () => {
+  it("opens the thread named by the session link from a job", () => {
+    // The job's Career Lab tab links to /career-lab?session=<id>, which may be
+    // an ended thread that no `status === "active"` scan would ever pick.
+    mocks.sessions.mockReturnValue({
+      data: { sessions: [summary({ sessionId: "open-one" })] },
+      isPending: false,
+    });
+    renderPage("/career-lab?session=job-thread");
+
+    expect(mocks.session).toHaveBeenCalledWith("job-thread");
+  });
+
+  it("stops showing a linked thread once it is deleted", async () => {
+    // Regression: while `?session=` was read as a fallback beneath the selection,
+    // deleting the linked thread cleared the selection and the surviving param
+    // re-selected the deleted row, leaving the page stuck fetching a 404.
+    mocks.sessions.mockReturnValue({
+      data: {
+        sessions: [
+          summary({ sessionId: "job-thread", title: "Acme thread", status: "ended" }),
+        ],
+      },
+      isPending: false,
+    });
+    mocks.remove.mockImplementation((_vars, options) => options?.onSuccess?.());
+    renderPage("/career-lab?session=job-thread");
+    expect(mocks.session).toHaveBeenCalledWith("job-thread");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Actions for Acme thread" }),
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(mocks.remove).toHaveBeenCalledWith(
+      { sessionId: "job-thread" },
+      expect.anything(),
+    );
+    await waitFor(() => expect(mocks.session).toHaveBeenLastCalledWith(null));
+  });
+
+  it("prefers the un-anchored thread when several jobs hold an open one", () => {
+    mocks.sessions.mockReturnValue({
+      data: {
+        sessions: [
+          summary({ sessionId: "job-7", jobId: 7, startedAt: "2026-08-01T00:00:00Z" }),
+          summary({ sessionId: "unanchored", jobId: null }),
+          summary({ sessionId: "job-9", jobId: 9, startedAt: "2026-08-03T00:00:00Z" }),
+        ],
+      },
+      isPending: false,
+    });
+    renderPage();
+
+    expect(mocks.session).toHaveBeenCalledWith("unanchored");
+  });
+
+  it("still offers a new session when only job-anchored threads are open", async () => {
+    // Regression: gating creation on "any active thread" meant one thread started
+    // from a job modal hid the New-session button, and the empty state that also
+    // offers it never renders while a thread is displayed — leaving no way to
+    // start an un-anchored thread the backend accepts (job_id=None is its own
+    // bucket).
+    mocks.sessions.mockReturnValue({
+      data: { sessions: [summary({ sessionId: "job-7", jobId: 7 })] },
+      isPending: false,
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", { name: "New Career Lab session" }),
+    ).toBeInTheDocument();
+  });
+
+  it("names the anchored job so job threads are told apart in history", () => {
+    mocks.sessions.mockReturnValue({
+      data: {
+        sessions: [
+          summary({
+            sessionId: "job-7",
+            title: "Application answer",
+            jobId: 7,
+            jobCompany: "Globex",
+            jobTitle: "Staff Engineer",
+          }),
+        ],
+      },
+      isPending: false,
+    });
+    renderPage();
+
+    expect(screen.getByText(/Globex · Staff Engineer/)).toBeInTheDocument();
+  });
+
+  it("withdraws the new-session button while an un-anchored thread is open", () => {
+    mocks.sessions.mockReturnValue({
+      data: { sessions: [summary({ sessionId: "unanchored", jobId: null })] },
+      isPending: false,
+    });
+    renderPage();
+
+    expect(
+      screen.queryByRole("button", { name: "New Career Lab session" }),
+    ).toBeNull();
+  });
+
+  it("falls back to the newest open thread when every one is job-anchored", () => {
+    mocks.sessions.mockReturnValue({
+      data: {
+        sessions: [
+          summary({ sessionId: "job-7", jobId: 7, startedAt: "2026-08-01T00:00:00Z" }),
+          summary({ sessionId: "job-9", jobId: 9, startedAt: "2026-08-03T00:00:00Z" }),
+        ],
+      },
+      isPending: false,
+    });
+    renderPage();
+
+    expect(mocks.session).toHaveBeenCalledWith("job-9");
+  });
+
   it("keeps the starter visible while the disabled session query reports pending", () => {
     mocks.session.mockReturnValue({ data: undefined, isPending: true });
     renderPage();

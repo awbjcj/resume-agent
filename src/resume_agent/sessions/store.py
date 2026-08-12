@@ -12,6 +12,7 @@ application — stays in the kind's own module.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 from collections.abc import Callable, Iterator
@@ -24,6 +25,8 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.progress import atomic_write_text
+
+logger = logging.getLogger(__name__)
 
 _SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
 
@@ -90,10 +93,25 @@ class SessionStore(Generic[M]):
         )
 
     def list(self, root: Path | str, *, include_archived: bool = False) -> list[dict]:
+        """Every readable session, oldest first.
+
+        An unreadable file is skipped with a warning rather than failing the
+        whole enumeration. ``load`` stays strict — asking for one session by id
+        must say so when it cannot be read — but one corrupt file must not take
+        down every listing, active-session check and bulk delete in the
+        workspace. That failure mode was live: a job delete ran its cascade
+        after the row was already committed, so a single bad file turned every
+        future delete into a 500 on a job that had in fact been removed.
+        """
         base = Path(root)
         if not base.exists():
             return []
-        sessions = [self.read(path) for path in base.glob("session-*.json")]
+        sessions = []
+        for path in base.glob("session-*.json"):
+            try:
+                sessions.append(self.read(path))
+            except ValueError:
+                logger.warning("Skipping unreadable %s session: %s", self.label, path)
         if not include_archived:
             sessions = [row for row in sessions if not row["archived_at"]]
         return sorted(sessions, key=lambda row: (row["started_at"], row["session_id"]))
@@ -140,6 +158,26 @@ class SessionStore(Generic[M]):
             if not path.exists():
                 raise ValueError(f"unknown session: {session_id}")
             path.unlink()
+
+    def delete_where(
+        self, root: Path | str, predicate: Callable[[dict], bool]
+    ) -> int:
+        """Remove every session matching ``predicate``. Returns how many went.
+
+        Bulk removal is custody, not kind-specific behavior: the lock must span
+        the scan and the unlinks so a session created in between cannot survive
+        as an orphan, archived rows must be included or they outlive their owner,
+        and a file that vanishes underneath us is the outcome asked for rather
+        than an error. Only the predicate belongs to the kind.
+        """
+        removed = 0
+        with self.lock():
+            for row in self.list(root, include_archived=True):
+                if not predicate(row):
+                    continue
+                self.path(root, row["session_id"]).unlink(missing_ok=True)
+                removed += 1
+        return removed
 
     def rename(self, root: Path | str, session_id: str, title: str) -> dict:
         cleaned = title.strip()

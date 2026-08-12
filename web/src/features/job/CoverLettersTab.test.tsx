@@ -29,7 +29,11 @@ const letter: CoverLetterItem = {
   createdAt: "2026-08-11T00:00:00Z",
 };
 
-function seedGenerateRun(jobId: number, status: "running" | "succeeded") {
+function seedGenerateRun(
+  jobId: number,
+  status: "running" | "succeeded",
+  meta: Record<string, unknown> = { jobId },
+) {
   useRunStore.getState().upsert({
     runId: "cl-run",
     kind: "coverLetter",
@@ -39,7 +43,7 @@ function seedGenerateRun(jobId: number, status: "running" | "succeeded") {
     current: 0,
     total: 1,
     etaText: null,
-    meta: { jobId },
+    meta,
   });
 }
 
@@ -82,6 +86,26 @@ describe("CoverLettersTab", () => {
     ).toBeEnabled();
   });
 
+  it("sees a bulk run that covers this job, so it cannot double-generate", () => {
+    // The Pipeline bulk action tags runs with `jobIds`, not `jobId`. Missing that
+    // shape offered Generate on a job already being generated for — and
+    // POST /api/cover-letters has no singleton key, so it really runs twice.
+    seedGenerateRun(3, "running", { jobIds: [3, 8] });
+    wrap(<CoverLettersTab jobId={3} coverLetters={[]} appliedId={null} />);
+
+    expect(screen.getByText("Cover letter in progress")).toBeInTheDocument();
+    expect(screen.queryByText("No cover letter yet")).toBeNull();
+  });
+
+  it("ignores a bulk run that covers only other jobs", () => {
+    seedGenerateRun(3, "running", { jobIds: [8, 9] });
+    wrap(<CoverLettersTab jobId={3} coverLetters={[]} appliedId={null} />);
+
+    expect(
+      screen.getByRole("button", { name: "Generate cover letter" }),
+    ).toBeEnabled();
+  });
+
   it("offers another draft once a cover letter exists", () => {
     wrap(<CoverLettersTab jobId={3} coverLetters={[letter]} appliedId={null} />);
 
@@ -93,6 +117,7 @@ describe("CoverLettersTab", () => {
     seedGenerateRun(3, "running");
     wrap(<CoverLettersTab jobId={3} coverLetters={[letter]} appliedId={null} />);
 
-    expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
+    // The busy label is prefixed by the Spinner's own "Loading" status text.
+    expect(screen.getByRole("button", { name: /Generating…/ })).toBeDisabled();
   });
 });

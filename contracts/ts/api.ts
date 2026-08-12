@@ -3510,6 +3510,8 @@ export interface components {
              * @default
              */
             goal: string;
+            /** Jobid */
+            jobId?: number | null;
             /** Sessionid */
             sessionId: string;
             /** Startedat */
@@ -3543,6 +3545,12 @@ export interface components {
              * @default
              */
             goal: string;
+            /** Jobcompany */
+            jobCompany?: string | null;
+            /** Jobid */
+            jobId?: number | null;
+            /** Jobtitle */
+            jobTitle?: string | null;
             /** Sessionid */
             sessionId: string;
             /** Startedat */
@@ -8684,6 +8692,7 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 includeArchived?: boolean;
+                jobId?: number | null;
             };
             header?: {
                 authorization?: string | null;

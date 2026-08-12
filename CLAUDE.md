@@ -645,12 +645,12 @@ reaches the run result, the log, and the dashboard.
   `skill-naming` and `numeric-evidence` join `provenance` in
   `DETERMINISTIC_GATES` and run before the panel, so the reviser sees them in
   the round they occurred. `skill-naming` legalizes a displayed name only from
-  the *cited fact's* own name/aliases — the cluster map's alias table is
+  the _cited fact's_ own name/aliases — the cluster map's alias table is
   deliberately not consulted, because it maps a token to a canonical cluster
   token, which is exactly the adjacent-skill rename fact-lock forbids. Only a
   **compound** name blocks (two or more segments, one unresolved: the writer
   named a technology it did not cite); an atomic mismatch (`AWS` for `Amazon
-  Web Services`) is advisory, since `CRAFT_WRITER` allows it and no alias table
+Web Services`) is advisory, since `CRAFT_WRITER` allows it and no alias table
   is complete. `numeric-evidence` blocks any standalone quantity absent from the
   cited fact, tokenized conservatively so `p95`, `L1–L3`, `GPT-4` and `C++` are
   never claims while `$50K` and `95%` are. `_is_citation_slip` therefore denies
@@ -660,7 +660,7 @@ reaches the run result, the log, and the dashboard.
   `RESERVED_REVIEWER_NAMES` (`review_config.py`) imports `PROVENANCE_REVIEWER` /
   `SKILL_NAMING_REVIEWER` / `NUMERIC_EVIDENCE_REVIEWER` rather than restating the
   literals, and `DETERMINISTIC_GATES` is that frozenset. A configured reviewer
-  may not claim one of those names; `must-have-coverage` is deliberately *not*
+  may not claim one of those names; `must-have-coverage` is deliberately _not_
   reserved, because it is also a legal configured reviewer — the deterministic
   measurement is kept out of gate and weighted-score selection by its runtime
   `CoverageCritique` type, never by its name.
@@ -740,7 +740,7 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   run repeated the loss: no tenant ever had a `skill_embeddings.json`, and every
   run silently used the lexical fallback. That fallback scored symmetric Jaccard
   over the whole descriptor, whose union denominator grows with member count, so
-  the *smallest* domain won — measured on a live 155-domain taxonomy, one domain
+  the _smallest_ domain won — measured on a live 155-domain taxonomy, one domain
   ranked first for **42 of 60** consecutive queries and the top-8 union reached
   only **53 of 155** domains, making two-thirds of the taxonomy unreachable per
   batch. Now: `embed_descriptors` persists every shard that lands and degrades
@@ -774,14 +774,14 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   `"model call failed" in message` check therefore never matched a real outage.
 - **`not_skills` is a terminal disposition, and it is reversible.** The domain
   classifier may return tokens that name no skill (`8+ years of machine learning
-  experience`); they land in `TaxonomyState.retired_skills`, are subtracted from
+experience`); they land in `TaxonomyState.retired_skills`, are subtracted from
   `demanded` on every later run, and are never re-sent. Without it the backlog
   re-bought the same verdict forever. They stay visible via
   `MatchGapOut.retiredSkills` and return through
   `POST /api/match-gap/restore-skills` — deliberately synchronous, since it only
   edits the state file.
 - **"Reorganize domains" cannot assign a skill.** `maintain_taxonomy` merges,
-  splits, renames and reparents *domains*, and gates on not increasing the
+  splits, renames and reparents _domains_, and gates on not increasing the
   unassigned count; nothing in it lowers that count. The button is named for
   what it does so it is not mistaken for a second Regroup.
 - **GitHub depth is two-tier; dossiers win.** `profile/github_harvest.py` writes
@@ -925,8 +925,18 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   `llm_runner.transcribe` (`Settings.transcribe_model`, Gemini/OpenAI only,
   default `gemini:gemini-2.5-flash`) through `POST /api/transcribe`; audio is
   never persisted.
-  Both the coach and interview stores are adapters of the Session substrate
-  (`sessions/store.py`); custody bugs are fixed there, once. `TurnRejected` and
+  The coach, interview, and Career Lab stores are all adapters of the Session
+  substrate (`sessions/store.py`); custody bugs are fixed there, once — bulk
+  removal is `SessionStore.delete_where(root, predicate)`, where only the
+  predicate belongs to the kind (it owns the lock spanning scan-and-unlink, the
+  archived-inclusive scan, and treating an already-gone file as success).
+  **`list` skips an unreadable file with a warning; `load` stays strict.** A
+  request for one session by id must say when it cannot be read, but `list`
+  backs every active-session check and bulk delete, so failing the whole scan on
+  one bad file took down far more than it protected: a job delete runs its
+  cascade *after* the row is committed, so a single corrupt file turned every
+  later delete into a 500 for a job that had in fact been removed.
+  `TurnRejected` and
   `format_with_retry` live in `sessions/turns.py`, shared by both stacks.
   `RunStreamSink` (`sessions/stream.py`) batches **text and reasoning alike** —
   each on its own budget, a kind change flushing the other — because every
@@ -934,6 +944,44 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   re-render that re-parses the thread's markdown. A reasoning model streams
   thinking one word at a time, so bypassing the batch cost 1,846 rows on a
   single turn where 33 suffice.
+- **A Career Lab thread's `job_id` is an index, not its context.** A thread may
+  be anchored to a job (started from the job modal's Career Lab tab) or
+  un-anchored (started from the Career Lab page). `CareerLabSession.job_id`
+  records which, so a job's own surfaces can list its threads
+  (`GET /api/career-lab/sessions?jobId=`) — but what the agent actually reads
+  stays per-turn in `CareerLabTurnRecord.context_refs`, which a roaming
+  conversation may legitimately point at a different job on any later turn. Do
+  not read the session's `job_id` as the prompt's job.
+  **One active thread per job, with `job_id=None` as its own bucket.** The rule
+  is enforced in three places that must agree on scope, each buying something
+  the others cannot: `store.create_session` under `store.lock()` is the atomic
+  authority; the router pre-flights it because work runs through `launch`, where
+  a service `ValueError` would surface as a _failed run_ rather than a 409; and
+  `run_start_turn` re-checks before paying for router/persona/formatter calls.
+  The start's `launch` singleton key is scoped to the same job. Two consequences
+  are easy to break: a surface may not gate "start a new thread" on _any_ active
+  thread (that hid the Career Lab page's New-session button as soon as any job
+  thread opened), and the CLI's `--job-id` must resume _that job's_ thread —
+  "whatever is open" was exact only while one thread could exist at a time.
+  Career Lab threads cascade on job delete alongside interview sessions and
+  never gate it (`has_progress` untouched).
+  **The listing is ordered open-threads-first, then newest** (`_ordered_for_listing`),
+  which is what lets a job's tab decide whether to offer Start from page 1
+  alone — the substrate lists oldest-first, so an open thread could sit past the
+  page boundary and the tab offered a Start the API then 409'd. Two stable
+  passes, not one composite key: the components sort in opposite directions.
+  `jobCompany`/`jobTitle` on the summary are resolved **live** in one batched
+  query per page (never per row), because Career Lab deliberately freezes no job
+  snapshot the way `InterviewContext` does; a thread whose job is gone simply
+  has no label.
+- **A per-job surface must recognise a bulk run covering that job.** Per-job
+  launchers tag runs with `meta.jobId`; the Pipeline bulk actions tag them with
+  `meta.jobIds`. `artifact-runs.ts::runCoversJob` is the one predicate that
+  reads both — checking only `jobId` made a bulk cover-letter run invisible to
+  the job's own Cover letters tab, which offered a second Generate for a job
+  already being generated for, and `POST /api/cover-letters` has no singleton
+  key, so it really ran twice. An approved-scope bulk run resolves its targets
+  server-side and carries neither key; it is invisible here by necessity.
 - **Email identity is authoritative in multi-user auth.** Verified email is the
   login identifier; the legacy username fallback is accepted only while a user
   has no email. Registration, reset, and email-adoption codes are single-use,

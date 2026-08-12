@@ -9,8 +9,11 @@ from resume_agent.career_lab.models import (
     CareerLabTurnRecord,
 )
 from resume_agent.career_lab.store import (
+    active_session_for_job,
     append_turns,
     create_session,
+    delete_sessions_for_job,
+    list_sessions,
     load_session,
     rename_session,
 )
@@ -50,11 +53,61 @@ def test_assistant_turn_requires_matching_run_metadata():
         )
 
 
-def test_session_store_enforces_one_active_session(tmp_path):
+def test_session_store_enforces_one_active_unanchored_session(tmp_path):
     first = create_session(tmp_path, session_id="first", goal="goal")
     assert first["status"] == "active"
+    assert first["job_id"] is None
     with pytest.raises(ValueError, match="active Career Lab session"):
         create_session(tmp_path, session_id="second")
+
+
+def test_active_sessions_are_scoped_per_job(tmp_path):
+    """A thread about one role must not block opening one about another."""
+    create_session(tmp_path, session_id="unanchored")
+    seven = create_session(tmp_path, session_id="job-seven", job_id=7)
+    nine = create_session(tmp_path, session_id="job-nine", job_id=9)
+    assert (seven["job_id"], nine["job_id"]) == (7, 9)
+
+    with pytest.raises(ValueError, match="active Career Lab session"):
+        create_session(tmp_path, session_id="job-seven-again", job_id=7)
+
+
+def test_active_session_for_job_selects_by_anchor(tmp_path):
+    create_session(tmp_path, session_id="unanchored")
+    create_session(tmp_path, session_id="job-seven", job_id=7)
+
+    job_session = active_session_for_job(tmp_path, 7)
+    assert job_session is not None
+    assert job_session["session_id"] == "job-seven"
+
+    unanchored_session = active_session_for_job(tmp_path, None)
+    assert unanchored_session is not None
+    assert unanchored_session["session_id"] == "unanchored"
+    assert active_session_for_job(tmp_path, 404) is None
+
+
+def test_list_sessions_filters_by_job(tmp_path):
+    create_session(tmp_path, session_id="unanchored")
+    create_session(tmp_path, session_id="job-seven", job_id=7)
+
+    assert [row["session_id"] for row in list_sessions(tmp_path, job_id=7)] == [
+        "job-seven"
+    ]
+    # No filter still returns every thread, anchored or not.
+    assert len(list_sessions(tmp_path)) == 2
+
+
+def test_delete_sessions_for_job_spares_other_threads(tmp_path):
+    create_session(tmp_path, session_id="unanchored")
+    create_session(tmp_path, session_id="job-seven", job_id=7)
+    create_session(tmp_path, session_id="job-nine", job_id=9)
+
+    assert delete_sessions_for_job(tmp_path, 7) == 1
+    assert sorted(row["session_id"] for row in list_sessions(tmp_path)) == [
+        "job-nine",
+        "unanchored",
+    ]
+    assert delete_sessions_for_job(tmp_path, 7) == 0
 
 
 def test_append_turns_round_trips_typed_artifact(tmp_path):

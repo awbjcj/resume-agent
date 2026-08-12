@@ -65,13 +65,32 @@ export function useCareerLabSkills() {
   });
 }
 
-export function useCareerLabSessions(includeArchived = false, page = 1, pageSize = 20) {
+/** Options rather than positionals: `includeArchived`, `page`, and `pageSize`
+ *  are three same-typed knobs, so a transposed call would typecheck silently. */
+export function useCareerLabSessions({
+  includeArchived = false,
+  page = 1,
+  pageSize = 20,
+  jobId,
+}: {
+  includeArchived?: boolean;
+  page?: number;
+  pageSize?: number;
+  jobId?: number;
+} = {}) {
   return useQuery({
-    queryKey: ["career-lab-sessions", includeArchived, page, pageSize],
+    queryKey: ["career-lab-sessions", includeArchived, page, pageSize, jobId ?? null],
     queryFn: () =>
       unwrap(
         api.GET("/api/career-lab/sessions", {
-          params: { query: { includeArchived, page, pageSize } },
+          params: {
+            query: {
+              includeArchived,
+              page,
+              pageSize,
+              ...(jobId != null ? { jobId } : {}),
+            },
+          },
         }),
       ) as Promise<components["schemas"]["CareerLabSessionsOut"]>,
   });
@@ -211,7 +230,13 @@ export function useCareerLabRecoveredRun(sessionId: string | null): RunRecord | 
         ["queued", "running", "cancelling"].includes(candidate.status) &&
         (sessionId
           ? candidate.meta?.sessionId === sessionId
-          : candidate.kind === "career-lab-turn" && !candidate.meta?.sessionId),
+          : // An un-anchored start: no session yet *and* no job. Without the
+            // `jobId` test this also matched a start launched from a job
+            // modal — same kind, same missing `sessionId` — so the page
+            // adopted it and streamed a draft with no user turn.
+            candidate.kind === "career-lab-turn"
+            && !candidate.meta?.sessionId
+            && !candidate.meta?.jobId),
     );
     return run ?? null;
   });

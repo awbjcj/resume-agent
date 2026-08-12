@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from sqlmodel import Session
 
 from resume_agent.api.deps import (
+    get_career_lab_dir,
     get_config_store,
     get_engine,
     get_interview_dir,
@@ -224,9 +225,13 @@ def delete_job_endpoint(
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     if not board.delete(session, job_id):
         raise ApiException(409, "CONFLICT", "Job has progress and cannot be deleted")
+    from resume_agent.career_lab.store import (
+        delete_sessions_for_job as delete_career_lab_sessions_for_job,
+    )
     from resume_agent.interview.store import delete_sessions_for_job
 
     delete_sessions_for_job(get_interview_dir(request), job_id)
+    delete_career_lab_sessions_for_job(get_career_lab_dir(request), job_id)
     return Response(status_code=204)
 
 

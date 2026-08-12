@@ -19,6 +19,7 @@ import { CoverLettersTab } from "@/features/job/CoverLettersTab";
 import { H1BSponsorshipPanel } from "@/features/job/H1BSponsorshipPanel";
 import { TrackingTab } from "@/features/job/TrackingTab";
 import { InterviewTab } from "@/features/interview/InterviewTab";
+import { CareerLabTab } from "@/features/career-lab/CareerLabTab";
 import { VersionRow } from "@/features/job/VersionRow";
 import { RevisionRunPlaceholders } from "@/features/job/RevisionRunPlaceholders";
 import { useJobDetail } from "@/features/job/use-job-detail";
@@ -200,6 +201,7 @@ export function JobModal({
                 </TabsTrigger>
                 <TabsTrigger value="tracking" className={tabTriggerClass}>Tracking</TabsTrigger>
                 <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
+                <TabsTrigger value="careerLab" className={tabTriggerClass}>Career Lab</TabsTrigger>
               </TabsList>
 
               <div className="min-h-0 flex-1 overflow-y-auto bg-muted/10 px-5 py-6 sm:px-8 sm:py-8">
@@ -320,6 +322,17 @@ export function JobModal({
                     jobId={jobId}
                     versions={job.resumeVersions}
                     hasJd={Boolean(job.jdText?.trim())}
+                  />
+                </TabsContent>
+
+                <TabsContent value="careerLab" className="mx-auto mt-0 max-w-6xl">
+                  <CareerLabTab
+                    jobId={jobId}
+                    jobLabel={
+                      [job.title, job.company].filter(Boolean).join(" at ")
+                      || `job #${jobId}`
+                    }
+                    versions={job.resumeVersions}
                   />
                 </TabsContent>
               </div>

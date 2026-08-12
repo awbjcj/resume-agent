@@ -108,7 +108,10 @@ describe("Career Lab hooks", () => {
   it("passes the archived-session filter to the generated API query", async () => {
     mocks.unwrap.mockResolvedValueOnce({ sessions: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } });
     const { wrapper } = wrap();
-    const { result } = renderHook(() => useCareerLabSessions(true), { wrapper });
+    const { result } = renderHook(
+      () => useCareerLabSessions({ includeArchived: true }),
+      { wrapper },
+    );
 
     await act(async () => {
       await result.current.refetch();
@@ -116,6 +119,29 @@ describe("Career Lab hooks", () => {
 
     expect(mocks.get).toHaveBeenCalledWith("/api/career-lab/sessions", {
       params: { query: { includeArchived: true, page: 1, pageSize: 20 } },
+    });
+  });
+
+  it("sends jobId only when a job scopes the listing", async () => {
+    mocks.unwrap.mockResolvedValue({ sessions: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } });
+    const { wrapper } = wrap();
+    const scoped = renderHook(() => useCareerLabSessions({ jobId: 7 }), { wrapper });
+    await act(async () => {
+      await scoped.result.current.refetch();
+    });
+
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/career-lab/sessions", {
+      params: { query: { includeArchived: false, page: 1, pageSize: 20, jobId: 7 } },
+    });
+
+    const unscoped = renderHook(() => useCareerLabSessions(), { wrapper });
+    await act(async () => {
+      await unscoped.result.current.refetch();
+    });
+
+    // Absent rather than null: the backend treats a missing jobId as "all threads".
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/career-lab/sessions", {
+      params: { query: { includeArchived: false, page: 1, pageSize: 20 } },
     });
   });
 
@@ -149,5 +175,26 @@ describe("Career Lab hooks", () => {
     });
     const { result } = renderHook(() => useCareerLabRecoveredRun(null));
     expect(result.current?.runId).toBe("start-run");
+  });
+
+  it("does not adopt a job modal's start as the page's own run", () => {
+    // A start from a job modal has the same kind and no sessionId either, so
+    // without the jobId test the page streamed that job's draft with no user
+    // turn beside it.
+    useRunStore.setState({ runs: {} });
+    useRunStore.getState().upsert({
+      runId: "job-start-run",
+      kind: "career-lab-turn",
+      status: "running",
+      percent: 20,
+      phase: "Drafting",
+      current: 1,
+      total: 2,
+      etaText: null,
+      meta: { jobId: 7 },
+    });
+
+    const { result } = renderHook(() => useCareerLabRecoveredRun(null));
+    expect(result.current).toBeNull();
   });
 });

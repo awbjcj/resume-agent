@@ -96,4 +96,10 @@ class CareerLabSession(SessionModel):
     title: str = Field(default="", max_length=120)
     goal: str = Field(default="", max_length=2_000)
     ended_at: str | None = None
+    # The job this thread is anchored to, recorded at creation so a job's own
+    # surfaces can list its threads. Purely an index: what the agent actually
+    # reads stays per-turn in ``CareerLabTurnRecord.context_refs``, which a
+    # roaming conversation may point at a different job on any later turn.
+    # ``None`` is the un-anchored thread started from the Career Lab page.
+    job_id: int | None = Field(default=None, ge=1)
     turns: list[CareerLabTurnRecord] = Field(default_factory=list)

@@ -274,9 +274,4 @@ def rename_session(interview_dir: Path | str, session_id: str, title: str) -> di
 
 def delete_sessions_for_job(interview_dir: Path | str, job_id: int) -> int:
     """Remove all interview session files for a deleted job. Returns count removed."""
-    removed = 0
-    with _STORE.lock():
-        for row in list_sessions(interview_dir, job_id=job_id, include_archived=True):
-            _STORE.path(interview_dir, row["session_id"]).unlink(missing_ok=True)
-            removed += 1
-    return removed
+    return _STORE.delete_where(interview_dir, lambda row: row["job_id"] == job_id)
