@@ -182,43 +182,56 @@ export function JobModal({
               </div>
             </header>
 
-            {/* Job context and application work stay visible together on wide screens. */}
-            <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1.08fr)_minmax(34rem,0.92fr)]">
-              <section
-                aria-labelledby="job-brief-title"
-                className="min-w-0 overflow-y-auto border-b px-5 py-6 sm:px-8 xl:border-r xl:border-b-0"
-              >
-                <div className="mx-auto max-w-4xl">
-                  <div className="mb-5 flex items-end justify-between gap-4">
+            <Tabs defaultValue="job" className="flex min-h-0 flex-1 flex-col">
+              <TabsList className="h-auto w-full shrink-0 flex-nowrap justify-start gap-1 overflow-x-auto rounded-none border-b bg-muted/25 px-4 py-3 text-base group-data-horizontal/tabs:h-auto sm:px-8">
+                <TabsTrigger value="job" className={tabTriggerClass}>Job details</TabsTrigger>
+                <TabsTrigger value="resumes" className={tabTriggerClass}>
+                  Resumes
+                  {job.resumeVersions.length > 0 && (
+                    <span className={tabCountClass}>{job.resumeVersions.length}</span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="sponsorship" className={tabTriggerClass}>Sponsorship</TabsTrigger>
+                <TabsTrigger value="coverLetters" className={tabTriggerClass}>
+                  Cover letters
+                  {coverLetters.length > 0 && (
+                    <span className={tabCountClass}>{coverLetters.length}</span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="tracking" className={tabTriggerClass}>Tracking</TabsTrigger>
+                <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
+              </TabsList>
+
+              <div className="min-h-0 flex-1 overflow-y-auto bg-muted/10 px-5 py-6 sm:px-8 sm:py-8">
+                <TabsContent value="job" className="mx-auto mt-0 max-w-[94rem]">
+                  <div className="mb-6 flex items-end justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                         Role context
                       </p>
-                      <h2 id="job-brief-title" className="mt-1 font-heading text-2xl font-semibold">
-                        Job brief
-                      </h2>
+                      <h2 className="mt-1 font-heading text-2xl font-semibold">Job brief</h2>
                     </div>
                     <span className="hidden text-xs text-muted-foreground sm:inline">
                       The source material used for tailoring
                     </span>
                   </div>
 
-                  <div className="grid gap-6 rounded-xl border bg-muted/20 p-4 sm:p-5 lg:grid-cols-[13rem_minmax(0,1fr)]">
+                  <div className="grid gap-6 rounded-xl border bg-background/70 p-4 sm:p-5 lg:grid-cols-[13rem_minmax(16rem,0.75fr)_minmax(24rem,1.25fr)]">
                     <div className="flex justify-center lg:border-r lg:pr-5">
                       <FitDial score={job.fitScore} />
                     </div>
-                    <JobMeta job={job} />
+                    <div className="lg:border-r lg:pr-5">
+                      <JobMeta job={job} />
+                    </div>
+                    <div className="rise-in" style={{ "--rise-i": 4 } as React.CSSProperties}>
+                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Skills requested
+                      </h3>
+                      <SkillMatrix skills={job.skills} />
+                    </div>
                   </div>
 
-                  <div className="rise-in mt-6" style={{ "--rise-i": 4 } as React.CSSProperties}>
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Skills requested
-                    </h3>
-                    <SkillMatrix skills={job.skills} />
-                  </div>
-
-                  {(job.status === "rejected" || job.status === "filtered") &&
-                    job.rejectReason && (
+                  {(job.status === "rejected" || job.status === "filtered") && job.rejectReason && (
                     <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900 dark:bg-rose-950/40">
                       <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
                         {job.status === "filtered" || job.rejectCategory === "filtered"
@@ -246,105 +259,71 @@ export function JobModal({
                     </h3>
                     <JdBody text={job.jdText} />
                   </div>
-                </div>
-              </section>
+                </TabsContent>
 
-              <aside
-                aria-labelledby="application-workspace-title"
-                className="min-w-0 overflow-y-auto bg-muted/15 px-5 py-6 sm:px-6"
-              >
-                <div className="mx-auto max-w-3xl space-y-8">
-                  <section>
-                    <div className="flex flex-wrap items-end justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                          Tailored application
-                        </p>
-                        <h2 id="application-workspace-title" className="mt-1 font-heading text-2xl font-semibold">
-                          Resume versions
-                        </h2>
-                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          Compare each version, understand its evidence choices, and pick what you will send.
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="tabular-nums">
-                        {job.resumeVersions.length} version{job.resumeVersions.length === 1 ? "" : "s"}
-                      </Badge>
-                    </div>
-                    {job.resumeVersions.length === 0 && (
-                      <p className="mt-4 rounded-xl border border-dashed bg-background/60 p-5 text-sm text-muted-foreground">
-                        No tailored resume yet. Use Redo to create the first version.
+                <TabsContent value="resumes" className="mx-auto mt-0 max-w-[94rem]">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                        Tailored application
                       </p>
-                    )}
-                    <ul className="mt-4 space-y-3">
-                      {job.resumeVersions.map((v) => (
-                        <VersionRow
-                          key={v.id}
-                          jobId={jobId}
-                          version={v}
-                          appliedVersionId={closedLoopJob?.application?.resumeVersionId ?? null}
-                        />
-                      ))}
-                      <RevisionRunPlaceholders
+                      <h2 className="mt-1 font-heading text-2xl font-semibold">Resume versions</h2>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Compare each version, understand its evidence choices, and pick what you will send.
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="tabular-nums">
+                      {job.resumeVersions.length} version{job.resumeVersions.length === 1 ? "" : "s"}
+                    </Badge>
+                  </div>
+                  {job.resumeVersions.length === 0 && (
+                    <p className="mt-4 rounded-xl border border-dashed bg-background/60 p-5 text-sm text-muted-foreground">
+                      No tailored resume yet. Use Redo to create the first version.
+                    </p>
+                  )}
+                  <ul className="mt-4 space-y-3">
+                    {job.resumeVersions.map((v) => (
+                      <VersionRow
+                        key={v.id}
                         jobId={jobId}
-                        kind="revise"
-                        label="Resume revision"
+                        version={v}
+                        appliedVersionId={closedLoopJob?.application?.resumeVersionId ?? null}
                       />
-                    </ul>
-                  </section>
+                    ))}
+                    <RevisionRunPlaceholders jobId={jobId} kind="revise" label="Resume revision" />
+                  </ul>
+                </TabsContent>
 
-                  <section className="border-t pt-7" aria-label="Sponsorship information">
-                    <H1BSponsorshipPanel
-                      jobId={jobId}
-                      company={job.company}
-                      initialResult={job.h1BSponsorship}
-                    />
-                  </section>
+                <TabsContent value="sponsorship" className="mx-auto mt-0 max-w-6xl">
+                  <H1BSponsorshipPanel
+                    jobId={jobId}
+                    company={job.company}
+                    initialResult={job.h1BSponsorship}
+                  />
+                </TabsContent>
 
-                  <section className="border-t pt-7" aria-labelledby="other-application-tools-title">
-                    <div className="mb-3">
-                      <h2 id="other-application-tools-title" className="font-heading text-xl font-semibold">
-                        Application tools
-                      </h2>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Draft supporting material, track progress, or prepare for interviews.
-                      </p>
-                    </div>
-                    <Tabs defaultValue="coverLetters">
-                      <TabsList className="h-auto w-full flex-wrap justify-start gap-2 rounded-lg border bg-background/70 p-1.5 group-data-horizontal/tabs:h-auto">
-                        <TabsTrigger value="coverLetters" className={tabTriggerClass}>
-                          Cover letters
-                          {coverLetters.length > 0 && (
-                            <span className={tabCountClass}>{coverLetters.length}</span>
-                          )}
-                        </TabsTrigger>
-                        <TabsTrigger value="tracking" className={tabTriggerClass}>Tracking</TabsTrigger>
-                        <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
-                      </TabsList>
-                      <div className="mt-4">
-                        <TabsContent value="coverLetters" className="mt-0">
-                          <CoverLettersTab
-                            jobId={jobId}
-                            coverLetters={coverLetters}
-                            appliedId={closedLoopJob?.application?.coverLetterId ?? null}
-                          />
-                        </TabsContent>
-                        <TabsContent value="tracking" className="mt-0">
-                          <TrackingTab job={job} onDeleted={onClose} />
-                        </TabsContent>
-                        <TabsContent value="interview" className="mt-0">
-                          <InterviewTab
-                            jobId={jobId}
-                            versions={job.resumeVersions}
-                            hasJd={Boolean(job.jdText?.trim())}
-                          />
-                        </TabsContent>
-                      </div>
-                    </Tabs>
-                  </section>
-                </div>
-              </aside>
-            </div>
+                <TabsContent value="coverLetters" className="mx-auto mt-0 max-w-6xl">
+                  <h2 className="mb-4 font-heading text-2xl font-semibold">Cover letters</h2>
+                  <CoverLettersTab
+                    jobId={jobId}
+                    coverLetters={coverLetters}
+                    appliedId={closedLoopJob?.application?.coverLetterId ?? null}
+                  />
+                </TabsContent>
+
+                <TabsContent value="tracking" className="mx-auto mt-0 max-w-6xl">
+                  <TrackingTab job={job} onDeleted={onClose} />
+                </TabsContent>
+
+                <TabsContent value="interview" className="mx-auto mt-0 max-w-6xl">
+                  <InterviewTab
+                    jobId={jobId}
+                    versions={job.resumeVersions}
+                    hasJd={Boolean(job.jdText?.trim())}
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
           </div>
         )}
       </DialogContent>

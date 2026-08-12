@@ -181,7 +181,7 @@ describe("JobModal", () => {
     expect(screen.queryByRole("button", { name: /next job/i })).not.toBeInTheDocument();
   });
 
-  it("uses the expanded workspace canvas and shows the version count", async () => {
+  it("uses the expanded workspace canvas and gives resumes a full-width tab", async () => {
     server.use(
       http.get("/api/jobs/42", () =>
         HttpResponse.json(
@@ -202,6 +202,8 @@ describe("JobModal", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.className).toContain("1760px");
     expect(screen.getByRole("heading", { name: "Job brief" })).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /resumes/i }));
     expect(screen.getByRole("heading", { name: "Resume versions" })).toBeInTheDocument();
     expect(screen.getByText("3 versions")).toBeInTheDocument();
   });
@@ -219,25 +221,30 @@ describe("JobModal", () => {
     expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
   });
 
-  it("keeps resume and sponsorship visible while secondary tools stay tabbed", async () => {
+  it("exposes each major section as a top-level full-canvas tab", async () => {
     server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
     wrap(<JobModal jobId={42} onClose={() => {}} />);
 
-    expect(await screen.findByRole("tab", { name: "Tracking" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Resume versions" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Historical H-1B sponsorship" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Sponsorship" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Job details" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Resumes" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sponsorship" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Cover letters" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tracking" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Interview" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Application" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Management" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.getAllByRole("tab")).toHaveLength(6);
   });
 
-  it("shows H-1B research without requiring a tab change", async () => {
+  it("gives H-1B research the full sponsorship canvas", async () => {
     server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    const user = userEvent.setup();
     wrap(<JobModal jobId={42} onClose={() => {}} />);
 
+    await user.click(await screen.findByRole("tab", { name: "Sponsorship" }));
+
     expect(
-      await screen.findByRole("heading", { name: "Historical H-1B sponsorship" }),
+      screen.getByRole("heading", { name: "Historical H-1B sponsorship" }),
     ).toBeInTheDocument();
   });
 });
