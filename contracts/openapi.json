@@ -1652,13 +1652,6 @@
       },
       "CareerLabSessionsOut": {
         "properties": {
-          "activeSessions": {
-            "items": {
-              "$ref": "#/components/schemas/CareerLabSessionSummaryOut"
-            },
-            "title": "Activesessions",
-            "type": "array"
-          },
           "pagination": {
             "$ref": "#/components/schemas/Pagination"
           },
