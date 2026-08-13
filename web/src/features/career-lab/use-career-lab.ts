@@ -9,6 +9,7 @@ import type { components } from "@/lib/api/schema";
 
 export type CareerLabSession = components["schemas"]["CareerLabSessionOut"];
 export type CareerLabSessionSummary = components["schemas"]["CareerLabSessionSummaryOut"];
+type CareerLabSessionsOut = components["schemas"]["CareerLabSessionsOut"];
 export type CareerLabSkill = components["schemas"]["CareerLabSkillOut"];
 export type CareerLabContext = components["schemas"]["CareerLabContextIn"];
 export type CareerLabSkillName = components["schemas"]["CareerLabSkillName"];
@@ -80,19 +81,27 @@ export function useCareerLabSessions({
 } = {}) {
   return useQuery({
     queryKey: ["career-lab-sessions", includeArchived, page, pageSize, jobId ?? null],
-    queryFn: () =>
-      unwrap(
+    queryFn: async () => {
+      const fetchPage = (nextPage: number) =>
         api.GET("/api/career-lab/sessions", {
           params: {
             query: {
               includeArchived,
-              page,
+              page: nextPage,
               pageSize,
               ...(jobId != null ? { jobId } : {}),
             },
           },
-        }),
-      ) as Promise<components["schemas"]["CareerLabSessionsOut"]>,
+        });
+      const first = (await unwrap(fetchPage(page))) as CareerLabSessionsOut;
+      if (page !== 1 || first.pagination.totalPages <= 1) return first;
+      const allSessions = [...(first.sessions ?? [])];
+      for (let nextPage = 2; nextPage <= first.pagination.totalPages; nextPage += 1) {
+        const next = (await unwrap(fetchPage(nextPage))) as CareerLabSessionsOut;
+        allSessions.push(...(next.sessions ?? []));
+      }
+      return { ...first, sessions: allSessions };
+    },
   });
 }
 

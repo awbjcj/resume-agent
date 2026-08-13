@@ -60,7 +60,8 @@ export function CareerLabPage() {
   const [searchParams] = useSearchParams();
   const sessions = useCareerLabSessions({ includeArchived: showArchived });
   const skills = useCareerLabSkills();
-  // Active threads are per job, so there can be several. `activeSummary` picks
+  // Active threads are per job, so there can be several. The API exposes the
+  // complete active collection outside paginated history. `activeSummary` picks
   // which one to *show* — the un-anchored thread this page owns, else the most
   // recent — rather than whatever the directory scan listed first.
   // `unanchoredActive` is a separate question: whether this page may *start* one.
@@ -69,12 +70,12 @@ export function CareerLabPage() {
   // that also offers it), leaving no way to start an un-anchored thread the
   // backend would happily accept — `job_id=None` is its own bucket.
   const { activeSummary, unanchoredActive } = useMemo(() => {
-    const active = (sessions.data?.sessions ?? [])
+    const active = (sessions.data?.activeSessions ?? sessions.data?.sessions ?? [])
       .filter((row) => row.status === "active")
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt));
     const unanchored = active.find((row) => row.jobId == null);
     return { activeSummary: unanchored ?? active[0], unanchoredActive: unanchored };
-  }, [sessions.data?.sessions]);
+  }, [sessions.data?.activeSessions, sessions.data?.sessions]);
   // `?session=` is an opening selection, not a standing one — a job's Career Lab
   // tab links here to name the thread to show. It seeds the selection instead of
   // acting as a fallback beneath it, because a fallback outlives the action meant

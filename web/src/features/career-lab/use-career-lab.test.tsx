@@ -145,6 +145,53 @@ describe("Career Lab hooks", () => {
     });
   });
 
+  it("loads every history page while keeping active sessions authoritative", async () => {
+    mocks.get.mockImplementation(
+      (_path, request) => request.params.query.page,
+    );
+    mocks.unwrap.mockImplementation(async (page) =>
+      page === 1
+        ? {
+            sessions: [{ sessionId: "newer" }],
+            activeSessions: [{ sessionId: "active-old" }],
+            pagination: {
+              page: 1,
+              pageSize: 20,
+              totalItems: 2,
+              totalPages: 2,
+            },
+          }
+        : {
+            sessions: [{ sessionId: "older" }],
+            activeSessions: [{ sessionId: "active-old" }],
+            pagination: {
+              page: 2,
+              pageSize: 20,
+              totalItems: 2,
+              totalPages: 2,
+            },
+          },
+    );
+    const { wrapper } = wrap();
+    const { result } = renderHook(() => useCareerLabSessions(), { wrapper });
+
+    let refreshed: Awaited<ReturnType<typeof result.current.refetch>> | undefined;
+    await act(async () => {
+      refreshed = await result.current.refetch();
+    });
+
+    expect(refreshed?.data?.sessions).toEqual([
+      { sessionId: "newer" },
+      { sessionId: "older" },
+    ]);
+    expect(refreshed?.data?.activeSessions).toEqual([
+      { sessionId: "active-old" },
+    ]);
+    expect(mocks.get).toHaveBeenCalledWith("/api/career-lab/sessions", {
+      params: { query: { includeArchived: false, page: 2, pageSize: 20 } },
+    });
+  });
+
   it("renames a session and refreshes session queries", async () => {
     mocks.unwrap.mockResolvedValueOnce({ sessionId: "s1", title: "Equity trade-offs" });
     const { wrapper, invalidate } = wrap();

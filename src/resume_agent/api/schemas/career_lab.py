@@ -143,4 +143,5 @@ class CareerLabSessionSummaryOut(CamelModel):
 
 class CareerLabSessionsOut(CamelModel):
     sessions: list[CareerLabSessionSummaryOut] = Field(default_factory=list)
+    active_sessions: list[CareerLabSessionSummaryOut] = Field(default_factory=list)
     pagination: Pagination

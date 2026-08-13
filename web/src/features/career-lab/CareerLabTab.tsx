@@ -22,10 +22,10 @@ export function CareerLabTab({
 }) {
   const [open, setOpen] = useState(false);
   const sessions = useCareerLabSessions({ jobId });
-  // The endpoint orders open threads first, then newest — so the open thread is
-  // on this page whatever the count, and `activeRow` is trustworthy here.
   const rows = sessions.data?.sessions ?? [];
-  const activeRow = rows.find((row) => row.status === "active");
+  const activeRow = (
+    sessions.data?.activeSessions ?? rows
+  ).find((row) => row.status === "active");
 
   return (
     <div className="space-y-5">

@@ -96,8 +96,12 @@ def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
         "resume_agent.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
     )
-    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
-    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
+    monkeypatch.setattr(
+        service, "build_persona_agent", lambda _skill, **_kwargs: _Persona()
+    )
+    monkeypatch.setattr(
+        service, "build_formatter_agent", lambda **_kwargs: _Formatter()
+    )
     client = _client(tmp_path)
     with client:
         started = client.post(
@@ -122,7 +126,9 @@ def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
 
         detail = client.get(f"/api/career-lab/sessions/{session_id}")
         assert detail.status_code == 200
-        assert detail.json()["turns"][1]["skillRef"]["name"] == "salary-negotiation-prep"
+        assert (
+            detail.json()["turns"][1]["skillRef"]["name"] == "salary-negotiation-prep"
+        )
 
         renamed = client.patch(
             f"/api/career-lab/sessions/{session_id}",
@@ -131,7 +137,10 @@ def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
         assert renamed.status_code == 200
         assert renamed.json()["title"] == "Equity trade-offs"
         assert renamed.json()["goal"] == "Prepare negotiation points"
-        assert client.get("/api/career-lab/sessions").json()["sessions"][0]["title"] == "Equity trade-offs"
+        assert (
+            client.get("/api/career-lab/sessions").json()["sessions"][0]["title"]
+            == "Equity trade-offs"
+        )
 
         message = client.post(
             f"/api/career-lab/sessions/{session_id}/messages",
@@ -143,13 +152,18 @@ def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
         ended = client.post(f"/api/career-lab/sessions/{session_id}/end")
         assert ended.status_code == 202
         assert _wait(client, ended.json()["runId"])["state"] == "done"
-        assert client.get(f"/api/career-lab/sessions/{session_id}").json()["status"] == "ended"
+        assert (
+            client.get(f"/api/career-lab/sessions/{session_id}").json()["status"]
+            == "ended"
+        )
 
         archived = client.post(f"/api/career-lab/sessions/{session_id}/archive")
         assert archived.status_code == 200
         assert archived.json()["archivedAt"]
         assert client.get("/api/career-lab/sessions").json()["sessions"] == []
-        assert client.delete(f"/api/career-lab/sessions/{session_id}").status_code == 204
+        assert (
+            client.delete(f"/api/career-lab/sessions/{session_id}").status_code == 204
+        )
 
 
 def test_start_uses_keys_from_the_effective_app_settings(monkeypatch, tmp_path):
@@ -166,8 +180,12 @@ def test_start_uses_keys_from_the_effective_app_settings(monkeypatch, tmp_path):
         "resume_agent.config.env_settings",
         lambda: Settings(_env_file=None),  # type: ignore[call-arg]
     )
-    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
-    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
+    monkeypatch.setattr(
+        service, "build_persona_agent", lambda _skill, **_kwargs: _Persona()
+    )
+    monkeypatch.setattr(
+        service, "build_formatter_agent", lambda **_kwargs: _Formatter()
+    )
     client = TestClient(
         create_app(
             db_url="sqlite://",
@@ -196,7 +214,9 @@ def _seed_job(app, company: str) -> int:
     from resume_agent.tracking.tables import Job
 
     with get_session(app.state.engine) as session:
-        job = Job(source="manual", jd_text="Build things.", company=company, title="Eng")
+        job = Job(
+            source="manual", jd_text="Build things.", company=company, title="Eng"
+        )
         session.add(job)
         session.commit()
         session.refresh(job)
@@ -205,7 +225,10 @@ def _seed_job(app, company: str) -> int:
 
 
 def _start_for_job(client, job_id: int | None):
-    body: dict = {"message": "What should I ask about?", "skill": "salary-negotiation-prep"}
+    body: dict = {
+        "message": "What should I ask about?",
+        "skill": "salary-negotiation-prep",
+    }
     if job_id is not None:
         body["context"] = {"jobId": job_id}
     return client.post("/api/career-lab/sessions", json=body)
@@ -217,8 +240,12 @@ def test_sessions_anchor_to_a_job_and_scope_the_active_conflict(monkeypatch, tmp
         "resume_agent.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
     )
-    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
-    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
+    monkeypatch.setattr(
+        service, "build_persona_agent", lambda _skill, **_kwargs: _Persona()
+    )
+    monkeypatch.setattr(
+        service, "build_formatter_agent", lambda **_kwargs: _Formatter()
+    )
     client = _client(tmp_path)
     with client:
         first = _seed_job(client.app, "Acme")
@@ -241,8 +268,9 @@ def test_sessions_anchor_to_a_job_and_scope_the_active_conflict(monkeypatch, tmp
         conflict = _start_for_job(client, first)
         assert conflict.status_code == 409
         assert conflict.json()["error"]["code"] == "SESSION_ACTIVE"
-        assert conflict.json()["error"]["details"]["sessionId"] == (
-            first_session["sessionId"]
+        assert (
+            conflict.json()["error"]["details"]["sessionId"]
+            == (first_session["sessionId"])
         )
 
         # An un-anchored thread is its own bucket and stays available.
@@ -265,8 +293,12 @@ def test_deleting_a_job_removes_its_career_lab_threads(monkeypatch, tmp_path):
         "resume_agent.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
     )
-    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
-    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
+    monkeypatch.setattr(
+        service, "build_persona_agent", lambda _skill, **_kwargs: _Persona()
+    )
+    monkeypatch.setattr(
+        service, "build_formatter_agent", lambda **_kwargs: _Formatter()
+    )
     client = _client(tmp_path)
     with client:
         job_id = _seed_job(client.app, "Acme")
@@ -303,28 +335,42 @@ def _write_session(
     )
 
 
-def test_listing_puts_open_threads_first_then_newest(tmp_path):
-    """Page 1 must always hold the active thread, whatever the page size.
-
-    A job's Career Lab tab decides whether to offer Start from page 1 alone, so
-    an active thread stranded on a later page offered a Start the API then 409'd.
-    """
+def test_listing_exposes_all_active_threads_outside_pagination(tmp_path):
     client = _client(tmp_path)
     with client:
         root = tmp_path / "data" / "career-lab"
-        # The open thread is the *oldest*: newer ones have since ended.
-        _write_session(root, "open-old", started_at="2026-08-01T00:00:00+00:00")
-        _write_session(root, "ended-new", started_at="2026-08-09T00:00:00+00:00", status="ended")
-        _write_session(root, "ended-mid", started_at="2026-08-05T00:00:00+00:00", status="ended")
+        _write_session(
+            root,
+            "open-old",
+            started_at="2026-08-01T00:00:00+00:00",
+            job_id=7,
+        )
+        _write_session(
+            root,
+            "open-new",
+            started_at="2026-08-10T00:00:00+00:00",
+            job_id=9,
+        )
+        _write_session(
+            root,
+            "open-unanchored",
+            started_at="2026-07-01T00:00:00+00:00",
+        )
+        _write_session(
+            root, "ended-new", started_at="2026-08-09T00:00:00+00:00", status="ended"
+        )
+        _write_session(
+            root, "ended-mid", started_at="2026-08-05T00:00:00+00:00", status="ended"
+        )
 
-        rows = client.get("/api/career-lab/sessions").json()["sessions"]
-        assert [row["sessionId"] for row in rows] == ["open-old", "ended-new", "ended-mid"]
+        listing = client.get("/api/career-lab/sessions", params={"pageSize": 1}).json()
 
-        # And it survives a page size that would otherwise strand it.
-        first_page = client.get(
-            "/api/career-lab/sessions", params={"pageSize": 1}
-        ).json()["sessions"]
-        assert [row["sessionId"] for row in first_page] == ["open-old"]
+        assert [row["sessionId"] for row in listing["sessions"]] == ["open-new"]
+        assert [row["sessionId"] for row in listing["activeSessions"]] == [
+            "open-new",
+            "open-old",
+            "open-unanchored",
+        ]
 
 
 def test_listing_labels_anchored_threads_with_the_job(tmp_path):
@@ -332,7 +378,9 @@ def test_listing_labels_anchored_threads_with_the_job(tmp_path):
     with client:
         job_id = _seed_job(client.app, "Globex")
         root = tmp_path / "data" / "career-lab"
-        _write_session(root, "anchored", started_at="2026-08-09T00:00:00+00:00", job_id=job_id)
+        _write_session(
+            root, "anchored", started_at="2026-08-09T00:00:00+00:00", job_id=job_id
+        )
         _write_session(root, "loose", started_at="2026-08-01T00:00:00+00:00")
 
         rows = {
@@ -351,7 +399,9 @@ def test_listing_tolerates_a_thread_whose_job_is_gone(tmp_path):
     client = _client(tmp_path)
     with client:
         root = tmp_path / "data" / "career-lab"
-        _write_session(root, "orphan", started_at="2026-08-09T00:00:00+00:00", job_id=4242)
+        _write_session(
+            root, "orphan", started_at="2026-08-09T00:00:00+00:00", job_id=4242
+        )
 
         rows = client.get("/api/career-lab/sessions").json()["sessions"]
         assert [row["sessionId"] for row in rows] == ["orphan"]
