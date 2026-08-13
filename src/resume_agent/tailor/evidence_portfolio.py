@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from resume_agent.models.evidence_portfolio import (
     EvidenceCatalog,
@@ -18,7 +21,37 @@ from resume_agent.profile.matrix import SkillMatch, SkillMatchContext
 from resume_agent.tailor.provenance import index_facts, renderable_profile
 from resume_agent.tailor.numeric_evidence import claim_numbers
 from resume_agent.tailor.review_config import LengthBudget
+from resume_agent.llm_runner import Runner
+from resume_agent.tailor.length import format_budget
+from resume_agent.tailor.portfolio_planner import (
+    aplan_evidence_portfolio,
+    compose_evidence_portfolio_input,
+    plan_evidence_portfolio,
+)
 from resume_agent.tracking.match_gap import normalize_skill
+
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PortfolioPlanRequest:
+    jd_text: str
+    criteria: JobCriteria
+    profile_facts: ProfileFacts
+    skill_context: SkillMatchContext | None
+    budget: LengthBudget
+
+
+def _fallback_warning(error: Exception | None) -> str:
+    reason = type(error).__name__ if error is not None else "planner unavailable"
+    return f"Evidence planner unavailable ({reason}); deterministic fallback used."
+
+
+def _portfolio_is_usable(portfolio: EvidencePortfolio, owner_ids: set[str]) -> bool:
+    return bool(portfolio.selections) and any(
+        selection.owner_id in owner_ids for selection in portfolio.selections
+    )
 
 
 _KNOWN_SECTIONS = {
@@ -613,6 +646,114 @@ def build_fallback_portfolio(
     )
     return normalize_evidence_portfolio(
         draft, catalog, facts, criteria, context, budget
+    )
+
+
+def plan_portfolio(
+    request: PortfolioPlanRequest,
+    planner: Runner | None,
+) -> EvidencePortfolio:
+    """Return one validated plan or a deterministic fallback.
+
+    The caller supplies intent and a planner adapter; catalog construction,
+    untrusted-output validation, normalization, and fallback stay behind this
+    lifecycle seam.
+    """
+
+    catalog = build_evidence_catalog(
+        request.profile_facts, request.criteria, request.skill_context
+    )
+    if planner is not None:
+        try:
+            draft = plan_evidence_portfolio(
+                compose_evidence_portfolio_input(
+                    request.jd_text,
+                    request.criteria,
+                    catalog,
+                    budget=format_budget(request.budget),
+                ),
+                planner,
+            )
+            if not _portfolio_is_usable(
+                draft, {owner.owner_id for owner in catalog.owners}
+            ):
+                raise ValueError("planner returned no usable owner selection")
+            draft = draft.model_copy(update={"status": "planned", "warning": None})
+            return normalize_evidence_portfolio(
+                draft,
+                catalog,
+                request.profile_facts,
+                request.criteria,
+                request.skill_context,
+                request.budget,
+            )
+        except Exception as error:
+            logger.warning(
+                "evidence portfolio planner failed; using fallback", exc_info=error
+            )
+            warning = _fallback_warning(error)
+    else:
+        warning = _fallback_warning(None)
+    return build_fallback_portfolio(
+        catalog,
+        request.profile_facts,
+        request.criteria,
+        request.skill_context,
+        request.budget,
+        warning=warning,
+    )
+
+
+async def aplan_portfolio(
+    request: PortfolioPlanRequest,
+    planner: Runner | None,
+    *,
+    sem: asyncio.Semaphore,
+) -> EvidencePortfolio:
+    """Async adapter for the same validated Evidence portfolio lifecycle."""
+
+    catalog = build_evidence_catalog(
+        request.profile_facts, request.criteria, request.skill_context
+    )
+    if planner is not None:
+        try:
+            draft = await aplan_evidence_portfolio(
+                compose_evidence_portfolio_input(
+                    request.jd_text,
+                    request.criteria,
+                    catalog,
+                    budget=format_budget(request.budget),
+                ),
+                planner,
+                sem=sem,
+            )
+            if not _portfolio_is_usable(
+                draft, {owner.owner_id for owner in catalog.owners}
+            ):
+                raise ValueError("planner returned no usable owner selection")
+            draft = draft.model_copy(update={"status": "planned", "warning": None})
+            return normalize_evidence_portfolio(
+                draft,
+                catalog,
+                request.profile_facts,
+                request.criteria,
+                request.skill_context,
+                request.budget,
+            )
+        except Exception as error:
+            logger.warning(
+                "evidence portfolio planner failed; using fallback", exc_info=error
+            )
+            warning = _fallback_warning(error)
+    else:
+        warning = _fallback_warning(None)
+    return build_fallback_portfolio(
+        catalog,
+        request.profile_facts,
+        request.criteria,
+        request.skill_context,
+        request.budget,
+        warning=warning,
     )
 
 

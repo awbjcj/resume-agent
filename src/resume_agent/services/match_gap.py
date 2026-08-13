@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import threading
 from pathlib import Path
 
 from sqlmodel import Session
@@ -26,6 +25,7 @@ from resume_agent.taxonomy.corrections import (
     apply_taxonomy_corrections,
     load_taxonomy_corrections,
 )
+from resume_agent.taxonomy.custody import TaxonomyCustody
 from resume_agent.taxonomy.embeddings import (
     CandidateContext,
     EmbeddingProvider,
@@ -44,8 +44,6 @@ from resume_agent.taxonomy.state import (
 from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.match_gap import normalize_skill
 from resume_agent.tracking.match_gap import collect_target_skill_tokens
-
-_REFRESH_LOCK = threading.Lock()
 
 # Domains that exist only to guarantee every demanded skill has a home.  The
 # prefix is a naming convention, not a protected kind: maintenance is expected
@@ -197,12 +195,13 @@ def refresh_clusters(
     if reconcile_size < 1:
         raise ValueError("reconcile_batch_size must be at least 1")
 
-    with _REFRESH_LOCK:
-        correction_file = (
-            corrections_path
-            if corrections_path is not None
-            else Path(path).with_name("taxonomy_corrections.json")
-        )
+    correction_file = (
+        corrections_path
+        if corrections_path is not None
+        else Path(path).with_name("taxonomy_corrections.json")
+    )
+    custody = TaxonomyCustody(path, correction_file)
+    with custody.mutation():
         corrections = load_taxonomy_corrections(correction_file)
         taxonomy_state = load_taxonomy_state(path)
         demanded = (
@@ -491,7 +490,8 @@ def restore_skills(
 ) -> dict[str, object]:
     """Un-retire tokens so the next regroup reconsiders them as real skills."""
 
-    with _REFRESH_LOCK:
+    correction_file = Path(path).with_name("taxonomy_corrections.json")
+    with TaxonomyCustody(path, correction_file).mutation():
         _state, restored = restore_retired_skills(path, set(skill_keys))
     return {"restoredSkills": restored, "restored": len(restored)}
 
@@ -507,12 +507,12 @@ def maintain_taxonomy(
     """Run one correction-safe, versioned taxonomy maintenance generation."""
 
     settings = get_settings()
-    with _REFRESH_LOCK:
-        correction_file = (
-            corrections_path
-            if corrections_path is not None
-            else Path(path).with_name("taxonomy_corrections.json")
-        )
+    correction_file = (
+        corrections_path
+        if corrections_path is not None
+        else Path(path).with_name("taxonomy_corrections.json")
+    )
+    with TaxonomyCustody(path, correction_file).mutation():
         corrections = load_taxonomy_corrections(correction_file)
         existing = apply_taxonomy_corrections(load_cluster_map(path), corrections)
         outcome = asyncio.run(
@@ -560,12 +560,12 @@ def undo_taxonomy_maintenance(
 ) -> dict[str, object]:
     """Restore the immediately preceding generated taxonomy version."""
 
-    with _REFRESH_LOCK:
-        correction_file = (
-            corrections_path
-            if corrections_path is not None
-            else Path(path).with_name("taxonomy_corrections.json")
-        )
+    correction_file = (
+        corrections_path
+        if corrections_path is not None
+        else Path(path).with_name("taxonomy_corrections.json")
+    )
+    with TaxonomyCustody(path, correction_file).mutation():
         corrections = load_taxonomy_corrections(correction_file)
         existing = apply_taxonomy_corrections(load_cluster_map(path), corrections)
         restored, state = undo_last_maintenance(path)

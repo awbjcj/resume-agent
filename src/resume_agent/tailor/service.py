@@ -19,7 +19,12 @@ from resume_agent.profile.matrix import (
 from resume_agent.progress import ProgressReporter
 from resume_agent.services.errors import StageFailure
 from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.workflow import TailorRound, arun_tailor_review
+from resume_agent.tailor.workflow import (
+    TailorAgents,
+    TailorRequest,
+    TailorRound,
+    TailorWorkflow,
+)
 from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.tracking.repository import (
     resume_versions_for_job,
@@ -148,17 +153,14 @@ def tailor_job(
         runners = (*runners, planner)
     rounds = asyncio.run(
         run_with_cleanup(
-            arun_tailor_review(
-                job.jd_text,
-                criteria,
-                profile_facts,
-                config,
-                tailor_agent,
-                reviewer_agents,
-                reviser_agent,
-                skill_context=skill_context,
+            TailorWorkflow().arun(
+                TailorRequest(
+                    job.jd_text, criteria, profile_facts, config, skill_context
+                ),
+                TailorAgents(
+                    tailor_agent, reviewer_agents, reviser_agent, planner
+                ),
                 sem=sem,
-                evidence_portfolio_agent=planner,
             ),
             *runners,
         )
@@ -212,17 +214,18 @@ def tailor_jobs(
 
         async def _run_job(job: Job) -> list[TailorRound]:
             criteria = _criteria(job)
-            return await arun_tailor_review(
-                job.jd_text,
-                criteria,
-                profile_facts,
-                config,
-                tailor_agent,
-                reviewer_agents,
-                reviser_agent,
-                skill_context=_skill_context(criteria),
+            return await TailorWorkflow().arun(
+                TailorRequest(
+                    job.jd_text,
+                    criteria,
+                    profile_facts,
+                    config,
+                    _skill_context(criteria),
+                ),
+                TailorAgents(
+                    tailor_agent, reviewer_agents, reviser_agent, planner
+                ),
                 sem=sem,
-                evidence_portfolio_agent=planner,
             )
 
         runners = (tailor_agent, *reviewer_agents.values(), reviser_agent)

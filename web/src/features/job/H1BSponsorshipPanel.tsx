@@ -24,9 +24,8 @@ import {
 } from "@/components/ui/select";
 import type { components } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
-import { useRunStore } from "@/lib/runs/store";
 import { useCheckH1BSponsorship } from "./use-job-mutations";
-import { ACTIVE_RUN_STATUSES, latestArtifactRun } from "./artifact-runs";
+import { ACTIVE_RUN_STATUSES, latestArtifactRun, useArtifactRunIndex } from "./artifact-runs";
 import type { JobDetail } from "./use-job-detail";
 
 type SponsorshipResult = components["schemas"]["H1BSponsorshipOut"];
@@ -202,8 +201,8 @@ export function H1BSponsorshipPanel({
   initialResult?: JobDetail["h1BSponsorship"];
 }) {
   const check = useCheckH1BSponsorship(jobId);
-  const runs = useRunStore((state) => state.runs);
-  const h1bRun = latestArtifactRun(runs, "h1bSponsorship", "jobId", jobId);
+  const runIndex = useArtifactRunIndex();
+  const h1bRun = latestArtifactRun(runIndex, "h1bSponsorship", "jobId", jobId);
   const checking = h1bRun !== undefined && ACTIVE_RUN_STATUSES.includes(h1bRun.status);
   const failed = h1bRun?.status === "failed";
   const result = initialResult ?? null;

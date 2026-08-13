@@ -16,6 +16,7 @@ from resume_agent.taxonomy.corrections import (
     apply_taxonomy_corrections,
     update_taxonomy_corrections,
 )
+from resume_agent.taxonomy.custody import TaxonomyCustody
 from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.match_gap import normalize_skill
 
@@ -138,7 +139,8 @@ def move_skill(
             new_domain=new_domain,
         )
 
-    update_taxonomy_corrections(corrections_path, mutate)
+    with TaxonomyCustody(cluster_path, corrections_path).mutation():
+        update_taxonomy_corrections(corrections_path, mutate)
 
 
 def add_skill(
@@ -163,10 +165,16 @@ def add_skill(
             ledger.added_skills.append(token)
         ledger.removed_skills = [item for item in ledger.removed_skills if item != token]
 
-    update_taxonomy_corrections(corrections_path, mutate)
+    with TaxonomyCustody(cluster_path, corrections_path).mutation():
+        update_taxonomy_corrections(corrections_path, mutate)
 
 
-def remove_skill(corrections_path: str | Path, token: str) -> None:
+def remove_skill(
+    corrections_path: str | Path,
+    token: str,
+    *,
+    cluster_path: str | Path | None = None,
+) -> None:
     token = _require_token(token)
 
     def mutate(ledger: TaxonomyCorrections) -> None:
@@ -175,7 +183,9 @@ def remove_skill(corrections_path: str | Path, token: str) -> None:
         if token not in ledger.removed_skills:
             ledger.removed_skills.append(token)
 
-    update_taxonomy_corrections(corrections_path, mutate)
+    cluster_file = cluster_path or Path(corrections_path).with_name("cluster_map.json")
+    with TaxonomyCustody(cluster_file, corrections_path).mutation():
+        update_taxonomy_corrections(corrections_path, mutate)
 
 
 def patch_domain(
@@ -202,7 +212,8 @@ def patch_domain(
         if category is not None:
             ledger.domain_category[domain_id] = category
 
-    update_taxonomy_corrections(corrections_path, mutate)
+    with TaxonomyCustody(cluster_path, corrections_path).mutation():
+        update_taxonomy_corrections(corrections_path, mutate)
 
 
 def rename_domain(
@@ -254,7 +265,8 @@ def merge_domains(
             if source != target
         }
 
-    update_taxonomy_corrections(corrections_path, mutate)
+    with TaxonomyCustody(cluster_path, corrections_path).mutation():
+        update_taxonomy_corrections(corrections_path, mutate)
 
 
 def add_skill_alias(
@@ -286,4 +298,5 @@ def add_skill_alias(
                 f"aliasing {token!r} to {canonical!r} would create a cycle"
             ) from exc
 
-    update_taxonomy_corrections(corrections_path, mutate)
+    with TaxonomyCustody(cluster_path, corrections_path).mutation():
+        update_taxonomy_corrections(corrections_path, mutate)

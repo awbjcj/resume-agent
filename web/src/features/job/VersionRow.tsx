@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { openDownload } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
-import { useRunStore } from "@/lib/runs/store";
 import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import {
   useRenderVersion,
@@ -16,9 +15,9 @@ import {
   useSelectResume,
 } from "./use-job-mutations";
 import {
-  ACTIVE_RUN_STATUSES,
-  latestArtifactRun,
-  runCreatedArtifact,
+  dismissArtifactRun,
+  resumeRevisionLifecycle,
+  useArtifactRunIndex,
 } from "./artifact-runs";
 import { EvidencePortfolioDisclosure } from "./EvidencePortfolioDisclosure";
 
@@ -53,11 +52,11 @@ export function VersionRow({
   const checkboxId = useId();
   const render = useRenderVersion(jobId);
   const revise = useReviseVersion(jobId);
-  const runs = useRunStore((state) => state.runs);
-  const reviseRun = latestArtifactRun(runs, "revise", "versionId", version.id);
-  const reviseActive =
-    reviseRun !== undefined && ACTIVE_RUN_STATUSES.includes(reviseRun.status);
-  const justCreated = runCreatedArtifact(runs, "revise", "versionId", version.id);
+  const runIndex = useArtifactRunIndex();
+  const revision = resumeRevisionLifecycle(runIndex, version.id);
+  const reviseRun = revision.run;
+  const reviseActive = revision.active;
+  const justCreated = revision.justCreated;
   const select = useSelectResume(jobId);
   const applied = appliedVersionId === version.id;
   const origin = version.origin ?? "tailor";
@@ -209,13 +208,7 @@ export function VersionRow({
           <Button
             size="sm"
             variant="outline"
-            onClick={() =>
-              revise.mutate({
-                versionId: version.id,
-                instruction: reviseRun.meta?.instruction ?? "",
-                reReview: Boolean(reviseRun.meta?.reReview),
-              })
-            }
+            onClick={() => revision.retryInput && revise.mutate(revision.retryInput)}
           >
             <RotateCcw data-icon="inline-start" />
             Retry
@@ -224,7 +217,7 @@ export function VersionRow({
             size="icon-sm"
             variant="ghost"
             aria-label="Dismiss revision error"
-            onClick={() => useRunStore.getState().remove(reviseRun.runId)}
+            onClick={() => dismissArtifactRun(reviseRun.runId)}
           >
             <X aria-hidden="true" />
           </Button>

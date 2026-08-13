@@ -96,9 +96,9 @@ def add_skill(body: AddSkillIn, session: Session = Depends(get_session)):
 
 @router.delete("/taxonomy/skills/{token}", response_model=MatchGapOut)
 def remove_skill(token: str, session: Session = Depends(get_session)):
-    corrections_path, _ = _paths()
+    corrections_path, cluster_path = _paths()
     with _translated_errors():
-        service.remove_skill(corrections_path, token)
+        service.remove_skill(corrections_path, token, cluster_path=cluster_path)
     return build_match_gap_payload(session)
 
 
