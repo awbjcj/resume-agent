@@ -2,9 +2,7 @@ import { FilePlus2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { useRunStore } from "@/lib/runs/store";
-
-import { ACTIVE_RUN_STATUSES, latestJobRun } from "./artifact-runs";
+import { ACTIVE_RUN_STATUSES, latestJobRun, useArtifactRunIndex } from "./artifact-runs";
 import { CoverLetterRow, type CoverLetterItem } from "./CoverLetterRow";
 import { RevisionRunPlaceholders } from "./RevisionRunPlaceholders";
 import { useGenerateCoverLetter } from "./use-job-mutations";
@@ -19,8 +17,8 @@ export function CoverLettersTab({
   appliedId: number | null;
 }) {
   const generate = useGenerateCoverLetter(jobId);
-  const runs = useRunStore((state) => state.runs);
-  const generateRun = latestJobRun(runs, "coverLetter", jobId);
+  const runIndex = useArtifactRunIndex();
+  const generateRun = latestJobRun(runIndex, "coverLetter", jobId);
   // `generating` is the run-store truth; `isPending` is the brief window before
   // the accepted run reaches the store. Only the former replaces the empty
   // state, so the placeholder below takes over without a gap in between.

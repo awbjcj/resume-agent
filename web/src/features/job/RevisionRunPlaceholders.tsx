@@ -1,6 +1,5 @@
 import { Spinner } from "@/components/ui/spinner";
-import { useRunStore } from "@/lib/runs/store";
-import { ACTIVE_RUN_STATUSES, runCoversJob } from "./artifact-runs";
+import { ACTIVE_RUN_STATUSES, jobRuns, useArtifactRunIndex } from "./artifact-runs";
 
 export function RevisionRunPlaceholders({
   jobId,
@@ -11,12 +10,9 @@ export function RevisionRunPlaceholders({
   kind: "revise" | "coverLetterRevise" | "coverLetter";
   label: string;
 }) {
-  const runs = useRunStore((state) => state.runs);
-  const pending = Object.values(runs).filter(
-    (run) =>
-      run.kind === kind &&
-      runCoversJob(run, jobId) &&
-      ACTIVE_RUN_STATUSES.includes(run.status),
+  const runIndex = useArtifactRunIndex();
+  const pending = jobRuns(runIndex, kind, jobId).filter((run) =>
+    ACTIVE_RUN_STATUSES.includes(run.status),
   );
 
   return pending.map((run) => (

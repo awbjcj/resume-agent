@@ -6,16 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { openDownload } from "@/lib/api/client";
-import { useRunStore } from "@/lib/runs/store";
 import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import {
   useReviseCoverLetter,
   useSelectCoverLetter,
 } from "./use-job-mutations";
 import {
-  ACTIVE_RUN_STATUSES,
-  latestArtifactRun,
-  runCreatedArtifact,
+  coverLetterRevisionLifecycle,
+  dismissArtifactRun,
+  useArtifactRunIndex,
 } from "./artifact-runs";
 
 export type CoverLetterItem = {
@@ -42,21 +41,11 @@ export function CoverLetterRow({
   const [instruction, setInstruction] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const revise = useReviseCoverLetter(jobId);
-  const runs = useRunStore((state) => state.runs);
-  const reviseRun = latestArtifactRun(
-    runs,
-    "coverLetterRevise",
-    "coverLetterId",
-    coverLetter.id,
-  );
-  const reviseActive =
-    reviseRun !== undefined && ACTIVE_RUN_STATUSES.includes(reviseRun.status);
-  const justCreated = runCreatedArtifact(
-    runs,
-    "coverLetterRevise",
-    "coverLetterId",
-    coverLetter.id,
-  );
+  const runIndex = useArtifactRunIndex();
+  const revision = coverLetterRevisionLifecycle(runIndex, coverLetter.id);
+  const reviseRun = revision.run;
+  const reviseActive = revision.active;
+  const justCreated = revision.justCreated;
   const select = useSelectCoverLetter(jobId);
   const applied = appliedId === coverLetter.id;
   const origin = coverLetter.origin ?? "draft";
@@ -179,12 +168,7 @@ export function CoverLetterRow({
           <Button
             size="sm"
             variant="outline"
-            onClick={() =>
-              revise.mutate({
-                coverLetterId: coverLetter.id,
-                instruction: reviseRun.meta?.instruction ?? "",
-              })
-            }
+            onClick={() => revision.retryInput && revise.mutate(revision.retryInput)}
           >
             <RotateCcw data-icon="inline-start" />
             Retry
@@ -193,7 +177,7 @@ export function CoverLetterRow({
             size="icon-sm"
             variant="ghost"
             aria-label="Dismiss revision error"
-            onClick={() => useRunStore.getState().remove(reviseRun.runId)}
+            onClick={() => dismissArtifactRun(reviseRun.runId)}
           >
             <X aria-hidden="true" />
           </Button>
