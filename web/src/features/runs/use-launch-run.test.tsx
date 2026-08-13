@@ -93,6 +93,24 @@ describe("useLaunchRun", () => {
     });
   });
 
+  it("uses authoritative run metadata returned by the backend", async () => {
+    const qc = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useLaunchRun(), { wrapper });
+
+    await act(() =>
+      result.current.launch("coverLetter", async () => ({
+        runId: "bulk-cl",
+        kind: "coverLetter",
+        meta: { jobIds: [3, 8] },
+      })),
+    );
+
+    expect(useRunStore.getState().runs["bulk-cl"].meta).toEqual({ jobIds: [3, 8] });
+  });
+
   it("removes a superseded revision failure when its retry launches", async () => {
     useRunStore.getState().upsert({
       runId: "failed-r1",

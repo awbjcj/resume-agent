@@ -113,8 +113,7 @@ def _value_error(exc: ValueError) -> ApiException:
 
 def _active_run(manager: RunManager, session_id: str) -> bool:
     return any(
-        snapshot.meta is not None
-        and snapshot.meta.get("sessionId") == session_id
+        snapshot.meta is not None and snapshot.meta.get("sessionId") == session_id
         for snapshot in manager.list_active()
     )
 
@@ -286,18 +285,18 @@ def end_career_lab(
         singleton_conflict="raise",
         busy_code="CAREER_LAB_BUSY",
         busy_message="A Career Lab operation is already running",
-        meta=_run_meta(session_id=session_id, turn_count=len(current["turns"]), skill=None),
+        meta=_run_meta(
+            session_id=session_id, turn_count=len(current["turns"]), skill=None
+        ),
     )
 
 
 def _ordered_for_listing(rows: list[dict]) -> list[dict]:
     """Open threads first, then most recently started.
 
-    Page 1 therefore always holds every active thread, which is what makes a
-    job's Career Lab tab correct without paging: it decides whether to offer
-    "start a thread" from that page alone, and an active thread stranded on
-    page 2 offered a Start that the API then rejected with a 409. The substrate
-    lists oldest-first, which is the wrong end for a history rail anyway.
+    Open-first ordering remains useful for history, but it cannot guarantee
+    every active thread fits on page one. The response therefore exposes the
+    complete active collection separately from paginated history.
 
     Two stable passes rather than one composite key, because the two components
     sort in opposite directions and `started_at` is a string that cannot be
@@ -327,6 +326,26 @@ def _job_label(
     return labels.get(job_id, (None, None))
 
 
+def _session_summary(
+    row: dict,
+    labels: dict[int, tuple[str | None, str | None]],
+) -> CareerLabSessionSummaryOut:
+    company, title = _job_label(labels, row.get("job_id"))
+    return CareerLabSessionSummaryOut(
+        session_id=row["session_id"],
+        title=row.get("title", ""),
+        goal=row["goal"],
+        started_at=row["started_at"],
+        ended_at=row.get("ended_at"),
+        status=row["status"],
+        archived_at=row.get("archived_at"),
+        job_id=row.get("job_id"),
+        job_company=company,
+        job_title=title,
+        turn_count=len(row["turns"]),
+    )
+
+
 @router.get("/career-lab/sessions", response_model=CareerLabSessionsOut)
 def list_career_lab_sessions(
     request: Request,
@@ -342,28 +361,16 @@ def list_career_lab_sessions(
     total = len(rows)
     start = (page - 1) * page_size
     selected = rows[start : start + page_size]
-    # Resolved once for the page, then handed to the projections — never a
-    # lookup per row.
+    active = [row for row in rows if row["status"] == "active"]
+    # Resolved once for the page and the authoritative active collection, then
+    # handed to the projections — never a lookup per row.
     labels = _job_labels(
-        session, {row["job_id"] for row in selected if row.get("job_id")}
+        session,
+        {row["job_id"] for row in [*selected, *active] if row.get("job_id")},
     )
     return CareerLabSessionsOut(
-        sessions=[
-            CareerLabSessionSummaryOut(
-                session_id=row["session_id"],
-                title=row.get("title", ""),
-                goal=row["goal"],
-                started_at=row["started_at"],
-                ended_at=row.get("ended_at"),
-                status=row["status"],
-                archived_at=row.get("archived_at"),
-                job_id=row.get("job_id"),
-                job_company=_job_label(labels, row.get("job_id"))[0],
-                job_title=_job_label(labels, row.get("job_id"))[1],
-                turn_count=len(row["turns"]),
-            )
-            for row in selected
-        ],
+        sessions=[_session_summary(row, labels) for row in selected],
+        active_sessions=[_session_summary(row, labels) for row in active],
         pagination=Pagination(
             page=page,
             page_size=page_size,
@@ -376,7 +383,9 @@ def list_career_lab_sessions(
 @router.get("/career-lab/sessions/{session_id}", response_model=CareerLabSessionOut)
 def get_career_lab_session(session_id: str, request: Request):
     try:
-        return CareerLabSessionOut.model_validate(session_view(_root(request), session_id))
+        return CareerLabSessionOut.model_validate(
+            session_view(_root(request), session_id)
+        )
     except ValueError as exc:
         raise _value_error(exc) from exc
 
@@ -391,9 +400,12 @@ def rename_career_lab_session(
     _ensure_no_active_run(manager, session_id)
     try:
         rename_session(_root(request), session_id, payload.title)
-        return CareerLabSessionOut.model_validate(session_view(_root(request), session_id))
+        return CareerLabSessionOut.model_validate(
+            session_view(_root(request), session_id)
+        )
     except ValueError as exc:
         raise _value_error(exc) from exc
+
 
 def _ensure_no_active_run(manager: RunManager, session_id: str) -> None:
     if _active_run(manager, session_id):
@@ -411,7 +423,9 @@ def archive_career_lab(
     _ensure_no_active_run(manager, session_id)
     try:
         archive_session(_root(request), session_id)
-        return CareerLabSessionOut.model_validate(session_view(_root(request), session_id))
+        return CareerLabSessionOut.model_validate(
+            session_view(_root(request), session_id)
+        )
     except ValueError as exc:
         raise _value_error(exc) from exc
 
@@ -428,7 +442,9 @@ def unarchive_career_lab(
     _ensure_no_active_run(manager, session_id)
     try:
         unarchive_session(_root(request), session_id)
-        return CareerLabSessionOut.model_validate(session_view(_root(request), session_id))
+        return CareerLabSessionOut.model_validate(
+            session_view(_root(request), session_id)
+        )
     except ValueError as exc:
         raise _value_error(exc) from exc
 

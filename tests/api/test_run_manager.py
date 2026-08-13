@@ -81,9 +81,7 @@ def test_submit_records_error(tmp_path):
 
 def test_error_hook_fires_once_for_a_failed_run(tmp_path):
     events = []
-    mgr = RunManager(
-        root=tmp_path, executor=InlineExecutor(), on_error=events.append
-    )
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor(), on_error=events.append)
 
     run_id = mgr.submit("pull", lambda _reporter: 1 / 0)
 
@@ -99,9 +97,7 @@ def test_error_hook_fires_once_for_a_failed_run(tmp_path):
 
 def test_error_hook_is_not_fired_for_success_or_cancel(tmp_path):
     events = []
-    mgr = RunManager(
-        root=tmp_path, executor=InlineExecutor(), on_error=events.append
-    )
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor(), on_error=events.append)
 
     mgr.submit("pull", lambda _reporter: {"ok": True})
     mgr.submit("pull", lambda _reporter: (_ for _ in ()).throw(RunCancelled))
@@ -113,9 +109,7 @@ def test_error_hook_failure_never_masks_the_run_failure(tmp_path):
     def broken_hook(_payload):
         raise RuntimeError("hook failed")
 
-    mgr = RunManager(
-        root=tmp_path, executor=InlineExecutor(), on_error=broken_hook
-    )
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor(), on_error=broken_hook)
     run_id = mgr.submit("pull", lambda _reporter: 1 / 0)
 
     snapshot = mgr.get(run_id)
@@ -125,7 +119,9 @@ def test_error_hook_failure_never_masks_the_run_failure(tmp_path):
 
 def test_reporter_checkpoint_raises_when_cancel_requested(tmp_path):
     flag = {"cancel": False}
-    rep = RunProgressReporter("rid", "pull", tmp_path, cancel_check=lambda: flag["cancel"])
+    rep = RunProgressReporter(
+        "rid", "pull", tmp_path, cancel_check=lambda: flag["cancel"]
+    )
     rep.begin(5, "working")  # not cancelled yet
     rep.step(1)
     flag["cancel"] = True
@@ -191,7 +187,9 @@ def test_request_cancel_marks_running_run_as_cancelling(tmp_path):
 
 def test_reporter_done_honours_a_late_cancel_request(tmp_path):
     flag = {"cancel": False}
-    rep = RunProgressReporter("rid", "tailor", tmp_path, cancel_check=lambda: flag["cancel"])
+    rep = RunProgressReporter(
+        "rid", "tailor", tmp_path, cancel_check=lambda: flag["cancel"]
+    )
     rep.begin(1, "Tailoring")
     flag["cancel"] = True
 
@@ -211,6 +209,7 @@ def test_submit_stamps_terminal_on_base_exception(tmp_path):
     files = list(tmp_path.glob("*.json"))
     assert len(files) == 1
     import json
+
     rec = json.loads(files[0].read_text(encoding="utf-8"))
     assert rec["state"] == "error"
     assert "KeyboardInterrupt" in rec["error"]
@@ -314,7 +313,9 @@ def test_parse_run_snapshot_uses_requested_id_and_typed_state():
     assert snapshot.run_id == "file-id"
     assert snapshot.state is RunState.running
     assert snapshot.created_at == datetime(2026, 6, 28, 10, tzinfo=timezone.utc)
-    assert snapshot.phase_started_at == datetime(2026, 6, 28, 10, 1, tzinfo=timezone.utc)
+    assert snapshot.phase_started_at == datetime(
+        2026, 6, 28, 10, 1, tzinfo=timezone.utc
+    )
 
 
 @pytest.mark.parametrize(
@@ -339,7 +340,10 @@ def test_list_active_filters_invalid_and_sorts_by_creation_time_then_id(tmp_path
     mgr = RunManager(root=tmp_path, executor=InlineExecutor())
     records = {
         "bbb": _run_record(created_at="2026-06-28T10:00:00+00:00"),
-        "aaa": _run_record(created_at="2026-06-28T10:00:00+00:00", started_at="2026-06-28T11:00:00+00:00"),
+        "aaa": _run_record(
+            created_at="2026-06-28T10:00:00+00:00",
+            started_at="2026-06-28T11:00:00+00:00",
+        ),
         "old": _run_record(created_at="2026-06-28T09:00:00+00:00", state="done"),
         "bad": _run_record(state="unknown"),
     }
@@ -353,7 +357,11 @@ def test_recover_interrupted_terminalizes_active_records_only(tmp_path):
     import json
 
     mgr = RunManager(root=tmp_path, executor=InlineExecutor())
-    for run_id, state in (("pending", "pending"), ("running", "running"), ("done", "done")):
+    for run_id, state in (
+        ("pending", "pending"),
+        ("running", "running"),
+        ("done", "done"),
+    ):
         (tmp_path / f"{run_id}.json").write_text(
             json.dumps(_run_record(state=state)), encoding="utf-8"
         )
@@ -375,9 +383,7 @@ def test_recover_interrupted_emits_user_attributed_errors(tmp_path):
     import json
 
     events = []
-    mgr = RunManager(
-        root=tmp_path, executor=InlineExecutor(), on_error=events.append
-    )
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor(), on_error=events.append)
     (tmp_path / "pending.json").write_text(
         json.dumps(_run_record(state="pending", user_id="user123")),
         encoding="utf-8",
@@ -394,7 +400,9 @@ def test_recover_interrupted_emits_user_attributed_errors(tmp_path):
     ]
 
 
-def test_submit_singleton_coalesces_racing_calls_and_releases_after_completion(tmp_path):
+def test_submit_singleton_coalesces_racing_calls_and_releases_after_completion(
+    tmp_path,
+):
     barrier = Barrier(3)
     release = Event()
     started = Event()
@@ -427,7 +435,9 @@ def test_submit_singleton_coalesces_racing_calls_and_releases_after_completion(t
 
     for future in list(mgr._futures.values()):
         future.result(timeout=2)
-    next_id = mgr.submit("refreshClusters", lambda _reporter: {}, singleton_key="refreshClusters")
+    next_id = mgr.submit(
+        "refreshClusters", lambda _reporter: {}, singleton_key="refreshClusters"
+    )
     assert next_id != first_id
     mgr.shutdown()
 
@@ -435,8 +445,12 @@ def test_submit_singleton_coalesces_racing_calls_and_releases_after_completion(t
 def test_submit_singleton_does_not_deadlock_with_inline_executor(tmp_path):
     mgr = RunManager(root=tmp_path, executor=InlineExecutor())
 
-    first = mgr.submit("refreshClusters", lambda _reporter: {}, singleton_key="clusters")
-    second = mgr.submit("refreshClusters", lambda _reporter: {}, singleton_key="clusters")
+    first = mgr.submit(
+        "refreshClusters", lambda _reporter: {}, singleton_key="clusters"
+    )
+    second = mgr.submit(
+        "refreshClusters", lambda _reporter: {}, singleton_key="clusters"
+    )
 
     assert first != second
 
@@ -468,6 +482,37 @@ def test_submit_can_raise_for_an_active_singleton_and_persists_meta(tmp_path):
         )
     assert error.value.run_id == first
     assert mgr.get(first).meta == {"versionId": 5, "instruction": "tighter"}  # type: ignore[union-attr]
+    release.set()
+    mgr.shutdown()
+
+
+def test_submit_rejects_any_overlapping_exclusive_key(tmp_path):
+    release = Event()
+    started = Event()
+    mgr = RunManager(root=tmp_path)
+
+    def work(_reporter):
+        started.set()
+        release.wait(timeout=2)
+        return {}
+
+    first = mgr.submit(
+        "coverLetter",
+        work,
+        singleton_keys=["cover-letter:1", "cover-letter:2"],
+        singleton_conflict="raise",
+    )
+    assert started.wait(timeout=1)
+
+    with pytest.raises(RunSingletonConflict) as error:
+        mgr.submit(
+            "coverLetter",
+            lambda _reporter: {},
+            singleton_keys=["cover-letter:2", "cover-letter:3"],
+            singleton_conflict="raise",
+        )
+
+    assert error.value.run_id == first
     release.set()
     mgr.shutdown()
 

@@ -13,6 +13,9 @@ from fastapi import Request, Response
 from resume_agent.config import Settings
 
 SESSION_COOKIE = "ra_session"
+OAUTH_STATE_COOKIE = "ra_google_oauth_state"
+OAUTH_PKCE_COOKIE = "ra_google_oauth_pkce"
+OAUTH_COOKIE_PATH = "/api/auth/google/callback"
 SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60
 _PBKDF2_ITERATIONS = 600_000
 LINK_TOKEN_TTL_SECONDS = 10 * 60
@@ -244,3 +247,74 @@ def verify_oauth_state(
     if (time.time() if now is None else now) >= expiry:
         return None
     return OAuthState(mode=mode, invite_hash=invite_hash)
+
+
+def issue_oauth_pkce_cookie(settings: Settings, state: str, verifier: str) -> str:
+    payload = f"{state}:{verifier}"
+    signature = _sign_user(settings, payload, "", namespace="oauth-pkce")
+    return f"{verifier}:{signature}"
+
+
+def verify_oauth_pkce_cookie(
+    cookie: str,
+    settings: Settings,
+    state: str,
+) -> str | None:
+    if not settings.session_secret:
+        return None
+    try:
+        verifier, signature = cookie.rsplit(":", 1)
+    except (AttributeError, ValueError):
+        return None
+    allowed = verifier.isascii() and all(
+        character.isalnum() or character in "-._~" for character in verifier
+    )
+    if not allowed or not 43 <= len(verifier) <= 128:
+        return None
+    payload = f"{state}:{verifier}"
+    expected = _sign_user(settings, payload, "", namespace="oauth-pkce")
+    if not hmac.compare_digest(signature, expected):
+        return None
+    return verifier
+
+
+def set_oauth_flow_cookies(
+    request: Request,
+    response: Response,
+    *,
+    state: str,
+    verifier: str,
+) -> None:
+    settings = request.app.state.settings
+    secure = settings.secure_cookies or request.url.scheme == "https"
+    response.set_cookie(
+        OAUTH_STATE_COOKIE,
+        state,
+        max_age=OAUTH_STATE_TTL_SECONDS,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        path=OAUTH_COOKIE_PATH,
+    )
+    response.set_cookie(
+        OAUTH_PKCE_COOKIE,
+        issue_oauth_pkce_cookie(settings, state, verifier),
+        max_age=OAUTH_STATE_TTL_SECONDS,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        path=OAUTH_COOKIE_PATH,
+    )
+
+
+def oauth_flow_verifier(request: Request, state: str, settings: Settings) -> str | None:
+    bound_state = request.cookies.get(OAUTH_STATE_COOKIE, "")
+    if not bound_state or not state or not hmac.compare_digest(bound_state, state):
+        return None
+    cookie = request.cookies.get(OAUTH_PKCE_COOKIE, "")
+    return verify_oauth_pkce_cookie(cookie, settings, state)
+
+
+def clear_oauth_flow_cookies(response: Response) -> None:
+    response.delete_cookie(OAUTH_STATE_COOKIE, path=OAUTH_COOKIE_PATH)
+    response.delete_cookie(OAUTH_PKCE_COOKIE, path=OAUTH_COOKIE_PATH)

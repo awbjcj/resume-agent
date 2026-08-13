@@ -26,6 +26,16 @@ def test_oauth_state_rejects_tampering_expiry_and_garbage():
         auth.verify_oauth_state(state, SETTINGS, now=auth.OAUTH_STATE_TTL_SECONDS + 1)
         is None
     )
+
+
+def test_oauth_pkce_cookie_is_bound_to_state_and_rejects_tampering():
+    state = auth.issue_oauth_state(SETTINGS, mode="login", now=1000.0)
+    verifier = "v" * 64
+    cookie = auth.issue_oauth_pkce_cookie(SETTINGS, state, verifier)
+
+    assert auth.verify_oauth_pkce_cookie(cookie, SETTINGS, state) == verifier
+    assert auth.verify_oauth_pkce_cookie(cookie, SETTINGS, state + "x") is None
+    assert auth.verify_oauth_pkce_cookie(cookie + "x", SETTINGS, state) is None
     assert auth.verify_oauth_state("garbage", SETTINGS) is None
     assert (
         auth.verify_oauth_state(

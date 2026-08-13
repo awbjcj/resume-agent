@@ -37,12 +37,22 @@ class _ManagerStub:
         self._error = error
         self.submitted: dict | None = None
 
-    def submit(self, kind, fn, *, singleton_key=None, singleton_conflict="join", meta=None):
+    def submit(
+        self,
+        kind,
+        fn,
+        *,
+        singleton_key=None,
+        singleton_keys=None,
+        singleton_conflict="join",
+        meta=None,
+    ):
         if self._error is not None:
             raise self._error
         self.submitted = {
             "kind": kind,
             "singleton_key": singleton_key,
+            "singleton_keys": singleton_keys,
             "singleton_conflict": singleton_conflict,
             "meta": meta,
         }
@@ -55,12 +65,18 @@ class _ManagerStub:
 def test_launch_submits_and_returns_runout():
     mgr = _ManagerStub()
     out = launch(
-        cast(RunManager, mgr), "pull", lambda reporter: {}, singleton_key="pull", meta={"a": 1}
+        cast(RunManager, mgr),
+        "pull",
+        lambda reporter: {},
+        singleton_key="pull",
+        singleton_keys=["item:1", "item:2"],
+        meta={"a": 1},
     )
     assert out.run_id == "run-1"
     assert mgr.submitted == {
         "kind": "pull",
         "singleton_key": "pull",
+        "singleton_keys": ["item:1", "item:2"],
         "singleton_conflict": "join",
         "meta": {"a": 1},
     }
@@ -69,8 +85,13 @@ def test_launch_submits_and_returns_runout():
 def test_launch_maps_singleton_conflict_to_409():
     mgr = _ManagerStub(error=RunSingletonConflict("run-9"))
     with pytest.raises(ApiException) as excinfo:
-        launch(cast(RunManager, mgr), "pull", lambda reporter: {}, singleton_key="pull",
-               singleton_conflict="raise")
+        launch(
+            cast(RunManager, mgr),
+            "pull",
+            lambda reporter: {},
+            singleton_key="pull",
+            singleton_conflict="raise",
+        )
     assert excinfo.value.status_code == 409
     assert excinfo.value.details == {"runId": "run-9"}
 
@@ -78,18 +99,31 @@ def test_launch_maps_singleton_conflict_to_409():
 def test_launch_busy_code_overrides_default():
     mgr = _ManagerStub(error=RunSingletonConflict("run-9"))
     with pytest.raises(ApiException) as excinfo:
-        launch(cast(RunManager, mgr), "coach", lambda reporter: {}, busy_code="COACH_BUSY",
-               busy_message="A coach turn is already running")
+        launch(
+            cast(RunManager, mgr),
+            "coach",
+            lambda reporter: {},
+            busy_code="COACH_BUSY",
+            busy_message="A coach turn is already running",
+        )
     assert excinfo.value.code == "COACH_BUSY"
     assert excinfo.value.message == "A coach turn is already running"
 
 
 def test_launch_maps_quota_to_429_and_reset_to_409():
     with pytest.raises(ApiException) as excinfo:
-        launch(cast(RunManager, _ManagerStub(error=RunQuotaError("too many"))), "pull", lambda r: {})
+        launch(
+            cast(RunManager, _ManagerStub(error=RunQuotaError("too many"))),
+            "pull",
+            lambda r: {},
+        )
     assert excinfo.value.status_code == 429
     with pytest.raises(ApiException) as excinfo:
-        launch(cast(RunManager, _ManagerStub(error=RunResetConflict("reset underway"))), "pull", lambda r: {})
+        launch(
+            cast(RunManager, _ManagerStub(error=RunResetConflict("reset underway"))),
+            "pull",
+            lambda r: {},
+        )
     assert excinfo.value.status_code == 409
 
 

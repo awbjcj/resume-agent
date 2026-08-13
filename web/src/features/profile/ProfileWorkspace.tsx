@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useState } from "react";
 import { ArrowRight, FileText, Sparkles, Wrench } from "lucide-react";
 
@@ -95,10 +95,10 @@ export function ProfileWorkspace() {
               : "Start your first coaching session to uncover grounded profile evidence."}
           </CardDescription>
           <CardAction>
-            <Button render={<a href="/coach" />}>
+            <a className={buttonVariants()} data-slot="button" href="/coach">
               Open coach
               <ArrowRight data-icon="inline-end" aria-hidden="true" />
-            </Button>
+            </a>
           </CardAction>
         </CardHeader>
       </Card>

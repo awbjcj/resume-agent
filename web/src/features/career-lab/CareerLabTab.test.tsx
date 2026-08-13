@@ -100,6 +100,21 @@ describe("CareerLabTab", () => {
     ).toBeNull();
   });
 
+  it("withdraws start when the active thread is outside the history page", () => {
+    mocks.sessions.mockReturnValue({
+      data: {
+        sessions: [session({ sessionId: "ended", status: "ended" })],
+        activeSessions: [session({ sessionId: "active-off-page" })],
+      },
+    });
+    renderTab();
+
+    expect(screen.getByText(/thread for this job is open/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /start a career lab thread/i }),
+    ).toBeNull();
+  });
+
   it("keeps starting available once every thread has ended", () => {
     mocks.sessions.mockReturnValue({
       data: {

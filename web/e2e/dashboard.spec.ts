@@ -63,3 +63,25 @@ test("dashboard is home and queue cards deep-link", async ({ page }) => {
     .click();
   await expect(page).toHaveURL(/\/triage/);
 });
+
+test("mobile chrome keeps launch actions compact and horizontally contained", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const chrome = page.locator("header.app-chrome");
+  await expect(chrome.getByText("Resume Agent", { exact: true })).toBeVisible();
+
+  const chromeBox = await chrome.boundingBox();
+  expect(chromeBox).not.toBeNull();
+  expect(chromeBox!.height).toBeLessThanOrEqual(128);
+
+  const rail = chrome.locator(".shell-action-rail");
+  const railDimensions = await rail.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(railDimensions.scrollWidth).toBeGreaterThan(railDimensions.clientWidth);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});

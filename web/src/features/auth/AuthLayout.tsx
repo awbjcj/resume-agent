@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Sparkles } from "lucide-react";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -37,21 +38,32 @@ export function AuthLayout({
         <p className="relative text-xs opacity-70">Your private command center.</p>
       </aside>
       <main className="flex w-full items-center justify-center p-4 sm:p-8 lg:w-[45%]">
-        <Card className="w-full max-w-md shadow-lg shadow-primary/5">
-          <CardHeader>
-            {icon ? (
-              <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                {icon}
-              </div>
-            ) : null}
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            <p className="text-sm text-muted-foreground">{description}</p>
-          </CardHeader>
-          <CardContent>
-            {children}
-            {footer ? <div className="mt-6 text-sm">{footer}</div> : null}
-          </CardContent>
-        </Card>
+        <div className="w-full max-w-md">
+          <div className="mb-5 flex items-center gap-3 px-1 lg:hidden">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <Sparkles className="size-4.5" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold leading-tight">Resume Agent</div>
+              <div className="text-xs text-muted-foreground">Your private command center</div>
+            </div>
+          </div>
+          <Card className="w-full shadow-card-raised">
+            <CardHeader>
+              {icon ? (
+                <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  {icon}
+                </div>
+              ) : null}
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              <p className="text-sm text-muted-foreground">{description}</p>
+            </CardHeader>
+            <CardContent>
+              {children}
+              {footer ? <div className="mt-6 text-sm">{footer}</div> : null}
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

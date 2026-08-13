@@ -1,6 +1,6 @@
 import { Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { SearchConfigForm } from "../forms/SearchConfigForm";
 import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
@@ -24,10 +24,14 @@ export function SearchSettingsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" render={<a href="/scout" />}>
+          <a
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+            data-slot="button"
+            href="/scout"
+          >
             <Sparkles data-icon="inline-start" aria-hidden="true" />
             Ask the Scout
-          </Button>
+          </a>
           <ResetSectionButton sectionId="search" label="Search" />
         </div>
       </header>

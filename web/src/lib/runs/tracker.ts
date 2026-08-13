@@ -16,6 +16,7 @@ interface RunStatusPayload extends RunSeed {
   etaText?: string | null;
   result?: RunRecord["result"];
   error?: string | null;
+  meta?: RunRecord["meta"];
 }
 
 interface TrackedRun {
@@ -45,6 +46,7 @@ function recordFromStatus(payload: RunStatusPayload): RunRecord {
     etaText: payload.etaText ?? null,
     error: payload.error ?? undefined,
     result: payload.result ?? null,
+    ...(payload.meta !== undefined ? { meta: payload.meta } : {}),
   };
 }
 

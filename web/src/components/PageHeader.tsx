@@ -14,7 +14,7 @@ export function PageHeader({
         {/* Tracking and leading are size-specific: as display type grows the
             letters read too far apart and the lines too loose, so both tighten
             here while the small uppercase kicker above keeps positive tracking. */}
-        <h1 className="mt-2 text-4xl font-semibold leading-[1.08] tracking-[-0.02em] text-balance text-foreground md:text-5xl">
+        <h1 className="mt-2 font-heading text-4xl font-semibold leading-[1.08] tracking-[-0.025em] text-balance text-foreground md:text-5xl">
           {title}
         </h1>
       </div>

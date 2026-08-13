@@ -94,7 +94,7 @@ export function RefreshClustersButton({
       {failed !== null && (
         <span
           role="status"
-          className="absolute top-full right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 text-xs text-nowrap text-destructive duration-150"
+          className="absolute top-full right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 text-xs text-nowrap text-destructive duration-150 ease-out-strong motion-reduce:animate-none"
         >
           Couldn't start taxonomy {failed}.
         </span>

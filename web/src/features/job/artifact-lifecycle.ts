@@ -26,6 +26,12 @@ const key = (...parts: Array<string | number>) => parts.join("\u001f");
 const newer = (left: RunRecord | undefined, right: RunRecord) =>
   left === undefined || (right.updatedAt ?? 0) > (left.updatedAt ?? 0) ? right : left;
 
+/** Whether a run is working on this job, however its launcher tagged it.
+ *
+ * Per-job launchers record `meta.jobId`; bulk cover-letter launches persist the
+ * backend-resolved target set as `meta.jobIds`. Checking both shapes keeps
+ * generation state visible after reload and across tabs.
+ */
 export function runCoversJob(run: RunRecord, jobId: number): boolean {
   if (run.meta?.jobId === jobId) return true;
   const jobIds = run.meta?.jobIds;

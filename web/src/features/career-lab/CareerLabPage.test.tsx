@@ -209,6 +209,25 @@ describe("CareerLabPage", () => {
     ).toBeNull();
   });
 
+  it("uses active sessions outside the current history page", () => {
+    mocks.sessions.mockReturnValue({
+      data: {
+        sessions: [summary({ sessionId: "ended", status: "ended" })],
+        activeSessions: [
+          summary({ sessionId: "job-7", jobId: 7 }),
+          summary({ sessionId: "unanchored", jobId: null }),
+        ],
+      },
+      isPending: false,
+    });
+    renderPage();
+
+    expect(mocks.session).toHaveBeenCalledWith("unanchored");
+    expect(
+      screen.queryByRole("button", { name: "New Career Lab session" }),
+    ).toBeNull();
+  });
+
   it("falls back to the newest open thread when every one is job-anchored", () => {
     mocks.sessions.mockReturnValue({
       data: {

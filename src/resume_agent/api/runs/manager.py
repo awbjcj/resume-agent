@@ -18,7 +18,7 @@ import contextvars
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -324,6 +324,7 @@ class RunManager:
         fn: RunFn,
         *,
         singleton_key: str | None = None,
+        singleton_keys: Iterable[str] | None = None,
         user_id: str | None = None,
         max_concurrent: int | None = None,
         singleton_conflict: str = "join",
@@ -343,12 +344,20 @@ class RunManager:
                 max_concurrent = active_limit(
                     "max_concurrent_runs", DEFAULT_MAX_CONCURRENT_RUNS
                 )
-            effective_singleton = (
-                f"{owner_id}:{singleton_key}"
-                if owner_id is not None and singleton_key is not None
-                else singleton_key
+            raw_singletons = list(
+                dict.fromkeys(
+                    [
+                        key
+                        for key in ([singleton_key] + list(singleton_keys or ()))
+                        if key is not None
+                    ]
+                )
             )
-            if effective_singleton is not None:
+            effective_singletons = tuple(
+                f"{owner_id}:{key}" if owner_id is not None else key
+                for key in raw_singletons
+            )
+            for effective_singleton in effective_singletons:
                 active_id = self._active_singletons.get(effective_singleton)
                 if active_id is not None:
                     snapshot = self.get(active_id)
@@ -370,7 +379,7 @@ class RunManager:
                     )
             run_id = self.create(kind, user_id=owner_id, meta=meta)
             reporter = self.reporter(run_id, kind)
-            if effective_singleton is not None:
+            for effective_singleton in effective_singletons:
                 self._active_singletons[effective_singleton] = run_id
 
             def _runner() -> None:
@@ -410,7 +419,7 @@ class RunManager:
             try:
                 future = executor.submit(submission_context.run, _runner)
             except BaseException as exc:
-                if effective_singleton is not None:
+                for effective_singleton in effective_singletons:
                     self._active_singletons.pop(effective_singleton, None)
                 record = self._read_record(run_id)
                 if record is not None:
@@ -427,11 +436,9 @@ class RunManager:
             def release(_future: Future) -> None:
                 with self._singleton_lock:
                     self._futures.pop(run_id, None)
-                    if (
-                        effective_singleton is not None
-                        and self._active_singletons.get(effective_singleton) == run_id
-                    ):
-                        self._active_singletons.pop(effective_singleton, None)
+                    for effective_singleton in effective_singletons:
+                        if self._active_singletons.get(effective_singleton) == run_id:
+                            self._active_singletons.pop(effective_singleton, None)
 
             future.add_done_callback(release)
         return run_id

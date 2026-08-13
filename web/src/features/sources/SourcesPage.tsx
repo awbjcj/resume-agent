@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Play, Sparkles, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
@@ -236,10 +236,14 @@ export function SourcesManager() {
     <div>
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <AddSourceDialog />
-        <Button variant="outline" size="sm" render={<a href="/scout" />}>
+        <a
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+          data-slot="button"
+          href="/scout"
+        >
           <Sparkles data-icon="inline-start" aria-hidden="true" />
           Ask the Scout
-        </Button>
+        </a>
         <Button
           variant="outline"
           size="sm"

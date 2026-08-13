@@ -26,7 +26,9 @@ def _client(tmp_path):
     env.write_text("", encoding="utf-8")
     return TestClient(
         create_app(
-            db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path,
+            db_url="sqlite://",
+            run_executor=InlineExecutor(),
+            runs_root=tmp_path,
             env_path=env,
         )
     )
@@ -59,22 +61,53 @@ def test_get_unknown_run_404(tmp_path):
 
 
 def test_resume_revise_launches_a_durable_artifact_run(monkeypatch, tmp_path):
-    monkeypatch.setattr(runs_router, "get_resume_version", lambda _session, version_id: SimpleNamespace(id=version_id, job_id=3))
-    monkeypatch.setattr(runs_router, "revise_resume_version", lambda _session, _version_id, _instruction, **_kw: SimpleNamespace(id=42, job_id=3))
+    monkeypatch.setattr(
+        runs_router,
+        "get_resume_version",
+        lambda _session, version_id: SimpleNamespace(id=version_id, job_id=3),
+    )
+    monkeypatch.setattr(
+        runs_router,
+        "revise_resume_version",
+        lambda _session, _version_id, _instruction, **_kw: SimpleNamespace(
+            id=42, job_id=3
+        ),
+    )
     with _client(tmp_path) as client:
-        response = client.post("/api/resume-versions/5/revise", json={"instruction": "shorter", "reReview": False})
+        response = client.post(
+            "/api/resume-versions/5/revise",
+            json={"instruction": "shorter", "reReview": False},
+        )
         assert response.status_code == 202
         run = client.get(f"/api/runs/{response.json()['runId']}").json()
     assert run["kind"] == "revise"
-    assert run["meta"] == {"versionId": 5, "jobId": 3, "instruction": "shorter", "reReview": False}
+    assert run["meta"] == {
+        "versionId": 5,
+        "jobId": 3,
+        "instruction": "shorter",
+        "reReview": False,
+    }
     assert run["result"] == {"versionId": 42, "jobId": 3}
 
 
 def test_cover_letter_revise_launches_a_durable_artifact_run(monkeypatch, tmp_path):
-    monkeypatch.setattr(runs_router, "get_cover_letter", lambda _session, cover_id: SimpleNamespace(id=cover_id, job_id=8))
-    monkeypatch.setattr(runs_router, "revise_cover_letter_version", lambda _session, _cover_id, _instruction, **_kw: SimpleNamespace(id=77, job_id=8))
+    monkeypatch.setattr(
+        runs_router,
+        "get_cover_letter",
+        lambda _session, cover_id: SimpleNamespace(id=cover_id, job_id=8),
+    )
+    monkeypatch.setattr(
+        runs_router,
+        "revise_cover_letter_version",
+        lambda _session, _cover_id, _instruction, **_kw: SimpleNamespace(
+            id=77, job_id=8
+        ),
+    )
     with _client(tmp_path) as client:
-        response = client.post("/api/cover-letters/5/revise", json={"instruction": "warmer", "reReview": False})
+        response = client.post(
+            "/api/cover-letters/5/revise",
+            json={"instruction": "warmer", "reReview": False},
+        )
         assert response.status_code == 202
         run = client.get(f"/api/runs/{response.json()['runId']}").json()
     assert run["kind"] == "coverLetterRevise"
@@ -172,6 +205,85 @@ def test_tailor_launch_maps_deep_to_review_path(monkeypatch, tmp_path):
         client.post("/api/tailor", json={"approved": True})
 
     assert review_paths == ["config/review_deep.yaml", "config/review.yaml"]
+
+
+def test_cover_letter_launch_persists_resolved_targets(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        runs_router,
+        "resolve_cover_letter_targets",
+        lambda _session, **_kwargs: [SimpleNamespace(id=4), SimpleNamespace(id=9)],
+    )
+    captured = {}
+
+    def fake_write(_session, *, job_ids, approved, reporter, **_kwargs):
+        captured.update(job_ids=job_ids, approved=approved)
+        reporter.begin(2, "Starting")
+        reporter.step(2)
+        return []
+
+    monkeypatch.setattr(runs_router, "write_cover_letters", fake_write)
+
+    with _client(tmp_path) as client:
+        response = client.post("/api/cover-letters", json={"approved": True})
+        run = client.get(f"/api/runs/{response.json()['runId']}").json()
+
+    assert response.status_code == 202
+    assert response.json()["meta"] == {"jobIds": [4, 9]}
+    assert run["meta"] == {"jobIds": [4, 9]}
+    assert captured == {"job_ids": [4, 9], "approved": False}
+
+
+def test_cover_letter_launch_rejects_overlapping_active_jobs(monkeypatch, tmp_path):
+    started = Event()
+    release = Event()
+    executor = ThreadPoolExecutor(max_workers=2)
+    env = tmp_path / ".env"
+    env.write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        runs_router,
+        "resolve_cover_letter_targets",
+        lambda _session, *, job_ids, approved: [
+            SimpleNamespace(id=job_id) for job_id in (job_ids or [])
+        ],
+    )
+
+    def wait_to_write(_session, *, reporter, **_kwargs):
+        reporter.begin(1, "Starting")
+        started.set()
+        assert release.wait(timeout=5)
+        reporter.step(1)
+        return []
+
+    monkeypatch.setattr(runs_router, "write_cover_letters", wait_to_write)
+    client = TestClient(
+        create_app(
+            db_url="sqlite://",
+            run_executor=executor,
+            runs_root=tmp_path,
+            env_path=env,
+        )
+    )
+
+    try:
+        with client:
+            first = client.post(
+                "/api/cover-letters", json={"jobIds": [1, 2], "approved": False}
+            )
+            assert first.status_code == 202
+            assert started.wait(timeout=5)
+
+            duplicate = client.post(
+                "/api/cover-letters", json={"jobIds": [2, 3], "approved": False}
+            )
+
+            assert duplicate.status_code == 409
+            assert duplicate.json()["error"]["details"] == {
+                "runId": first.json()["runId"]
+            }
+            release.set()
+    finally:
+        release.set()
+        executor.shutdown(wait=True)
 
 
 def test_reprocess_endpoint_launches_run(monkeypatch, tmp_path):
@@ -278,9 +390,7 @@ def test_linkedin_scrape_409_when_not_configured(monkeypatch, tmp_path):
     assert response.json()["error"]["code"] == "LINKEDIN_NOT_CONFIGURED"
 
 
-def test_linkedin_ready_requires_credentials_or_nonempty_profile(
-    monkeypatch, tmp_path
-):
+def test_linkedin_ready_requires_credentials_or_nonempty_profile(monkeypatch, tmp_path):
     profile = tmp_path / "linkedin-profile"
     profile.mkdir()
     settings = SimpleNamespace(
