@@ -1,7 +1,7 @@
 import asyncio
-import logging
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from pydantic import Field
 
@@ -15,19 +15,13 @@ from resume_agent.models.review import ReviewCritique
 from resume_agent.profile.matrix import SkillMatchContext
 from resume_agent.tailor.coverage import coverage_critique, format_coverage
 from resume_agent.tailor.evidence_portfolio import (
-    build_evidence_catalog,
-    build_fallback_portfolio,
-    normalize_evidence_portfolio,
+    PortfolioPlanRequest,
+    aplan_portfolio,
+    plan_portfolio,
 )
-from resume_agent.tailor.length import format_budget
 from resume_agent.tailor.numeric_evidence import numeric_evidence_critique
 from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.portfolio_alignment import portfolio_alignment_critique
-from resume_agent.tailor.portfolio_planner import (
-    aplan_evidence_portfolio,
-    compose_evidence_portfolio_input,
-    plan_evidence_portfolio,
-)
 from resume_agent.tailor.provenance import PROVENANCE_REVIEWER, provenance_critique
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.skill_naming import skill_naming_critique
@@ -43,15 +37,87 @@ from resume_agent.tailor.tailoring import (
 from resume_agent.tailor.verdict import PanelVerdict, aggregate, failing_gate_names
 
 
-logger = logging.getLogger(__name__)
-
-
 class TailorRound(ExtensibleModel):
     round_num: int
     content: ResumeContent
     verdict: PanelVerdict
     evidence_portfolio: EvidencePortfolio | None = None
     stage_seconds: dict[str, float] = Field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TailorRequest:
+    jd_text: str
+    criteria: JobCriteria
+    profile_facts: ProfileFacts
+    config: ReviewConfig
+    skill_context: SkillMatchContext | None = None
+
+
+@dataclass(frozen=True)
+class TailorAgents:
+    writer: Runner
+    reviewers: Mapping[str, Runner]
+    reviser: Runner
+    portfolio_planner: Runner | None = None
+
+
+@dataclass
+class _WorkflowState:
+    """Execution-independent Tailoring round policy."""
+
+    request: TailorRequest
+    content: ResumeContent
+    coverage: str
+    portfolio: EvidencePortfolio | None
+    pending: dict[str, float]
+    rounds: list[TailorRound]
+    free_retries: int
+    quality_rounds: int = 0
+
+    def record(self, panel: list[ReviewCritique]) -> PanelVerdict:
+        deterministic = _deterministic_critiques(
+            self.content,
+            self.request.profile_facts,
+            self.request.skill_context,
+            self.portfolio,
+        )
+        verdict = aggregate([*deterministic, *panel], self.request.config)
+        self.rounds.append(
+            TailorRound(
+                round_num=len(self.rounds) + 1,
+                content=self.content,
+                verdict=verdict,
+                evidence_portfolio=self.portfolio,
+                stage_seconds=self.pending,
+            )
+        )
+        self.pending = {}
+        if _is_citation_slip(verdict, self.request.config) and self.free_retries > 0:
+            self.free_retries -= 1
+        else:
+            self.quality_rounds += 1
+        return verdict
+
+    def should_stop(self, verdict: PanelVerdict) -> bool:
+        return (
+            verdict.passed
+            or self.quality_rounds >= self.request.config.max_rounds
+            or (
+                self.request.config.early_stop_on_regression
+                and _has_regressed(self.rounds)
+            )
+        )
+
+    def next_revision_input(self) -> str:
+        return _compose_next_revision_input(
+            self.rounds,
+            self.request.profile_facts,
+            self.request.jd_text,
+            self.request.config,
+            self.coverage,
+            self.portfolio,
+        )
 
 
 def _deterministic_critiques(
@@ -85,117 +151,19 @@ def _deterministic_critiques(
     return critiques
 
 
-def _fallback_warning(error: Exception | None) -> str:
-    reason = type(error).__name__ if error is not None else "planner unavailable"
-    return f"Evidence planner unavailable ({reason}); deterministic fallback used."
-
-
-def _portfolio_is_usable(portfolio: EvidencePortfolio, owner_ids: set[str]) -> bool:
-    return bool(portfolio.selections) and any(
-        selection.owner_id in owner_ids for selection in portfolio.selections
-    )
-
-
-def _plan_portfolio(
+def _portfolio_request(
     jd_text: str,
     criteria: JobCriteria,
     profile_facts: ProfileFacts,
     config: ReviewConfig,
     skill_context: SkillMatchContext | None,
-    agent: Runner | None,
-) -> EvidencePortfolio:
-    catalog = build_evidence_catalog(profile_facts, criteria, skill_context)
-    if agent is not None:
-        try:
-            draft = plan_evidence_portfolio(
-                compose_evidence_portfolio_input(
-                    jd_text,
-                    criteria,
-                    catalog,
-                    budget=format_budget(config.length_budget),
-                ),
-                agent,
-            )
-            if not _portfolio_is_usable(
-                draft, {owner.owner_id for owner in catalog.owners}
-            ):
-                raise ValueError("planner returned no usable owner selection")
-            draft = draft.model_copy(update={"status": "planned", "warning": None})
-            return normalize_evidence_portfolio(
-                draft,
-                catalog,
-                profile_facts,
-                criteria,
-                skill_context,
-                config.length_budget,
-            )
-        except Exception as error:
-            logger.warning(
-                "evidence portfolio planner failed; using fallback", exc_info=error
-            )
-            warning = _fallback_warning(error)
-    else:
-        warning = _fallback_warning(None)
-    return build_fallback_portfolio(
-        catalog,
-        profile_facts,
-        criteria,
-        skill_context,
-        config.length_budget,
-        warning=warning,
-    )
-
-
-async def _aplan_portfolio(
-    jd_text: str,
-    criteria: JobCriteria,
-    profile_facts: ProfileFacts,
-    config: ReviewConfig,
-    skill_context: SkillMatchContext | None,
-    agent: Runner | None,
-    *,
-    sem: asyncio.Semaphore,
-) -> EvidencePortfolio:
-    catalog = build_evidence_catalog(profile_facts, criteria, skill_context)
-    if agent is not None:
-        try:
-            draft = await aplan_evidence_portfolio(
-                compose_evidence_portfolio_input(
-                    jd_text,
-                    criteria,
-                    catalog,
-                    budget=format_budget(config.length_budget),
-                ),
-                agent,
-                sem=sem,
-            )
-            if not _portfolio_is_usable(
-                draft, {owner.owner_id for owner in catalog.owners}
-            ):
-                raise ValueError("planner returned no usable owner selection")
-            draft = draft.model_copy(update={"status": "planned", "warning": None})
-            return normalize_evidence_portfolio(
-                draft,
-                catalog,
-                profile_facts,
-                criteria,
-                skill_context,
-                config.length_budget,
-            )
-        except Exception as error:
-            logger.warning(
-                "evidence portfolio planner failed; using fallback", exc_info=error
-            )
-            warning = _fallback_warning(error)
-    else:
-        warning = _fallback_warning(None)
-    return build_fallback_portfolio(
-        catalog,
-        profile_facts,
-        criteria,
-        skill_context,
-        config.length_budget,
-        warning=warning,
+) -> PortfolioPlanRequest:
+    return PortfolioPlanRequest(
+        jd_text=jd_text,
+        criteria=criteria,
+        profile_facts=profile_facts,
+        skill_context=skill_context,
+        budget=config.length_budget,
     )
 
 
@@ -319,12 +287,10 @@ def run_tailor_review(
     portfolio = None
     if config.portfolio_enabled:
         started = time.monotonic()
-        portfolio = _plan_portfolio(
-            jd_text,
-            criteria,
-            profile_facts,
-            config,
-            skill_context,
+        portfolio = plan_portfolio(
+            _portfolio_request(
+                jd_text, criteria, profile_facts, config, skill_context
+            ),
             evidence_portfolio_agent or match_plan_agent,
         )
         pending["evidence_portfolio"] = time.monotonic() - started
@@ -342,60 +308,38 @@ def run_tailor_review(
         tailor_agent,
     )
     pending["draft"] = time.monotonic() - started
-    rounds: list[TailorRound] = []
-    free_retries = config.provenance_retry_budget
-    quality_rounds = 0
+    state = _WorkflowState(
+        request=TailorRequest(
+            jd_text, criteria, profile_facts, config, skill_context
+        ),
+        content=content,
+        coverage=coverage,
+        portfolio=portfolio,
+        pending=pending,
+        rounds=[],
+        free_retries=config.provenance_retry_budget,
+    )
     while True:
-        deterministic = _deterministic_critiques(
-            content, profile_facts, skill_context, portfolio
-        )
         started = time.monotonic()
         panel = run_panel(
-            content,
+            state.content,
             profile_facts,
             jd_text,
             config,
             reviewer_agents,
             coverage=coverage,
         )
-        pending["panel"] = time.monotonic() - started
-        critiques = [*deterministic, *panel]
-        verdict = aggregate(critiques, config)
-
-        rounds.append(
-            TailorRound(
-                round_num=len(rounds) + 1,
-                content=content,
-                verdict=verdict,
-                evidence_portfolio=portfolio,
-                stage_seconds=pending,
-            )
-        )
-        pending = {}
-        # A citation slip is not a quality pass, so it does not consume one -
-        # up to the configured budget.
-        if _is_citation_slip(verdict, config) and free_retries > 0:
-            free_retries -= 1
-        else:
-            quality_rounds += 1
-        if verdict.passed or quality_rounds >= config.max_rounds:
-            break
-        if config.early_stop_on_regression and _has_regressed(rounds):
+        state.pending["panel"] = time.monotonic() - started
+        verdict = state.record(panel)
+        if state.should_stop(verdict):
             break
         started = time.monotonic()
-        content = revise(
-            _compose_next_revision_input(
-                rounds,
-                profile_facts,
-                jd_text,
-                config,
-                coverage,
-                portfolio,
-            ),
+        state.content = revise(
+            state.next_revision_input(),
             reviser_agent,
         )
-        pending["revise"] = time.monotonic() - started
-    return rounds
+        state.pending["revise"] = time.monotonic() - started
+    return state.rounds
 
 
 async def arun_tailor_review(
@@ -417,12 +361,10 @@ async def arun_tailor_review(
     portfolio = None
     if config.portfolio_enabled:
         started = time.monotonic()
-        portfolio = await _aplan_portfolio(
-            jd_text,
-            criteria,
-            profile_facts,
-            config,
-            skill_context,
+        portfolio = await aplan_portfolio(
+            _portfolio_request(
+                jd_text, criteria, profile_facts, config, skill_context
+            ),
             evidence_portfolio_agent or match_plan_agent,
             sem=sem,
         )
@@ -442,16 +384,21 @@ async def arun_tailor_review(
         sem=sem,
     )
     pending["draft"] = time.monotonic() - started
-    rounds: list[TailorRound] = []
-    free_retries = config.provenance_retry_budget
-    quality_rounds = 0
+    state = _WorkflowState(
+        request=TailorRequest(
+            jd_text, criteria, profile_facts, config, skill_context
+        ),
+        content=content,
+        coverage=coverage,
+        portfolio=portfolio,
+        pending=pending,
+        rounds=[],
+        free_retries=config.provenance_retry_budget,
+    )
     while True:
-        deterministic = _deterministic_critiques(
-            content, profile_facts, skill_context, portfolio
-        )
         started = time.monotonic()
         panel = await arun_panel(
-            content,
+            state.content,
             profile_facts,
             jd_text,
             config,
@@ -459,40 +406,52 @@ async def arun_tailor_review(
             sem=sem,
             coverage=coverage,
         )
-        pending["panel"] = time.monotonic() - started
-        critiques = [*deterministic, *panel]
-        verdict = aggregate(critiques, config)
-
-        rounds.append(
-            TailorRound(
-                round_num=len(rounds) + 1,
-                content=content,
-                verdict=verdict,
-                evidence_portfolio=portfolio,
-                stage_seconds=pending,
-            )
-        )
-        pending = {}
-        if _is_citation_slip(verdict, config) and free_retries > 0:
-            free_retries -= 1
-        else:
-            quality_rounds += 1
-        if verdict.passed or quality_rounds >= config.max_rounds:
-            break
-        if config.early_stop_on_regression and _has_regressed(rounds):
+        state.pending["panel"] = time.monotonic() - started
+        verdict = state.record(panel)
+        if state.should_stop(verdict):
             break
         started = time.monotonic()
-        content = await arevise(
-            _compose_next_revision_input(
-                rounds,
-                profile_facts,
-                jd_text,
-                config,
-                coverage,
-                portfolio,
-            ),
+        state.content = await arevise(
+            state.next_revision_input(),
             reviser_agent,
             sem=sem,
         )
-        pending["revise"] = time.monotonic() - started
-    return rounds
+        state.pending["revise"] = time.monotonic() - started
+    return state.rounds
+
+
+class TailorWorkflow:
+    """Deep Tailoring module with compatibility adapters at the old interface."""
+
+    def run(self, request: TailorRequest, agents: TailorAgents) -> list[TailorRound]:
+        return run_tailor_review(
+            request.jd_text,
+            request.criteria,
+            request.profile_facts,
+            request.config,
+            agents.writer,
+            agents.reviewers,
+            agents.reviser,
+            skill_context=request.skill_context,
+            evidence_portfolio_agent=agents.portfolio_planner,
+        )
+
+    async def arun(
+        self,
+        request: TailorRequest,
+        agents: TailorAgents,
+        *,
+        sem: asyncio.Semaphore,
+    ) -> list[TailorRound]:
+        return await arun_tailor_review(
+            request.jd_text,
+            request.criteria,
+            request.profile_facts,
+            request.config,
+            agents.writer,
+            agents.reviewers,
+            agents.reviser,
+            skill_context=request.skill_context,
+            sem=sem,
+            evidence_portfolio_agent=agents.portfolio_planner,
+        )
