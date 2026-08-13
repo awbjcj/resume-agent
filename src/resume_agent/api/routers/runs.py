@@ -40,7 +40,10 @@ from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.config import get_settings
 from resume_agent.db import get_session
 from resume_agent.services.cover_letter_revision import revise_cover_letter_version
-from resume_agent.services.cover_letters import write_cover_letters
+from resume_agent.services.cover_letters import (
+    resolve_cover_letter_targets,
+    write_cover_letters,
+)
 from resume_agent.services.discovery import (
     add_job_from_url,
     discover_jobs,
@@ -73,7 +76,9 @@ def _owned_record(mgr: RunManager, run_id: str):
     return record
 
 
-@router.post("/resume-versions/{version_id}/revise", response_model=RunOut, status_code=202)
+@router.post(
+    "/resume-versions/{version_id}/revise", response_model=RunOut, status_code=202
+)
 def launch_resume_revise(
     version_id: int,
     body: ReviseRequest,
@@ -84,7 +89,9 @@ def launch_resume_revise(
     with get_session(engine) as session:
         parent = get_resume_version(session, version_id)
         if parent is None:
-            raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
+            raise ApiException(
+                404, "NOT_FOUND", f"Resume version #{version_id} not found"
+            )
         job_id = parent.job_id
 
     def do_revise(session, reporter):
@@ -93,17 +100,31 @@ def launch_resume_revise(
             session, version_id, body.instruction, re_review=body.re_review
         )
         reporter.step(1)
-        return {"versionId": child.id if child else None, "jobId": child.job_id if child else job_id}
+        return {
+            "versionId": child.id if child else None,
+            "jobId": child.job_id if child else job_id,
+        }
 
-    meta = {"versionId": version_id, "jobId": job_id, "instruction": body.instruction, "reReview": body.re_review}
+    meta = {
+        "versionId": version_id,
+        "jobId": job_id,
+        "instruction": body.instruction,
+        "reReview": body.re_review,
+    }
     return launch(
-        mgr, "revise", session_work(engine, do_revise),
-        singleton_key=f"revise:{version_id}", singleton_conflict="raise", meta=meta,
+        mgr,
+        "revise",
+        session_work(engine, do_revise),
+        singleton_key=f"revise:{version_id}",
+        singleton_conflict="raise",
+        meta=meta,
         busy_message="A revision is already running for this item",
     )
 
 
-@router.post("/cover-letters/{cover_letter_id}/revise", response_model=RunOut, status_code=202)
+@router.post(
+    "/cover-letters/{cover_letter_id}/revise", response_model=RunOut, status_code=202
+)
 def launch_cover_letter_revise(
     cover_letter_id: int,
     body: ReviseRequest,
@@ -114,19 +135,32 @@ def launch_cover_letter_revise(
     with get_session(engine) as session:
         parent = get_cover_letter(session, cover_letter_id)
         if parent is None:
-            raise ApiException(404, "NOT_FOUND", f"Cover letter #{cover_letter_id} not found")
+            raise ApiException(
+                404, "NOT_FOUND", f"Cover letter #{cover_letter_id} not found"
+            )
         job_id = parent.job_id
 
     def do_revise(session, reporter):
         reporter.begin(1, f"Revising cover letter #{cover_letter_id}")
         child = revise_cover_letter_version(session, cover_letter_id, body.instruction)
         reporter.step(1)
-        return {"coverLetterId": child.id if child else None, "jobId": child.job_id if child else job_id}
+        return {
+            "coverLetterId": child.id if child else None,
+            "jobId": child.job_id if child else job_id,
+        }
 
-    meta = {"coverLetterId": cover_letter_id, "jobId": job_id, "instruction": body.instruction}
+    meta = {
+        "coverLetterId": cover_letter_id,
+        "jobId": job_id,
+        "instruction": body.instruction,
+    }
     return launch(
-        mgr, "coverLetterRevise", session_work(engine, do_revise),
-        singleton_key=f"cover-letter-revise:{cover_letter_id}", singleton_conflict="raise", meta=meta,
+        mgr,
+        "coverLetterRevise",
+        session_work(engine, do_revise),
+        singleton_key=f"cover-letter-revise:{cover_letter_id}",
+        singleton_conflict="raise",
+        meta=meta,
         busy_message="A revision is already running for this item",
     )
 
@@ -152,9 +186,7 @@ def launch_import_urls(
         raise ApiException(400, "NO_URLS", "The file contains no URL entries")
     if len(lines) > 10_000:
         raise ApiException(400, "TOO_MANY_URLS", "URL list exceeds 10,000 lines")
-    valid_urls = [
-        line for line in lines if line.startswith(("http://", "https://"))
-    ]
+    valid_urls = [line for line in lines if line.startswith(("http://", "https://"))]
     invalid_lines = [line for line in lines if line not in valid_urls]
     engine = _engine(request)
     allow_browser = get_settings().browser_enabled
@@ -216,7 +248,9 @@ def launch_reprocess(
     scopes = params.scopes if params is not None and params.scopes else ["shortlisted"]
 
     def do_reprocess(session, reporter):
-        return {"statusCounts": reprocess_jobs(session, scopes=scopes, reporter=reporter)}
+        return {
+            "statusCounts": reprocess_jobs(session, scopes=scopes, reporter=reporter)
+        }
 
     return launch(mgr, "reprocess", session_work(engine, do_reprocess))
 
@@ -241,7 +275,9 @@ def launch_refresh(
             "failures": report.failures,
         }
 
-    return launch(mgr, "refresh", session_work(engine, do_refresh), singleton_key="refresh")
+    return launch(
+        mgr, "refresh", session_work(engine, do_refresh), singleton_key="refresh"
+    )
 
 
 @router.post("/pull", response_model=RunOut, status_code=202)
@@ -345,12 +381,21 @@ def launch_cover_letters(
     mgr: RunManager = Depends(get_run_manager),
 ):
     engine = _engine(request)
+    with get_session(engine) as session:
+        targets = resolve_cover_letter_targets(
+            session,
+            job_ids=params.job_ids,
+            approved=params.approved,
+        )
+        target_ids = list(
+            dict.fromkeys(job.id for job in targets if job.id is not None)
+        )
 
     def do_write(session, reporter):
         results = write_cover_letters(
             session,
-            job_ids=params.job_ids,
-            approved=params.approved,
+            job_ids=target_ids,
+            approved=False,
             reporter=reporter,
             skill=params.skill,
         )
@@ -365,7 +410,17 @@ def launch_cover_letters(
             ]
         }
 
-    return launch(mgr, "coverLetter", session_work(engine, do_write))
+    return launch(
+        mgr,
+        "coverLetter",
+        session_work(engine, do_write),
+        singleton_keys=[f"cover-letter:{job_id}" for job_id in target_ids],
+        singleton_conflict="raise",
+        meta={"jobIds": target_ids},
+        busy_message=(
+            "A cover letter is already being generated for one or more selected jobs"
+        ),
+    )
 
 
 @router.post("/gmail/sync", response_model=RunOut, status_code=202)
@@ -417,7 +472,12 @@ def launch_linkedin_scrape(
     def do_scrape(session, reporter):
         return scrape_linkedin_jobs(session, reporter=reporter)
 
-    return launch(mgr, "linkedinScrape", session_work(engine, do_scrape), singleton_key="linkedinScrape")
+    return launch(
+        mgr,
+        "linkedinScrape",
+        session_work(engine, do_scrape),
+        singleton_key="linkedinScrape",
+    )
 
 
 @router.post("/jobs/from-url", response_model=RunOut, status_code=202)

@@ -72,6 +72,7 @@ it("reconciles a terminal backend status after an SSE transport error", async ()
     etaText: null,
     result: null,
     error: null,
+    meta: { jobIds: [3, 8] },
   });
   trackRun({ runId: "r1", kind: "pull" }, onDone);
 
@@ -80,6 +81,7 @@ it("reconciles a terminal backend status after an SSE transport error", async ()
 
   await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
   expect(onDone.mock.calls[0][0].status).toBe("succeeded");
+  expect(onDone.mock.calls[0][0].meta).toEqual({ jobIds: [3, 8] });
   expect(mocks.watchRun).toHaveBeenCalledOnce();
   expect(isTracking("r1")).toBe(false);
 });

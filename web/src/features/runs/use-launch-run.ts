@@ -6,7 +6,7 @@ import { useRunStore } from "@/lib/runs/store";
 import type { RunMeta } from "@/lib/runs/store";
 import { trackRun } from "@/lib/runs/tracker";
 
-type RunOut = { runId: string; kind: string };
+type RunOut = { runId: string; kind: string; meta?: RunMeta | null };
 
 const DEFAULT_INVALIDATE = ["shortlist", "pipeline", "triage", "job"];
 
@@ -85,7 +85,8 @@ export function useLaunchRun() {
   ): Promise<boolean> => {
     try {
       const run = (await call()) as RunOut;
-      removeSupersededArtifactFailures(kind, meta);
+      const effectiveMeta = run.meta ?? meta;
+      removeSupersededArtifactFailures(kind, effectiveMeta);
       useRunStore.getState().upsert({
         runId: run.runId,
         kind,
@@ -95,7 +96,7 @@ export function useLaunchRun() {
         current: 0,
         total: 0,
         etaText: null,
-        meta,
+        meta: effectiveMeta,
       });
       trackRun({ runId: run.runId, kind }, async (completed) => {
         await Promise.all(

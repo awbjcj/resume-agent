@@ -1,6 +1,11 @@
 import { getToken, withTokenParam } from "@/lib/api/client";
 import { getSseLinkToken } from "./linkToken";
-import { useRunStore, type PullRunResult, type RunRecord } from "./store";
+import {
+  useRunStore,
+  type PullRunResult,
+  type RunMeta,
+  type RunRecord,
+} from "./store";
 
 /** Map a backend run state to the store projection. */
 export function stateToStatus(state: string): RunRecord["status"] {
@@ -52,6 +57,7 @@ export function watchRun(
       etaText?: string | null;
       error?: string;
       result?: PullRunResult | Record<string, unknown> | null;
+      meta?: RunMeta | null;
     };
     try {
       data = JSON.parse(e.data);
@@ -71,6 +77,7 @@ export function watchRun(
       etaText: data.etaText ?? null,
       error: data.error ?? undefined,
       result: data.result ?? null,
+      ...(data.meta !== undefined ? { meta: data.meta } : {}),
     };
     useRunStore.getState().upsert(run);
     if (state === "done" || state === "error" || state === "cancelled") {

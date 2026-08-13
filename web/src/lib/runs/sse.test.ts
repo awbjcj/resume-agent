@@ -76,6 +76,43 @@ describe("watchRun", () => {
     expect(useRunStore.getState().runs.r1.status).toBe("queued");
   });
 
+  it("keeps durable backend metadata on streamed run records", async () => {
+    watchRun("r1", "coverLetter");
+    await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
+
+    FakeEventSource.current.onmessage?.({
+      data: JSON.stringify({
+        state: "running",
+        label: "Drafting",
+        meta: { jobIds: [3, 8] },
+      }),
+    } as MessageEvent);
+
+    expect(useRunStore.getState().runs.r1.meta).toEqual({ jobIds: [3, 8] });
+  });
+
+  it("does not erase optimistic metadata when an event omits meta", async () => {
+    useRunStore.getState().upsert({
+      runId: "r1",
+      kind: "coverLetter",
+      status: "running",
+      percent: 0,
+      phase: "Queued",
+      current: 0,
+      total: 0,
+      etaText: null,
+      meta: { jobIds: [3, 8] },
+    });
+    watchRun("r1", "coverLetter");
+    await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
+
+    FakeEventSource.current.onmessage?.({
+      data: JSON.stringify({ state: "running", label: "Drafting" }),
+    } as MessageEvent);
+
+    expect(useRunStore.getState().runs.r1.meta).toEqual({ jobIds: [3, 8] });
+  });
+
   it("reports a transport error without marking the backend run failed", async () => {
     const onTransportError = vi.fn();
     watchRun("r1", "pull", undefined, onTransportError);

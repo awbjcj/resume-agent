@@ -8,12 +8,9 @@ export const ACTIVE_RUN_STATUSES: RunRecord["status"][] = [
 
 /** Whether a run is working on this job, however its launcher tagged it.
  *
- * Per-job launchers record `meta.jobId`; the Pipeline bulk actions record
- * `meta.jobIds`. A per-job surface that only checked `jobId` treated a bulk run
- * covering the same job as absent — offering a second Generate on a job already
- * being processed, which really does run twice (`POST /api/cover-letters` has no
- * singleton key). An approved-scope bulk run resolves its targets server-side
- * and so carries neither; it stays invisible here by necessity.
+ * Per-job launchers record `meta.jobId`; bulk cover-letter launches persist the
+ * backend-resolved target set as `meta.jobIds`. Checking both shapes keeps
+ * generation state visible after reload and across tabs.
  */
 export function runCoversJob(run: RunRecord, jobId: number): boolean {
   if (run.meta?.jobId === jobId) return true;

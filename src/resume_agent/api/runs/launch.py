@@ -11,6 +11,7 @@ session, which is not safe to share across threads.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any, Callable
 
 from resume_agent.api.errors import ApiException
@@ -32,6 +33,7 @@ def launch(
     work: RunFn,
     *,
     singleton_key: str | None = None,
+    singleton_keys: Iterable[str] | None = None,
     singleton_conflict: str = "join",
     meta: dict[str, object] | None = None,
     busy_code: str | None = None,
@@ -42,6 +44,7 @@ def launch(
             kind,
             work,
             singleton_key=singleton_key,
+            singleton_keys=singleton_keys,
             singleton_conflict=singleton_conflict,
             meta=meta,
         )
