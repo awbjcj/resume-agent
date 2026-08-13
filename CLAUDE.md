@@ -934,7 +934,7 @@ experience`); they land in `TaxonomyState.retired_skills`, are subtracted from
   request for one session by id must say when it cannot be read, but `list`
   backs every active-session check and bulk delete, so failing the whole scan on
   one bad file took down far more than it protected: a job delete runs its
-  cascade *after* the row is committed, so a single corrupt file turned every
+  cascade _after_ the row is committed, so a single corrupt file turned every
   later delete into a 500 for a job that had in fact been removed.
   `TurnRejected` and
   `format_with_retry` live in `sessions/turns.py`, shared by both stacks.
