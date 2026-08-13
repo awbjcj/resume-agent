@@ -96,6 +96,24 @@
   );
 }
 
+/* Compact chrome on narrow screens: keep launch actions in one tactile rail
+   instead of allowing six controls to wrap into a second toolbar-sized page
+   header. Scrollbars stay visually quiet while keyboard/touch scrolling still
+   works, and overscroll does not drag the whole page sideways. */
+.shell-action-rail {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.shell-action-rail::-webkit-scrollbar { display: none; }
+
+/* Job boards can render hundreds of cards. Preserve a realistic placeholder
+   height while letting the browser skip off-screen layout and paint work. */
+.job-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 15rem;
+}
+
 .agent-artifact-enter {
   opacity: 1;
   transform: translateY(0);
@@ -238,6 +256,10 @@
   html {
     @apply font-sans;
     }
+  ::selection {
+    background: color-mix(in oklab, var(--primary), transparent 72%);
+    color: var(--foreground);
+    }
 }
 
 /* NavLink active state inside the sidebar (NavLink sets aria-current="page"). */
@@ -292,7 +314,7 @@
 .dial-ring {
   stroke-dasharray: var(--dial-circ);
   stroke-dashoffset: var(--dial-offset);
-  animation: dial-sweep 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: dial-sweep 420ms var(--ease-out-strong) both;
   transform: rotate(-90deg);
   transform-origin: center;
 }
@@ -303,23 +325,23 @@
   to { opacity: 1; transform: translateY(0); }
 }
 .rise-in {
-  animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--rise-i, 0) * 70ms);
+  animation: rise-in 220ms var(--ease-out-strong) both;
+  animation-delay: calc(var(--rise-i, 0) * 36ms);
 }
 
 /* Column-level cascade for dashboard sections. The delay is deliberately
-   capped: a dashboard has seven or more panels, and 70ms × 7 would hold the
-   last card back by half a second, which reads as the page being slow rather
-   than as a cascade. Five steps at 45ms tops out at 225ms. */
+   capped: a dashboard has seven or more panels, and an uncapped cascade would
+   hold the last card back long enough to read as a slow page rather than as a
+   cascade. Five steps at 36ms tops out at 180ms. */
 .stagger-children > * {
-  animation: rise-in 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation: rise-in 240ms var(--ease-out-strong) both;
 }
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 45ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 90ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 135ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 180ms; }
-.stagger-children > *:nth-child(n + 6) { animation-delay: 225ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 36ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 72ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 108ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 144ms; }
+.stagger-children > *:nth-child(n + 6) { animation-delay: 180ms; }
 @media (prefers-reduced-motion: reduce) {
   .dial-ring,
   .rise-in,

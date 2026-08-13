@@ -187,17 +187,31 @@ export function AppLayout() {
         {/* `app-chrome` is the hook that makes this translucent layer become an
             opaque surface under prefers-reduced-transparency / prefers-contrast
             (see index.css) — blur is a material here, not decoration. */}
-        <header className="app-chrome sticky top-0 z-10 flex min-h-16 flex-wrap items-center gap-3 border-b bg-background/88 px-5 py-3 backdrop-blur-md md:px-8 lg:px-10">
-          <SidebarTrigger className="md:hidden" />
-          <div className="hidden min-w-0 md:block">
-            <div className="text-sm font-medium">Job search operations</div>
-            <div className="text-xs text-muted-foreground">Pull, discover, review, and ship.</div>
+        <header className="app-chrome sticky top-0 z-10 border-b bg-background/88 backdrop-blur-md">
+          <div className="flex min-h-16 items-center gap-3 px-5 py-3 md:px-8 lg:px-10">
+            <SidebarTrigger className="md:hidden" />
+            <div className="flex min-w-0 items-center gap-2.5 md:hidden">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                <Sparkles className="size-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold leading-tight">Resume Agent</div>
+                <div className="truncate text-[0.68rem] text-muted-foreground">Command Center</div>
+              </div>
+            </div>
+            <div className="hidden min-w-0 md:block">
+              <div className="text-sm font-medium">Job search operations</div>
+              <div className="text-xs text-muted-foreground">Pull, discover, review, and ship.</div>
+            </div>
+            <RunActions className="ml-auto hidden flex-nowrap xl:flex" />
+            <div className="ml-auto flex shrink-0 items-center gap-1 xl:ml-0">
+              <NotificationsBell />
+              <ThemeToggle />
+              <LogoutButton />
+            </div>
           </div>
-          <div className="ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
-            <RunActions />
-            <NotificationsBell />
-            <ThemeToggle />
-            <LogoutButton />
+          <div className="shell-action-rail border-t border-border/70 px-5 py-2 xl:hidden md:px-8 lg:px-10">
+            <RunActions className="w-max flex-nowrap justify-start" />
           </div>
         </header>
         <RunPanel />

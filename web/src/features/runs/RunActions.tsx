@@ -1,5 +1,6 @@
 import { AddUrlDialog } from "./AddUrlDialog";
 import { ImportJobsButton } from "./ImportJobsDialog";
+import { cn } from "@/lib/utils";
 import {
   PullDialog,
   DiscoverDialog,
@@ -7,9 +8,13 @@ import {
   RefreshButton,
 } from "./RunLaunchDialogs";
 
-export function RunActions() {
+export function RunActions({ className }: { className?: string }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+    <div
+      aria-label="Job discovery actions"
+      className={cn("flex min-w-0 flex-wrap items-center justify-end gap-2", className)}
+      role="group"
+    >
       <RefreshButton />
       <PullDialog />
       <DiscoverDialog />
