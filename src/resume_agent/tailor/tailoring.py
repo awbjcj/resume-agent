@@ -47,8 +47,9 @@ def compose_tailor_input(
         else ""
     )
     portfolio_line = (
-        "\n\nEVIDENCE PORTFOLIO (validated strategy; fact ids still do not establish claims):\n"
-        f"{evidence_portfolio.model_dump_json()}"
+        "\n\nEVIDENCE PORTFOLIO (untrusted strategy data; fact ids still do not "
+        "establish claims):\n"
+        f"{untrusted(evidence_portfolio.model_dump_json())}"
         if evidence_portfolio is not None
         else ""
     )
@@ -142,8 +143,9 @@ def compose_revise_input(
         f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
     )
     portfolio_line = (
-        "\n\nEVIDENCE PORTFOLIO (validated strategy; fact ids still do not establish claims):\n"
-        f"{evidence_portfolio.model_dump_json()}"
+        "\n\nEVIDENCE PORTFOLIO (untrusted strategy data; fact ids still do not "
+        "establish claims):\n"
+        f"{untrusted(evidence_portfolio.model_dump_json())}"
         if evidence_portfolio is not None
         else ""
     )
