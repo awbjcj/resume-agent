@@ -1,13 +1,16 @@
 import shutil
 import time
+from functools import partial
 from pathlib import Path
 
 from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import Route
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.url_ingest.models import PageContent
+from resume_agent.security.outbound import Resolver, resolve_host, validate_public_url
 
 # Pure disk caches Chrome migrates into a "<profile>.CHROME_DELETE" staging
 # folder when the profile's recorded version differs from the launching
@@ -52,11 +55,35 @@ def _launch_persistent_context(chromium, data_dir: str, *, headless: bool):
     migration artifacts present) propagates unchanged.
     """
     try:
-        return chromium.launch_persistent_context(data_dir, headless=headless)
+        return chromium.launch_persistent_context(
+            data_dir,
+            headless=headless,
+            service_workers="block",
+        )
     except PlaywrightError:
         if not _clear_stale_profile_cache(data_dir):
             raise
-        return chromium.launch_persistent_context(data_dir, headless=headless)
+        return chromium.launch_persistent_context(
+            data_dir,
+            headless=headless,
+            service_workers="block",
+        )
+
+
+def _guard_public_request(
+    route: Route,
+    *,
+    resolver: Resolver,
+    blocked: list[ValueError],
+) -> None:
+    """Allow only public HTTP(S) requests from the browser context."""
+    try:
+        validate_public_url(route.request.url, resolver)
+    except ValueError as error:
+        blocked.append(error)
+        route.abort("blockedbyclient")
+        return
+    route.continue_()
 
 
 def fetch_rendered(
@@ -67,6 +94,7 @@ def fetch_rendered(
     headless: bool = False,
     render_timeout_ms: int = 8000,
     pace_seconds: float = 1.0,
+    resolver: Resolver = resolve_host,
 ) -> str:
     """Render one URL in the logged-in persistent browser and return its HTML.
 
@@ -74,12 +102,23 @@ def fetch_rendered(
     reused session: this fetches a single page, optionally waiting for a content
     selector. Reuses the same ``user_data_dir`` so a LinkedIn login carries over.
     """
+    validate_public_url(url, resolver)
     data_dir = user_data_dir or get_settings().linkedin_user_data_dir
     with sync_playwright() as p:
         context = _launch_persistent_context(p.chromium, data_dir, headless=headless)
         try:
+            blocked: list[ValueError] = []
+            context.route(
+                "**/*",
+                partial(_guard_public_request, resolver=resolver, blocked=blocked),
+            )
             page = context.new_page()
             page.goto(url, wait_until="domcontentloaded")
+            if blocked:
+                raise ValueError(
+                    "browser request was blocked by public URL policy"
+                ) from blocked[0]
+            validate_public_url(page.url, resolver)
             if wait_selector is not None:
                 try:
                     page.wait_for_selector(wait_selector, timeout=render_timeout_ms)
@@ -99,6 +138,7 @@ def render_pages(
     goto_timeout_ms: int = 30000,
     settle_ms: int = 6000,
     pace_seconds: float = 1.0,
+    resolver: Resolver = resolve_host,
 ) -> dict[str, PageContent]:
     """Render each URL through ONE shared browser context, returning post-redirect pages.
 
@@ -119,12 +159,28 @@ def render_pages(
     with sync_playwright() as p:
         context = _launch_persistent_context(p.chromium, data_dir, headless=headless)
         try:
-            for url in dict.fromkeys(urls):  # dedupe, preserve order; re-clicks boomerang
+            blocked: list[ValueError] = []
+            context.route(
+                "**/*",
+                partial(_guard_public_request, resolver=resolver, blocked=blocked),
+            )
+            for url in dict.fromkeys(
+                urls
+            ):  # dedupe, preserve order; re-clicks boomerang
                 page = context.new_page()
                 try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=goto_timeout_ms)
+                    blocked.clear()
+                    validate_public_url(url, resolver)
+                    page.goto(
+                        url, wait_until="domcontentloaded", timeout=goto_timeout_ms
+                    )
                     if settle_ms:
                         page.wait_for_timeout(settle_ms)  # let JS/meta redirect settle
+                    if blocked:
+                        raise ValueError(
+                            "browser request was blocked by public URL policy"
+                        ) from blocked[0]
+                    validate_public_url(page.url, resolver)
                     results[url] = PageContent(
                         html=page.content(), final_url=page.url, rendered=True
                     )

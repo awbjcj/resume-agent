@@ -3573,6 +3573,8 @@ export interface components {
         };
         /** CareerLabSessionsOut */
         CareerLabSessionsOut: {
+            /** Activesessions */
+            activeSessions?: components["schemas"]["CareerLabSessionSummaryOut"][];
             pagination: components["schemas"]["Pagination"];
             /** Sessions */
             sessions?: components["schemas"]["CareerLabSessionSummaryOut"][];
