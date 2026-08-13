@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -54,7 +54,12 @@ def _redirect_uri(request: Request) -> str:
     return public_url(request, "/api/auth/google/callback")
 
 
-def _build_flow(settings: Settings, redirect_uri: str) -> Any:
+def _build_flow(
+    settings: Settings,
+    redirect_uri: str,
+    *,
+    code_verifier: str | None = None,
+) -> Any:
     from google_auth_oauthlib.flow import Flow
 
     return Flow.from_client_config(
@@ -68,7 +73,8 @@ def _build_flow(settings: Settings, redirect_uri: str) -> Any:
         },
         scopes=GOOGLE_SCOPES,
         redirect_uri=redirect_uri,
-        autogenerate_code_verifier=False,
+        code_verifier=code_verifier,
+        autogenerate_code_verifier=code_verifier is None,
     )
 
 
@@ -88,6 +94,7 @@ def _verify_id_token(flow: Any, settings: Settings) -> dict[str, Any]:
 @router.get("/start", response_model=GoogleStartOut)
 def google_start(
     request: Request,
+    response: Response,
     mode: str = Query(default="login", pattern="^(login|register)$"),
     invite: str = Query(default=""),
 ) -> GoogleStartOut:
@@ -105,11 +112,22 @@ def google_start(
     )
     flow = _build_flow(settings, _redirect_uri(request))
     url, _state = flow.authorization_url(prompt="select_account", state=state)
+    verifier = str(flow.code_verifier or "")
+    if not verifier:
+        raise ApiException(500, "OAUTH_START_FAILED", "Google sign-in could not start")
+    auth.set_oauth_flow_cookies(
+        request,
+        response,
+        state=state,
+        verifier=verifier,
+    )
     return GoogleStartOut(auth_url=url)
 
 
 def _finish(target: str) -> RedirectResponse:
-    return RedirectResponse(target)
+    response = RedirectResponse(target)
+    auth.clear_oauth_flow_cookies(response)
+    return response
 
 
 def _failure(request: Request, target: str) -> RedirectResponse:
@@ -166,14 +184,19 @@ def google_callback(
         return _failure(request, "/login?error=denied")
     settings = request.app.state.settings
     parsed = auth.verify_oauth_state(state, settings)
-    if parsed is None:
+    verifier = auth.oauth_flow_verifier(request, state, settings)
+    if parsed is None or verifier is None:
         return _failure(request, "/login?error=invalid_state")
     engine = getattr(request.app.state, "system_engine", None)
     if engine is None:
         return _failure(request, "/login?error=unavailable")
     try:
         _require_client(settings)
-        flow = _build_flow(settings, _redirect_uri(request))
+        flow = _build_flow(
+            settings,
+            _redirect_uri(request),
+            code_verifier=verifier,
+        )
         flow.fetch_token(code=code)
         claims = _verify_id_token(flow, settings)
     except Exception:  # noqa: BLE001 - OAuth errors must return a safe page
