@@ -202,6 +202,7 @@ def parse_list_rows(target: AtsTarget, page: dict) -> list[WorkdayRow]:
                 location=item.get("locationsText"),
                 jd_text="",
                 external_path=path,
+                company_provenance="token",
             )
         )
     return rows
@@ -236,6 +237,7 @@ def apply_detail(row: WorkdayRow, detail: dict) -> None:
         if row.company and company.casefold() != row.company.casefold():
             row.stale_company = row.stale_company or row.company
         row.company = company
+        row.company_provenance = "provider"
     row.posted_at = parse_iso_datetime(info.get("startDate"))
 
 

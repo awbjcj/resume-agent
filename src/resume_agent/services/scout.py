@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
+from collections.abc import Callable
 from typing import cast
 
 from resume_agent.api.schemas.config import SearchConfigDoc
@@ -17,12 +18,24 @@ from resume_agent.discovery.scout import (
     ValidatedScoutTurn,
     build_scout_agent,
     build_scout_formatter_agent,
-    make_check_source_tool,
+    make_resolve_company_source_tool,
     normalize_recap,
     normalize_turn,
 )
 from resume_agent.discovery.scout_models import Citation
+from resume_agent.discovery.source_resolution.models import CompanySourceResolution
+from resume_agent.discovery.source_resolution.resolver import (
+    CompanySourceResolver,
+    CompanySourceResolverLike,
+    resolution_cache_key,
+)
+from resume_agent.discovery.source_resolution.search import (
+    SearchBudget,
+    SearchCoverage,
+    SearchCoverageSink,
+)
 from resume_agent.discovery.scout_store import (
+    ManualSourceConfirmation,
     ScoutProposal,
     ScoutTurnRecord,
     SourcePayload,
@@ -32,10 +45,12 @@ from resume_agent.discovery.scout_store import (
     end_session,
     list_sessions,
     load_session,
+    replace_pending_source_resolution,
     scout_lock,
     set_proposal_status,
 )
 from resume_agent.llm_runner import Runner, UnparsedAgentOutput
+from resume_agent.security.outbound import validate_public_url
 from resume_agent.services.config_store import ConfigStore
 from resume_agent.services.scout_context import (
     _EXISTING_FIELD,
@@ -52,12 +67,11 @@ from resume_agent.services.scout_context import (
     session_term_keys,
 )
 from resume_agent.services.sources import (
-    SourcePreview,
     add_source,
     board_root_url,
-    preview_source,
 )
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
+from resume_agent.sessions.store import now_iso
 from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
 
 logger = logging.getLogger(__name__)
@@ -70,8 +84,9 @@ _CHECK_RANK = {
     "unverified": 1,
     "new": 2,
     "avoid": 3,
-    "failed": 4,
-    "duplicate": 5,
+    "conflict": 4,
+    "failed": 5,
+    "duplicate": 6,
 }
 
 
@@ -90,7 +105,13 @@ def _source_payload(row: ScoutProposalDraft) -> SourcePayload:
     # proposal carries the board root rather than a job-detail URL. Deterministic
     # rather than prompt-enforced: one URL that slips through is written into
     # connectors.yaml and 404s on every later pull.
-    return SourcePayload(company=row.source.company, url=board_root_url(row.source.url))
+    board_url = board_root_url(row.source.url)
+    return SourcePayload(
+        company=row.source.company,
+        url=board_url,
+        requested_url=row.source.url,
+        canonical_board_url=board_url,
+    )
 
 
 def _term_payload(row: ScoutProposalDraft) -> TermPayload:
@@ -121,6 +142,48 @@ def _rank(proposals: list[ScoutProposal]) -> list[ScoutProposal]:
     )
 
 
+_RESOLUTION_CHECK = {
+    "verified": "validated",
+    "unverified": "unverified",
+    "conflict": "conflict",
+    "failed": "failed",
+}
+
+
+def _resolution_error(resolution: CompanySourceResolution) -> str:
+    if resolution.status not in {"conflict", "failed"}:
+        return ""
+    return resolution.reason_code[:_CHECK_ERROR_CAP]
+
+
+def _merge_search_coverage(
+    resolution: CompanySourceResolution,
+    coverage: SearchCoverage | None,
+) -> CompanySourceResolution:
+    if coverage is None:
+        return resolution
+    searched = list(
+        dict.fromkeys([*resolution.searched_families, *coverage.searched_families])
+    )
+    unsearched = [
+        family
+        for family in dict.fromkeys(
+            [*resolution.unsearched_families, *coverage.unsearched_families]
+        )
+        if family not in searched
+    ]
+    reason = resolution.reason_code
+    if coverage.interruption_reason and resolution.status in {"unverified", "failed"}:
+        reason = coverage.interruption_reason
+    return resolution.model_copy(
+        update={
+            "reason_code": reason,
+            "searched_families": searched,
+            "unsearched_families": unsearched,
+        }
+    )
+
+
 def _post_process(
     reporter,
     drafts: list[ScoutProposalDraft],
@@ -128,7 +191,9 @@ def _post_process(
     session: dict,
     connectors_path: str,
     search_path: str,
-    probe_cache: dict[str, SourcePreview] | None = None,
+    resolution_cache: dict[tuple[str, str], CompanySourceResolution] | None = None,
+    resolve_source: Callable[[str, str], CompanySourceResolution] | None = None,
+    search_coverage: SearchCoverage | None = None,
 ) -> list[ScoutProposal]:
     existing_sources = _existing_keys(_load_connectors(connectors_path))
     prior_sources = session_source_keys(session)
@@ -165,76 +230,80 @@ def _post_process(
                 seen_terms.add(key)
         proposals.append(proposal)
 
-    cached: dict[int, SourcePreview] = {}
+    cached: dict[int, CompanySourceResolution] = {}
     uncached: list[tuple[int, ScoutProposal]] = []
     for item in fresh:
         source = item[1].source
         assert source is not None
-        preview = (probe_cache or {}).get(source.url.strip())
-        if preview is None:
+        resolution = (resolution_cache or {}).get(
+            resolution_cache_key(source.company, source.url)
+        )
+        if resolution is None:
             uncached.append(item)
         else:
-            cached[item[0]] = preview
+            cached[item[0]] = resolution
 
-    async def probe_all():
-        async def probe(item: tuple[int, ScoutProposal]) -> SourcePreview:
+    source_resolver = resolve_source or CompanySourceResolver(search_path).resolve
+
+    async def resolve_all():
+        semaphore = asyncio.Semaphore(4)
+
+        async def resolve(item: tuple[int, ScoutProposal]) -> CompanySourceResolution:
             source = item[1].source
             assert source is not None
-            return await asyncio.to_thread(
-                preview_source,
-                source.url,
-                search_path=search_path,
-                browser=False,
-            )
+            async with semaphore:
+                return await asyncio.to_thread(source_resolver, source.company, source.url)
 
         return await gather_isolated(
             uncached,
-            probe,
+            resolve,
             on_complete=reporter.step,
             checkpoint=reporter.checkpoint,
         )
 
     # Its own segment: `reporter.step` reports an absolute count, so fanning
-    # out N probes under the research phase's total of 1 pinned the bar at 100%
-    # and displayed "8 of 1".
+    # out N resolver calls under the research phase's total of 1 pinned the bar
+    # at 100% and displayed "8 of 1".
     if uncached:
-        reporter.begin(len(uncached), "Discovery Scout is checking sources")
-    probed = asyncio.run(probe_all()) if uncached else []
-    results = {item[0]: result for item, result in zip(uncached, probed, strict=True)}
+        reporter.begin(len(uncached), "Discovery Scout is verifying source ownership")
+    resolved = asyncio.run(resolve_all()) if uncached else []
+    results = {item[0]: result for item, result in zip(uncached, resolved, strict=True)}
     for index, proposal in fresh:
         assert proposal.source is not None
         result = results.get(index)
-        preview = cached.get(index)
-        if preview is None and result is not None:
-            preview = result.value if result.ok else None
-        if preview is not None and preview.ok:
-            check = "validated"
-        elif preview is not None and preview.error_code == "ATS_NOT_DETECTED":
-            check = "unverified"
-        else:
-            check = "failed"
-            if preview is None:
-                assert result is not None
-                preview = SourcePreview(
-                    ok=False,
-                    url=proposal.source.url,
-                    error=f"Validation failed ({type(result.error).__name__}).",
-                    error_code="VALIDATION_ERROR",
-                )
+        resolution = cached.get(index)
+        if resolution is None and result is not None and result.ok:
+            resolution = result.value
+        if resolution is None:
+            resolution = CompanySourceResolution(
+                company=proposal.source.company,
+                requested_url=proposal.source.url,
+                canonical_board_url=proposal.source.url,
+                status="failed",
+                reason_code="OFFICIAL_SITE_UNREACHABLE",
+            )
+        resolution = _merge_search_coverage(resolution, search_coverage)
         source = proposal.source.model_copy(
             update={
-                "url": preview.url,
-                "ats": preview.kind,
-                "token": preview.token,
-                "role_count": preview.role_count,
-                "error_code": preview.error_code,
+                "url": resolution.canonical_board_url or resolution.requested_url,
+                "requested_url": resolution.requested_url,
+                "canonical_board_url": resolution.canonical_board_url,
+                "ats": resolution.ats,
+                "token": resolution.token,
+                "role_count": resolution.role_count,
+                "error_code": resolution.reason_code if resolution.status == "failed" else None,
+                "resolution_status": resolution.status,
+                "resolution_reason": resolution.reason_code,
+                "evidence": resolution.evidence,
+                "searched_families": resolution.searched_families,
+                "unsearched_families": resolution.unsearched_families,
             }
         )
         proposals[index] = proposal.model_copy(
             update={
                 "source": source,
-                "check": check,
-                "check_error": (preview.error or "")[:_CHECK_ERROR_CAP] if check == "failed" else "",
+                "check": _RESOLUTION_CHECK[resolution.status],
+                "check_error": _resolution_error(resolution),
             }
         )
     return _rank(proposals)
@@ -264,9 +333,16 @@ def _run_turn(
     if session["status"] != "active":
         raise ValueError("session ended")
     reporter.begin(1, "Discovery Scout is researching")
-    probe_cache: dict[str, SourcePreview] = {}
+    resolution_cache: dict[tuple[str, str], CompanySourceResolution] = {}
+    source_resolver = CompanySourceResolver(search_path)
+    search_budget = SearchBudget()
     researcher = scout_agent or build_scout_agent(
-        make_check_source_tool(search_path, cache=probe_cache)
+        make_resolve_company_source_tool(
+            search_path,
+            cache=resolution_cache,
+            resolver=source_resolver,
+        ),
+        search_budget,
     )
     formatter = formatter_agent or build_scout_formatter_agent()
     prompt = "\n\n".join(
@@ -278,7 +354,7 @@ def _run_turn(
             f"USER'S LATEST MESSAGE (UNTRUSTED):\n{text}",
         ]
     )
-    output_sink = sink or NullSink()
+    output_sink = SearchCoverageSink(sink or NullSink())
     prose, notes = persona_output(
         researcher, prompt, output_sink, reporter, source="scout notes"
     )
@@ -319,7 +395,9 @@ def _run_turn(
         session=session,
         connectors_path=connectors_path,
         search_path=search_path,
-        probe_cache=probe_cache,
+        resolution_cache=resolution_cache,
+        resolve_source=source_resolver.resolve,
+        search_coverage=output_sink.snapshot(),
     )
     reporter.checkpoint()
     turn = ScoutTurnRecord(
@@ -428,7 +506,10 @@ def run_recap_turn(
     if session["status"] != "active":
         raise ValueError("session ended")
     reporter.begin(1, "Discovery Scout is writing a recap")
-    researcher = scout_agent or build_scout_agent(make_check_source_tool(search_path))
+    researcher = scout_agent or build_scout_agent(
+        make_resolve_company_source_tool(search_path),
+        SearchBudget(),
+    )
     formatter = formatter_agent or build_scout_formatter_agent()
     prompt = "\n\n".join(
         [
@@ -472,10 +553,17 @@ def _camel_source(source: dict | None) -> dict | None:
     return {
         "company": source["company"],
         "url": source["url"],
+        "requestedUrl": source["requested_url"],
+        "canonicalBoardUrl": source["canonical_board_url"],
         "ats": source["ats"],
         "token": source["token"],
         "roleCount": source["role_count"],
         "errorCode": source["error_code"],
+        "resolutionStatus": source["resolution_status"],
+        "resolutionReason": source["resolution_reason"],
+        "evidence": source["evidence"],
+        "searchedFamilies": source["searched_families"],
+        "unsearchedFamilies": source["unsearched_families"],
     }
 
 
@@ -499,6 +587,7 @@ def _camel_proposal(proposal: dict) -> dict:
         "status": proposal["status"],
         "dismissReason": proposal["dismiss_reason"],
         "resolvedAt": proposal["resolved_at"],
+        "manualConfirmation": proposal["manual_confirmation"],
     }
 
 
@@ -580,19 +669,34 @@ def approve_proposal(
     connectors_path: str,
     search_path: str,
     browser_enabled: bool,
+    manual_confirmation: bool = False,
 ) -> dict:
     with scout_lock():
         proposal = _pending_proposal(load_session(workspace_root, session_id), proposal_id)
+        confirmation: ManualSourceConfirmation | None = None
         if proposal["kind"] == "source":
             if proposal["check"] not in {"validated", "unverified"}:
                 raise ValueError(f"source proposal is not approvable: {proposal['check']}")
-            if proposal["check"] == "unverified" and not browser_enabled:
-                raise ValueError("scrape target requires a local browser")
             source = proposal["source"]
             assert source is not None
+            provider = "auto"
+            if proposal["check"] == "unverified":
+                if not manual_confirmation:
+                    raise ValueError("manual confirmation required for an unverified source")
+                if source["ats"] is None:
+                    if not browser_enabled:
+                        raise ValueError("scrape target requires a local browser")
+                    provider = "scrape"
+                confirmation = ManualSourceConfirmation(
+                    company=source["company"],
+                    url=source["url"],
+                    ats=source["ats"],
+                    resolution_reason=source["resolution_reason"],
+                    confirmed_at=now_iso(),
+                )
             if not (_candidate_keys(source["url"]) & _existing_keys(_load_connectors(connectors_path))):
                 add_source(
-                    provider="scrape" if proposal["check"] == "unverified" else "auto",
+                    provider=provider,
                     url=source["url"],
                     label=source["company"],
                     country="com",
@@ -610,7 +714,48 @@ def approve_proposal(
                     "search",
                     document.model_copy(update={field: [*values, term["value"]]}),
                 )
-        set_proposal_status(workspace_root, session_id, proposal_id, "added")
+        set_proposal_status(
+            workspace_root,
+            session_id,
+            proposal_id,
+            "added",
+            confirmation=confirmation if proposal["kind"] == "source" else None,
+        )
+    return session_view(workspace_root, session_id, browser_enabled=browser_enabled)
+
+
+def resolve_proposal_source(
+    workspace_root: Path | str,
+    session_id: str,
+    proposal_id: str,
+    *,
+    url: str,
+    search_path: str,
+    browser_enabled: bool,
+    resolver: CompanySourceResolverLike | None = None,
+) -> dict:
+    """Re-resolve a pending source without holding the Scout ledger lock over I/O."""
+
+    candidate_url = url.strip()
+    if not candidate_url or len(candidate_url) > 2_048:
+        raise ValueError("a public HTTP(S) URL is required")
+    snapshot = load_session(workspace_root, session_id)
+    proposal = _pending_proposal(snapshot, proposal_id)
+    if proposal["kind"] != "source" or proposal["source"] is None:
+        raise ValueError("proposal is not a source")
+    source = proposal["source"]
+    expected_url = source["url"]
+    validate_public_url(candidate_url)
+    resolution = (resolver or CompanySourceResolver(search_path)).resolve(
+        source["company"], candidate_url
+    )
+    replace_pending_source_resolution(
+        workspace_root,
+        session_id,
+        proposal_id,
+        expected_url=expected_url,
+        resolution=resolution,
+    )
     return session_view(workspace_root, session_id, browser_enabled=browser_enabled)
 
 

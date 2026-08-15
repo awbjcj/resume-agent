@@ -8159,6 +8159,17 @@
         "title": "RunState",
         "type": "string"
       },
+      "ScoutApproveIn": {
+        "properties": {
+          "manualConfirmation": {
+            "default": false,
+            "title": "Manualconfirmation",
+            "type": "boolean"
+          }
+        },
+        "title": "ScoutApproveIn",
+        "type": "object"
+      },
       "ScoutCitationOut": {
         "properties": {
           "title": {
@@ -8189,6 +8200,73 @@
         "title": "ScoutDismissIn",
         "type": "object"
       },
+      "ScoutEvidenceOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "sourceUrl": {
+            "title": "Sourceurl",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "targetUrl": {
+            "default": "",
+            "title": "Targeturl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "sourceUrl"
+        ],
+        "title": "ScoutEvidenceOut",
+        "type": "object"
+      },
+      "ScoutManualConfirmationOut": {
+        "properties": {
+          "ats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats"
+          },
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "confirmedAt": {
+            "title": "Confirmedat",
+            "type": "string"
+          },
+          "resolutionReason": {
+            "title": "Resolutionreason",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "company",
+          "url",
+          "resolutionReason",
+          "confirmedAt"
+        ],
+        "title": "ScoutManualConfirmationOut",
+        "type": "object"
+      },
       "ScoutMessageIn": {
         "properties": {
           "message": {
@@ -8210,6 +8288,7 @@
             "enum": [
               "validated",
               "unverified",
+              "conflict",
               "failed",
               "duplicate",
               "avoid",
@@ -8257,6 +8336,16 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "manualConfirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoutManualConfirmationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "reason": {
             "default": "",
@@ -8311,6 +8400,22 @@
           "status"
         ],
         "title": "ScoutProposalOut",
+        "type": "object"
+      },
+      "ScoutResolveSourceIn": {
+        "properties": {
+          "url": {
+            "format": "uri",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "ScoutResolveSourceIn",
         "type": "object"
       },
       "ScoutSessionOut": {
@@ -8545,6 +8650,11 @@
             ],
             "title": "Ats"
           },
+          "canonicalBoardUrl": {
+            "default": "",
+            "title": "Canonicalboardurl",
+            "type": "string"
+          },
           "company": {
             "title": "Company",
             "type": "string"
@@ -8560,6 +8670,40 @@
             ],
             "title": "Errorcode"
           },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ScoutEvidenceOut"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "requestedUrl": {
+            "default": "",
+            "title": "Requestedurl",
+            "type": "string"
+          },
+          "resolutionReason": {
+            "default": "",
+            "title": "Resolutionreason",
+            "type": "string"
+          },
+          "resolutionStatus": {
+            "anyOf": [
+              {
+                "enum": [
+                  "verified",
+                  "unverified",
+                  "conflict",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolutionstatus"
+          },
           "roleCount": {
             "anyOf": [
               {
@@ -8571,6 +8715,13 @@
             ],
             "title": "Rolecount"
           },
+          "searchedFamilies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Searchedfamilies",
+            "type": "array"
+          },
           "token": {
             "anyOf": [
               {
@@ -8581,6 +8732,13 @@
               }
             ],
             "title": "Token"
+          },
+          "unsearchedFamilies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unsearchedfamilies",
+            "type": "array"
           },
           "url": {
             "default": "",
@@ -21758,6 +21916,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ScoutApproveIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -21855,6 +22030,80 @@
           }
         },
         "summary": "Dismiss Scout Proposal"
+      }
+    },
+    "/api/scout/sessions/{session_id}/proposals/{proposal_id}/resolve": {
+      "post": {
+        "operationId": "resolve_scout_proposal_api_scout_sessions__session_id__proposals__proposal_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoutResolveSourceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoutSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Scout Proposal"
       }
     },
     "/api/scout/sessions/{session_id}/unarchive": {

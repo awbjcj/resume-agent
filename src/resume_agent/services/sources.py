@@ -36,6 +36,7 @@ from resume_agent.discovery.connectors.registry import (
     find_unit,
     spec_for,
 )
+from resume_agent.discovery.source_resolution.catalog import canonical_target_url
 from resume_agent.discovery.connectors.sources import (
     NATIVE_URL_KINDS as NATIVE_URL_KINDS,
     SourceView,
@@ -54,17 +55,6 @@ _UNSET = object()
 _SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _HOST_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
 
-_TOKEN_URLS = {
-    "greenhouse": "https://job-boards.greenhouse.io/{token}",
-    "lever": "https://jobs.lever.co/{token}",
-    "ashby": "https://jobs.ashbyhq.com/{token}",
-    "smartrecruiters": "https://jobs.smartrecruiters.com/{token}",
-    "workable": "https://apply.workable.com/{token}",
-    "recruitee": "https://{token}.recruitee.com",
-    "breezy": "https://{token}.breezy.hr",
-    "jazzhr": "https://{token}.applytojob.com",
-    "bamboohr": "https://{token}.bamboohr.com/careers",
-}
 _SUBDOMAIN_PROVIDERS = {"recruitee", "personio", "breezy", "jazzhr", "bamboohr"}
 
 
@@ -82,6 +72,7 @@ class SourcePreview:
     role_count: int | None = None
     error: str | None = None
     error_code: str | None = None
+    observed_companies: tuple[str, ...] = ()
 
 
 def _save(path: str, config: ConnectorsConfig) -> None:
@@ -224,25 +215,22 @@ def board_root_url(url: str) -> str:
     if target is None:
         return raw
     try:
-        if target.ats == "workday":
-            if not (target.tenant and target.datacenter and target.site):
-                return raw
-            return _connection_url(
-                provider="workday",
-                tenant=target.tenant,
-                datacenter=target.datacenter,
-                site=target.site,
-            )
         if not target.token:
+            if target.ats == "workday" and target.tenant and target.datacenter and target.site:
+                return _connection_url(
+                    provider="workday",
+                    tenant=target.tenant,
+                    datacenter=target.datacenter,
+                    site=target.site,
+                )
             # Singleton portals (Tesla, Google Careers) are identified by host
             # alone, so there is no token to rebuild a root from.
             return raw
-        if target.ats == "personio":
-            return _connection_url(
-                provider="personio", token=target.token, country=target.country
-            )
-        if target.ats in _TOKEN_URLS:
-            return _connection_url(provider=target.ats, token=target.token)
+        return _connection_url(
+            provider=target.ats,
+            token=target.token,
+            country=target.country,
+        )
     except SourceError:
         # A slug the templates would reject is not a reason to lose the
         # proposal; the probe still gets the URL the agent actually found.
@@ -293,14 +281,14 @@ def _connection_url(
         if provider not in _SUBDOMAIN_PROVIDERS:
             allowed += " or underscores"
         raise SourceError(f"Company token must contain only {allowed}.")
-    if provider == "personio":
-        if country not in {"com", "de"}:
-            raise SourceError("Personio country must be com or de.")
-        return f"https://{normalized_token}.jobs.personio.{country}"
-    template = _TOKEN_URLS.get(provider)
-    if template is None:
+    if provider == "personio" and country not in {"com", "de"}:
+        raise SourceError("Personio country must be com or de.")
+    canonical = canonical_target_url(
+        AtsTarget(provider, token=normalized_token, country=country)
+    )
+    if canonical is None:
         raise SourceError(f"Unknown source provider '{provider}'.")
-    return template.format(token=normalized_token)
+    return canonical
 
 
 def preview_source(
@@ -406,6 +394,13 @@ def preview_source(
         token=target.token or None,
         label=label,
         role_count=len(result.jobs),
+        observed_companies=tuple(
+            dict.fromkeys(
+                job.company.strip()
+                for job in result.jobs
+                if job.company_provenance == "provider" and job.company and job.company.strip()
+            )
+        ),
     )
 
 

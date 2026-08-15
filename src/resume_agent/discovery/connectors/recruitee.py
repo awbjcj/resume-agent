@@ -26,11 +26,12 @@ def parse_recruitee(payload: dict, token: str) -> list[RawJob]:
     for item in payload.get("offers") or []:
         description = _translated(item, "description") or ""
         requirements = _translated(item, "requirements") or ""
+        provider_company = item.get("company_name")
         rows.append(
             RawJob(
                 source="recruitee",
                 url=item.get("careers_apply_url") or item.get("careers_url"),
-                company=item.get("company_name") or token,
+                company=provider_company or token,
                 title=_translated(item, "title"),
                 location=item.get("location")
                 or item.get("city")
@@ -39,6 +40,7 @@ def parse_recruitee(payload: dict, token: str) -> list[RawJob]:
                 posted_at=parse_iso_datetime(
                     str(item.get("published_at") or "").replace(" UTC", "+00:00")
                 ),
+                company_provenance="provider" if provider_company else "token",
             )
         )
     return rows

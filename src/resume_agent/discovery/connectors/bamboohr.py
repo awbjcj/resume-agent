@@ -50,6 +50,7 @@ def parse_bamboohr(payload: dict, token: str) -> list[BambooHrRow]:
                 location=_location(item),
                 jd_text="",
                 opening_id=opening_id,
+                company_provenance="token",
             )
         )
     return rows

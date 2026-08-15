@@ -53,6 +53,7 @@ def parse_postings(payload: dict, company: str) -> list[SmartRecruitersRow]:
     rows = []
     for item in payload.get("content") or []:
         posting_id = str(item.get("id") or "")
+        provider_company = (item.get("company") or {}).get("name")
         rows.append(
             SmartRecruitersRow(
                 source="smartrecruiters",
@@ -61,12 +62,13 @@ def parse_postings(payload: dict, company: str) -> list[SmartRecruitersRow]:
                     if posting_id
                     else None
                 ),
-                company=(item.get("company") or {}).get("name") or company,
+                company=provider_company or company,
                 title=item.get("name"),
                 location=_location(item.get("location")),
                 jd_text="",
                 posted_at=parse_iso_datetime(item.get("releasedDate")),
                 posting_id=posting_id,
+                company_provenance="provider" if provider_company else "token",
             )
         )
     return rows

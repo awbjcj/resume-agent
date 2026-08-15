@@ -38,6 +38,7 @@ def parse_listing(html: str, token: str) -> list[RawJob]:
                 title=link.get_text(" ", strip=True),
                 location=location,
                 jd_text="",
+                company_provenance="token",
             )
         )
     return rows
@@ -53,6 +54,8 @@ def apply_detail(row: RawJob, detail: dict) -> None:
     row.posted_at = parse_iso_datetime(posting.get("datePosted"))
     organization = posting.get("hiringOrganization") or {}
     row.company = organization.get("name") or row.company
+    if organization.get("name"):
+        row.company_provenance = "provider"
     if posting.get("jobLocationType") == "TELECOMMUTE":
         row.location = "Remote"
 

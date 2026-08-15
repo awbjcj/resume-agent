@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AnyHttpUrl, Field
 
 from resume_agent.api.schemas.base import CamelModel
 
@@ -17,6 +17,14 @@ class ScoutDismissIn(CamelModel):
     reason: str = Field(default="", max_length=200)
 
 
+class ScoutApproveIn(CamelModel):
+    manual_confirmation: bool = False
+
+
+class ScoutResolveSourceIn(CamelModel):
+    url: AnyHttpUrl = Field(max_length=2_048)
+
+
 class ScoutCitationOut(CamelModel):
     url: str
     title: str = ""
@@ -25,10 +33,32 @@ class ScoutCitationOut(CamelModel):
 class ScoutSourceOut(CamelModel):
     company: str
     url: str = ""
+    requested_url: str = ""
+    canonical_board_url: str = ""
     ats: str | None = None
     token: str | None = None
     role_count: int | None = None
     error_code: str | None = None
+    resolution_status: Literal["verified", "unverified", "conflict", "failed"] | None = None
+    resolution_reason: str = ""
+    evidence: list["ScoutEvidenceOut"] = Field(default_factory=list)
+    searched_families: list[str] = Field(default_factory=list)
+    unsearched_families: list[str] = Field(default_factory=list)
+
+
+class ScoutEvidenceOut(CamelModel):
+    kind: str
+    source_url: str
+    target_url: str = ""
+    summary: str = ""
+
+
+class ScoutManualConfirmationOut(CamelModel):
+    company: str
+    url: str
+    ats: str | None = None
+    resolution_reason: str
+    confirmed_at: str
 
 
 class ScoutTermOut(CamelModel):
@@ -52,11 +82,14 @@ class ScoutProposalOut(CamelModel):
     reason: str = ""
     fit_score: int | None = None
     citations: list[ScoutCitationOut] = Field(default_factory=list)
-    check: Literal["validated", "unverified", "failed", "duplicate", "avoid", "new"]
+    check: Literal[
+        "validated", "unverified", "conflict", "failed", "duplicate", "avoid", "new"
+    ]
     check_error: str = ""
     status: Literal["pending", "added", "dismissed"]
     dismiss_reason: str = ""
     resolved_at: str | None = None
+    manual_confirmation: ScoutManualConfirmationOut | None = None
 
 
 class ScoutTurnOut(CamelModel):

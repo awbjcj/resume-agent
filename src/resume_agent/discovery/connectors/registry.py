@@ -27,6 +27,7 @@ from resume_agent.discovery.connectors.sources import (
 )
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
+from resume_agent.discovery.source_resolution.catalog import BoardFamily, board_family
 
 _BROWSER_DISABLED = "requires a local browser (browser_enabled=false)"
 
@@ -78,6 +79,7 @@ class ConnectorSpec:
     new_unit: (
         Callable[[AtsTarget | None, str, str | None], tuple[str, Any]] | None
     ) = None
+    discovery: BoardFamily | None = None
 
 
 def _token_admits(target: AtsTarget | None) -> bool:
@@ -108,6 +110,7 @@ def _native_url_spec(kind: str) -> ConnectorSpec:
             native_url_id(kind, url),
             NativeUrlBoard(url=url, company=label),
         ),
+        discovery=board_family(kind),
     )
 
 
@@ -126,6 +129,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         new_unit=lambda target, url, label: _token_unit(
             "greenhouse", GreenhouseBoard, target, label
         ),
+        discovery=board_family("greenhouse"),
     ),
     ConnectorSpec(
         kind="lever",
@@ -140,6 +144,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         new_unit=lambda target, url, label: _token_unit(
             "lever", LeverBoard, target, label
         ),
+        discovery=board_family("lever"),
     ),
     ConnectorSpec(
         kind="ashby",
@@ -154,6 +159,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         new_unit=lambda target, url, label: _token_unit(
             "ashby", AshbyBoard, target, label
         ),
+        discovery=board_family("ashby"),
     ),
     *(_native_url_spec(kind) for kind in NATIVE_URL_KINDS),
     ConnectorSpec(
@@ -230,6 +236,15 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
 )
 
 _SPEC_BY_KIND = {spec.kind: spec for spec in CONNECTOR_SPECS}
+
+
+def discoverable_board_families() -> tuple[BoardFamily, ...]:
+    """Catalog-backed generic ATS families that have a connector registration."""
+    return tuple(
+        family
+        for spec in CONNECTOR_SPECS
+        if (family := spec.discovery) is not None
+    )
 
 
 def spec_for(kind: str) -> ConnectorSpec | None:

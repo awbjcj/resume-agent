@@ -25,17 +25,19 @@ def parse_personio(payload: str, token: str, country: str = "com") -> list[RawJo
     rows = []
     for position in positions:
         position_id = position.get("id")
+        provider_company = position.get("subcompany")
         rows.append(
             RawJob(
                 source="personio",
                 url=job_url(token, country, str(position_id))
                 if position_id is not None
                 else None,
-                company=position.get("subcompany") or token,
+                company=provider_company or token,
                 title=position.get("name"),
                 location=position.get("office") or None,
                 jd_text=html_to_markdown(position.get("description") or ""),
                 posted_at=None,
+                company_provenance="provider" if provider_company else "token",
             )
         )
     return rows

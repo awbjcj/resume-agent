@@ -20,14 +20,17 @@ from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.api.schemas.scout import (
+    ScoutApproveIn,
     ScoutDismissIn,
     ScoutMessageIn,
+    ScoutResolveSourceIn,
     ScoutSessionOut,
     ScoutSessionPatchIn,
     ScoutSessionsOut,
 )
 from resume_agent.config import Settings
 from resume_agent.discovery.scout_store import (
+    ScoutProposalChangedError,
     active_session,
     archive_session,
     delete_session,
@@ -41,6 +44,7 @@ from resume_agent.services.scout import (
     run_message_turn,
     run_recap_turn,
     run_start_turn,
+    resolve_proposal_source,
     session_view,
     sessions_view,
 )
@@ -108,6 +112,7 @@ def _value_error(exc: ValueError) -> ApiException:
         for token in (
             "already resolved",
             "not approvable",
+            "manual confirmation required",
             "requires a local browser",
             "session ended",
             "active session",
@@ -253,6 +258,7 @@ def approve_scout_proposal(
     session_id: str,
     proposal_id: str,
     request: Request,
+    payload: ScoutApproveIn | None = None,
     settings: Settings = Depends(get_settings_dep),
 ):
     connectors_path, search_path = _config_paths(request)
@@ -266,8 +272,38 @@ def approve_scout_proposal(
                 connectors_path=connectors_path,
                 search_path=search_path,
                 browser_enabled=settings.browser_enabled,
+                manual_confirmation=payload.manual_confirmation if payload else False,
             )
         )
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.post(
+    "/scout/sessions/{session_id}/proposals/{proposal_id}/resolve",
+    response_model=ScoutSessionOut,
+)
+def resolve_scout_proposal(
+    session_id: str,
+    proposal_id: str,
+    payload: ScoutResolveSourceIn,
+    request: Request,
+    settings: Settings = Depends(get_settings_dep),
+):
+    _, search_path = _config_paths(request)
+    try:
+        return ScoutSessionOut.model_validate(
+            resolve_proposal_source(
+                _workspace_root(request),
+                session_id,
+                proposal_id,
+                url=str(payload.url),
+                search_path=search_path,
+                browser_enabled=settings.browser_enabled,
+            )
+        )
+    except ScoutProposalChangedError as exc:
+        raise ApiException(409, "CONFLICT", str(exc)) from exc
     except ValueError as exc:
         raise _value_error(exc) from exc
 

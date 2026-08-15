@@ -20,6 +20,7 @@ class PublicTextResponse:
     final_url: str
     text: str
     content_type: str
+    redirect_chain: tuple[str, ...] = ()
 
 
 def resolve_host(host: str) -> set[str]:
@@ -99,6 +100,7 @@ def fetch_public_text(
     owns_client = client is None
     http = client if client is not None else httpx.Client(timeout=timeout)
     current = url.strip()
+    redirect_chain = [current]
     try:
         for redirect_count in range(_MAX_REDIRECTS + 1):
             host, pinned_ip, port = resolve_public_url(current, resolver)
@@ -127,6 +129,7 @@ def fetch_public_text(
                     if not location or redirect_count == _MAX_REDIRECTS:
                         raise ValueError("too many URL redirects")
                     current = urljoin(current, location)
+                    redirect_chain.append(current)
                     continue
                 response.raise_for_status()
                 content_type = (
@@ -151,6 +154,7 @@ def fetch_public_text(
                         response.encoding or "utf-8", errors="replace"
                     ),
                     content_type=content_type,
+                    redirect_chain=tuple(redirect_chain),
                 )
             finally:
                 response.close()

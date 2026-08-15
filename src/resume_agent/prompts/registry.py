@@ -214,7 +214,7 @@ PROMPT_SPECS = (
         "Discovery Scout",
         "discovery",
         "Researches company sources and search conditions in a conversational session.",
-        scout._SCOUT_INSTRUCTIONS,
+        scout.scout_instructions(),
     ),
     _spec(
         "discovery-scout-format",

@@ -15,17 +15,41 @@ from resume_agent.discovery.scout import (
     SuggestionKind,
 )
 from resume_agent.discovery.scout_models import Citation
+from resume_agent.discovery.source_resolution.models import (
+    CompanySourceResolution,
+    ResolutionStatus,
+    SourceEvidence,
+)
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.sessions.store import SessionModel, SessionStore, now_iso
+
+
+class ScoutProposalChangedError(ValueError):
+    """A pending proposal changed between displaying and resolving it."""
+
+
+class ManualSourceConfirmation(ExtensibleModel):
+    company: str
+    url: str
+    ats: str | None = None
+    resolution_reason: str
+    confirmed_at: str
 
 
 class SourcePayload(ExtensibleModel):
     company: str = ""
     url: str = ""
+    requested_url: str = ""
+    canonical_board_url: str = ""
     ats: str | None = None
     token: str | None = None
     role_count: int | None = None
     error_code: str | None = None
+    resolution_status: ResolutionStatus | None = None
+    resolution_reason: str = ""
+    evidence: list[SourceEvidence] = Field(default_factory=list)
+    searched_families: list[str] = Field(default_factory=list)
+    unsearched_families: list[str] = Field(default_factory=list)
 
 
 class TermPayload(ExtensibleModel):
@@ -47,11 +71,14 @@ class ScoutProposal(ExtensibleModel):
     reason: str = ""
     fit_score: int | None = Field(default=None, ge=0, le=100)
     citations: list[Citation] = Field(default_factory=list)
-    check: Literal["validated", "unverified", "failed", "duplicate", "avoid", "new"] = "new"
+    check: Literal[
+        "validated", "unverified", "conflict", "failed", "duplicate", "avoid", "new"
+    ] = "new"
     check_error: str = ""
     status: Literal["pending", "added", "dismissed"] = "pending"
     dismiss_reason: str = ""
     resolved_at: str | None = None
+    manual_confirmation: ManualSourceConfirmation | None = None
 
     @model_validator(mode="after")
     def exactly_one_payload(self) -> Self:
@@ -194,6 +221,7 @@ def set_proposal_status(
     status: Literal["added", "dismissed"],
     *,
     reason: str = "",
+    confirmation: ManualSourceConfirmation | None = None,
 ) -> dict:
     def apply(session: dict) -> None:
         proposal = next((row for row in session["proposals"] if row["id"] == proposal_id), None)
@@ -201,9 +229,80 @@ def set_proposal_status(
             raise ValueError(f"unknown proposal: {proposal_id}")
         if proposal["status"] != "pending":
             raise ValueError("proposal already resolved")
+        if confirmation is not None:
+            if status != "added":
+                raise ValueError("manual confirmation is only valid when adding a proposal")
+            if proposal["kind"] != "source" or proposal["source"] is None:
+                raise ValueError("manual confirmation requires a source proposal")
+            source = proposal["source"]
+            if confirmation.company != source["company"] or confirmation.url != source["url"]:
+                raise ScoutProposalChangedError("source URL or company changed")
         proposal["status"] = status
         proposal["dismiss_reason"] = reason if status == "dismissed" else ""
         proposal["resolved_at"] = now_iso()
+        if confirmation is not None:
+            proposal["manual_confirmation"] = confirmation.model_dump(mode="json")
+
+    return _STORE.mutate(scout_dir(workspace_root), session_id, apply)
+
+
+_RESOLUTION_CHECK = {
+    "verified": "validated",
+    "unverified": "unverified",
+    "conflict": "conflict",
+    "failed": "failed",
+}
+
+
+def _source_from_resolution(
+    company: str, resolution: CompanySourceResolution
+) -> SourcePayload:
+    return SourcePayload(
+        company=company,
+        url=resolution.canonical_board_url or resolution.requested_url,
+        requested_url=resolution.requested_url,
+        canonical_board_url=resolution.canonical_board_url,
+        ats=resolution.ats,
+        token=resolution.token,
+        role_count=resolution.role_count,
+        error_code=resolution.reason_code if resolution.status == "failed" else None,
+        resolution_status=resolution.status,
+        resolution_reason=resolution.reason_code,
+        evidence=resolution.evidence,
+        searched_families=resolution.searched_families,
+        unsearched_families=resolution.unsearched_families,
+    )
+
+
+def replace_pending_source_resolution(
+    workspace_root: Path | str,
+    session_id: str,
+    proposal_id: str,
+    *,
+    expected_url: str,
+    resolution: CompanySourceResolution,
+) -> dict:
+    """Atomically replace a displayed source only when its URL is still current."""
+
+    def apply(session: dict) -> None:
+        proposal = next((row for row in session["proposals"] if row["id"] == proposal_id), None)
+        if proposal is None:
+            raise ValueError(f"unknown proposal: {proposal_id}")
+        if proposal["status"] != "pending":
+            raise ValueError("proposal already resolved")
+        if proposal["kind"] != "source" or proposal["source"] is None:
+            raise ValueError("proposal is not a source")
+        current = proposal["source"]
+        if current["url"] != expected_url:
+            raise ScoutProposalChangedError("source URL changed")
+        proposal["source"] = _source_from_resolution(
+            current["company"], resolution
+        ).model_dump(mode="json")
+        proposal["check"] = _RESOLUTION_CHECK[resolution.status]
+        proposal["check_error"] = (
+            resolution.reason_code if resolution.status in {"conflict", "failed"} else ""
+        )
+        proposal["manual_confirmation"] = None
 
     return _STORE.mutate(scout_dir(workspace_root), session_id, apply)
 

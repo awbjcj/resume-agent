@@ -39,7 +39,8 @@ def _jd_html(item: dict) -> str:
 
 
 def parse_workable(payload: dict, account: str) -> list[RawJob]:
-    company = payload.get("name") or account
+    provider_company = payload.get("name")
+    company = provider_company or account
     return [
         RawJob(
             source="workable",
@@ -49,6 +50,7 @@ def parse_workable(payload: dict, account: str) -> list[RawJob]:
             location=_location(item),
             jd_text=html_to_markdown(_jd_html(item)),
             posted_at=parse_iso_datetime(item.get("published_on")),
+            company_provenance="provider" if provider_company else "token",
         )
         for item in payload.get("jobs") or []
     ]

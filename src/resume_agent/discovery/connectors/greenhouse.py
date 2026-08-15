@@ -1,3 +1,5 @@
+from typing import Literal
+
 import httpx
 
 from resume_agent.discovery.connectors import http as board
@@ -31,9 +33,7 @@ def fetch_greenhouse_job(token: str, job_id: str) -> dict:
     the rendered page, whose markup differs between the legacy ``boards.`` and
     modern ``job-boards.`` layouts.
     """
-    resp = board.get(
-        f"{_BASE}/{token}/jobs/{job_id}", params={"content": "true"}
-    )
+    resp = board.get(f"{_BASE}/{token}/jobs/{job_id}", params={"content": "true"})
     resp.raise_for_status()
     return resp.json()
 
@@ -47,7 +47,10 @@ def fetch_greenhouse_board_name(token: str) -> str | None:
 
 
 def parse_greenhouse(
-    payload: dict, company: str, stale_company: str | None = None
+    payload: dict,
+    company: str,
+    stale_company: str | None = None,
+    company_provenance: Literal["configured", "provider", "token"] = "configured",
 ) -> list[RawJob]:
     """Map a Greenhouse board `jobs` payload to RawJobs."""
     jobs: list[RawJob] = []
@@ -63,6 +66,7 @@ def parse_greenhouse(
                 jd_text=html_to_markdown(item.get("content", "")),
                 posted_at=parse_iso_datetime(item.get("updated_at")),
                 stale_company=stale_company,
+                company_provenance=company_provenance,
             )
         )
     return jobs
@@ -89,7 +93,9 @@ class GreenhouseConnector:
     ) -> FetchResult:
         return harvest(
             self.boards,
-            lambda board: parse_greenhouse(self._get_board(board.token), *self._company_pair(board)),
+            lambda board: parse_greenhouse(
+                self._get_board(board.token), *self._company_pair(board)
+            ),
             search=search,
             limit=limit,
             key=lambda board: board.token,
@@ -104,12 +110,22 @@ class GreenhouseConnector:
     def _get_board_name(self, token: str) -> str | None:
         return fetch_greenhouse_board_name(token)
 
-    def _company_pair(self, board: GreenhouseBoard) -> tuple[str, str | None]:
+    def _company_pair(
+        self, board: GreenhouseBoard
+    ) -> tuple[str, str | None, Literal["configured", "provider", "token"]]:
         if board.company:
-            return board.company, board.token if board.company != board.token else None
+            return (
+                board.company,
+                board.token if board.company != board.token else None,
+                "configured",
+            )
         try:
             resolved = self._get_board_name(board.token)
         except (httpx.HTTPError, KeyError, TypeError, ValueError):
             resolved = None
         company = resolved or board.token
-        return company, board.token if company != board.token else None
+        return (
+            company,
+            board.token if company != board.token else None,
+            "provider" if resolved else "token",
+        )

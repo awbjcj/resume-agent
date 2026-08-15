@@ -14,18 +14,22 @@ def board_url(token: str) -> str:
 
 
 def parse_breezy(payload: list, token: str) -> list[RawJob]:
-    return [
-        RawJob(
+    rows = []
+    for item in payload:
+        provider_company = (item.get("company") or {}).get("name")
+        rows.append(
+            RawJob(
             source="breezy",
             url=item.get("url"),
-            company=(item.get("company") or {}).get("name") or token,
+            company=provider_company or token,
             title=item.get("name"),
             location=(item.get("location") or {}).get("name"),
             jd_text="",
             posted_at=parse_iso_datetime(item.get("published_date")),
+                company_provenance="provider" if provider_company else "token",
+            )
         )
-        for item in payload
-    ]
+    return rows
 
 
 def apply_detail(row: RawJob, detail: dict) -> None:
@@ -37,6 +41,8 @@ def apply_detail(row: RawJob, detail: dict) -> None:
     row.jd_text = html_to_markdown(posting.get("description") or "")
     organization = posting.get("hiringOrganization") or {}
     row.company = organization.get("name") or row.company
+    if organization.get("name"):
+        row.company_provenance = "provider"
 
 
 def fetch_breezy(

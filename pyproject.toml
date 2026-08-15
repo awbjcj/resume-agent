@@ -32,6 +32,7 @@ dependencies = [
     "typst>=0.14.9",
     "markdownify>=0.13.0",
     "ddgs>=9.14.4",
+    "tldextract>=5.3.0",
     "markitdown[docx,pdf,pptx,xlsx]>=0.1.6",
 ]
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from collections.abc import Callable
-from typing import Protocol
+from typing import Literal, Protocol
 
 import httpx
 
@@ -39,6 +39,9 @@ class RawJob:
     jd_text: str
     posted_at: datetime | None = None
     stale_company: str | None = None
+    company_provenance: Literal[
+        "provider", "configured", "token", "fixed", "unknown"
+    ] = "unknown"
 
 
 SkipSeen = Callable[[RawJob], bool]

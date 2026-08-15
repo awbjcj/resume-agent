@@ -278,11 +278,7 @@ class AgentRunner:
                 yield Completed(terminal_output)
                 return
             except Exception as exc:
-                if (
-                    emitted
-                    or attempt >= settings.llm_retries
-                    or not is_transient(exc)
-                ):
+                if emitted or attempt >= settings.llm_retries or not is_transient(exc):
                     yield Failed(str(exc), type(exc).__name__)
                     return
                 time.sleep(settings.llm_retry_delay * (2**attempt))
@@ -340,26 +336,20 @@ def _map_stream_event(tag: str, raw: Any) -> list[StreamEvent]:
             events.append(TextDelta(content))
         return events
     if tag == "ReasoningContentDelta":
-        content = getattr(raw, "reasoning_content", None) or getattr(
-            raw, "content", ""
-        )
+        content = getattr(raw, "reasoning_content", None) or getattr(raw, "content", "")
         return [ReasoningDelta(content)] if isinstance(content, str) and content else []
     if tag == "ToolCallStarted":
         tool = getattr(raw, "tool", None)
         name = str(getattr(tool, "tool_name", "") or "tool")
         call_id = str(getattr(tool, "tool_call_id", "") or name)
         return [
-            ToolStarted(
-                call_id, name, _stream_preview(getattr(tool, "tool_args", ""))
-            )
+            ToolStarted(call_id, name, _stream_preview(getattr(tool, "tool_args", "")))
         ]
     if tag in {"ToolCallCompleted", "ToolCallError"}:
         tool = getattr(raw, "tool", None)
         name = str(getattr(tool, "tool_name", "") or "tool")
         call_id = str(getattr(tool, "tool_call_id", "") or name)
-        error = getattr(raw, "error", None) or getattr(
-            tool, "tool_call_error", None
-        )
+        error = getattr(raw, "error", None) or getattr(tool, "tool_call_error", None)
         ok = tag == "ToolCallCompleted" and not error
         result = error if error else getattr(tool, "result", "")
         return [ToolCompleted(call_id, name, _stream_preview(result), ok)]
@@ -1409,6 +1399,7 @@ def build_search_equipped(
     *,
     reasoning: bool = False,
     cache_system_prompt: bool = False,
+    tool_search: Any | None = None,
 ) -> tuple[Any, list[Any]]:
     """Build a model and its search tools for advisor research."""
     settings = get_settings()
@@ -1457,6 +1448,8 @@ def build_search_equipped(
     if plan.strategy == "native_anthropic":
         return model, [anthropic_web_search_tool(model_id)]
     if plan.strategy == "tool":
+        if tool_search is not None:
+            return model, [tool_search]
         from agno.tools.duckduckgo import DuckDuckGoTools
 
         return model, [DuckDuckGoTools()]

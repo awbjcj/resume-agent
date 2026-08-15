@@ -211,17 +211,28 @@ def _get_html(url: str, *, client: httpx.Client | None = None) -> str | None:
 
 
 def _target_from_html(raw_html: str) -> AtsTarget | None:
+    targets = targets_from_html(raw_html)
+    return targets[0] if targets else None
+
+
+def targets_from_html(raw_html: str) -> list[AtsTarget]:
+    """Extract every supported board target embedded in untrusted page markup."""
+    found: list[AtsTarget] = []
     for ats, pattern in _L2_MARKERS:
         match = pattern.search(raw_html)
         if match:
-            return AtsTarget(ats, match.group(1))
+            found.append(AtsTarget(ats, match.group(1)))
 
     html = unescape(raw_html).replace("\\/", "/")
     for match in _WORKDAY_URL.finditer(html):
         target = _workday_target(match.group("host").lower(), match.group("path") or "")
         if target is not None:
-            return target
-    return None
+            found.append(target)
+    for raw_url in re.findall(r"https?://[^\"'<>\s]+", html, re.IGNORECASE):
+        target = identify_host(raw_url.rstrip(").,;"))
+        if target is not None:
+            found.append(target)
+    return list(dict.fromkeys(found))
 
 
 def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
