@@ -7,6 +7,7 @@ from resume_agent.api.schemas.base import CamelModel, Page
 
 CycleUnit = Literal["WEEK", "MONTH"]
 QuotaStatus = Literal["ACTIVE", "EXHAUSTED", "OVERAGE", "UNLIMITED"]
+RatePeriod = Literal["peak", "off_peak"]
 
 
 class UtcCamelModel(CamelModel):
@@ -159,6 +160,7 @@ class LlmRateOut(UtcCamelModel):
     cache_write_micros_per_million: int | None
     output_micros_per_million: int
     tool_micros_per_unit: int | None
+    rate_period: RatePeriod | None
     effective_from: datetime
     effective_to: datetime | None
     source_url: str
@@ -178,6 +180,7 @@ class LlmRateCreate(CamelModel):
     cache_write_micros_per_million: int | None = Field(default=None, ge=0)
     output_micros_per_million: int = Field(ge=0)
     tool_micros_per_unit: int | None = Field(default=None, ge=0)
+    rate_period: RatePeriod | None = None
     effective_from: datetime
     effective_to: datetime | None = None
     source_url: str = Field(min_length=1, max_length=500)

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ModelPicker, ModelTuningControls } from "./ModelPicker";
 import type { ProviderModelCatalog } from "./use-model-catalog";
@@ -49,6 +49,49 @@ describe("ModelPicker", () => {
 
     expect(screen.queryByPlaceholderText(/provider:model-id/)).not.toBeInTheDocument();
     expect(screen.getByRole("combobox")).toHaveTextContent("GPT-5.5");
+  });
+
+  describe("DeepSeek pricing badge", () => {
+    beforeEach(() => {
+      // Only Date is faked — the Select popup's own content (including this
+      // badge) mounts lazily on open, and userEvent's internal waiting needs
+      // real setTimeout/requestAnimationFrame to ever resolve.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-08-17T02:00:00Z")); // a peak-hour moment
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows live peak/off-peak status only in the DeepSeek group", async () => {
+      const catalog: ProviderModelCatalog[] = [
+        ...CATALOG,
+        {
+          provider: "deepseek",
+          label: "DeepSeek",
+          hasKey: true,
+          models: [
+            {
+              id: "deepseek:deepseek-v4-flash",
+              label: "DeepSeek V4 Flash",
+              supportsReasoning: false,
+              supportsNativeSearch: false,
+              reasoningEfforts: ["none", "low", "high", "max"],
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup();
+      render(<ModelPicker value={KNOWN_MODEL} onChange={vi.fn()} catalog={catalog} />);
+
+      await user.click(screen.getByRole("combobox"));
+
+      const openaiGroup = screen.getByRole("group", { name: /OpenAI/ });
+      expect(within(openaiGroup).queryByText("Peak")).not.toBeInTheDocument();
+      const deepseekGroup = screen.getByRole("group", { name: /DeepSeek/ });
+      expect(within(deepseekGroup).getByText("Peak")).toBeInTheDocument();
+    });
   });
 
   it("lets the user pick a reasoning effort level", async () => {

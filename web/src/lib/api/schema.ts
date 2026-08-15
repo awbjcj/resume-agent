@@ -4838,6 +4838,8 @@ export interface components {
             outputMicrosPerMillion: number;
             /** Provider */
             provider: string;
+            /** Rateperiod */
+            ratePeriod?: ("peak" | "off_peak") | null;
             /** Reason */
             reason: string;
             /** Sourceurl */
@@ -4872,6 +4874,8 @@ export interface components {
             outputMicrosPerMillion: number;
             /** Provider */
             provider: string;
+            /** Rateperiod */
+            ratePeriod: ("peak" | "off_peak") | null;
             /** Sourceurl */
             sourceUrl: string;
             /** Toolmicrosperunit */

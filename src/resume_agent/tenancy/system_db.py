@@ -218,6 +218,9 @@ class LlmRate(SystemBase):
     cache_write_micros_per_million: Mapped[int | None] = mapped_column(Integer)
     output_micros_per_million: Mapped[int] = mapped_column(Integer, nullable=False)
     tool_micros_per_unit: Mapped[int | None] = mapped_column(Integer)
+    # None = active for every hour of the day. "peak" / "off_peak" restrict
+    # the row to DeepSeek-style time-of-day bands (see costs.py::_rate_period).
+    rate_period: Mapped[str | None] = mapped_column(String(16))
     effective_from: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

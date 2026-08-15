@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { DeepSeekPricingBadge } from "./DeepSeekPricingBadge";
 import type { ProviderModelCatalog } from "./use-model-catalog";
 
 const CUSTOM_VALUE = "__custom__";
@@ -96,9 +97,12 @@ export function ModelPicker({
             <SelectGroup key={provider.provider}>
               <SelectLabel className="flex items-center gap-1.5">
                 {provider.label}
-                {!provider.hasKey && (
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">No key</Badge>
-                )}
+                <span className="ml-auto flex items-center gap-1.5">
+                  {provider.provider === "deepseek" && <DeepSeekPricingBadge />}
+                  {!provider.hasKey && (
+                    <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">No key</Badge>
+                  )}
+                </span>
               </SelectLabel>
               {provider.models.map((model) => (
                 <SelectItem

@@ -4866,6 +4866,21 @@
             "title": "Provider",
             "type": "string"
           },
+          "ratePeriod": {
+            "anyOf": [
+              {
+                "enum": [
+                  "peak",
+                  "off_peak"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rateperiod"
+          },
           "reason": {
             "maxLength": 500,
             "minLength": 1,
@@ -4979,6 +4994,21 @@
             "title": "Provider",
             "type": "string"
           },
+          "ratePeriod": {
+            "anyOf": [
+              {
+                "enum": [
+                  "peak",
+                  "off_peak"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rateperiod"
+          },
           "sourceUrl": {
             "title": "Sourceurl",
             "type": "string"
@@ -5006,6 +5036,7 @@
           "cacheWriteMicrosPerMillion",
           "outputMicrosPerMillion",
           "toolMicrosPerUnit",
+          "ratePeriod",
           "effectiveFrom",
           "effectiveTo",
           "sourceUrl"

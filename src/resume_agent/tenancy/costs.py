@@ -14,6 +14,11 @@ from resume_agent.tenancy.system_db import LlmRate
 
 MILLION = 1_000_000
 
+RATE_PERIOD_PEAK = "peak"
+RATE_PERIOD_OFF_PEAK = "off_peak"
+# DeepSeek's published peak windows, half-open [start, end) in UTC hours.
+_PEAK_HOUR_BANDS = ((1, 4), (6, 10))
+
 
 @dataclass(frozen=True)
 class MeteredUsage:
@@ -61,6 +66,14 @@ def normalize_provider(value: str) -> str:
     if "deepseek" in folded:
         return "deepseek"
     return value.casefold()
+
+
+def _rate_period(moment: datetime) -> str:
+    """The time-of-day band ``moment`` falls in, for period-restricted rates."""
+    hour = moment.astimezone(timezone.utc).hour
+    if any(start <= hour < end for start, end in _PEAK_HOUR_BANDS):
+        return RATE_PERIOD_PEAK
+    return RATE_PERIOD_OFF_PEAK
 
 
 def _cost(units: int, rate_micros: int) -> int:
@@ -119,7 +132,13 @@ def find_rate(
         rows = _active_rates(engine, provider, model, moment)
         if cacheable:
             _rate_rows_cache.setdefault(engine, {})[key] = (time.monotonic(), rows)
+    # The row set is cached (it only depends on the date window), but which
+    # period is live depends on the current hour, so that check always reads
+    # the fresh ``moment`` rather than anything cached.
+    current_period = _rate_period(moment)
     for rate in rows:
+        if rate.rate_period is not None and rate.rate_period != current_period:
+            continue
         if rate.context_min_tokens <= input_tokens and (
             rate.context_max_tokens is None or rate.context_max_tokens >= input_tokens
         ):
@@ -238,6 +257,7 @@ def seed_llm_rates(engine: Engine) -> None:
     # repricing events from July.
     openai_price_update = datetime(2026, 8, 1, tzinfo=timezone.utc)
     sonnet_intro_end = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    deepseek_price_update = datetime(2026, 8, 16, 16, 0, tzinfo=timezone.utc)
     openai = "https://developers.openai.com/api/docs/pricing"
     anthropic = "https://platform.claude.com/docs/en/about-claude/pricing"
     gemini = "https://ai.google.dev/gemini-api/docs/pricing"
@@ -431,6 +451,62 @@ def seed_llm_rates(engine: Engine) -> None:
             current_rate.output_micros_per_million = _micros_per_million(output_rate)
             current_rate.tool_micros_per_unit = 10_000
             current_rate.source_url = openai
+
+        # DeepSeek moves both models from a flat rate to peak/off-peak hourly
+        # billing at deepseek_price_update (see _rate_period for the UTC hour
+        # bands). Close the flat seed row at the cutover and seed the two
+        # period rows per model from that moment on, verified against the
+        # official pricing page on 2026-08-14.
+        for model in ("deepseek-v4-flash", "deepseek-v4-pro"):
+            flat_rate = (
+                session.execute(
+                    select(LlmRate).where(
+                        LlmRate.provider == "deepseek",
+                        LlmRate.model == model,
+                        LlmRate.effective_from == start,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if flat_rate is not None:
+                flat_rate.effective_to = deepseek_price_update
+        for model, period, input_rate, cache_read, output_rate in (
+            ("deepseek-v4-flash", RATE_PERIOD_OFF_PEAK, 0.22, 0.007, 0.66),
+            ("deepseek-v4-flash", RATE_PERIOD_PEAK, 0.44, 0.014, 1.32),
+            ("deepseek-v4-pro", RATE_PERIOD_OFF_PEAK, 0.66, 0.022, 1.98),
+            ("deepseek-v4-pro", RATE_PERIOD_PEAK, 1.32, 0.044, 3.96),
+        ):
+            key = ("deepseek", model, 0, stamp(deepseek_price_update))
+            current_rate = None
+            if key in existing:
+                current_rate = (
+                    session.execute(
+                        select(LlmRate).where(
+                            LlmRate.provider == "deepseek",
+                            LlmRate.model == model,
+                            LlmRate.context_min_tokens == 0,
+                            LlmRate.effective_from == deepseek_price_update,
+                            LlmRate.rate_period == period,
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+            if current_rate is None:
+                current_rate = LlmRate(
+                    id=uuid.uuid4().hex,
+                    provider="deepseek",
+                    model=model,
+                    rate_period=period,
+                    effective_from=deepseek_price_update,
+                )
+                session.add(current_rate)
+            current_rate.input_micros_per_million = _micros_per_million(input_rate)
+            current_rate.cache_read_micros_per_million = _micros_per_million(cache_read)
+            current_rate.output_micros_per_million = _micros_per_million(output_rate)
+            current_rate.source_url = deepseek
+
         sonnet_intro = (
             session.execute(
                 select(LlmRate).where(

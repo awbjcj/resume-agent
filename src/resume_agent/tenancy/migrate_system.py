@@ -30,6 +30,8 @@ _USAGE_COLUMNS = (
     ("reasoning_mode", "VARCHAR(24)"),
 )
 
+_LLM_RATE_COLUMNS = (("rate_period", "VARCHAR(16)"),)
+
 _SHARED_KEYS_ALL_ACCOUNTS_MARKER = "migration_shared_keys_all_accounts_v1"
 
 
@@ -109,3 +111,9 @@ def migrate_system_db(engine: Engine) -> None:
                     "ADD COLUMN pending_email VARCHAR(320)"
                 )
             )
+        rate_columns = _columns(connection, "llm_rates")
+        for name, ddl in _LLM_RATE_COLUMNS:
+            if rate_columns and name not in rate_columns:
+                connection.execute(
+                    text(f"ALTER TABLE llm_rates ADD COLUMN {name} {ddl}")
+                )

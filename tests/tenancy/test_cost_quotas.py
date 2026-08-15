@@ -112,6 +112,57 @@ def test_seeded_model_prices_use_current_openai_and_deepseek_rates(tmp_path):
         ) == expected
 
 
+def test_deepseek_switches_to_peak_off_peak_rates_after_cutover(tmp_path):
+    engine = _engine(tmp_path)
+
+    # Just before the 2026-08-16T16:00Z cutover, the flat legacy rate is
+    # still active regardless of hour.
+    just_before = datetime(2026, 8, 16, 15, 59, tzinfo=UTC)
+    rate = find_rate(engine, "deepseek", "deepseek-v4-flash", now=just_before)
+    assert rate is not None
+    assert rate.rate_period is None
+    assert rate.input_micros_per_million == 140_000
+
+    expected = {
+        ("deepseek-v4-flash", "off_peak"): (220_000, 7_000, 660_000),
+        ("deepseek-v4-flash", "peak"): (440_000, 14_000, 1_320_000),
+        ("deepseek-v4-pro", "off_peak"): (660_000, 22_000, 1_980_000),
+        ("deepseek-v4-pro", "peak"): (1_320_000, 44_000, 3_960_000),
+    }
+    # hour=2 -> peak (01:00-04:00), hour=12 -> off-peak.
+    moments = {
+        "peak": datetime(2026, 8, 17, 2, 0, tzinfo=UTC),
+        "off_peak": datetime(2026, 8, 17, 12, 0, tzinfo=UTC),
+    }
+    for (model, period), micros in expected.items():
+        rate = find_rate(engine, "deepseek", model, now=moments[period])
+        assert rate is not None
+        assert rate.rate_period == period
+        assert (
+            rate.input_micros_per_million,
+            rate.cache_read_micros_per_million,
+            rate.output_micros_per_million,
+        ) == micros
+
+
+def test_deepseek_peak_windows_are_half_open(tmp_path):
+    engine = _engine(tmp_path)
+    # Peak bands are [01:00, 04:00) and [06:00, 10:00); the end hour of each
+    # band is already off-peak, and the start hour is already peak.
+    off_peak_boundaries = (4, 10, 0, 5, 11)
+    peak_boundaries = (1, 3, 6, 9)
+    for hour in off_peak_boundaries:
+        moment = datetime(2026, 8, 17, hour, 0, tzinfo=UTC)
+        rate = find_rate(engine, "deepseek", "deepseek-v4-flash", now=moment)
+        assert rate is not None
+        assert rate.rate_period == "off_peak", hour
+    for hour in peak_boundaries:
+        moment = datetime(2026, 8, 17, hour, 0, tzinfo=UTC)
+        rate = find_rate(engine, "deepseek", "deepseek-v4-flash", now=moment)
+        assert rate is not None
+        assert rate.rate_period == "peak", hour
+
+
 def test_embedding_rate_is_seeded_for_shared_key_metering(tmp_path):
     engine = _engine(tmp_path)
     priced = calculate_cost(

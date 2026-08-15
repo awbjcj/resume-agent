@@ -569,6 +569,34 @@ def create_rate(
             if body.context_max_tokens is None
             else LlmRate.context_max_tokens == body.context_max_tokens
         )
+        # A peak row and an off-peak row can legitimately share the same
+        # provider/model/context band/effective window (they're active in
+        # disjoint hours). rate_period is None for every non-DeepSeek rate
+        # today, so both clauses below are a no-op for existing callers.
+        #
+        # Predecessor auto-close only fires for an exact period match: a
+        # flat (None) row spans every hour, so silently closing it because a
+        # narrower "peak" row arrived would strand off-peak calls with no
+        # active rate. Forcing that case through the overlap rejection below
+        # makes the admin close/replace the flat row explicitly instead.
+        predecessor_period_clause = (
+            LlmRate.rate_period.is_(None)
+            if body.rate_period is None
+            else LlmRate.rate_period == body.rate_period
+        )
+        # Overlap rejection is broader than predecessor-matching: a flat row
+        # conflicts with a row of *any* period (it already covers those
+        # hours), and an incoming flat row conflicts with any existing row.
+        # Only two explicit, different periods (peak vs. off_peak) are
+        # disjoint enough to coexist in the same window.
+        overlap_period_clause = (
+            true()
+            if body.rate_period is None
+            else or_(
+                LlmRate.rate_period.is_(None),
+                LlmRate.rate_period == body.rate_period,
+            )
+        )
         predecessor = (
             session.execute(
                 select(LlmRate)
@@ -577,6 +605,7 @@ def create_rate(
                     LlmRate.model == body.model,
                     LlmRate.context_min_tokens == body.context_min_tokens,
                     context_max_clause,
+                    predecessor_period_clause,
                     LlmRate.effective_to.is_(None),
                     LlmRate.effective_from < body.effective_from,
                 )
@@ -602,6 +631,7 @@ def create_rate(
             select(LlmRate.id).where(
                 LlmRate.provider == values["provider"],
                 LlmRate.model == body.model,
+                overlap_period_clause,
                 or_(
                     LlmRate.context_max_tokens.is_(None),
                     LlmRate.context_max_tokens >= body.context_min_tokens,
