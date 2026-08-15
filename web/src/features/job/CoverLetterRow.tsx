@@ -3,11 +3,15 @@ import { CheckCircle2, Download, Eye, FileText, Loader2, RotateCcw, X } from "lu
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { openDownload } from "@/lib/api/client";
+import { ArtifactDeleteButton } from "./ArtifactDeleteButton";
 import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import {
+  useDeleteCoverLetters,
+  useDeselectCoverLetter,
   useReviseCoverLetter,
   useSelectCoverLetter,
 } from "./use-job-mutations";
@@ -33,10 +37,14 @@ export function CoverLetterRow({
   jobId,
   coverLetter,
   appliedId,
+  selected = false,
+  onToggleSelected,
 }: {
   jobId: number;
   coverLetter: CoverLetterItem;
   appliedId: number | null;
+  selected?: boolean;
+  onToggleSelected?: (id: number) => void;
 }) {
   const [instruction, setInstruction] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -47,6 +55,8 @@ export function CoverLetterRow({
   const reviseActive = revision.active;
   const justCreated = revision.justCreated;
   const select = useSelectCoverLetter(jobId);
+  const deselect = useDeselectCoverLetter(jobId);
+  const remove = useDeleteCoverLetters(jobId);
   const applied = appliedId === coverLetter.id;
   const origin = coverLetter.origin ?? "draft";
   const isRevision = origin === "revision";
@@ -58,33 +68,49 @@ export function CoverLetterRow({
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant={isRevision ? "secondary" : "outline"}>
-              {isRevision ? "Revision" : "Draft"}
-            </Badge>
-            {justCreated ? <Badge>Just created</Badge> : null}
-            <Badge variant={coverLetter.factCheckPassed ? "outline" : "destructive"}>
-              {coverLetter.factCheckPassed ? "Fact-check passed" : "Fact-check failed"}
-            </Badge>
-            {coverLetter.parentId && (
-              <span className="text-xs text-muted-foreground">
-                from cover letter #{coverLetter.parentId}
-              </span>
+        <div className="flex min-w-0 items-start gap-3">
+          {onToggleSelected && (
+            <Checkbox
+              className="mt-1"
+              checked={selected}
+              disabled={applied}
+              onCheckedChange={() => onToggleSelected(coverLetter.id)}
+              aria-label={`Select cover letter #${coverLetter.id} for deletion`}
+            />
+          )}
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Badge variant={isRevision ? "secondary" : "outline"}>
+                {isRevision ? "Revision" : "Draft"}
+              </Badge>
+              {justCreated ? <Badge>Just created</Badge> : null}
+              <Badge variant={coverLetter.factCheckPassed ? "outline" : "destructive"}>
+                {coverLetter.factCheckPassed ? "Fact-check passed" : "Fact-check failed"}
+              </Badge>
+              {coverLetter.parentId && (
+                <span className="text-xs text-muted-foreground">
+                  from cover letter #{coverLetter.parentId}
+                </span>
+              )}
+            </div>
+            {coverLetter.instruction && (
+              <p className="max-w-[56rem] text-sm leading-6 text-muted-foreground">
+                {coverLetter.instruction}
+              </p>
             )}
           </div>
-          {coverLetter.instruction && (
-            <p className="max-w-[56rem] text-sm leading-6 text-muted-foreground">
-              {coverLetter.instruction}
-            </p>
-          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* A toggle: clicking an applied letter unselects it, which is also
+              how the user gets past the delete gate below. */}
           <Button
             size="sm"
             variant={applied ? "default" : "outline"}
-            disabled={select.isPending}
-            onClick={() => select.mutate(coverLetter.id)}
+            disabled={select.isPending || deselect.isPending}
+            title={applied ? "Click to unselect" : undefined}
+            onClick={() =>
+              applied ? deselect.mutate() : select.mutate(coverLetter.id)
+            }
           >
             <CheckCircle2 className="size-4" aria-hidden="true" />
             {applied ? "Applied" : "Use for application"}
@@ -118,6 +144,13 @@ export function CoverLetterRow({
               No PDF
             </span>
           )}
+          <ArtifactDeleteButton
+            noun="cover letter"
+            label={isRevision ? "this revision" : "this cover letter"}
+            applied={applied}
+            disabled={remove.isPending || reviseActive}
+            onConfirm={() => remove.mutate([coverLetter.id])}
+          />
           {/* Portalled, so it costs nothing here and cannot be unmounted
               mid-view by `pdfPath` going falsy while the preview is open. */}
           <PdfPreviewDialog

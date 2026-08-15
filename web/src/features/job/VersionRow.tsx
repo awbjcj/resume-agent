@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { openDownload } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
+import { ArtifactDeleteButton } from "./ArtifactDeleteButton";
 import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import {
+  useDeleteVersions,
+  useDeselectResume,
   useRenderVersion,
   useReviseVersion,
   useSelectResume,
@@ -41,10 +44,14 @@ export function VersionRow({
   jobId,
   version,
   appliedVersionId,
+  selected = false,
+  onToggleSelected,
 }: {
   jobId: number;
   version: ResumeVersion;
   appliedVersionId: number | null;
+  selected?: boolean;
+  onToggleSelected?: (id: number) => void;
 }) {
   const [instruction, setInstruction] = useState("");
   const [reReview, setReReview] = useState(false);
@@ -58,6 +65,8 @@ export function VersionRow({
   const reviseActive = revision.active;
   const justCreated = revision.justCreated;
   const select = useSelectResume(jobId);
+  const deselect = useDeselectResume(jobId);
+  const remove = useDeleteVersions(jobId);
   const applied = appliedVersionId === version.id;
   const origin = version.origin ?? "tailor";
   const isRevision = origin === "revision";
@@ -69,36 +78,52 @@ export function VersionRow({
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant={isRevision ? "secondary" : "outline"}>
-              {isRevision ? "Revision" : `Round ${version.round}`}
-            </Badge>
-            {justCreated ? <Badge>Just created</Badge> : null}
-            <span className="text-muted-foreground">Score {version.reviewScore ?? "not scored"}</span>
-            <Badge variant={version.factCheckPassed ? "outline" : "destructive"}>
-              {version.factCheckPassed
-                ? "Fact-lock passed"
-                : failedGateLabel(version.failedGates)}
-            </Badge>
-            {version.parentVersionId && (
-              <span className="text-xs text-muted-foreground">
-                from version #{version.parentVersionId}
-              </span>
+        <div className="flex min-w-0 items-start gap-3">
+          {onToggleSelected && (
+            <Checkbox
+              className="mt-1"
+              checked={selected}
+              disabled={applied}
+              onCheckedChange={() => onToggleSelected(version.id)}
+              aria-label={`Select round ${version.round} for deletion`}
+            />
+          )}
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Badge variant={isRevision ? "secondary" : "outline"}>
+                {isRevision ? "Revision" : `Round ${version.round}`}
+              </Badge>
+              {justCreated ? <Badge>Just created</Badge> : null}
+              <span className="text-muted-foreground">Score {version.reviewScore ?? "not scored"}</span>
+              <Badge variant={version.factCheckPassed ? "outline" : "destructive"}>
+                {version.factCheckPassed
+                  ? "Fact-lock passed"
+                  : failedGateLabel(version.failedGates)}
+              </Badge>
+              {version.parentVersionId && (
+                <span className="text-xs text-muted-foreground">
+                  from version #{version.parentVersionId}
+                </span>
+              )}
+            </div>
+            {version.instruction && (
+              <p className="max-w-[56rem] text-sm leading-6 text-muted-foreground">
+                {version.instruction}
+              </p>
             )}
           </div>
-          {version.instruction && (
-            <p className="max-w-[56rem] text-sm leading-6 text-muted-foreground">
-              {version.instruction}
-            </p>
-          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* A toggle: clicking an applied version unselects it, which is also
+              how the user gets past the delete gate below. */}
           <Button
             size="sm"
             variant={applied ? "default" : "outline"}
-            disabled={select.isPending}
-            onClick={() => select.mutate(version.id)}
+            disabled={select.isPending || deselect.isPending}
+            title={applied ? "Click to unselect" : undefined}
+            onClick={() =>
+              applied ? deselect.mutate() : select.mutate(version.id)
+            }
           >
             <CheckCircle2 className="size-4" aria-hidden="true" />
             {applied ? "Applied" : "Use for application"}
@@ -141,6 +166,13 @@ export function VersionRow({
               Render
             </Button>
           )}
+          <ArtifactDeleteButton
+            noun="version"
+            label={isRevision ? "this revision" : `round ${version.round}`}
+            applied={applied}
+            disabled={remove.isPending || reviseActive}
+            onConfirm={() => remove.mutate([version.id])}
+          />
           {/* Portalled, so it costs nothing here and cannot be unmounted
               mid-view by `pdfPath` going falsy while the preview is open. */}
           <PdfPreviewDialog

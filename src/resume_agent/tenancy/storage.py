@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from resume_agent.tenancy.context import current_context
+
+logger = logging.getLogger(__name__)
 
 
 class TenantPathError(ValueError):
@@ -56,3 +59,27 @@ def resolve_artifact_pdf(pdf_path: str | None) -> Path | None:
     except TenantPathError:
         return None
     return path if path.is_file() else None
+
+
+def delete_artifact_pdf(pdf_path: str | None) -> bool:
+    """Unlink a stored artifact PDF, confined to the tenant's own output root.
+
+    Returns True only when a file was actually removed. Every other outcome --
+    no recorded path, a file already gone, a path that resolves outside the
+    tenant root, an unlinkable file -- is reported as False rather than raised,
+    because the caller is deleting the row that owns this path: letting an
+    unusable path abort that would strand the row permanently, which is the
+    opposite of the guarantee deletion exists to provide.
+    """
+
+    path = resolve_artifact_pdf(pdf_path)
+    if path is None:
+        return False
+    try:
+        path.unlink()
+    except OSError:
+        # Worth a record -- this is the one branch that leaves a real file
+        # behind after its owning row is gone.
+        logger.warning("could not unlink artifact %s", path, exc_info=True)
+        return False
+    return True

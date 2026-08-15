@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 import typer
 from sqlmodel import select
@@ -1345,6 +1345,65 @@ def export_cmd(
             if export_job_artifacts(session, current_job_id, base=output) is not None:
                 count += 1
     typer.echo(f"Exported {count} job folder(s) to {output}/")
+
+
+def _delete_artifacts_cmd(
+    ids: list[int], db_url: str | None, *, kind: Literal["resume", "cover-letter"]
+) -> None:
+    """Shared body for the two delete commands: same rules, different noun."""
+    from resume_agent.services.board import (
+        delete_cover_letters,
+        delete_resume_versions,
+    )
+
+    noun = "Resume version" if kind == "resume" else "Cover letter"
+    delete = delete_resume_versions if kind == "resume" else delete_cover_letters
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        result = delete(session, ids)
+
+    if result.missing_ids:
+        typer.echo(f"{noun}(s) not found: {_id_list(result.missing_ids)}")
+        raise typer.Exit(code=1)
+    if result.blocked_ids:
+        # Named rather than skipped: silently deleting the rest would leave the
+        # caller believing the whole batch is gone.
+        typer.echo(
+            f"{noun}(s) selected for an application: {_id_list(result.blocked_ids)}\n"
+            "Nothing was deleted. Unselect them first, then retry."
+        )
+        raise typer.Exit(code=1)
+    typer.echo(f"Deleted {result.deleted} {kind}(s).")
+
+
+def _id_list(ids: tuple[int, ...]) -> str:
+    return ", ".join(f"#{value}" for value in ids)
+
+
+@app.command("delete-resume-versions")
+def delete_resume_versions_cmd(
+    version_ids: list[int] = typer.Argument(..., help="resume_versions.id to delete."),
+    db_url: str | None = typer.Option(
+        None, "--db-url", help="Override the database URL."
+    ),
+) -> None:
+    """Delete unneeded resume versions and their rendered PDFs.
+
+    All-or-nothing: refuses the whole batch if any id is unknown or is the
+    version selected for its job's application.
+    """
+    _delete_artifacts_cmd(version_ids, db_url, kind="resume")
+
+
+@app.command("delete-cover-letters")
+def delete_cover_letters_cmd(
+    cover_letter_ids: list[int] = typer.Argument(..., help="cover_letters.id to delete."),
+    db_url: str | None = typer.Option(
+        None, "--db-url", help="Override the database URL."
+    ),
+) -> None:
+    """Delete unneeded cover letters and their rendered PDFs."""
+    _delete_artifacts_cmd(cover_letter_ids, db_url, kind="cover-letter")
 
 
 @app.command("setup")

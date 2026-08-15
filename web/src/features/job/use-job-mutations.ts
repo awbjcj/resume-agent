@@ -121,6 +121,95 @@ export function useSelectResume(jobId: number) {
   });
 }
 
+/**
+ * Clearing the application's resume selection. This is not merely the inverse
+ * of selecting: it is the only way past the delete gate, since the API refuses
+ * to delete a version an application still points at.
+ */
+export function useDeselectResume(jobId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.DELETE("/api/jobs/{job_id}/select-resume", {
+          params: { path: { job_id: jobId } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
+    onError: () => toast.error("Failed to unselect"),
+  });
+}
+
+export function useDeselectCoverLetter(jobId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.DELETE("/api/jobs/{job_id}/select-cover-letter", {
+          params: { path: { job_id: jobId } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
+    onError: () => toast.error("Failed to unselect"),
+  });
+}
+
+/**
+ * Deleting artifacts invalidates the boards, not just the job: a row's
+ * reported version count and rendered state are read straight off these
+ * tables, so a board left uninvalidated would keep showing artifacts that no
+ * longer exist.
+ *
+ * The error toast carries the server's own message rather than a generic one,
+ * because the two failure modes need different fixes from the user: an id
+ * that is gone (reload) versus one that is in use (unselect it first).
+ */
+function useDeleteArtifacts<TVars>(
+  jobId: number,
+  mutationFn: (vars: TVars) => Promise<unknown>,
+  successMessage: (vars: TVars) => string,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: (_data, vars) => {
+      invalidateBoards(qc, jobId);
+      toast.success(successMessage(vars));
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useDeleteVersions(jobId: number) {
+  return useDeleteArtifacts(
+    jobId,
+    (ids: number[]) =>
+      ids.length === 1
+        ? unwrap(
+            api.DELETE("/api/resume-versions/{version_id}", {
+              params: { path: { version_id: ids[0] } },
+            }),
+          )
+        : unwrap(api.POST("/api/resume-versions/bulk-delete", { body: { ids } })),
+    (ids) => `Deleted ${ids.length} version${ids.length === 1 ? "" : "s"}`,
+  );
+}
+
+export function useDeleteCoverLetters(jobId: number) {
+  return useDeleteArtifacts(
+    jobId,
+    (ids: number[]) =>
+      ids.length === 1
+        ? unwrap(
+            api.DELETE("/api/cover-letters/{cover_letter_id}", {
+              params: { path: { cover_letter_id: ids[0] } },
+            }),
+          )
+        : unwrap(api.POST("/api/cover-letters/bulk-delete", { body: { ids } })),
+    (ids) => `Deleted ${ids.length} cover letter${ids.length === 1 ? "" : "s"}`,
+  );
+}
+
 export function useGenerateCoverLetter(jobId: number) {
   const { launch } = useLaunchRun();
   return useMutation({

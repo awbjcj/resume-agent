@@ -39,6 +39,7 @@ from resume_agent.tracking.queries import (
 from resume_agent.tracking.repository import (
     application_for_job,
     archive_job,
+    delete_artifact_rows,
     delete_job,
     delete_job_row,
     get_cover_letter,
@@ -51,7 +52,14 @@ from resume_agent.tracking.repository import (
     save_job,
     update_application_status,
 )
-from resume_agent.tracking.tables import Application, Job, JobStatus, utcnow
+from resume_agent.tracking.tables import (
+    Application,
+    CoverLetter,
+    Job,
+    JobStatus,
+    ResumeVersion,
+    utcnow,
+)
 
 _DISCOVERY_STAGE_STATUSES = {
     JobStatus.filtered.value,
@@ -382,3 +390,101 @@ def select_cover_letter(
     application = application_for_job(session, job_id) or Application(job_id=job_id)
     application.cover_letter_id = cover_letter_id
     return save_application(session, application)
+
+
+def _deselect(session: Session, job_id: int, field: str) -> Application | None:
+    """Clear one artifact pointer, leaving the rest of the application alone.
+
+    Returns None when there is nothing to clear -- no such job, or no
+    application row, meaning nothing was ever selected. An application is never
+    created here: deselecting is the reverse of selecting, not a way to start
+    tracking a job.
+    """
+
+    application = application_for_job(session, job_id)
+    if application is None:
+        return None
+    setattr(application, field, None)
+    return save_application(session, application)
+
+
+def deselect_resume_version(session: Session, job_id: int) -> Application | None:
+    return _deselect(session, job_id, "resume_version_id")
+
+
+def deselect_cover_letter(session: Session, job_id: int) -> Application | None:
+    return _deselect(session, job_id, "cover_letter_id")
+
+
+# --- artifact deletion ---------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ArtifactDeleteResult:
+    """Outcome of one delete request, which is all-or-nothing.
+
+    ``deleted`` is non-zero only when both id tuples are empty. Reporting the
+    offending ids rather than a bare failure is what lets the API name them:
+    "this one is in use" and "this one is already gone" need different fixes
+    from whoever asked.
+    """
+
+    deleted: int
+    blocked_ids: tuple[int, ...] = ()
+    missing_ids: tuple[int, ...] = ()
+
+
+def _delete_artifacts(
+    session: Session,
+    model: type[ResumeVersion] | type[CoverLetter],
+    selected_column: Any,
+    ids: Sequence[int],
+) -> ArtifactDeleteResult:
+    # Deliberately all-or-nothing. A partial success would leave the caller
+    # unable to say what survived without re-reading, and the UI already
+    # disables the applied row's checkbox -- so a blocked id here means the
+    # client's view was stale, which is worth surfacing rather than papering
+    # over by deleting the rest.
+    requested = tuple(dict.fromkeys(ids))
+    if not requested:
+        return ArtifactDeleteResult(0)
+
+    id_column = cast(Any, model.id)
+    found = {
+        cast(int, row.id): row
+        for row in session.exec(select(model).where(id_column.in_(requested))).all()
+    }
+    missing = tuple(artifact_id for artifact_id in requested if artifact_id not in found)
+    selected: set[int] = set()
+    if found:
+        selected = set(
+            session.exec(
+                select(selected_column).where(selected_column.in_(found))
+            ).all()
+        )
+    blocked = tuple(artifact_id for artifact_id in requested if artifact_id in selected)
+    if missing or blocked:
+        return ArtifactDeleteResult(0, blocked, missing)
+
+    rows = list(found.values())
+    if model is ResumeVersion:
+        delete_artifact_rows(session, versions=cast(Any, rows))
+    else:
+        delete_artifact_rows(session, cover_letters=cast(Any, rows))
+    return ArtifactDeleteResult(len(rows))
+
+
+def delete_resume_versions(
+    session: Session, ids: Sequence[int]
+) -> ArtifactDeleteResult:
+    """Delete resume versions not selected for their job's application."""
+    return _delete_artifacts(
+        session, ResumeVersion, cast(Any, Application.resume_version_id), ids
+    )
+
+
+def delete_cover_letters(session: Session, ids: Sequence[int]) -> ArtifactDeleteResult:
+    """Delete cover letters not selected for their job's application."""
+    return _delete_artifacts(
+        session, CoverLetter, cast(Any, Application.cover_letter_id), ids
+    )

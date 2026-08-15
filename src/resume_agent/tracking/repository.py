@@ -18,6 +18,7 @@ from resume_agent.tracking.prune import (
     prune_reason_counts,
     prune_skipped,
 )
+from resume_agent.tenancy.storage import delete_artifact_pdf
 from resume_agent.tracking.prune_config import PruneConfig
 from resume_agent.tracking.tables import (
     Application,
@@ -402,6 +403,51 @@ def delete_job_row(session: Session, job: Job, *, commit: bool = True) -> None:
         for child in session.exec(select(model).where(model.job_id == job.id)).all():
             session.delete(child)
     session.delete(job)
+    if commit:
+        session.commit()
+
+
+def delete_artifact_rows(
+    session: Session,
+    *,
+    versions: Collection[ResumeVersion] = (),
+    cover_letters: Collection[CoverLetter] = (),
+    commit: bool = True,
+) -> None:
+    """Delete resume versions and cover letters, orphaning whatever points at them.
+
+    Unguarded: callers must have already applied the applied-artifact gate.
+
+    Deletion never cascades. A revision descended from a deleted version, and a
+    cover letter drafted from one, are independent artifacts the user may still
+    want, so their pointer is cleared instead of following the delete. Nothing
+    does this for us -- the schema declares these as foreign keys but SQLite
+    here runs without ``PRAGMA foreign_keys``, so a dangling id would simply
+    persist and later resolve to nothing.
+    """
+
+    version_ids = {version.id for version in versions if version.id is not None}
+    letter_ids = {letter.id for letter in cover_letters if letter.id is not None}
+
+    def _orphan(model: type[Any], column: Any, targets: set[int]) -> None:
+        if not targets:
+            return
+        for row in session.exec(select(model).where(column.in_(targets))).all():
+            setattr(row, column.key, None)
+            session.add(row)
+
+    # The Application pointers are cleared here as well as gated above: this
+    # primitive must not be able to leave an application citing a version that
+    # no longer exists, whichever caller reaches it.
+    _orphan(Application, cast(Any, Application.resume_version_id), version_ids)
+    _orphan(CoverLetter, cast(Any, CoverLetter.resume_version_id), version_ids)
+    _orphan(ResumeVersion, cast(Any, ResumeVersion.parent_version_id), version_ids)
+    _orphan(Application, cast(Any, Application.cover_letter_id), letter_ids)
+    _orphan(CoverLetter, cast(Any, CoverLetter.parent_id), letter_ids)
+
+    for row in (*versions, *cover_letters):
+        delete_artifact_pdf(row.pdf_path)
+        session.delete(row)
     if commit:
         session.commit()
 

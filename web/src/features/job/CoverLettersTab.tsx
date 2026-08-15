@@ -1,11 +1,14 @@
+import { useMemo } from "react";
 import { FilePlus2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ACTIVE_RUN_STATUSES, latestJobRun, useArtifactRunIndex } from "./artifact-runs";
+import { ArtifactSelectionBar } from "./ArtifactSelectionBar";
 import { CoverLetterRow, type CoverLetterItem } from "./CoverLetterRow";
 import { RevisionRunPlaceholders } from "./RevisionRunPlaceholders";
-import { useGenerateCoverLetter } from "./use-job-mutations";
+import { useArtifactSelection } from "./use-artifact-selection";
+import { useDeleteCoverLetters, useGenerateCoverLetter } from "./use-job-mutations";
 
 export function CoverLettersTab({
   jobId,
@@ -17,6 +20,13 @@ export function CoverLettersTab({
   appliedId: number | null;
 }) {
   const generate = useGenerateCoverLetter(jobId);
+  // The applied letter is not deletable, so it is not selectable either.
+  const deletableIds = useMemo(
+    () => coverLetters.map((c) => c.id).filter((id) => id !== appliedId),
+    [coverLetters, appliedId],
+  );
+  const selection = useArtifactSelection(deletableIds);
+  const remove = useDeleteCoverLetters(jobId);
   const runIndex = useArtifactRunIndex();
   const generateRun = latestJobRun(runIndex, "coverLetter", jobId);
   // `generating` is the run-store truth; `isPending` is the brief window before
@@ -36,6 +46,18 @@ export function CoverLettersTab({
 
   return (
     <>
+      {deletableIds.length > 0 && (
+        <ArtifactSelectionBar
+          noun="cover letter"
+          selectedCount={selection.selectedIds.length}
+          allSelected={selection.allSelected}
+          onToggleAll={selection.toggleAll}
+          disabled={remove.isPending}
+          onDelete={() =>
+            remove.mutate(selection.selectedIds, { onSuccess: selection.clear })
+          }
+        />
+      )}
       <ul className="mt-2 space-y-2">
         {empty && !generating ? (
           <li className="rounded-xl border border-dashed bg-muted/20 p-6 text-center">
@@ -60,6 +82,8 @@ export function CoverLettersTab({
             jobId={jobId}
             coverLetter={coverLetter}
             appliedId={appliedId}
+            selected={selection.isSelected(coverLetter.id)}
+            onToggleSelected={selection.toggle}
           />
         ))}
         <RevisionRunPlaceholders

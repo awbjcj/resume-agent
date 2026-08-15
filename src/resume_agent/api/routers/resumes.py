@@ -4,22 +4,29 @@ from __future__ import annotations
 
 from typing import cast
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
+from resume_agent.api.artifacts import raise_for_delete_result
 from resume_agent.api.deps import get_config_store, get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.config import ReviewConfigDoc
 from resume_agent.api.schemas.evidence_portfolio import EvidencePortfolioOut
 from resume_agent.api.schemas.jobs import (
     ApplicationOut,
+    ArtifactDeleteOut,
+    ArtifactDeleteRequest,
     ResumeVersionOut,
 )
 from resume_agent.render.export import resume_download_name
 from resume_agent.models.evidence_portfolio import EvidencePortfolio
 from resume_agent.models.resume import ResumeContent
-from resume_agent.services.board import select_resume_version
+from resume_agent.services.board import (
+    delete_resume_versions,
+    deselect_resume_version,
+    select_resume_version,
+)
 from resume_agent.services.rendering import render_resume_version
 from resume_agent.tenancy.storage import resolve_artifact_pdf
 from resume_agent.tracking.repository import get_job, get_resume_version
@@ -152,3 +159,31 @@ def select_resume_endpoint(
     if application is None:
         raise ApiException(404, "NOT_FOUND", "Job or resume version not found")
     return ApplicationOut.model_validate(application)
+
+
+@router.delete("/jobs/{job_id}/select-resume", response_model=ApplicationOut)
+def deselect_resume_endpoint(job_id: int, session: Session = Depends(get_session)):
+    """Clear the application's resume selection -- the way past the delete gate."""
+    application = deselect_resume_version(session, job_id)
+    if application is None:
+        raise ApiException(404, "NOT_FOUND", "No application for this job")
+    return ApplicationOut.model_validate(application)
+
+
+@router.delete("/resume-versions/{version_id}", status_code=204)
+def delete_resume_version_endpoint(
+    version_id: int, session: Session = Depends(get_session)
+) -> Response:
+    raise_for_delete_result(
+        delete_resume_versions(session, [version_id]), noun="Resume version"
+    )
+    return Response(status_code=204)
+
+
+@router.post("/resume-versions/bulk-delete", response_model=ArtifactDeleteOut)
+def bulk_delete_resume_versions_endpoint(
+    body: ArtifactDeleteRequest, session: Session = Depends(get_session)
+) -> ArtifactDeleteOut:
+    result = delete_resume_versions(session, body.ids)
+    raise_for_delete_result(result, noun="Resume version")
+    return ArtifactDeleteOut(deleted=result.deleted)

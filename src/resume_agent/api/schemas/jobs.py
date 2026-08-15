@@ -169,6 +169,15 @@ class CoverLetterOut(CamelModel):
     created_at: datetime
 
 
+class ArtifactDeleteRequest(CamelModel):
+    # At least one id: an empty batch is a client bug, not a no-op delete.
+    ids: list[int] = Field(min_length=1)
+
+
+class ArtifactDeleteOut(CamelModel):
+    deleted: int
+
+
 class H1BPeriodStatOut(CamelModel):
     period: str
     filing_count: int | None = None

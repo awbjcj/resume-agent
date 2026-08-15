@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
+from resume_agent.api.artifacts import raise_for_delete_result
 from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.jobs import ApplicationOut
+from resume_agent.api.schemas.jobs import (
+    ApplicationOut,
+    ArtifactDeleteOut,
+    ArtifactDeleteRequest,
+)
 from resume_agent.render.export import cover_letter_download_name
-from resume_agent.services.board import select_cover_letter
+from resume_agent.services.board import (
+    delete_cover_letters,
+    deselect_cover_letter,
+    select_cover_letter,
+)
 from resume_agent.tenancy.storage import resolve_artifact_pdf
 from resume_agent.tracking.repository import get_cover_letter, get_job
 
@@ -27,6 +36,36 @@ def select_cover_letter_endpoint(
     if application is None:
         raise ApiException(404, "NOT_FOUND", "Job or cover letter not found")
     return ApplicationOut.model_validate(application)
+
+
+@router.delete("/jobs/{job_id}/select-cover-letter", response_model=ApplicationOut)
+def deselect_cover_letter_endpoint(
+    job_id: int, session: Session = Depends(get_session)
+):
+    """Clear the application's cover-letter selection -- the way past the gate."""
+    application = deselect_cover_letter(session, job_id)
+    if application is None:
+        raise ApiException(404, "NOT_FOUND", "No application for this job")
+    return ApplicationOut.model_validate(application)
+
+
+@router.delete("/cover-letters/{cover_letter_id}", status_code=204)
+def delete_cover_letter_endpoint(
+    cover_letter_id: int, session: Session = Depends(get_session)
+) -> Response:
+    raise_for_delete_result(
+        delete_cover_letters(session, [cover_letter_id]), noun="Cover letter"
+    )
+    return Response(status_code=204)
+
+
+@router.post("/cover-letters/bulk-delete", response_model=ArtifactDeleteOut)
+def bulk_delete_cover_letters_endpoint(
+    body: ArtifactDeleteRequest, session: Session = Depends(get_session)
+) -> ArtifactDeleteOut:
+    result = delete_cover_letters(session, body.ids)
+    raise_for_delete_result(result, noun="Cover letter")
+    return ArtifactDeleteOut(deleted=result.deleted)
 
 
 @link_router.get("/cover-letters/{cover_letter_id}/pdf")

@@ -20,8 +20,7 @@ import { H1BSponsorshipPanel } from "@/features/job/H1BSponsorshipPanel";
 import { TrackingTab } from "@/features/job/TrackingTab";
 import { InterviewTab } from "@/features/interview/InterviewTab";
 import { CareerLabTab } from "@/features/career-lab/CareerLabTab";
-import { VersionRow } from "@/features/job/VersionRow";
-import { RevisionRunPlaceholders } from "@/features/job/RevisionRunPlaceholders";
+import { ResumeVersionsTab } from "@/features/job/ResumeVersionsTab";
 import { useJobDetail } from "@/features/job/use-job-detail";
 import { JdBody } from "./JdBody";
 import { locationLabel } from "@/lib/format";
@@ -283,17 +282,11 @@ export function JobModal({
                       No tailored resume yet. Use Redo to create the first version.
                     </p>
                   )}
-                  <ul className="mt-4 space-y-3">
-                    {job.resumeVersions.map((v) => (
-                      <VersionRow
-                        key={v.id}
-                        jobId={jobId}
-                        version={v}
-                        appliedVersionId={closedLoopJob?.application?.resumeVersionId ?? null}
-                      />
-                    ))}
-                    <RevisionRunPlaceholders jobId={jobId} kind="revise" label="Resume revision" />
-                  </ul>
+                  <ResumeVersionsTab
+                    jobId={jobId}
+                    versions={job.resumeVersions}
+                    appliedVersionId={closedLoopJob?.application?.resumeVersionId ?? null}
+                  />
                 </TabsContent>
 
                 <TabsContent value="sponsorship" className="mx-auto mt-0 max-w-6xl">
