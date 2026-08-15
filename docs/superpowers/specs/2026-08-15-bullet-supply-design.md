@@ -144,9 +144,9 @@ silent and safe.
 ### 2. Deterministic agenda seeding
 
 `profile/depth.py` gains `depth_topics(facts, target) -> list[CoachTopic]`,
-built from Spec A's `owner_depth()`. One topic per below-target owner, in
-`evidence_owners` order (resume order, current role first), truncated to
-`AGENDA_CAP` (12, `coach.py:38`):
+built from Spec A's `owner_depth()`. One topic per below-target owner **that
+already holds at least one bullet**, in `evidence_owners` order (resume order,
+current role first), truncated to `AGENDA_CAP` (12, `coach.py:38`):
 
 ```
 id:             t1
@@ -168,11 +168,22 @@ agenda is empty from *both* sources, which means the profile has no gaps and
 the model found nothing to add — a legitimate "nothing to work on" state rather
 than a malformed turn. The message changes accordingly.
 
+**The zero-bullet exclusion is load-bearing, not a tidiness rule.** Measured on
+the live profile, seeding every below-target owner produces **19 topics against
+a cap of 12**. Experiences sort first, so the five roles take slots 1-5 and
+projects take 6-12 — including `h1b-job-search-mcp` and
+`LogAnalysisTool_EnumVer` at zero highlights each, with `personal-website`,
+`bao-birthday`, and `Resume-latex` queued behind them, while the model receives
+**no slots at all**. An owner with zero bullets is not a thin entry; it is not
+yet a profile entry, and the decision it needs is whether it belongs on a
+resume — not a depth interview. Excluding them yields 5 experiences plus 5
+projects, leaving 2 slots for the model.
+
 `AGENDA_CAP` applies to the **combined** list, and seeded topics take
 precedence: seeding truncates to the cap first, then the model's proposals fill
-whatever remains. A profile with 12 or more below-target owners therefore
-leaves the model no room to add any — which is correct, because a profile that
-thin has nothing more urgent to discuss than its own gaps.
+whatever remains. A profile with 12 or more eligible below-target owners
+therefore leaves the model no room to add any — which is correct, because a
+profile that thin has nothing more urgent to discuss than its own gaps.
 
 Only seeded topics carry `owner_id`. Model-added topics do not, and their notes
 stay unanchored.
@@ -256,6 +267,9 @@ Offline, with faked agents and no network, per the project's test contract.
 
 - `depth_topics` seeds one topic per below-target owner, in resume order,
   capped at `AGENDA_CAP`; a profile with no gaps seeds nothing.
+- **An owner holding zero bullets never seeds a topic**, even though it is
+  furthest below target. On the live profile this is the difference between 10
+  seeded topics and 19 against a cap of 12.
 - A seeded topic carries `owner_id`; a model-added topic does not.
 - `approve_draft` on a seeded topic writes a manifest doc with
   `mode="synthesis"` and `anchor=<owner_id>`; on an unseeded topic it writes
