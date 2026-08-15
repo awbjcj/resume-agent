@@ -83,6 +83,95 @@ def test_quota_console_manages_tiers_accounts_and_audited_operations(mu_app, mu_
     )
 
 
+def test_bulk_operation_targets_tiers_and_canonicalizes_all_members(mu_app, mu_client):
+    alice = _member(mu_app, "alice")
+    bob = _member(mu_app, "bob")
+    assert _login(mu_client).status_code == 200
+
+    moved = mu_client.patch(
+        f"/api/admin/quota-accounts/{alice}",
+        json={"tierId": "SUBSCRIBER", "reason": "paid plan activated"},
+    )
+    assert moved.status_code == 200
+
+    tier_preview = mu_client.post(
+        "/api/admin/quota-operation-previews",
+        json={
+            "targetType": "TIER",
+            "targetValue": "SUBSCRIBER",
+            "actionType": "GRANT_CREDIT",
+            "amountMicros": 100_000,
+        },
+    )
+    assert tier_preview.status_code == 201, tier_preview.text
+    assert tier_preview.json()["targetValue"] == "SUBSCRIBER"
+    assert tier_preview.json()["affectedCount"] == 1
+
+    tier_commit = mu_client.post(
+        "/api/admin/quota-operations",
+        json={
+            "previewId": tier_preview.json()["id"],
+            "reason": "subscriber recovery credit",
+            "idempotencyKey": "subscriber-recovery-2026",
+        },
+    )
+    assert tier_commit.status_code == 201
+    assert (
+        mu_client.get(f"/api/admin/quota-accounts/{alice}").json()[
+            "creditBalanceMicros"
+        ]
+        == 100_000
+    )
+
+    all_preview = mu_client.post(
+        "/api/admin/quota-operation-previews",
+        json={
+            "targetType": "ALL_MEMBERS",
+            # This mimics a client that switched scopes after selecting a tier.
+            # The server must make the all-member scope unambiguous.
+            "targetValue": "SUBSCRIBER",
+            "actionType": "GRANT_CREDIT",
+            "amountMicros": 25_000,
+        },
+    )
+    assert all_preview.status_code == 201, all_preview.text
+    assert all_preview.json()["targetValue"] is None
+    assert all_preview.json()["affectedCount"] == 2
+
+    all_commit = mu_client.post(
+        "/api/admin/quota-operations",
+        json={
+            "previewId": all_preview.json()["id"],
+            "reason": "platform-wide recovery credit",
+            "idempotencyKey": "all-member-recovery-2026",
+        },
+    )
+    assert all_commit.status_code == 201
+    assert (
+        mu_client.get(f"/api/admin/quota-accounts/{alice}").json()[
+            "creditBalanceMicros"
+        ]
+        == 125_000
+    )
+    assert (
+        mu_client.get(f"/api/admin/quota-accounts/{bob}").json()[
+            "creditBalanceMicros"
+        ]
+        == 25_000
+    )
+
+    missing_tier = mu_client.post(
+        "/api/admin/quota-operation-previews",
+        json={
+            "targetType": "TIER",
+            "actionType": "GRANT_CREDIT",
+            "amountMicros": 25_000,
+        },
+    )
+    assert missing_tier.status_code == 422
+    assert missing_tier.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_member_usage_exposes_cost_quota_and_separate_token_totals(mu_app, mu_client):
     _member(mu_app)
     assert _login(mu_client, "alice", "member-password").status_code == 200

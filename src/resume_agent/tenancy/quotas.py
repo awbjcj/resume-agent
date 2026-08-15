@@ -456,17 +456,34 @@ def create_operation_preview(
         amount_micros is None or amount_micros <= 0
     ):
         raise ValueError("credit operations require a positive amount")
+
+    # A tier is an account attribute, so initialize member accounts before
+    # resolving a tier target. Without this, a valid tier could silently freeze
+    # an empty set until another endpoint happened to initialize the accounts.
+    with Session(engine) as session:
+        member_ids = list(
+            session.execute(
+                select(User.id).where(User.role != "admin").order_by(User.id)
+            ).scalars()
+        )
+    for user_id in member_ids:
+        ensure_quota_account(engine, user_id)
+
     with Session(engine) as session:
         query = select(User.id).where(User.role != "admin")
         if target_type == "USER":
             query = query.where(User.id == target_value)
         elif target_type == "TIER":
+            if session.get(QuotaTier, target_value) is None:
+                raise ValueError("target tier does not exist")
             query = query.join(QuotaAccount, QuotaAccount.user_id == User.id).where(
                 QuotaAccount.tier_id == target_value
             )
         user_ids = list(session.execute(query.order_by(User.id)).scalars())
         if target_type == "USER" and not user_ids:
             raise ValueError("target user is not a member")
+        if target_type == "TIER" and not user_ids:
+            raise ValueError("target tier has no members")
         preview = QuotaOperationPreview(
             id=uuid.uuid4().hex,
             created_by=actor_user_id,

@@ -40,6 +40,23 @@ def _envelope(code: str, message: str, details: Any | None = None) -> dict:
     ).model_dump(by_alias=True)
 
 
+def _validation_details(exc: RequestValidationError) -> list[dict[str, Any]]:
+    """Return Pydantic validation details that JSONResponse can always encode."""
+    details: list[dict[str, Any]] = []
+    for error in exc.errors():
+        context = error.get("ctx")
+        if context:
+            error = {
+                **error,
+                "ctx": {
+                    key: str(value) if isinstance(value, BaseException) else value
+                    for key, value in context.items()
+                },
+            }
+        details.append(error)
+    return details
+
+
 def install_error_handlers(app: FastAPI) -> None:
     from resume_agent.tenancy.limits import CostRateUnavailableError
     from resume_agent.tenancy.quotas import (
@@ -73,7 +90,7 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=422,
             content=_envelope(
-                "VALIDATION_ERROR", "Request validation failed", exc.errors()
+                "VALIDATION_ERROR", "Request validation failed", _validation_details(exc)
             ),
         )
 

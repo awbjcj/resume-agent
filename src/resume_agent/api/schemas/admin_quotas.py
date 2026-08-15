@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import Field, field_serializer, field_validator
+from pydantic import Field, field_serializer, field_validator, model_validator
 
 from resume_agent.api.schemas.base import CamelModel, Page
 
@@ -114,6 +114,22 @@ class QuotaOperationPreviewCreate(CamelModel):
     target_value: str | None = None
     action_type: Literal["RESET_CURRENT_PERIOD", "GRANT_CREDIT", "DEBIT_CREDIT"]
     amount_micros: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def normalize_target(self) -> "QuotaOperationPreviewCreate":
+        """Make a preview target explicit before it reaches quota business logic."""
+        if self.target_type == "ALL_MEMBERS":
+            # A stale value from a client-side scope switch must never be
+            # recorded as though it narrowed an all-member operation.
+            self.target_value = None
+            return self
+
+        target = (self.target_value or "").strip()
+        if not target:
+            label = "member" if self.target_type == "USER" else "tier"
+            raise ValueError(f"a {label} target is required")
+        self.target_value = target
+        return self
 
 
 class QuotaOperationPreviewOut(UtcCamelModel):
