@@ -15,12 +15,14 @@ def test_known_model_capabilities_are_model_gated():
     assert provider_capabilities("openai:gpt-5.6").supports_reasoning is True
     assert provider_capabilities("openai:gpt-4o").supports_reasoning is False
     assert provider_capabilities("gemini:gemini-3.5-flash").supports_reasoning is True
-    assert provider_capabilities("deepseek:deepseek-reasoner") == ProviderCapabilities(
+    # Citations stay False even though DeepSeek now has native web search: it
+    # runs the search server-side but returns no `url_citation` annotations.
+    assert provider_capabilities("deepseek:deepseek-v4-pro") == ProviderCapabilities(
         supports_reasoning=True,
         supports_native_citations=False,
         supports_prompt_cache=True,
     )
-    assert provider_capabilities("deepseek:deepseek-chat").supports_reasoning is False
+    assert provider_capabilities("deepseek:deepseek-v3").supports_reasoning is False
 
 
 def test_unknown_or_empty_model_is_conservative():

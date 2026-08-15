@@ -1,16 +1,23 @@
 """Regression guard: structured-output agents pick the right output mode per provider.
 
-OpenAI-compatible providers such as DeepSeek expose no native/json_schema
-structured outputs (``supports_native_structured_outputs = False``), so an
-``output_schema`` is honoured only when the agent runs with
-``use_json_mode=True``. Without it, DeepSeek intermittently returns prose that
-agno cannot parse, falls back to the raw ``str``, and the pipeline raises
-``TypeError: Expected <Schema> from agent, got str``.
+Every supported provider now exposes native/json_schema structured outputs, so
+JSON mode is reserved for the one case that still needs it: a Claude schema that
+exceeds Anthropic's grammar limits.
 
-Providers that support native structured outputs keep them unless a schema
-exceeds a provider grammar limit. Builders derive the flag from the model and
-the output schema via ``use_json_mode_for``; these tests pin both the helper's
-contract and that the builders thread it through.
+DeepSeek used to be the exception. On Chat Completions it advertised
+``supports_native_structured_outputs = False``, so an ``output_schema`` was sent
+as ``response_format={"type": "json_object"}`` -- which constrains "the output
+must be JSON" but NOT "one well-formed, schema-conforming document and nothing
+else". Live failures showed all three ways that leaks: malformed JSON, a second
+document, and a literal ``<|DSML|>tool_calls`` block written into the content
+channel instead of the tool channel. agno's parsers then left ``content`` a raw
+``str`` and the pipeline raised ``Expected <Schema> from agent, got str``. On the
+Responses API the schema rides ``text.format``, so DeepSeek keeps native
+structured outputs like everyone else.
+
+Builders derive the flag from the model and the output schema via
+``use_json_mode_for``; these tests pin both the helper's contract and that the
+builders thread it through.
 
 Model construction here is offline: no network call is made, and a missing API
 key resolves to ``None`` without error.
@@ -30,10 +37,11 @@ from resume_agent.llm_runner import AgentRunner, build_model, use_json_mode_for
 from resume_agent.profile.extractor import build_extractor_agent
 from resume_agent.tailor.agents import build_reviewer_agent, build_tailor_agent
 
-# (model_id, expected use_json_mode): DeepSeek needs JSON mode; the others keep
-# native structured outputs.
+# (model_id, expected use_json_mode): every provider keeps native structured
+# outputs. JSON mode now has exactly one trigger, covered separately below:
+# a Claude schema too large for Anthropic's grammar compiler.
 _CASES = [
-    pytest.param("deepseek:deepseek-chat", True, id="deepseek-json-mode"),
+    pytest.param("deepseek:deepseek-v4-flash", False, id="deepseek-native"),
     pytest.param("claude-haiku-4-5-20251001", False, id="anthropic-native"),
     pytest.param("openai:gpt-4o-mini", False, id="openai-native"),
 ]

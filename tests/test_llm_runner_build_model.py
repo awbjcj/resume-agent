@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 from typing import cast
 
-from openai.types.responses import Response
+from agno.models.message import Message
+from openai.types.responses import Response, ResponseStreamEvent
 import pytest
 from pydantic import BaseModel
 
@@ -25,9 +26,8 @@ def test_reasoning_parameters_are_attached_for_capable_models():
     gemini = build_model("gemini:gemini-3.5-flash", api_key="k", reasoning=True)
     assert gemini.thinking_level == "high"
 
-    deepseek = build_model("deepseek:deepseek-reasoner", api_key="k", reasoning=True)
-    assert deepseek.use_thinking is True
-    assert deepseek.reasoning_effort == "max"
+    deepseek = build_model("deepseek:deepseek-v4-pro", api_key="k", reasoning=True)
+    assert deepseek.reasoning == {"effort": "max"}
 
 
 def test_builder_refuses_reasoning_for_incapable_model():
@@ -73,19 +73,74 @@ def test_openai_asks_for_a_reasoning_summary_whenever_it_sends_a_reasoning_confi
 
 
 def test_non_reasoning_deepseek_disables_thinking_rather_than_omitting_it():
-    # Third instance of the "unset means provider decides" trap, after Gemini and
-    # Anthropic. agno 2.8.2 reads use_thinking=None as the provider default, and
-    # that default is ON for every deepseek-v4-* id -- so leaving it unset bought
-    # thinking on every non-reasoning agent. Measured on the live coach turn: 7,779
-    # characters of reasoning, streamed as 1,846 one-word deltas.
+    # Fourth instance of the "unset means provider decides" trap, after Gemini,
+    # Anthropic and OpenAI. Verified live: omitting `reasoning` entirely on
+    # deepseek-v4-flash spent 46 reasoning tokens and emitted a reasoning output
+    # item, so an unset config bought thinking on every non-reasoning agent.
     #
-    # Unlike Gemini 3 (which 400s on thinking_budget), an explicit disabled flag is
-    # verified accepted on deepseek-chat, -v4-flash and -v4-pro alike, so one
-    # uniform rule is safe -- no generation gate needed.
-    for model_id in ("deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash", "deepseek:deepseek-chat"):
+    # On the Responses API `reasoning.effort` is BOTH the toggle and the dial --
+    # `none` disables thinking outright (verified: zero reasoning tokens, no
+    # reasoning output item) -- so the Chat Completions
+    # `extra_body={"thinking": {"type": "disabled"}}` side-channel is gone.
+    for model_id in ("deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash"):
         model = build_model(model_id, api_key="k")
-        assert model.use_thinking is False, model_id
-        assert model.get_request_params()["extra_body"]["thinking"] == {"type": "disabled"}
+        assert model.reasoning == {"effort": "none"}, model_id
+        assert model.get_request_params()["reasoning"] == {
+            "effort": "none",
+            "summary": "auto",
+        }, model_id
+
+
+def test_deepseek_rides_the_responses_api_under_its_own_provider_name():
+    # `tenancy.costs.normalize_provider` tests for "openai" BEFORE "deepseek", so
+    # a subclass of the OpenAI Responses adapter that inherited provider="OpenAI"
+    # would bill every DeepSeek call to the OpenAI budget, resolve the OpenAI key,
+    # and report `openai:deepseek-...` from `_agent_model_id`.
+    from resume_agent.tenancy.costs import normalize_provider
+
+    model = build_model("deepseek:deepseek-v4-flash", api_key="k")
+    assert model.provider == "DeepSeek"
+    assert normalize_provider(model.provider) == "deepseek"
+    assert model.base_url == "https://api.deepseek.com"
+    assert model.id == "deepseek-v4-flash"
+
+
+def test_deepseek_sends_the_unmodified_schema_without_strict():
+    # DeepSeek's `strict` gates validation of the REQUEST SCHEMA, not constrained
+    # decoding of the response -- unlike OpenAI, where a strict schema compiles to
+    # a grammar that makes a stray key or a wrong-typed field impossible to emit.
+    # Measured against instructions that deliberately violate the schema:
+    # strict=True still returned a wrong-typed field 6/6 and leaked an undeclared
+    # key 5/6 (strict=False: 6/6 and 6/6). It enforces nothing.
+    #
+    # So the only thing strict=True would buy is its own precondition: a sibling
+    # `type` on every bare `anyOf` -- which for a nullable OBJECT can only be the
+    # false value `null`, because DeepSeek rejects `object`. Measured across
+    # FitScore and JobCriteriaExtract at n=10 per arm, that rewrite was
+    # indistinguishable from sending the raw schema (10/10 valid, and 10/10
+    # populated on every nullable-object field, either way).
+    class Inner(BaseModel):
+        city: str
+
+    class Outer(BaseModel):
+        name: str | None
+        place: Inner | None
+
+    model = build_model("deepseek:deepseek-v4-flash", api_key="k")
+    params = model.get_request_params(response_format=Outer)
+    text_format = params["text"]["format"]
+
+    assert text_format["strict"] is False
+    # Untouched: both the scalar union and the $ref union keep the bare `anyOf`
+    # pydantic emitted. A normalizer would also carry a latent gap -- a union of
+    # two models with no null member yields no legal scalar sibling and would 400.
+    unions = [
+        node
+        for node in llm_runner._walk_json_schema(text_format["schema"])
+        if isinstance(node.get("anyOf"), list)
+    ]
+    assert len(unions) == 2
+    assert all("type" not in node for node in unions)
 
 
 def test_pre_4_6_claude_omits_thinking_instead_of_disabling_it():
@@ -251,23 +306,23 @@ def test_openai_bounds_the_output_budget():
 
 def test_openai_effort_floor_is_the_lowest_effort_the_model_declares():
     assert (
-        llm_runner._openai_effort("openai:gpt-5.6-terra", reasoning=False)
+        llm_runner._responses_effort("openai:gpt-5.6-terra", "openai", reasoning=False)
         == "none"
     )
     assert (
-        llm_runner._openai_effort("openai:gpt-5.4-mini", reasoning=False)
+        llm_runner._responses_effort("openai:gpt-5.4-mini", "openai", reasoning=False)
         == "none"
     )
     assert (
-        llm_runner._openai_effort("openai:gpt-5.5-pro", reasoning=False)
+        llm_runner._responses_effort("openai:gpt-5.5-pro", "openai", reasoning=False)
         == "medium"
     )
 
 
 def test_openai_effort_is_unset_for_an_uncatalogued_model():
     model_id = "openai:gpt-5.9-experimental"
-    assert llm_runner._openai_effort(model_id, reasoning=False) is None
-    assert llm_runner._openai_effort(model_id, reasoning=True) is None
+    assert llm_runner._responses_effort(model_id, "openai", reasoning=False) is None
+    assert llm_runner._responses_effort(model_id, "openai", reasoning=True) is None
 
 
 def test_openai_reasoning_effort_defaults_to_high_within_the_catalog(monkeypatch):
@@ -282,11 +337,11 @@ def test_openai_reasoning_effort_defaults_to_high_within_the_catalog(monkeypatch
     monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
 
     assert (
-        llm_runner._openai_effort("openai:gpt-5.6-terra", reasoning=True)
+        llm_runner._responses_effort("openai:gpt-5.6-terra", "openai", reasoning=True)
         == "high"
     )
     assert (
-        llm_runner._openai_effort("openai:gpt-5.5-pro", reasoning=True) == "high"
+        llm_runner._responses_effort("openai:gpt-5.5-pro", "openai", reasoning=True) == "high"
     )
 
 
@@ -302,7 +357,7 @@ def test_openai_reasoning_effort_honours_configured_tier_tuning(monkeypatch):
     monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
 
     assert (
-        llm_runner._openai_effort("openai:gpt-5.6-terra", reasoning=True) == "max"
+        llm_runner._responses_effort("openai:gpt-5.6-terra", "openai", reasoning=True) == "max"
     )
 
 
@@ -322,7 +377,7 @@ def test_openai_reasoning_fallback_uses_the_nearest_supported_effort(monkeypatch
     monkeypatch.setitem(llm_runner.MODEL_CATALOG, "openai", entries)
 
     assert (
-        llm_runner._openai_effort("openai:gpt-future", reasoning=True)
+        llm_runner._responses_effort("openai:gpt-future", "openai", reasoning=True)
         == "medium"
     )
 
@@ -412,6 +467,95 @@ def test_responses_shim_leaves_a_completed_response_alone():
 
     assert parsed.role == "assistant"
     assert llm_runner.INCOMPLETE_KEY not in (parsed.provider_data or {})
+
+
+def _deepseek_response(*, reasoning_text: str | None):
+    """A DeepSeek Responses payload.
+
+    Live shape, verified against deepseek-v4-flash: a reasoning item carries its
+    chain-of-thought in `content[].text` under `type == "reasoning_text"`, and
+    its `summary` is ALWAYS `[]` -- DeepSeek documents `reasoning.summary` as
+    "accepted but no summary is generated".
+    """
+    output = []
+    if reasoning_text is not None:
+        output.append(
+            SimpleNamespace(
+                type="reasoning",
+                summary=[],
+                content=[SimpleNamespace(type="reasoning_text", text=reasoning_text)],
+            )
+        )
+    output.append(SimpleNamespace(type="message", content=[]))
+    return SimpleNamespace(
+        id="resp_ds_1",
+        status="completed",
+        incomplete_details=None,
+        error=None,
+        output=output,
+        output_text="9.8 is larger.",
+        usage=SimpleNamespace(
+            input_tokens=23,
+            input_tokens_details=SimpleNamespace(cached_tokens=0),
+            output_tokens=171,
+            output_tokens_details=SimpleNamespace(reasoning_tokens=159),
+            total_tokens=194,
+        ),
+    )
+
+
+def test_deepseek_recovers_real_reasoning_instead_of_echoing_the_answer():
+    # agno looks for reasoning in a reasoning item's `summary`. DeepSeek never
+    # populates it, so agno falls through to
+    #     elif self.reasoning is not None:
+    #         model_response.reasoning_content = response.output_text
+    # copying the visible answer into the reasoning channel on EVERY
+    # non-streaming call. reasoning_summary="auto" does not prevent it -- that
+    # only guards the streaming branch.
+    model = llm_runner._compatible_deepseek_responses_class()(
+        id="deepseek-v4-flash", api_key="k", reasoning={"effort": "max"}
+    )
+
+    parsed = model._parse_provider_response(
+        cast(Response, _deepseek_response(reasoning_text="9.8 = 9.80, so 9.8 wins."))
+    )
+
+    assert parsed.reasoning_content == "9.8 = 9.80, so 9.8 wins."
+    assert parsed.content == "9.8 is larger."
+
+
+def test_deepseek_drops_the_reasoning_echo_when_thinking_is_off():
+    # effort="none" produces no reasoning item at all, so anything agno left in
+    # the reasoning channel is the echo. The visible answer is never reasoning.
+    model = llm_runner._compatible_deepseek_responses_class()(
+        id="deepseek-v4-flash", api_key="k", reasoning={"effort": "none"}
+    )
+
+    parsed = model._parse_provider_response(
+        cast(Response, _deepseek_response(reasoning_text=None))
+    )
+
+    assert parsed.reasoning_content is None
+    assert parsed.content == "9.8 is larger."
+
+
+def test_deepseek_maps_its_streamed_reasoning_deltas():
+    # DeepSeek streams chain-of-thought as `response.reasoning_text.delta`
+    # (measured: 177 deltas on one effort="max" turn). agno has a branch only for
+    # `response.reasoning_summary_text.delta`, so every one of these was dropped
+    # and a reasoning turn streamed no reasoning at all.
+    model = llm_runner._compatible_deepseek_responses_class()(
+        id="deepseek-v4-flash", api_key="k", reasoning={"effort": "max"}
+    )
+    event = SimpleNamespace(type="response.reasoning_text.delta", delta="We need")
+
+    parsed, tool_use = model._parse_provider_response_delta(
+        cast(ResponseStreamEvent, event), cast(Message, None), {"seen": 1}
+    )
+
+    assert parsed.reasoning_content == "We need"
+    assert parsed.content is None
+    assert tool_use == {"seen": 1}
 
 
 def _run_output(content, *, truncated: bool):

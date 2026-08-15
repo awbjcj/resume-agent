@@ -16,7 +16,7 @@ def test_split_provider_bare_id_defaults_anthropic():
     [
         ("openai:gpt-5.4-mini", ("openai", "gpt-5.4-mini")),
         ("gemini:gemini-2.0-flash", ("gemini", "gemini-2.0-flash")),
-        ("deepseek:deepseek-chat", ("deepseek", "deepseek-chat")),
+        ("deepseek:deepseek-v4-flash", ("deepseek", "deepseek-v4-flash")),
     ],
 )
 def test_split_provider_parses_known_prefixes(model_id, expected):
@@ -40,7 +40,7 @@ def test_resolve_api_key_reads_provider_specific_setting(monkeypatch):
     assert resolve_api_key("claude-opus-4-8") == "ak"
     assert resolve_api_key("openai:gpt-5.4-mini") == "ok"
     assert resolve_api_key("gemini:gemini-2.0-flash") == "gk"
-    assert resolve_api_key("deepseek:deepseek-chat") == "dk"
+    assert resolve_api_key("deepseek:deepseek-v4-flash") == "dk"
     env_settings.cache_clear()
 
 
@@ -170,10 +170,14 @@ def test_claude_falls_back_to_json_mode_only_for_oversized_schema():
 
 
 def test_build_model_deepseek_branch():
-    DeepSeek = pytest.importorskip("agno.models.deepseek").DeepSeek
-    model = build_model("deepseek:deepseek-chat", api_key="sk-test")
-    assert isinstance(model, DeepSeek)
-    assert model.id == "deepseek-chat"
+    # DeepSeek speaks the Responses API at its own base_url, so it is built from
+    # the OpenAI Responses adapter rather than agno.models.deepseek.DeepSeek --
+    # which is why `provider` has to be overridden back to "DeepSeek".
+    OpenAIResponses = pytest.importorskip("agno.models.openai.responses").OpenAIResponses
+    model = build_model("deepseek:deepseek-v4-flash", api_key="sk-test")
+    assert isinstance(model, OpenAIResponses)
+    assert model.id == "deepseek-v4-flash"
+    assert model.provider == "DeepSeek"
 
 
 def test_agent_runner_arun_delegates():

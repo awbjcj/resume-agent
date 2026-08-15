@@ -466,7 +466,7 @@ Each tier uses its own provider's key, so you can mix providers freely:
 
 ```bash
 CHEAP_MODEL=gemini:gemini-2.0-flash     # cheap extract/fit/relevance on Gemini
-MID_MODEL=deepseek:deepseek-chat        # reviewers / cover-letter reviser on DeepSeek
+MID_MODEL=deepseek:deepseek-v4-flash    # reviewers / cover-letter reviser on DeepSeek
 PREMIUM_MODEL=claude-opus-4-8           # bare id → Anthropic for the tailor writer
 ```
 

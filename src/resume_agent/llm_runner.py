@@ -11,6 +11,7 @@ from inspect import isawaitable
 from types import SimpleNamespace
 from typing import Any, Literal, Protocol, TypeVar, cast
 
+import httpx
 from pydantic import BaseModel
 
 from resume_agent.agent_trace import record_agent_run
@@ -60,6 +61,34 @@ _TRANSIENT_NAMES = {
     "TimeoutException",
     "WriteTimeout",
 }
+
+
+class _UnparsedRetry(Exception):
+    """Internal signal: a structured run came back unparsed and may be retried.
+
+    Never escapes ``AgentRunner``; the last response is returned instead so the
+    call site's ``expect_schema`` raises its own rich diagnostic.
+    """
+
+    def __init__(self, response: Any) -> None:
+        super().__init__("agent returned unparsed structured output")
+        self.response = response
+
+
+def _unparsed_structured_output(agent: Any, response: Any) -> bool:
+    """Whether a completed run failed to produce the schema it was asked for.
+
+    agno does not raise when it cannot coerce a response into ``output_schema``
+    -- it leaves ``RunOutput.content`` as the raw ``str``. That is a *successful*
+    provider call, so nothing in the transient-error path sees it and the single
+    bad parse goes straight to whatever fallback the caller has. Detected here,
+    where the retry budget already lives, so one malformed body costs a retry
+    rather than a degraded result.
+    """
+    schema = getattr(agent, "output_schema", None)
+    if not (isinstance(schema, type) and issubclass(schema, BaseModel)):
+        return False
+    return not isinstance(getattr(response, "content", None), schema)
 
 
 def is_transient(exc: BaseException) -> bool:
@@ -199,7 +228,18 @@ class AgentRunner:
                     self._exit()
                 record_call(self._agent, response)
                 record_agent_run(self, response, retries=attempt)
+                if _unparsed_structured_output(self._agent, response):
+                    raise _UnparsedRetry(response)
                 return response
+            except _UnparsedRetry as unparsed:
+                if attempt >= settings.llm_retries:
+                    return unparsed.response
+                logger.warning(
+                    "agent returned unparsed structured output; retrying (%d/%d)",
+                    attempt + 1,
+                    settings.llm_retries,
+                )
+                time.sleep(settings.llm_retry_delay * (2**attempt))
             except Exception as exc:
                 if attempt >= settings.llm_retries or not is_transient(exc):
                     record_agent_run(
@@ -223,7 +263,18 @@ class AgentRunner:
                     self._exit()
                 await asyncio.to_thread(record_call, self._agent, response)
                 record_agent_run(self, response, retries=attempt)
+                if _unparsed_structured_output(self._agent, response):
+                    raise _UnparsedRetry(response)
                 return response
+            except _UnparsedRetry as unparsed:
+                if attempt >= settings.llm_retries:
+                    return unparsed.response
+                logger.warning(
+                    "agent returned unparsed structured output; retrying (%d/%d)",
+                    attempt + 1,
+                    settings.llm_retries,
+                )
+                await asyncio.sleep(settings.llm_retry_delay * (2**attempt))
             except Exception as exc:
                 if attempt >= settings.llm_retries or not is_transient(exc):
                     record_agent_run(
@@ -665,11 +716,22 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
         ),
     ],
     "deepseek": [
+        # On the Responses API `reasoning.effort` is BOTH the thinking toggle and
+        # the effort dial -- `none` disables thinking outright -- so `none` belongs
+        # in the declared vocabulary. `_responses_effort` picks the lowest declared
+        # effort for a non-reasoning agent, which is what turns thinking off.
+        # DeepSeek maps a requested effort to an actual one as
+        # low->low, medium->high, high->high, xhigh->high, max->max, so only these
+        # four are distinct.
         ModelCatalogEntry(
-            "deepseek:deepseek-v4-flash", "DeepSeek V4 Flash", ("high", "max")
+            "deepseek:deepseek-v4-flash",
+            "DeepSeek V4 Flash",
+            ("none", "low", "high", "max"),
         ),
         ModelCatalogEntry(
-            "deepseek:deepseek-v4-pro", "DeepSeek V4 Pro", ("high", "max")
+            "deepseek:deepseek-v4-pro",
+            "DeepSeek V4 Pro",
+            ("none", "low", "high", "max"),
         ),
     ],
 }
@@ -689,6 +751,14 @@ def catalog_entry(model_id: str) -> ModelCatalogEntry | None:
 
 
 OPENAI_WEB_SEARCH_TOOL = {"type": "web_search"}
+
+#: DeepSeek executes `web_search` server-side on the Responses API, and its tool
+#: definition is byte-identical to OpenAI's. It is kept as a separate name rather
+#: than aliased because the two are only incidentally equal -- DeepSeek ignores
+#: `search_context_size`/`user_location`, and returns **no** `url_citation`
+#: annotations, which is why `provider_capabilities` still reports
+#: `supports_native_citations=False` for it.
+DEEPSEEK_WEB_SEARCH_TOOL = {"type": "web_search"}
 
 # Claude ids name their family before the version (``claude-opus-4-8``,
 # ``claude-sonnet-5``, ``claude-haiku-4-5-20251001``). Pre-4 ids used the
@@ -739,11 +809,13 @@ SearchStrategy = Literal[
     "native_anthropic",
     "native_openai",
     "native_gemini",
+    "native_deepseek",
 ]
 _NATIVE_SEARCH_STRATEGIES: dict[str, SearchStrategy] = {
     "anthropic": "native_anthropic",
     "openai": "native_openai",
     "gemini": "native_gemini",
+    "deepseek": "native_deepseek",
 }
 
 
@@ -823,17 +895,19 @@ def provider_capabilities(model_id: str) -> ProviderCapabilities:
             folded.startswith(("gemini-3", "gemini-2.5")), True, True
         )
     if provider == "deepseek" and folded.startswith("deepseek-"):
-        reasoning = "reasoner" in folded or folded.startswith("deepseek-v4")
-        return ProviderCapabilities(reasoning, False, True)
+        # Citations stay False: DeepSeek's native web_search runs server-side but
+        # returns no `url_citation` annotations (verified live on both tool-type
+        # strings), so there is nothing for a citation renderer to read.
+        return ProviderCapabilities(folded.startswith("deepseek-v4"), False, True)
     return _NO_PROVIDER_CAPABILITIES
 
 
 def supports_native_search(model_id: str) -> bool:
     """Whether ``model_id``'s provider gets provider-native web search.
 
-    Providers outside this set (DeepSeek) still get search under
-    ``search_mode=auto`` — ``plan_search`` falls back to the DuckDuckGo tool —
-    just not the higher-quality native variant.
+    Every supported provider now has one. A provider outside this set still gets
+    search under ``search_mode=auto`` — ``plan_search`` falls back to the
+    DuckDuckGo tool — just not the higher-quality native variant.
     """
     provider, _model = split_provider(model_id)
     return provider in _NATIVE_SEARCH_STRATEGIES
@@ -1069,6 +1143,114 @@ def _compatible_openai_responses_class():
 
 
 @lru_cache(maxsize=1)
+def _compatible_deepseek_responses_class():
+    """DeepSeek on the Responses API, with agno's reasoning defects corrected.
+
+    Subclasses the OpenAI Responses adapter because DeepSeek serves the same
+    wire format at its own ``base_url`` -- which also inherits the truncation
+    recording and ``$ref``-sibling stripping that class already does.
+    """
+    OpenAIResponses = _compatible_openai_responses_class()
+
+    @dataclass
+    class CompatibleDeepSeekResponses(OpenAIResponses):  # type: ignore[valid-type,misc]
+        id: str = "deepseek-v4-flash"
+        name: str = "DeepSeek"
+        # Load-bearing, not cosmetic: `tenancy.costs.normalize_provider` tests
+        # for "openai" BEFORE "deepseek", so inheriting the parent's "OpenAI"
+        # would bill every DeepSeek call against the OpenAI budget, select the
+        # OpenAI key, and mislabel `_agent_model_id` as `openai:deepseek-...`.
+        provider: str = "DeepSeek"
+        base_url: str | httpx.URL | None = "https://api.deepseek.com"
+        # DeepSeek's `strict` gates VALIDATION OF THE REQUEST SCHEMA, not
+        # constrained decoding of the response -- unlike OpenAI, where a strict
+        # schema is compiled into a grammar that makes a stray key or a
+        # wrong-typed field impossible to emit. Measured against instructions
+        # that deliberately violate the schema: strict=True still returned a
+        # wrong-typed field 6/6 and leaked an undeclared key 5/6, versus 6/6 and
+        # 6/6 for strict=False. It enforces nothing.
+        #
+        # What it does do is reject a bare `anyOf` -- the shape pydantic emits
+        # for EVERY Optional field -- with `400 Invalid json schema: field
+        # `anyOf`: missing field `type``. Satisfying that needs a sibling
+        # `type`, which must be a single scalar (a list is rejected, and so is
+        # `object`), so a nullable OBJECT field can only be annotated `null`.
+        # Measured across `FitScore` and `JobCriteriaExtract` at n=10 per arm,
+        # strict=True + that annotation was indistinguishable from strict=False
+        # on the raw schema: 10/10 valid and 10/10 populated on every
+        # nullable-object field either way. So the rewrite bought nothing, and
+        # the one future in which it starts mattering is the bad one -- if
+        # DeepSeek ever implements real constrained decoding, `type: "null"`
+        # becomes a real constraint and silently nulls those fields.
+        #
+        # Sending the same unmodified schema OpenAI gets is therefore both
+        # simpler and safer. `expect_schema` + pydantic remain the real gate,
+        # which is where enforcement actually lives for this provider.
+        strict_output: bool = False
+
+        def _parse_provider_response(self, response, **kwargs):
+            """Hand back DeepSeek's real chain-of-thought, not an echo of the answer.
+
+            agno looks for reasoning in a reasoning item's ``summary``. DeepSeek
+            documents that ``reasoning.summary`` is "accepted but no summary is
+            generated", and live responses confirm it: ``summary`` is always
+            ``[]`` while the actual reasoning sits in
+            ``content[].text`` under ``type == "reasoning_text"``. Finding no
+            summary, agno falls through to ``reasoning_content =
+            response.output_text`` -- copying the visible answer into the
+            reasoning channel on **every** non-streaming call. Sending
+            ``reasoning_summary="auto"`` does not prevent this; that only guards
+            the streaming branch.
+            """
+            parsed = super()._parse_provider_response(response, **kwargs)
+            texts: list[str] = []
+            for item in getattr(response, "output", None) or []:
+                if getattr(item, "type", None) != "reasoning":
+                    continue
+                for part in getattr(item, "content", None) or []:
+                    text = (
+                        part.get("text")
+                        if isinstance(part, dict)
+                        else getattr(part, "text", None)
+                    )
+                    if isinstance(text, str) and text:
+                        texts.append(text)
+            content = getattr(parsed, "content", None)
+            reasoning = getattr(parsed, "reasoning_content", None)
+            if texts:
+                parsed.reasoning_content = "".join(texts)
+            elif isinstance(reasoning, str) and reasoning == content:
+                # No reasoning item at all (effort="none"): whatever agno put
+                # here is the echo. The visible answer is never reasoning.
+                parsed.reasoning_content = None
+            return parsed
+
+        def _parse_provider_response_delta(
+            self, stream_event, assistant_message, tool_use
+        ):
+            """Map DeepSeek's streamed reasoning, which agno has no branch for.
+
+            DeepSeek streams chain-of-thought as ``response.reasoning_text.delta``
+            (measured: 177 deltas on one ``effort="max"`` turn). agno handles only
+            ``response.reasoning_summary_text.delta``, so every one of those was
+            dropped and a reasoning turn streamed no reasoning at all.
+            """
+            if getattr(stream_event, "type", None) == "response.reasoning_text.delta":
+                from agno.models.response import ModelResponse
+
+                delta = getattr(stream_event, "delta", None)
+                model_response = ModelResponse()
+                if isinstance(delta, str) and delta:
+                    model_response.reasoning_content = delta
+                return model_response, tool_use
+            return super()._parse_provider_response_delta(
+                stream_event, assistant_message, tool_use
+            )
+
+    return CompatibleDeepSeekResponses
+
+
+@lru_cache(maxsize=1)
 def _compatible_gemini_class():
     from agno.models.google import Gemini
 
@@ -1208,15 +1390,22 @@ def _reasoning_effort_for(model_id: str, provider: str) -> str:
 _EFFORT_ORDER = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
-def _openai_effort(model_id: str, *, reasoning: bool) -> str | None:
-    """Resolve the explicit effort for a catalogued OpenAI model."""
+def _responses_effort(model_id: str, provider: str, *, reasoning: bool) -> str | None:
+    """Resolve the explicit ``reasoning.effort`` for a catalogued Responses model.
+
+    Shared by OpenAI and DeepSeek because both speak the Responses API. For
+    DeepSeek this single value is also the thinking **toggle**: its lowest
+    declared effort is ``none``, which is how a non-reasoning agent turns
+    thinking off. An uncatalogued id returns ``None`` so no reasoning config is
+    sent at all -- its effort vocabulary is unknown.
+    """
     entry = catalog_entry(model_id)
     if entry is None or not entry.reasoning_efforts:
         return None
     if not reasoning:
         return min(entry.reasoning_efforts, key=_EFFORT_ORDER.index)
 
-    selected = _reasoning_effort_for(model_id, "openai")
+    selected = _reasoning_effort_for(model_id, provider)
     if selected in entry.reasoning_efforts:
         return selected
     target = _EFFORT_ORDER.index(selected)
@@ -1254,7 +1443,7 @@ def _build_openai_responses(
 ) -> Any:
     """Build an OpenAI model with the shared Responses request policy."""
     OpenAIResponses = _compatible_openai_responses_class()
-    effort = _openai_effort(model_id, reasoning=reasoning)
+    effort = _responses_effort(model_id, "openai", reasoning=reasoning)
     return OpenAIResponses(
         id=split_provider(model_id)[1],
         api_key=api_key,
@@ -1275,6 +1464,38 @@ def _build_openai_responses(
         reasoning_summary="auto" if effort is not None else None,
         max_output_tokens=_openai_max_output_tokens(reasoning=reasoning),
         # Agno requests encrypted reasoning for stateless tool-call replay.
+        store=False,
+    )
+
+
+def _build_deepseek_responses(
+    model_id: str, *, api_key: str | None, reasoning: bool
+) -> Any:
+    """Build a DeepSeek model on the Responses API.
+
+    DeepSeek is the fourth provider with the "unset means provider decides"
+    trap, and on Responses the fix is a first-class parameter rather than the
+    ``extra_body={"thinking": {"type": "disabled"}}`` side-channel the Chat
+    Completions adapter needed: ``reasoning.effort`` is *both* the toggle and
+    the dial, and ``none`` disables thinking. Verified live -- omitting
+    ``reasoning`` entirely spent 46 reasoning tokens, ``effort="none"`` spends
+    zero and emits no reasoning output item at all.
+    """
+    DeepSeekResponses = _compatible_deepseek_responses_class()
+    effort = _responses_effort(model_id, "deepseek", reasoning=reasoning)
+    return DeepSeekResponses(
+        id=split_provider(model_id)[1],
+        api_key=api_key,
+        reasoning={"effort": effort} if effort is not None else None,
+        # Same rule as OpenAI: whenever a reasoning config is sent, ask for a
+        # summary, or agno's streaming branch relabels every visible output_text
+        # delta as reasoning. DeepSeek accepts the field and never generates a
+        # summary (verified: `summary` is always `[]`), which is exactly why the
+        # non-streaming echo needs its own override in the model class.
+        reasoning_summary="auto" if effort is not None else None,
+        max_output_tokens=_openai_max_output_tokens(reasoning=reasoning),
+        # Documented as unsupported and always reported back as false. Sent
+        # anyway so the value we ask for matches the value we get.
         store=False,
     )
 
@@ -1360,24 +1581,7 @@ def build_model(
             thinking_budget=None if reasoning else 0,
         )
     if provider == "deepseek":
-        from agno.models.deepseek import DeepSeek
-
-        # Third provider with the "unset means provider decides" trap, after
-        # Gemini and Anthropic: agno reads use_thinking=None as the provider
-        # default, and that default is ON for every deepseek-v4-* id. Leaving it
-        # unset therefore bought thinking on every non-reasoning agent -- a live
-        # coach turn spent 7,779 characters of reasoning it was never asked for,
-        # streamed as 1,846 one-word deltas.
-        #
-        # Unlike Gemini 3, which rejects thinking_budget outright, an explicit
-        # disabled flag is accepted by deepseek-chat, -v4-flash and -v4-pro
-        # alike (verified live), so this needs no generation gate.
-        return DeepSeek(
-            id=model,
-            api_key=key,
-            use_thinking=bool(reasoning),
-            reasoning_effort=reasoning_effort,
-        )
+        return _build_deepseek_responses(model_id, api_key=key, reasoning=reasoning)
     from agno.models.anthropic import Claude
 
     thinking, output_config = _anthropic_thinking(model, reasoning=reasoning)
@@ -1414,6 +1618,11 @@ def build_search_equipped(
         return (
             _build_openai_responses(model_id, api_key=api_key, reasoning=reasoning),
             [OPENAI_WEB_SEARCH_TOOL],
+        )
+    if plan.strategy == "native_deepseek":
+        return (
+            _build_deepseek_responses(model_id, api_key=api_key, reasoning=reasoning),
+            [DEEPSEEK_WEB_SEARCH_TOOL],
         )
     if plan.strategy == "native_gemini":
         from agno.models.google.gemini_interactions import GeminiInteractions

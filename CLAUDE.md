@@ -140,15 +140,91 @@ INVALID_ARGUMENT` before generating anything, and agno then hands back the
   `thinking_budget=0` only for pre-3 ids. Verified live against
   `gemini-3.6-flash`: `thinking_level="low"` reports no thought tokens;
   `thinking_budget=0` is a hard 400.
-- **DeepSeek is the third instance of the same trap, and the only one without a
-  generation gate.** agno reads `use_thinking=None` as the provider default, and
-  that default is **on** for every `deepseek-v4-*` id — so a bare `None` bought
-  thinking on every non-reasoning agent. Measured on a live coach turn: 7,779
-  characters of unrequested reasoning, streamed as 1,846 one-word deltas.
-  `build_model` therefore sends `use_thinking=bool(reasoning)`. Unlike Gemini 3,
-  an explicit `thinking: {"type": "disabled"}` is verified accepted by
-  `deepseek-chat`, `-v4-flash` and `-v4-pro` alike, so no version parsing is
-  needed here.
+- **DeepSeek runs on the Responses API, and its whole request surface changed
+  with it.** DeepSeek serves the OpenAI Responses wire format at
+  `base_url="https://api.deepseek.com"`, so `_compatible_deepseek_responses_class`
+  subclasses `CompatibleOpenAIResponses` — inheriting the truncation recording
+  and `$ref`-sibling stripping. `agno.models.deepseek.DeepSeek` (Chat
+  Completions) is no longer used, and the legacy `deepseek-chat` /
+  `deepseek-reasoner` ids are retired; only `deepseek-v4-flash` and
+  `deepseek-v4-pro` are catalogued. Five things ride on this:
+  - **`provider = "DeepSeek"` is load-bearing, not cosmetic.**
+    `tenancy/costs.py::normalize_provider` tests for `"openai"` **before**
+    `"deepseek"`, so a subclass that inherited the parent's `"OpenAI"` would bill
+    every DeepSeek call against the OpenAI budget, resolve the OpenAI key, and
+    report `openai:deepseek-…` from `_agent_model_id`.
+  - **`reasoning.effort` is both the thinking toggle and the effort dial**, which
+    is the fourth instance of the "unset means provider decides" trap. Verified
+    live on `deepseek-v4-flash`: omitting `reasoning` spends 46 reasoning tokens
+    and emits a reasoning output item; `effort="none"` spends **zero** and emits
+    none. So the catalog declares `("none", "low", "high", "max")` and
+    `_responses_effort` (shared with OpenAI) picks the lowest declared effort for
+    a non-reasoning agent — which *is* the off switch. The Chat Completions
+    `extra_body={"thinking": {"type": "disabled"}}` side-channel is gone.
+    DeepSeek maps requested→actual as low→low, medium→high, high→high,
+    xhigh→high, max→max.
+  - **agno copies the visible answer into `reasoning_content` on every
+    non-streaming call.** It reads reasoning from a reasoning item's `summary`;
+    DeepSeek documents `reasoning.summary` as "accepted but no summary is
+    generated" and live responses confirm `summary` is always `[]`, with the real
+    chain-of-thought in `content[].text` under `type == "reasoning_text"`. Finding
+    no summary, agno falls to `reasoning_content = response.output_text`.
+    `reasoning_summary="auto"` does **not** fix this — that only guards the
+    streaming branch — so `_parse_provider_response` is overridden to recover the
+    real text, and to drop the echo when thinking is off.
+  - **agno drops DeepSeek's streamed reasoning entirely.** DeepSeek streams CoT as
+    `response.reasoning_text.delta` (measured: 177 deltas on one `effort="max"`
+    turn); agno has a branch only for `response.reasoning_summary_text.delta`.
+    `_parse_provider_response_delta` is overridden to map it.
+  - **Native `web_search` works** (`DEEPSEEK_WEB_SEARCH_TOOL`, strategy
+    `native_deepseek`), executed server-side, with automatic context caching
+    (measured: 15,488 cached tokens on one search turn). But it returns **no
+    `url_citation` annotations**, so `provider_capabilities` keeps
+    `supports_native_citations=False`.
+- **DeepSeek's `json_schema` validator is not OpenAI's, and `json_object` was the
+  root cause of `UnparsedAgentOutput` on DeepSeek.** On Chat Completions the
+  DeepSeek class declared `supports_native_structured_outputs=False`, so
+  `use_json_mode_for` sent `response_format={"type": "json_object"}` — which
+  constrains "the output must be JSON" but **not** "one well-formed,
+  schema-conforming document and nothing else". Live failures showed all three
+  leaks on `status=COMPLETED`, `reasoning=0` runs: malformed JSON (`{{`, a stray
+  `,`), a second document, and a literal `<｜｜DSML｜｜tool_calls>` block written into
+  the content channel instead of the tool channel. agno's three JSON parsers then
+  left `content` a raw `str` and call sites raised `Expected <Schema> …, got str`
+  — which is what drove the Evidence planner to its deterministic fallback. On
+  Responses the schema rides `text.format`, so DeepSeek keeps native structured
+  outputs — sent as **`strict_output = False`, with the schema unmodified**.
+- **DeepSeek's `strict` validates the request schema; it does not constrain
+  generation.** This is the opposite of OpenAI, where a strict schema compiles
+  into a grammar that makes a stray key or a wrong-typed field impossible to
+  emit. Measured against instructions that deliberately violate the schema,
+  `strict=True` still returned a wrong-typed field **6/6** and leaked an
+  undeclared key **5/6** (`strict=False`: 6/6 and 6/6). It enforces nothing.
+  What it *does* do is reject a bare `anyOf` with `400 Invalid json schema:
+  field `anyOf`: missing field `type``— the shape pydantic emits for every
+  `Optional` field, so `FitScore` (four of them) 400'd on every call. Satisfying
+  that needs a sibling `type`, which must be a **single scalar** (a list is
+  rejected, and so is `object`), so a nullable *object* field could only be
+  annotated with the false value `null`. Measured across `FitScore` and
+  `JobCriteriaExtract` at n=10 per arm, that rewrite was indistinguishable from
+  sending the raw schema — 10/10 valid and 10/10 populated on every
+  nullable-object field either way — so it bought nothing, and the one future in
+  which it would start mattering is the bad one: if DeepSeek ever implements
+  real constrained decoding, `type: "null"` becomes a real constraint and
+  silently nulls `seniority`, `employment_type`, `salary_range` and
+  `FitScore.location`. A normalizer also carries a latent 400: a union of two
+  models with no `null` member yields no legal scalar sibling. So DeepSeek gets
+  the same schema OpenAI gets, and `expect_schema` + pydantic remain the real
+  gate — which is where enforcement actually lives for this provider.
+- **An unparsed structured response is retried, in `AgentRunner`.** agno does not
+  raise when it cannot coerce a response into `output_schema` — it leaves
+  `RunOutput.content` a raw `str` on a run the provider reports as a *success*, so
+  nothing in the transient-error path could see it and one bad body went straight
+  to the caller's fallback. `_unparsed_structured_output` detects it where the
+  retry budget already lives. On exhaustion the **last response is returned, never
+  raised**, so the call site's own `expect_schema` still owns the error and its
+  model/status/token diagnostics. An agent with no `output_schema` is untouched —
+  prose must never look like a failed parse.
 - **A persona model may simply ignore the `---METADATA---` sentinel, and that is
   not a failure.** `sessions/turns.py::persona_output` splits prose from
   formatter input on that marker. Claude emits it; **DeepSeek v4 never does** —
