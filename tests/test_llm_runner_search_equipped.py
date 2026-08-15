@@ -63,3 +63,17 @@ def test_native_openai_search_reuses_the_shared_builder():
     assert searched.max_output_tokens == direct.max_output_tokens
     assert searched.store == direct.store
     assert tools == [{"type": "web_search"}]
+
+
+def test_tool_search_strategy_uses_the_scout_specific_callable():
+    def scout_search(query: str) -> str:
+        """Search with the Scout's independent five-use budget."""
+        return query
+
+    _model, tools = build_search_equipped(
+        "openai:gpt-4o",
+        mode="tool",
+        tool_search=scout_search,
+    )
+
+    assert tools == [scout_search]

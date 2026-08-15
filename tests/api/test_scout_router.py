@@ -7,6 +7,7 @@ from resume_agent.api.routers import scout as scout_router
 from resume_agent.discovery.scout_store import (
     ScoutProposal,
     ScoutTurnRecord,
+    SourcePayload,
     TermPayload,
     create_session_from_turn,
     end_session,
@@ -56,6 +57,29 @@ def seed(tmp_path, *, ended=False):
         end_session(root, "s1", "Done")
 
 
+def seed_unverified_source(tmp_path):
+    create_session_from_turn(
+        tmp_path / "data",
+        "s1",
+        goal="AI infra",
+        user_text="AI infra",
+        scout_turn=ScoutTurnRecord(role="scout", text="First"),
+        proposals=[
+            ScoutProposal(
+                kind="source",
+                source=SourcePayload(
+                    company="Acme",
+                    url="https://jobs.lever.co/acme",
+                    ats="lever",
+                    resolution_status="unverified",
+                    resolution_reason="OWNERSHIP_NOT_PROVEN",
+                ),
+                check="unverified",
+            )
+        ],
+    )
+
+
 def test_start_preallocates_session_metadata_and_launches_stream(monkeypatch, tmp_path):
     client = client_for(tmp_path)
     monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
@@ -100,6 +124,53 @@ def test_ended_session_blocks_messages_but_allows_pending_resolution(tmp_path):
         approved = client.post("/api/scout/sessions/s1/proposals/p1/approve")
         assert approved.status_code == 200
         assert approved.json()["proposals"][0]["status"] == "added"
+
+
+def test_approve_body_is_optional_and_passes_manual_confirmation(monkeypatch, tmp_path):
+    client = client_for(tmp_path)
+    seed_unverified_source(tmp_path)
+    seen = []
+
+    def approve(root, session_id, proposal_id, **kwargs):
+        seen.append(kwargs["manual_confirmation"])
+        return scout_router.session_view(root, session_id, browser_enabled=kwargs["browser_enabled"])
+
+    monkeypatch.setattr(scout_router, "approve_proposal", approve)
+    with client:
+        normal = client.post("/api/scout/sessions/s1/proposals/p1/approve")
+        confirmed = client.post(
+            "/api/scout/sessions/s1/proposals/p1/approve",
+            json={"manualConfirmation": True},
+        )
+
+    assert normal.status_code == 200
+    assert confirmed.status_code == 200
+    assert seen == [False, True]
+
+
+def test_resolve_source_route_validates_body_and_maps_stale_changes(monkeypatch, tmp_path):
+    client = client_for(tmp_path)
+    seed_unverified_source(tmp_path)
+    seen = []
+
+    def resolve(root, session_id, proposal_id, **kwargs):
+        seen.append(kwargs["url"])
+        return scout_router.session_view(root, session_id, browser_enabled=kwargs["browser_enabled"])
+
+    monkeypatch.setattr(scout_router, "resolve_proposal_source", resolve)
+    with client:
+        invalid = client.post(
+            "/api/scout/sessions/s1/proposals/p1/resolve",
+            json={"url": "file:///tmp/board"},
+        )
+        resolved = client.post(
+            "/api/scout/sessions/s1/proposals/p1/resolve",
+            json={"url": "https://jobs.lever.co/acme"},
+        )
+
+    assert invalid.status_code == 422
+    assert resolved.status_code == 200
+    assert seen == ["https://jobs.lever.co/acme"]
 
 
 def test_dismiss_validation_and_lifecycle(tmp_path):

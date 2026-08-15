@@ -15,6 +15,26 @@ def test_openapi_exposes_core_paths():
         assert p in paths, f"missing {p}"
 
 
+def test_openapi_exposes_scout_source_verification_contract():
+    spec = create_app(db_url="sqlite://").openapi()
+    paths = spec["paths"]
+    resolve = paths["/api/scout/sessions/{session_id}/proposals/{proposal_id}/resolve"]["post"]
+    approve = paths["/api/scout/sessions/{session_id}/proposals/{proposal_id}/approve"]["post"]
+    schemas = spec["components"]["schemas"]
+
+    assert resolve["requestBody"]["required"] is True
+    assert resolve["requestBody"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/ScoutResolveSourceIn"
+    )
+    assert approve["requestBody"].get("required", False) is False
+    approve_variants = approve["requestBody"]["content"]["application/json"]["schema"]["anyOf"]
+    assert any(variant.get("$ref", "").endswith("/ScoutApproveIn") for variant in approve_variants)
+    assert "manualConfirmation" in schemas["ScoutProposalOut"]["properties"]
+    assert "resolutionStatus" in schemas["ScoutSourceOut"]["properties"]
+    assert "searchedFamilies" in schemas["ScoutSourceOut"]["properties"]
+    assert "conflict" in schemas["ScoutProposalOut"]["properties"]["check"]["enum"]
+
+
 def test_committed_openapi_is_current():
     """The committed contract must match the live app — regenerate if this fails."""
     assert CONTRACT.exists(), "run scripts/export_openapi.py and commit contracts/openapi.json"

@@ -426,7 +426,7 @@ def test_add_scrape_target_duplicate_refused(tmp_path, monkeypatch):
         ("https://jobs.ashbyhq.com/acme/abcd-1234", "https://jobs.ashbyhq.com/acme"),
         (
             "https://jobs.smartrecruiters.com/Acme/744000012345-senior-engineer",
-            "https://jobs.smartrecruiters.com/Acme",
+            "https://careers.smartrecruiters.com/Acme",
         ),
         ("https://apply.workable.com/acme/j/ABC123/", "https://apply.workable.com/acme"),
         ("https://acme.recruitee.com/o/senior-engineer", "https://acme.recruitee.com"),

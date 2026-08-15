@@ -3,6 +3,9 @@ import json
 import pytest
 
 from resume_agent.discovery import scout
+from resume_agent.discovery.source_resolution.catalog import BOARD_FAMILIES
+from resume_agent.discovery.source_resolution.models import CompanySourceResolution
+from resume_agent.discovery.source_resolution.search import SearchBudget
 from resume_agent.discovery.scout import (
     ProposalRejected,
     ScoutProposalDraft,
@@ -186,18 +189,71 @@ def test_draft_schema_publishes_its_closed_vocabularies():
     assert "kind" not in schema["properties"]
 
 
-def test_check_source_tool_returns_bounded_json_when_probe_raises(monkeypatch):
+def test_resolve_company_source_tool_caches_by_company_and_board_root():
+    class Resolver:
+        def __init__(self):
+            self.calls = 0
+
+        def resolve(self, company: str, candidate_url: str) -> CompanySourceResolution:
+            self.calls += 1
+            return CompanySourceResolution(
+                company=company,
+                requested_url=candidate_url,
+                canonical_board_url="https://jobs.lever.co/acme",
+                ats="lever",
+                status="unverified",
+                reason_code="OWNERSHIP_NOT_PROVEN",
+            )
+
+    resolver = Resolver()
+    tool = scout.make_resolve_company_source_tool(
+        "search.yaml",
+        cache={},
+        resolver=resolver,
+    )
+
+    first = json.loads(tool("Acme", "https://jobs.lever.co/acme/jobs/123"))
+    second = json.loads(tool("acme", "https://jobs.lever.co/acme"))
+
+    assert first["canonical_board_url"] == "https://jobs.lever.co/acme"
+    assert second == first
+    assert resolver.calls == 1
+
+
+def test_scout_instructions_cover_all_supported_hosts_and_resolver_policy():
+    instructions = "\n".join(scout.scout_instructions())
+
+    assert "resolve_company_source" in instructions
+    assert "check_source" not in instructions
+    assert "five web searches" in instructions
+    for family in BOARD_FAMILIES:
+        assert all(host in instructions for host in family.search_hosts)
+
+
+def test_build_scout_agent_uses_the_resolver_and_budgeted_fallback(monkeypatch):
+    captured = {}
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(scout, "Agent", FakeAgent)
+    monkeypatch.setattr(scout, "AgentRunner", lambda agent: agent)
+    monkeypatch.setattr(scout, "get_settings", lambda: type("Settings", (), {"mid_model": "openai:gpt-4o"})())
     monkeypatch.setattr(
         scout,
-        "preview_source",
-        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("secret")),
+        "provider_capabilities",
+        lambda _model: type("Capabilities", (), {"supports_reasoning": False, "supports_prompt_cache": False})(),
     )
-    payload = json.loads(scout.make_check_source_tool("search.yaml")("https://jobs/acme"))
-    assert payload == {
-        "ok": False,
-        "ats": None,
-        "token": None,
-        "role_count": None,
-        "error": "Source probe failed (RuntimeError).",
-        "error_code": "PROBE_ERROR",
-    }
+    monkeypatch.setattr(scout, "build_search_equipped", lambda *args, **kwargs: (object(), [kwargs["tool_search"]]))
+
+    def resolve_company_source(company: str, candidate_url: str) -> str:
+        """Resolve ownership for a company source."""
+        return json.dumps({"company": company, "url": candidate_url})
+
+    scout.build_scout_agent(resolve_company_source, SearchBudget())
+
+    assert [tool.__name__ for tool in captured["tools"]] == [
+        "web_search",
+        "resolve_company_source",
+    ]

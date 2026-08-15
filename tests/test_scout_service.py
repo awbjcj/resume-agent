@@ -1,10 +1,11 @@
 from dataclasses import dataclass
+import threading
+import time
 from typing import Literal, cast
 
 import pytest
 
 from resume_agent.api.schemas.config import SearchConfigDoc
-from resume_agent.discovery import scout as scout_agent
 from resume_agent.discovery.scout import ScoutTurnDraft
 from resume_agent.discovery.scout_store import (
     ScoutProposal,
@@ -15,9 +16,15 @@ from resume_agent.discovery.scout_store import (
     end_session,
     load_session,
 )
+from resume_agent.discovery.source_resolution.models import (
+    CompanySourceResolution,
+    ResolutionStatus,
+    SourceEvidence,
+)
+from resume_agent.discovery.source_resolution.resolver import resolution_cache_key
+from resume_agent.discovery.source_resolution.search import SearchCoverage
 from resume_agent.services import scout as service
 from resume_agent.services.config_store import YamlConfigStore
-from resume_agent.services.sources import SourcePreview
 from resume_agent.sessions.stream import (
     Completed,
     TextDelta,
@@ -73,7 +80,7 @@ class StreamingScout:
         return self.run(prompt)
 
 
-CheckStatus = Literal["validated", "unverified", "failed", "duplicate", "avoid", "new"]
+CheckStatus = Literal["validated", "unverified", "conflict", "failed", "duplicate", "avoid", "new"]
 
 
 def source_proposal(company: str = "Modal", check: CheckStatus = "validated") -> ScoutProposal:
@@ -88,30 +95,18 @@ def term_proposal(value="inference serving"):
     return ScoutProposal(kind="search_term", term=TermPayload(value=value), check="new")
 
 
-def test_post_process_reuses_the_models_source_probe(monkeypatch, tmp_path):
-    calls = 0
-
-    def probe(url, **kwargs):
-        nonlocal calls
-        calls += 1
-        return SourcePreview(
-            ok=True,
-            url=url,
-            kind="lever",
-            token="modal",
-            role_count=4,
-        )
-
-    monkeypatch.setattr(scout_agent, "preview_source", probe)
-    cache: dict[str, SourcePreview] = {}
-    scout_agent.make_check_source_tool(str(tmp_path / "search.yaml"), cache=cache)(
-        "https://jobs.lever.co/modal"
+def test_post_process_reuses_the_company_and_board_resolution(tmp_path):
+    resolution = CompanySourceResolution(
+        company="Modal",
+        requested_url="https://jobs.lever.co/modal",
+        canonical_board_url="https://jobs.lever.co/modal",
+        ats="lever",
+        token="modal",
+        role_count=4,
+        status="verified",
+        reason_code="VERIFIED_PROVIDER_METADATA",
     )
-    monkeypatch.setattr(
-        service,
-        "preview_source",
-        lambda *args, **kwargs: pytest.fail("source was probed twice"),
-    )
+    cache = {resolution_cache_key("Modal", resolution.requested_url): resolution}
 
     proposals = service._post_process(
         Reporter(),
@@ -134,23 +129,33 @@ def test_post_process_reuses_the_models_source_probe(monkeypatch, tmp_path):
         session={"proposals": []},
         connectors_path=str(tmp_path / "connectors.yaml"),
         search_path=str(tmp_path / "search.yaml"),
-        probe_cache=cache,
+        resolution_cache=cache,
+        resolve_source=lambda *_args: pytest.fail("source was resolved twice"),
     )
 
-    assert calls == 1
     assert proposals[0].check == "validated"
     assert proposals[0].source is not None
     assert proposals[0].source.token == "modal"
 
 
-def test_streamed_prose_is_stored_and_source_is_authoritatively_probed(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        service,
-        "preview_source",
-        lambda url, **kwargs: SourcePreview(
-            ok=True, url="https://jobs.lever.co/modal", kind="lever", token="modal", role_count=4
-        ),
-    )
+def test_streamed_prose_is_stored_and_source_is_authoritatively_resolved(monkeypatch, tmp_path):
+    class Resolver:
+        def __init__(self, _search_path):
+            pass
+
+        def resolve(self, company, candidate_url):
+            return CompanySourceResolution(
+                company=company,
+                requested_url=candidate_url,
+                canonical_board_url="https://jobs.lever.co/modal",
+                ats="lever",
+                token="modal",
+                role_count=4,
+                status="verified",
+                reason_code="VERIFIED_PROVIDER_METADATA",
+            )
+
+    monkeypatch.setattr(service, "CompanySourceResolver", Resolver)
     sink = _Sink()
     view = service.run_start_turn(
         Reporter(),
@@ -187,6 +192,139 @@ def test_streamed_prose_is_stored_and_source_is_authoritatively_probed(monkeypat
         for event in sink.events
         if isinstance(event, (ToolStarted, ToolCompleted))
     ] == ["ToolStarted", "ToolCompleted"]
+
+
+def test_post_process_never_validates_a_live_unowned_board(tmp_path):
+    result = CompanySourceResolution(
+        company="Tempus",
+        requested_url="https://jobs.lever.co/tempus",
+        canonical_board_url="https://jobs.lever.co/tempus",
+        ats="lever",
+        status="unverified",
+        reason_code="OWNERSHIP_NOT_PROVEN",
+    )
+    draft = ScoutTurnDraft.model_validate(
+        {
+            "message": "Found Tempus.",
+            "proposals": [
+                {
+                    "kind": "source",
+                    "source": {
+                        "company": "Tempus",
+                        "url": result.requested_url,
+                    },
+                }
+            ],
+        }
+    ).proposals[0]
+
+    proposals = service._post_process(
+        Reporter(),
+        [draft],
+        session={"proposals": []},
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        resolve_source=lambda _company, _url: result,
+    )
+
+    assert proposals[0].check == "unverified"
+    assert proposals[0].source is not None
+    assert proposals[0].source.resolution_reason == "OWNERSHIP_NOT_PROVEN"
+
+
+def test_interrupted_search_only_downgrades_unresolved_sources(tmp_path):
+    verified = CompanySourceResolution(
+        company="Intuitive Surgical",
+        requested_url="https://careers.smartrecruiters.com/intuitive",
+        canonical_board_url="https://careers.smartrecruiters.com/intuitive",
+        ats="smartrecruiters",
+        status="verified",
+        reason_code="VERIFIED_FIRST_PARTY",
+    )
+    unresolved = CompanySourceResolution(
+        company="Tempus",
+        requested_url="https://tempus.wd5.myworkdayjobs.com/Tempus_Careers",
+        canonical_board_url="https://tempus.wd5.myworkdayjobs.com/Tempus_Careers",
+        ats="workday",
+        status="unverified",
+        reason_code="OWNERSHIP_NOT_PROVEN",
+    )
+    drafts = ScoutTurnDraft.model_validate(
+        {
+            "message": "Found two companies.",
+            "proposals": [
+                {"kind": "source", "source": {"company": verified.company, "url": verified.requested_url}},
+                {"kind": "source", "source": {"company": unresolved.company, "url": unresolved.requested_url}},
+            ],
+        }
+    ).proposals
+    coverage = SearchCoverage(
+        searched_families=["smartrecruiters", "workday"],
+        unsearched_families=["lever"],
+        interruption_reason="SEARCH_RATE_LIMITED",
+    )
+
+    proposals = service._post_process(
+        Reporter(),
+        drafts,
+        session={"proposals": []},
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        resolve_source=lambda company, _url: verified if company == verified.company else unresolved,
+        search_coverage=coverage,
+    )
+
+    assert [row.check for row in proposals] == ["validated", "unverified"]
+    assert proposals[0].source is not None
+    assert proposals[0].source.resolution_reason == "VERIFIED_FIRST_PARTY"
+    assert proposals[1].source is not None
+    assert proposals[1].source.resolution_reason == "SEARCH_RATE_LIMITED"
+
+
+def test_post_process_limits_concurrent_company_resolutions_to_four(tmp_path):
+    active = 0
+    peak = 0
+    guard = threading.Lock()
+
+    def resolve(company: str, url: str) -> CompanySourceResolution:
+        nonlocal active, peak
+        with guard:
+            active += 1
+            peak = max(peak, active)
+        time.sleep(0.03)
+        with guard:
+            active -= 1
+        return CompanySourceResolution(
+            company=company,
+            requested_url=url,
+            canonical_board_url=url,
+            status="unverified",
+            reason_code="OWNERSHIP_NOT_PROVEN",
+        )
+
+    drafts = ScoutTurnDraft.model_validate(
+        {
+            "message": "Found candidates.",
+            "proposals": [
+                {
+                    "kind": "source",
+                    "source": {"company": f"Company {index}", "url": f"https://company-{index}.example/jobs"},
+                }
+                for index in range(6)
+            ],
+        }
+    ).proposals
+
+    service._post_process(
+        Reporter(),
+        drafts,
+        session={"proposals": []},
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        resolve_source=resolve,
+    )
+
+    assert peak == 4
 
 
 class _Sink:
@@ -286,6 +424,142 @@ def test_term_approval_preserves_unrelated_fields(tmp_path):
     assert view["proposals"][0]["status"] == "added"
 
 
+def _seed_source_for_approval(
+    tmp_path,
+    *,
+    check: CheckStatus,
+    ats: str | None = "lever",
+) -> None:
+    resolution_status: dict[CheckStatus, ResolutionStatus] = {
+        "validated": "verified",
+        "unverified": "unverified",
+        "conflict": "conflict",
+        "failed": "failed",
+    }
+    create_session_from_turn(
+        tmp_path,
+        "s1",
+        goal="AI infra",
+        user_text="AI infra",
+        scout_turn=ScoutTurnRecord(role="scout", text="First"),
+        proposals=[
+            ScoutProposal(
+                kind="source",
+                source=SourcePayload(
+                    company="Acme",
+                    url="https://jobs.lever.co/acme" if ats else "https://acme.example/careers",
+                    ats=ats,
+                    resolution_status=resolution_status.get(check),
+                    resolution_reason="OWNERSHIP_NOT_PROVEN",
+                ),
+                check=check,
+            )
+        ],
+    )
+
+
+def test_normal_approval_requires_a_verified_source(monkeypatch, tmp_path):
+    _seed_source_for_approval(tmp_path, check="unverified")
+    monkeypatch.setattr(service, "add_source", lambda **_kwargs: None)
+
+    with pytest.raises(ValueError, match="manual confirmation required"):
+        service.approve_proposal(
+            tmp_path,
+            "s1",
+            "p1",
+            config_store=YamlConfigStore(tmp_path / "config"),
+            connectors_path=str(tmp_path / "connectors.yaml"),
+            search_path=str(tmp_path / "search.yaml"),
+            browser_enabled=True,
+        )
+
+
+def test_manual_confirmation_adds_unverified_known_ats_and_audits(monkeypatch, tmp_path):
+    _seed_source_for_approval(tmp_path, check="unverified", ats="lever")
+    calls = []
+    monkeypatch.setattr(service, "add_source", lambda **kwargs: calls.append(kwargs))
+
+    view = service.approve_proposal(
+        tmp_path,
+        "s1",
+        "p1",
+        config_store=YamlConfigStore(tmp_path / "config"),
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        browser_enabled=False,
+        manual_confirmation=True,
+    )
+
+    assert calls[0]["provider"] == "auto"
+    assert view["proposals"][0]["manualConfirmation"]["url"] == "https://jobs.lever.co/acme"
+
+
+def test_manual_confirmation_requires_a_browser_for_generic_sources(monkeypatch, tmp_path):
+    _seed_source_for_approval(tmp_path, check="unverified", ats=None)
+    monkeypatch.setattr(service, "add_source", lambda **_kwargs: pytest.fail("must not add"))
+
+    with pytest.raises(ValueError, match="requires a local browser"):
+        service.approve_proposal(
+            tmp_path,
+            "s1",
+            "p1",
+            config_store=YamlConfigStore(tmp_path / "config"),
+            connectors_path=str(tmp_path / "connectors.yaml"),
+            search_path=str(tmp_path / "search.yaml"),
+            browser_enabled=False,
+            manual_confirmation=True,
+        )
+
+
+@pytest.mark.parametrize("check", ["conflict", "failed"])
+def test_conflict_and_failed_sources_cannot_be_manually_confirmed(monkeypatch, tmp_path, check):
+    _seed_source_for_approval(tmp_path, check=check)
+    monkeypatch.setattr(service, "add_source", lambda **_kwargs: pytest.fail("must not add"))
+
+    with pytest.raises(ValueError, match="not approvable"):
+        service.approve_proposal(
+            tmp_path,
+            "s1",
+            "p1",
+            config_store=YamlConfigStore(tmp_path / "config"),
+            connectors_path=str(tmp_path / "connectors.yaml"),
+            search_path=str(tmp_path / "search.yaml"),
+            browser_enabled=True,
+            manual_confirmation=True,
+        )
+
+
+def test_re_resolve_replaces_only_the_pending_exact_source_url(monkeypatch, tmp_path):
+    _seed_source_for_approval(tmp_path, check="unverified")
+    monkeypatch.setattr(service, "validate_public_url", lambda _url: None)
+
+    class Resolver:
+        def resolve(self, company, candidate_url):
+            return CompanySourceResolution(
+                company=company,
+                requested_url=candidate_url,
+                canonical_board_url="https://tempus.wd5.myworkdayjobs.com/Tempus_Careers",
+                ats="workday",
+                status="verified",
+                reason_code="VERIFIED_PROVIDER_METADATA",
+            )
+
+    view = service.resolve_proposal_source(
+        tmp_path,
+        "s1",
+        "p1",
+        url="https://tempus.example/careers",
+        search_path=str(tmp_path / "search.yaml"),
+        browser_enabled=False,
+        resolver=Resolver(),
+    )
+
+    proposal = view["proposals"][0]
+    assert proposal["check"] == "validated"
+    assert proposal["source"]["url"] == "https://tempus.wd5.myworkdayjobs.com/Tempus_Careers"
+    assert proposal["source"]["requestedUrl"] == "https://tempus.example/careers"
+
+
 def test_server_rejects_non_approvable_source_and_allows_resolution_after_end(tmp_path):
     create_session_from_turn(
         tmp_path,
@@ -311,6 +585,45 @@ def test_server_rejects_non_approvable_source_and_allows_resolution_after_end(tm
     )
     assert dismissed["proposals"][0]["status"] == "dismissed"
     assert load_session(tmp_path, "s1")["status"] == "ended"
+
+
+def test_session_view_projects_source_resolution_fields(tmp_path):
+    create_session_from_turn(
+        tmp_path,
+        "s1",
+        goal="AI infra",
+        user_text="AI infra",
+        scout_turn=ScoutTurnRecord(role="scout", text="First"),
+        proposals=[
+            ScoutProposal(
+                kind="source",
+                source=SourcePayload(
+                    company="Acme",
+                    url="https://jobs.lever.co/acme",
+                    ats="lever",
+                    resolution_status="unverified",
+                    resolution_reason="OWNERSHIP_NOT_PROVEN",
+                    evidence=[
+                        SourceEvidence(
+                            kind="candidate",
+                            source_url="https://acme.example/careers",
+                        )
+                    ],
+                    searched_families=["lever"],
+                    unsearched_families=["workday"],
+                ),
+                check="unverified",
+            )
+        ],
+    )
+
+    source = service.session_view(tmp_path, "s1", browser_enabled=False)["proposals"][0]["source"]
+
+    assert source["resolutionStatus"] == "unverified"
+    assert source["resolutionReason"] == "OWNERSHIP_NOT_PROVEN"
+    assert source["evidence"][0]["kind"] == "candidate"
+    assert source["searchedFamilies"] == ["lever"]
+    assert source["unsearchedFamilies"] == ["workday"]
 
 
 class UnparsableFormatter:
@@ -348,34 +661,28 @@ def test_unparsable_formatter_keeps_the_reply_the_user_already_watched(tmp_path,
     assert any("Expected ScoutTurnDraft" in record.getMessage() for record in caplog.records)
 
 
-def test_a_posting_url_is_stored_as_its_board_root_and_probed_only_once(
-    monkeypatch, tmp_path
-):
+def test_a_posting_url_reuses_its_company_and_board_resolution(tmp_path):
     """The agent finds a posting; the workspace must end up with the board.
 
-    This also pins the cache alignment: `check_source` and `_post_process` have
-    to normalize identically, or the post-process lookup misses and the source
-    is probed a second time.
+    This also pins cache alignment: the resolver tool and post-processing have
+    to normalize the company/board key identically, or one source is resolved
+    twice.
     """
     posting = (
         "https://phinia.wd5.myworkdayjobs.com/en-US/PHINIA_Careers/job/"
         "Potting-and-Dispense-System-Expert_R2026-0020?utm_source=openai"
     )
     root = "https://phinia.wd5.myworkdayjobs.com/PHINIA_Careers"
-    probed: list[str] = []
-
-    def probe(url, **kwargs):
-        probed.append(url)
-        return SourcePreview(ok=True, url=url, kind="workday", role_count=7)
-
-    monkeypatch.setattr(scout_agent, "preview_source", probe)
-    cache: dict[str, SourcePreview] = {}
-    scout_agent.make_check_source_tool(str(tmp_path / "search.yaml"), cache=cache)(posting)
-    monkeypatch.setattr(
-        service,
-        "preview_source",
-        lambda *args, **kwargs: pytest.fail("source was probed twice"),
+    resolution = CompanySourceResolution(
+        company="PHINIA",
+        requested_url=root,
+        canonical_board_url=root,
+        ats="workday",
+        role_count=7,
+        status="verified",
+        reason_code="VERIFIED_FIRST_PARTY",
     )
+    cache = {resolution_cache_key("PHINIA", posting): resolution}
 
     proposals = service._post_process(
         Reporter(),
@@ -392,10 +699,10 @@ def test_a_posting_url_is_stored_as_its_board_root_and_probed_only_once(
         session={"proposals": []},
         connectors_path=str(tmp_path / "connectors.yaml"),
         search_path=str(tmp_path / "search.yaml"),
-        probe_cache=cache,
+        resolution_cache=cache,
+        resolve_source=lambda *_args: pytest.fail("source was resolved twice"),
     )
 
-    assert probed == [root], "the tool must probe the board root, not the posting"
     assert proposals[0].source is not None
     assert proposals[0].source.url == root
     assert proposals[0].check == "validated"
