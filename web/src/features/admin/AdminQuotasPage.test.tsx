@@ -16,6 +16,7 @@ const page = (data: unknown[]) => ({
 
 const previewBodies: Array<Record<string, unknown>> = [];
 const tierBodies: Array<Record<string, unknown>> = [];
+const tierPatches: Array<{ tierId: string; body: Record<string, unknown> }> = [];
 
 function handlers() {
   return [
@@ -43,6 +44,21 @@ function handlers() {
         memberCount: 0,
         spendMicros: 0,
       }, { status: 201 });
+    }),
+    http.patch("/api/admin/quota-tiers/:tierId", async ({ params, request }) => {
+      const body = await request.json() as Record<string, unknown>;
+      tierPatches.push({ tierId: String(params.tierId), body });
+      return HttpResponse.json({
+        id: params.tierId,
+        name: body.name ?? "Free",
+        cycleUnit: body.cycleUnit ?? "WEEK",
+        cycleCount: body.cycleCount ?? 1,
+        allowanceMicros: body.allowanceMicros ?? 1000000,
+        isDefault: params.tierId === "FREE",
+        archivedAt: null,
+        memberCount: 0,
+        spendMicros: 0,
+      });
     }),
     http.post("/api/admin/quota-operation-previews", async ({ request }) => {
       const body = await request.json() as Record<string, unknown>;
@@ -79,6 +95,7 @@ async function choose(user: ReturnType<typeof userEvent.setup>, triggerName: str
 beforeEach(() => {
   previewBodies.length = 0;
   tierBodies.length = 0;
+  tierPatches.length = 0;
 });
 
 describe("AdminQuotasPage", () => {
@@ -99,6 +116,8 @@ describe("AdminQuotasPage", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
 
     await choose(user, "Target member", /alice · FREE/);
+    expect(screen.getByRole("combobox", { name: "Target member" })).toHaveTextContent("alice");
+    expect(screen.getByRole("combobox", { name: "Target member" })).not.toHaveTextContent("alice0000000");
     await user.type(screen.getByLabelText("Amount (USD)"), "1.00");
     await user.click(screen.getByRole("button", { name: "Preview impact" }));
     await waitFor(() => expect(previewBodies).toHaveLength(1));
@@ -119,32 +138,80 @@ describe("AdminQuotasPage", () => {
     });
   });
 
-  it("uses a closed tier selection and a single tier configuration reason", async () => {
+  it("creates a tier from the roster with an admin-supplied short ID", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByRole("heading", { name: "Cost quotas" });
 
     await user.click(screen.getByRole("tab", { name: "Tiers" }));
-    expect(await screen.findByRole("heading", { name: "Tier balance operation" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Tier ID")).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText("Audit reason for the next tier action")).toHaveLength(1);
+    expect(await screen.findByRole("heading", { name: "Allowance tiers" })).toBeInTheDocument();
+    // Every mutation carries its own reason; there is no shared reason field.
+    expect(screen.queryByLabelText("Audit reason for the next tier action")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Tier name")).not.toBeInTheDocument();
 
-    const createTierSection = screen.getByRole("heading", { name: "Create allowance tier" }).closest("section");
-    expect(createTierSection).not.toBeNull();
-    await user.type(within(createTierSection!).getByLabelText("Tier name"), "Partner Team");
-    await user.type(screen.getByLabelText("Audit reason for the next tier action"), "new partner plan");
+    await user.click(screen.getByRole("button", { name: "New tier" }));
+    await user.type(screen.getByLabelText("Tier name"), "Partner Team");
+    // The short ID follows the name until it is edited.
+    expect(screen.getByLabelText("Short ID")).toHaveValue("PARTNER_TEAM");
+    await user.clear(screen.getByLabelText("Short ID"));
+    await user.type(screen.getByLabelText("Short ID"), "partners");
+    expect(screen.getByLabelText("Short ID")).toHaveValue("PARTNERS");
+    await user.type(screen.getByLabelText("Reason for this new tier"), "new partner plan");
     await user.click(screen.getByRole("button", { name: "Create tier" }));
     await waitFor(() => expect(tierBodies).toHaveLength(1));
     expect(tierBodies[0]).toMatchObject({
-      id: "PARTNER_TEAM",
+      id: "PARTNERS",
       name: "Partner Team",
       cycleUnit: "MONTH",
       cycleCount: 1,
       allowanceMicros: null,
       reason: "new partner plan",
     });
+  });
+
+  it("edits a tier in place and refuses to archive the default tier", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Cost quotas" });
+    await user.click(screen.getByRole("tab", { name: "Tiers" }));
+    await screen.findByRole("heading", { name: "Allowance tiers" });
+
+    await user.click(screen.getByRole("button", { name: "Edit Free tier" }));
+    const editor = screen.getByLabelText("Tier name").closest<HTMLElement>("div.border-t");
+    expect(editor).not.toBeNull();
+    // The short ID is permanent, so it is a readout rather than an input here.
+    expect(within(editor!).queryByRole("textbox", { name: "Short ID" })).not.toBeInTheDocument();
+    // FREE is the default tier and cannot be archived.
+    expect(within(editor!).queryByRole("button", { name: /Archive/ })).not.toBeInTheDocument();
+
+    // The editor seeds from the tier it belongs to, so $1.00 is already there.
+    expect(screen.getByLabelText("Allowance (USD)")).toHaveValue("1");
+    await user.clear(screen.getByLabelText("Allowance (USD)"));
+    await user.type(screen.getByLabelText("Allowance (USD)"), "2");
+    await user.type(screen.getByLabelText("Reason for this tier change"), "raise the free allowance");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(tierPatches).toHaveLength(1));
+    expect(tierPatches[0]).toEqual({
+      tierId: "FREE",
+      body: { reason: "raise the free allowance", allowanceMicros: 2000000 },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Edit Team tier" }));
+    expect(screen.getByRole("button", { name: /Archive tier/ })).toBeInTheDocument();
+  });
+
+  it("targets a tier balance operation with one inline audit reason", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Cost quotas" });
+
+    await user.click(screen.getByRole("tab", { name: "Tiers" }));
+    expect(await screen.findByRole("heading", { name: "Tier balance operation" })).toBeInTheDocument();
+    expect(screen.getAllByLabelText("Reason for this operation")).toHaveLength(1);
 
     await choose(user, "Target tier", /Free · 1 members/);
+    // The trigger shows the tier name, never the raw identifier.
+    expect(screen.getByRole("combobox", { name: "Target tier" })).toHaveTextContent("Free");
     await user.type(screen.getByLabelText("Amount (USD)"), "2.50");
     await user.click(screen.getByRole("button", { name: "Preview impact" }));
     await waitFor(() => expect(previewBodies).toHaveLength(1));

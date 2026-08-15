@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Archive,
   Banknote,
   CircleUserRound,
   Clock3,
   Gauge,
   History,
   Layers3,
+  Plus,
   Search,
   Users,
 } from "lucide-react";
@@ -42,6 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMe } from "@/features/auth/AuthGate";
 import { api, unwrap } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
+import { cn } from "@/lib/utils";
 
 type QuotaAccount = components["schemas"]["QuotaAccountOut"];
 type QuotaPreview = components["schemas"]["QuotaOperationPreviewOut"];
@@ -69,6 +72,20 @@ const ACTION_LABELS: Record<QuotaActionType, string> = {
   GRANT_CREDIT: "Grant credit",
   DEBIT_CREDIT: "Debit credit",
   RESET_CURRENT_PERIOD: "Reset current period",
+};
+
+const RATE_PERIOD_LABELS: Record<RatePeriodChoice, string> = {
+  all: "Every hour",
+  peak: "Peak hours",
+  off_peak: "Off-peak hours",
+};
+
+const BALANCE_LABELS: Record<string, string> = {
+  [ALL_BALANCES]: "All balances",
+  POSITIVE: "Positive",
+  ZERO: "Depleted",
+  OVERAGE: "Overage",
+  UNLIMITED: "Unlimited",
 };
 
 function usd(micros: number | null | undefined): string {
@@ -119,9 +136,72 @@ function tierIdFromName(name: string): string {
   return identifier.slice(0, 32).replace(/_+$/g, "") || "TIER";
 }
 
-function readableCycle(unit: CycleUnit, count: number): string {
+function cycleSuffix(unit: CycleUnit, count: number): string {
   const label = unit === "WEEK" ? "week" : "month";
-  return count === 1 ? `Every ${label}` : `Every ${count} ${label}s`;
+  return count === 1 ? `every ${label}` : `every ${count} ${label}s`;
+}
+
+/** Agrees with the count beside it, so the pair never reads "Every 1 Months". */
+function unitLabel(unit: CycleUnit, count: string): string {
+  const label = unit === "WEEK" ? "Week" : "Month";
+  return count === "1" ? label : `${label}s`;
+}
+
+/**
+ * Select triggers ship at `pl-2.5` and `text-sm`; inputs at `px-3` and
+ * `text-base md:text-[0.95rem]`. Side by side in a row that difference reads as
+ * a misalignment, so every trigger on this page is paired to the input metrics.
+ */
+const CONTROL_TRIGGER = "w-full pl-3 text-base md:text-[0.95rem]";
+
+/**
+ * One label-plus-control geometry for the whole console.
+ *
+ * Two things break a row of fields, and both are fixed here rather than at each
+ * call site. First, `Label` is `leading-none`, so a hand-rolled
+ * `<p className="text-sm">` label stands ~6px taller and drops its control out
+ * of line. Second, the stack is `flex flex-col gap-1.5` and never `space-y-*`:
+ * Tailwind spaces with `:not(:last-child)`, and Base UI's `Select` appends a
+ * hidden form input after the trigger, which hands the trigger a stray 6px
+ * bottom margin. A flex gap ignores that out-of-flow child.
+ */
+function Field({
+  label,
+  htmlFor,
+  className,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+/** A field-shaped readout for a target the admin cannot change. */
+function StaticField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <span className="flex items-center text-sm leading-none font-medium">{label}</span>
+      <div className="flex h-9 items-center rounded-lg border bg-muted/30 px-3 text-base text-muted-foreground md:text-[0.95rem]">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function Metric({
@@ -232,11 +312,13 @@ function AccountDrawer({
               </div>
             </dl>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="drawer-tier">Assign tier</Label>
+            <Field label="Assign tier" htmlFor="drawer-tier">
               <Select value={tierId} onValueChange={(value) => setTierId(value ?? "")}>
-                <SelectTrigger id="drawer-tier" size="compact" className="w-full" aria-label="Assign member tier">
-                  <SelectValue placeholder={`Keep ${account.tierId}`} />
+                <SelectTrigger id="drawer-tier" size="compact" className={CONTROL_TRIGGER} aria-label="Assign member tier">
+                  <SelectValue>
+                    {(value) =>
+                      tiers.find((tier) => tier.id === value)?.name ?? `Keep ${account.tierId}`}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {tiers.map((tier) => (
@@ -246,7 +328,7 @@ function AccountDrawer({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
             <div className="space-y-3 rounded-lg border p-4">
               <div className="space-y-1">
@@ -280,8 +362,7 @@ function AccountDrawer({
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="drawer-reason">Audit reason</Label>
+            <Field label="Reason for this member change" htmlFor="drawer-reason">
               <Input
                 id="drawer-reason"
                 className="h-9"
@@ -289,7 +370,7 @@ function AccountDrawer({
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="Why is this member change needed?"
               />
-            </div>
+            </Field>
             {patch.isError ? (
               <Alert variant="destructive">
                 <AlertTitle>Update failed</AlertTitle>
@@ -407,30 +488,23 @@ function QuotaOperationCard({
   }
 
   return (
-    <Card className="border-amber-500/35 bg-amber-500/[0.035]">
-      <CardHeader>
+    <Card>
+      <CardHeader className="pb-3">
         <CardTitle>
           <h2 className="flex items-center gap-2 text-base">
-            <Banknote className="size-4" aria-hidden="true" />
+            <Banknote className="size-4 text-muted-foreground" aria-hidden="true" />
             {title}
           </h2>
         </CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div
-          className={`grid gap-3 sm:grid-cols-2 ${
-            targetTypes.length > 1
-              ? "xl:grid-cols-[10rem_minmax(14rem,1fr)_13rem_10rem]"
-              : "xl:grid-cols-[minmax(14rem,1fr)_13rem_10rem]"
-          }`}
-        >
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
           {targetTypes.length > 1 ? (
-            <div className="space-y-1.5">
-              <Label htmlFor={`${title}-scope`}>Scope</Label>
+            <Field label="Scope" htmlFor={`${title}-scope`} className="w-36">
               <Select value={targetType} onValueChange={(value) => changeTargetType(value as QuotaTargetType)}>
-                <SelectTrigger id={`${title}-scope`} size="compact" className="w-full" aria-label="Target scope">
-                  <SelectValue />
+                <SelectTrigger id={`${title}-scope`} size="compact" className={CONTROL_TRIGGER} aria-label="Target scope">
+                  <SelectValue>{(value) => TARGET_LABELS[value as QuotaTargetType]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {targetTypes.map((type) => (
@@ -438,12 +512,11 @@ function QuotaOperationCard({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : null}
 
           {targetType === "USER" ? (
-            <div className="space-y-1.5">
-              <Label htmlFor={`${title}-member`}>Member</Label>
+            <Field label="Member" htmlFor={`${title}-member`} className="w-48">
               <Select
                 value={targetValue}
                 onValueChange={(value) => {
@@ -451,8 +524,11 @@ function QuotaOperationCard({
                   clearPreview();
                 }}
               >
-                <SelectTrigger id={`${title}-member`} size="compact" className="w-full" aria-label="Target member">
-                  <SelectValue placeholder="Choose a member" />
+                <SelectTrigger id={`${title}-member`} size="compact" className={CONTROL_TRIGGER} aria-label="Target member">
+                  <SelectValue>
+                    {(value) =>
+                      accounts.find((account) => account.userId === value)?.username ?? "Choose a member"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
@@ -462,12 +538,11 @@ function QuotaOperationCard({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : null}
 
           {targetType === "TIER" ? (
-            <div className="space-y-1.5">
-              <Label htmlFor={`${title}-tier`}>Tier</Label>
+            <Field label="Tier" htmlFor={`${title}-tier`} className="w-48">
               <Select
                 value={targetValue}
                 onValueChange={(value) => {
@@ -475,8 +550,10 @@ function QuotaOperationCard({
                   clearPreview();
                 }}
               >
-                <SelectTrigger id={`${title}-tier`} size="compact" className="w-full" aria-label="Target tier">
-                  <SelectValue placeholder="Choose a tier" />
+                <SelectTrigger id={`${title}-tier`} size="compact" className={CONTROL_TRIGGER} aria-label="Target tier">
+                  <SelectValue>
+                    {(value) => tiers.find((tier) => tier.id === value)?.name ?? "Choose a tier"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {tiers.map((tier) => (
@@ -486,20 +563,16 @@ function QuotaOperationCard({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : null}
 
           {targetType === "ALL_MEMBERS" ? (
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">Target</p>
-              <div className="flex h-9 items-center rounded-lg border bg-background/70 px-3 text-sm">
-                All {accounts.length} member accounts
-              </div>
-            </div>
+            <StaticField label="Target" className="w-48">
+              All {accounts.length} member accounts
+            </StaticField>
           ) : null}
 
-          <div className="space-y-1.5">
-            <Label htmlFor={`${title}-action`}>Action</Label>
+          <Field label="Action" htmlFor={`${title}-action`} className="w-40">
             <Select
               value={actionType}
               onValueChange={(value) => {
@@ -507,8 +580,8 @@ function QuotaOperationCard({
                 clearPreview();
               }}
             >
-              <SelectTrigger id={`${title}-action`} size="compact" className="w-full" aria-label="Quota action">
-                <SelectValue />
+              <SelectTrigger id={`${title}-action`} size="compact" className={CONTROL_TRIGGER} aria-label="Quota action">
+                <SelectValue>{(value) => ACTION_LABELS[value as QuotaActionType]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {(Object.keys(ACTION_LABELS) as QuotaActionType[]).map((action) => (
@@ -516,45 +589,35 @@ function QuotaOperationCard({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           {requiresAmount ? (
-            <div className="space-y-1.5">
-              <Label htmlFor={`${title}-amount`}>Amount (USD)</Label>
+            <Field label="Amount (USD)" htmlFor={`${title}-amount`} className="w-32">
               <Input
                 id={`${title}-amount`}
                 className="h-9"
                 aria-invalid={amount !== "" && amountMicros == null}
                 inputMode="decimal"
-                placeholder="e.g. 10.00"
+                placeholder="10.00"
                 value={amount}
                 onChange={(event) => {
                   setAmount(event.target.value);
                   clearPreview();
                 }}
               />
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">Effect</p>
-              <div className="flex h-9 items-center rounded-lg border bg-background/70 px-3 text-sm">
-                Reset current period
-              </div>
-            </div>
-          )}
-        </div>
+            </Field>
+          ) : null}
 
-        <div className="flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="w-full space-y-1.5 lg:max-w-2xl">
-            <Label htmlFor={`${title}-reason`}>Audit reason</Label>
+          <Field label="Reason for this operation" htmlFor={`${title}-reason`} className="min-w-48 flex-1">
             <Input
               id={`${title}-reason`}
               className="h-9"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Required only when confirming this operation"
+              placeholder="Why this operation is needed"
             />
-          </div>
+          </Field>
+
           <Button
             size="sm"
             variant="outline"
@@ -566,13 +629,13 @@ function QuotaOperationCard({
         </div>
 
         {preview ? (
-          <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-background p-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/[0.04] p-3 duration-150 ease-out-strong animate-in fade-in-0 slide-in-from-top-1 motion-reduce:animate-none sm:flex-row sm:items-center">
             <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden="true" />
             <div className="flex-1">
-              <div className="font-medium">
+              <div className="text-sm font-medium">
                 {preview.affectedCount} account{preview.affectedCount === 1 ? "" : "s"} frozen for review
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 Total effect {usd(preview.totalEffectMicros)} · preview expires {new Date(preview.expiresAt).toLocaleTimeString()}
               </div>
             </div>
@@ -598,331 +661,445 @@ function QuotaOperationCard({
   );
 }
 
-type TierDraft = {
-  name?: string;
-  cycleUnit?: CycleUnit;
-  cycleCount?: string;
-  allowance?: string;
+const TIER_ID_PATTERN = /^[A-Z][A-Z0-9_]{1,31}$/;
+
+/** Roster geometry. The header, every tier row, and the editor all read from it. */
+const TIER_GRID = "grid grid-cols-[minmax(9rem,1fr)_7rem_9rem_5rem_7rem_4.5rem] items-center gap-3";
+
+type TierForm = {
+  id: string;
+  name: string;
+  allowance: string;
+  cycleUnit: CycleUnit;
+  cycleCount: string;
+  reason: string;
 };
+
+function formFromTier(tier: QuotaTier): TierForm {
+  return {
+    id: tier.id,
+    name: tier.name,
+    allowance: usdInputValue(tier.allowanceMicros),
+    cycleUnit: tier.cycleUnit,
+    cycleCount: String(tier.cycleCount),
+    reason: "",
+  };
+}
+
+const BLANK_TIER_FORM: TierForm = {
+  id: "",
+  name: "",
+  allowance: "",
+  cycleUnit: "MONTH",
+  cycleCount: "1",
+  reason: "",
+};
+
+function TierColumnHeader() {
+  return (
+    <div
+      className={cn(
+        TIER_GRID,
+        "border-b bg-muted/25 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground",
+      )}
+    >
+      <span>Tier</span>
+      <span>Short ID</span>
+      <span>Allowance</span>
+      <span className="text-right">Members</span>
+      <span className="text-right">Spend</span>
+      <span className="sr-only">Actions</span>
+    </div>
+  );
+}
+
+/**
+ * The create and edit forms are the same component so a tier is configured with
+ * the same controls that made it. Only the immutable short ID differs: it is an
+ * input at creation and a fixed readout afterwards.
+ */
+function TierEditor({
+  form,
+  onChange,
+  mode,
+  tier,
+  onCancel,
+  onSubmit,
+  onArchive,
+  isSaving,
+  isArchiving,
+  error,
+}: {
+  form: TierForm;
+  onChange: (changes: Partial<TierForm>) => void;
+  mode: "create" | "edit";
+  tier: QuotaTier | null;
+  onCancel: () => void;
+  onSubmit: () => void;
+  onArchive: () => void;
+  isSaving: boolean;
+  isArchiving: boolean;
+  error: string | null;
+}) {
+  const prefix = mode === "create" ? "new-tier" : "edit-tier";
+  const allowanceMicros = optionalMicros(form.allowance);
+  const allowanceIsValid = allowanceMicros !== undefined;
+  const idIsValid = TIER_ID_PATTERN.test(form.id);
+  const hasReason = Boolean(form.reason.trim());
+  const changed = tier
+    ? form.name.trim() !== tier.name
+      || form.cycleUnit !== tier.cycleUnit
+      || Number(form.cycleCount) !== tier.cycleCount
+      || allowanceMicros !== tier.allowanceMicros
+    : true;
+  const canSubmit = Boolean(
+    form.name.trim() && allowanceIsValid && hasReason && changed && (mode === "edit" || idIsValid),
+  );
+
+  return (
+    <div className="border-t bg-muted/20 px-4 py-4 duration-150 ease-out-strong animate-in fade-in-0 slide-in-from-top-1 motion-reduce:animate-none">
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Tier name" htmlFor={`${prefix}-name`} className="w-48">
+          <Input
+            id={`${prefix}-name`}
+            className="h-9"
+            placeholder="e.g. Team"
+            value={form.name}
+            onChange={(event) => onChange({ name: event.target.value })}
+          />
+        </Field>
+
+        {mode === "create" ? (
+          <Field label="Short ID" htmlFor="new-tier-id" className="w-48">
+            <Input
+              id="new-tier-id"
+              className="h-9 font-mono uppercase"
+              aria-invalid={form.id !== "" && !idIsValid}
+              aria-describedby="new-tier-id-rule"
+              placeholder="TEAM"
+              value={form.id}
+              onChange={(event) => onChange({ id: event.target.value.toUpperCase() })}
+            />
+          </Field>
+        ) : (
+          <StaticField label="Short ID" className="w-48">
+            <span className="font-mono">{form.id}</span>
+          </StaticField>
+        )}
+
+        <Field label="Allowance (USD)" htmlFor={`${prefix}-allowance`} className="w-36">
+          <Input
+            id={`${prefix}-allowance`}
+            className="h-9"
+            aria-invalid={form.allowance !== "" && !allowanceIsValid}
+            inputMode="decimal"
+            placeholder="Unlimited"
+            value={form.allowance}
+            onChange={(event) => onChange({ allowance: event.target.value })}
+          />
+        </Field>
+
+        <Field label="Every" htmlFor={`${prefix}-count`} className="w-20">
+          <Select
+            value={form.cycleCount}
+            onValueChange={(value) => onChange({ cycleCount: value ?? "1" })}
+          >
+            <SelectTrigger
+              id={`${prefix}-count`}
+              size="compact"
+              className={CONTROL_TRIGGER}
+              aria-label={mode === "create" ? "New tier cycle count" : "Tier cycle count"}
+            >
+              <SelectValue>{(value) => String(value ?? "1")}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {CYCLE_COUNTS.map((count) => <SelectItem key={count} value={String(count)}>{count}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field label="Period" htmlFor={`${prefix}-unit`} className="w-32">
+          <Select
+            value={form.cycleUnit}
+            onValueChange={(value) => onChange({ cycleUnit: value as CycleUnit })}
+          >
+            <SelectTrigger
+              id={`${prefix}-unit`}
+              size="compact"
+              className={CONTROL_TRIGGER}
+              aria-label={mode === "create" ? "New tier cycle period" : "Tier cycle period"}
+            >
+              <SelectValue>{(value) => unitLabel(value as CycleUnit, form.cycleCount)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="MONTH">{unitLabel("MONTH", form.cycleCount)}</SelectItem>
+              <SelectItem value="WEEK">{unitLabel("WEEK", form.cycleCount)}</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field
+          label={mode === "create" ? "Reason for this new tier" : "Reason for this tier change"}
+          htmlFor={`${prefix}-reason`}
+          className="min-w-48 flex-1"
+        >
+          <Input
+            id={`${prefix}-reason`}
+            className="h-9"
+            value={form.reason}
+            onChange={(event) => onChange({ reason: event.target.value })}
+            placeholder={mode === "create" ? "Why this tier is being added" : "Why this tier is changing"}
+          />
+        </Field>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p id="new-tier-id-rule" className="text-xs text-muted-foreground">
+          {mode === "create"
+            ? "The short ID is permanent. Use A–Z, 0–9 and underscores, starting with a letter."
+            : `${tier?.memberCount ?? 0} member${tier?.memberCount === 1 ? "" : "s"} on this tier · ${usd(tier?.spendMicros ?? 0)} spent this period`}
+        </p>
+        <div className="flex gap-2">
+          {mode === "edit" && tier && !tier.isDefault ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={!hasReason || isArchiving}
+              onClick={onArchive}
+            >
+              <Archive data-icon="inline-start" />
+              {isArchiving ? "Archiving…" : "Archive tier"}
+            </Button>
+          ) : null}
+          <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button size="sm" disabled={!canSubmit || isSaving} onClick={onSubmit}>
+            {isSaving
+              ? (mode === "create" ? "Creating…" : "Saving…")
+              : (mode === "create" ? "Create tier" : "Save changes")}
+          </Button>
+        </div>
+      </div>
+
+      {error ? (
+        <Alert variant="destructive" className="mt-3">
+          <AlertTitle>{mode === "create" ? "Tier not created" : "Tier not updated"}</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
+  );
+}
 
 function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAccount[] }) {
   const queryClient = useQueryClient();
-  const [newName, setNewName] = useState("");
-  const [newAllowance, setNewAllowance] = useState("");
-  const [newCycleUnit, setNewCycleUnit] = useState<CycleUnit>("MONTH");
-  const [newCycleCount, setNewCycleCount] = useState("1");
-  const [reason, setReason] = useState("");
-  const [selectedTierId, setSelectedTierId] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, TierDraft>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<TierForm>(BLANK_TIER_FORM);
+  // The short ID follows the name until an admin types their own.
+  const [idIsCustom, setIdIsCustom] = useState(false);
 
-  const selectedTier = tiers.find((tier) => tier.id === selectedTierId) ?? tiers[0] ?? null;
-  const selectedDraft = selectedTier ? drafts[selectedTier.id] ?? {} : {};
-  const selectedName = selectedTier ? selectedDraft.name ?? selectedTier.name : "";
-  const selectedCycleUnit = selectedTier ? selectedDraft.cycleUnit ?? selectedTier.cycleUnit : "MONTH";
-  const selectedCycleCount = selectedTier ? selectedDraft.cycleCount ?? String(selectedTier.cycleCount) : "1";
-  const selectedAllowance = selectedTier
-    ? selectedDraft.allowance ?? usdInputValue(selectedTier.allowanceMicros)
-    : "";
-  const newAllowanceMicros = optionalMicros(newAllowance);
-  const selectedAllowanceMicros = optionalMicros(selectedAllowance);
-  const derivedId = tierIdFromName(newName);
+  const editingTier = tiers.find((tier) => tier.id === editingId) ?? null;
 
-  function updateDraft(changes: TierDraft) {
-    if (!selectedTier) return;
-    setDrafts((current) => ({
-      ...current,
-      [selectedTier.id]: { ...current[selectedTier.id], ...changes },
-    }));
+  function updateForm(changes: Partial<TierForm>) {
+    if (changes.id !== undefined) setIdIsCustom(true);
+    setForm((current) => {
+      const next = { ...current, ...changes };
+      if (creating && changes.name !== undefined && changes.id === undefined && !idIsCustom) {
+        next.id = changes.name.trim() ? tierIdFromName(changes.name) : "";
+      }
+      return next;
+    });
   }
 
-  function buildTierPatch() {
-    if (!selectedTier) return null;
-    const nextName = selectedName.trim();
-    const nextCycleCount = Number(selectedCycleCount);
+  function closeEditor() {
+    setCreating(false);
+    setEditingId(null);
+    setIdIsCustom(false);
+    create.reset();
+    save.reset();
+    archive.reset();
+  }
+
+  function startCreate() {
+    setEditingId(null);
+    setIdIsCustom(false);
+    setForm(BLANK_TIER_FORM);
+    setCreating(true);
+    create.reset();
+  }
+
+  function startEdit(tier: QuotaTier) {
+    setCreating(false);
+    setIdIsCustom(false);
+    setForm(formFromTier(tier));
+    setEditingId(tier.id);
+    save.reset();
+    archive.reset();
+  }
+
+  function tierPatch(tier: QuotaTier) {
+    const allowanceMicros = optionalMicros(form.allowance);
     const body: {
       name?: string;
       cycleUnit?: CycleUnit;
       cycleCount?: number;
       allowanceMicros?: number | null;
       reason: string;
-    } = { reason };
-    if (nextName !== selectedTier.name) body.name = nextName;
-    if (selectedCycleUnit !== selectedTier.cycleUnit) body.cycleUnit = selectedCycleUnit;
-    if (nextCycleCount !== selectedTier.cycleCount) body.cycleCount = nextCycleCount;
-    if (selectedAllowanceMicros !== selectedTier.allowanceMicros) {
-      body.allowanceMicros = selectedAllowanceMicros;
-    }
+    } = { reason: form.reason };
+    if (form.name.trim() !== tier.name) body.name = form.name.trim();
+    if (form.cycleUnit !== tier.cycleUnit) body.cycleUnit = form.cycleUnit;
+    if (Number(form.cycleCount) !== tier.cycleCount) body.cycleCount = Number(form.cycleCount);
+    if (allowanceMicros !== tier.allowanceMicros) body.allowanceMicros = allowanceMicros;
     return body;
   }
 
-  const patchBody = buildTierPatch();
-  const hasTierChanges = patchBody != null && Object.keys(patchBody).length > 1;
-  const canCreate = Boolean(newName.trim()) && newAllowanceMicros !== undefined && Boolean(reason.trim());
-  const canSave = Boolean(
-    selectedTier
-    && selectedName.trim()
-    && selectedAllowanceMicros !== undefined
-    && hasTierChanges
-    && reason.trim(),
-  );
+  function refreshTiers() {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "quota-tiers"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "quota-accounts"] });
+  }
 
   const create = useMutation({
     mutationFn: () => unwrap(api.POST("/api/admin/quota-tiers", {
       body: {
-        id: derivedId,
-        name: newName.trim(),
-        cycleUnit: newCycleUnit,
-        cycleCount: Number(newCycleCount),
-        allowanceMicros: newAllowanceMicros ?? null,
-        reason,
+        id: form.id,
+        name: form.name.trim(),
+        cycleUnit: form.cycleUnit,
+        cycleCount: Number(form.cycleCount),
+        allowanceMicros: optionalMicros(form.allowance) ?? null,
+        reason: form.reason,
       },
     })),
     onSuccess: () => {
-      setNewName("");
-      setNewAllowance("");
-      setNewCycleUnit("MONTH");
-      setNewCycleCount("1");
-      setReason("");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "quota-tiers"] });
+      setCreating(false);
+      setIdIsCustom(false);
+      setForm(BLANK_TIER_FORM);
+      refreshTiers();
     },
   });
   const save = useMutation({
     mutationFn: () => {
-      if (!selectedTier || !patchBody || !hasTierChanges) throw new Error("No tier changes to save");
+      if (!editingTier) throw new Error("No tier changes to save");
       return unwrap(api.PATCH("/api/admin/quota-tiers/{tier_id}", {
-        params: { path: { tier_id: selectedTier.id } },
-        body: patchBody,
+        params: { path: { tier_id: editingTier.id } },
+        body: tierPatch(editingTier),
       }));
     },
     onSuccess: () => {
-      if (selectedTier) {
-        setDrafts((current) => {
-          const next = { ...current };
-          delete next[selectedTier.id];
-          return next;
-        });
-      }
-      setReason("");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "quota-tiers"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "quota-accounts"] });
+      setEditingId(null);
+      refreshTiers();
     },
   });
   const archive = useMutation({
     mutationFn: () => {
-      if (!selectedTier) throw new Error("No tier selected");
+      if (!editingTier) throw new Error("No tier selected");
       return unwrap(api.PATCH("/api/admin/quota-tiers/{tier_id}", {
-        params: { path: { tier_id: selectedTier.id } },
-        body: { archived: true, reason },
+        params: { path: { tier_id: editingTier.id } },
+        body: { archived: true, reason: form.reason },
       }));
     },
     onSuccess: () => {
-      setReason("");
-      setSelectedTierId("");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "quota-tiers"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "quota-accounts"] });
+      setEditingId(null);
+      refreshTiers();
     },
   });
 
   return (
     <div className="space-y-5 pt-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle><h2 className="text-base">Tier configuration</h2></CardTitle>
-          <CardDescription>
-            Name a new plan once; its stable identifier is derived automatically. Select an existing tier to revise it.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="max-w-2xl space-y-1.5">
-            <Label htmlFor="tier-change-reason">Audit reason for the next tier action</Label>
-            <Input
-              id="tier-change-reason"
-              className="h-9"
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder="Why is this tier being created, changed, or archived?"
-            />
-            <p className="text-xs text-muted-foreground">Shared by create, save, and archive actions below.</p>
+      <Card className="gap-0 overflow-hidden py-0">
+        <CardHeader className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4">
+          <div>
+            <CardTitle>
+              <h2 className="flex items-center gap-2 text-base">
+                <Layers3 className="size-4 text-muted-foreground" aria-hidden="true" />
+                Allowance tiers
+              </h2>
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Each tier grants a recurring allowance to every member assigned to it. Edit a tier in place; changes are audited.
+            </CardDescription>
           </div>
-
-          <div className="grid gap-4 border-t pt-4 xl:grid-cols-2 xl:items-start">
-          <section className="space-y-4 rounded-lg border bg-muted/10 p-4" aria-labelledby="create-tier-title">
-            <div>
-              <h3 id="create-tier-title" className="font-medium">Create allowance tier</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Add a recurring allowance plan.</p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Label htmlFor="new-tier-name">Tier name</Label>
-                <Input
-                  id="new-tier-name"
-                  className="h-9"
-                  placeholder="e.g. Team"
-                  value={newName}
-                  onChange={(event) => setNewName(event.target.value)}
-                />
-              </div>
-              <div className="w-full space-y-1.5 sm:w-36">
-                <Label htmlFor="new-tier-allowance">Allowance (USD)</Label>
-                <Input
-                  id="new-tier-allowance"
-                  className="h-9"
-                  aria-invalid={newAllowance !== "" && newAllowanceMicros === undefined}
-                  inputMode="decimal"
-                  placeholder="Unlimited"
-                  value={newAllowance}
-                  onChange={(event) => setNewAllowance(event.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="w-full space-y-1.5 sm:w-36">
-                <Label htmlFor="new-tier-unit">Cadence</Label>
-                <Select value={newCycleUnit} onValueChange={(value) => setNewCycleUnit(value as CycleUnit)}>
-                  <SelectTrigger id="new-tier-unit" size="compact" className="w-full" aria-label="New tier cadence unit">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MONTH">Months</SelectItem>
-                    <SelectItem value="WEEK">Weeks</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-full space-y-1.5 sm:w-24">
-                <Label htmlFor="new-tier-count">Every</Label>
-                <Select value={newCycleCount} onValueChange={(value) => setNewCycleCount(value ?? "1")}>
-                  <SelectTrigger id="new-tier-count" size="compact" className="w-full" aria-label="New tier cadence count">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CYCLE_COUNTS.map((count) => <SelectItem key={count} value={String(count)}>{count}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t pt-3">
-              <p className="truncate text-xs text-muted-foreground">
-                ID <span className="font-mono text-foreground">{derivedId}</span>
-              </p>
-              <Button size="sm" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
-                {create.isPending ? "Creating…" : "Create tier"}
-              </Button>
-            </div>
-          </section>
-
-          <section className="space-y-4 rounded-lg border bg-muted/10 p-4" aria-labelledby="edit-tier-title">
-            <div>
-              <h3 id="edit-tier-title" className="font-medium">Edit existing tier</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Choose a tier, then adjust only the values that need to change.
-              </p>
-            </div>
-            {selectedTier ? (
-              <div className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Label htmlFor="selected-tier">Tier</Label>
-                    <Select
-                      value={selectedTier.id}
-                      onValueChange={(value) => setSelectedTierId(value ?? "")}
-                    >
-                      <SelectTrigger id="selected-tier" size="compact" className="w-full" aria-label="Tier to edit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tiers.map((tier) => (
-                          <SelectItem key={tier.id} value={tier.id}>{tier.name} · {tier.id}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+          <Button size="sm" variant="outline" disabled={creating} onClick={startCreate}>
+            <Plus data-icon="inline-start" />
+            New tier
+          </Button>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <div className="min-w-[46rem]">
+            <TierColumnHeader />
+            {creating ? (
+              <TierEditor
+                form={form}
+                onChange={updateForm}
+                mode="create"
+                tier={null}
+                onCancel={closeEditor}
+                onSubmit={() => create.mutate()}
+                onArchive={() => undefined}
+                isSaving={create.isPending}
+                isArchiving={false}
+                error={create.error?.message ?? null}
+              />
+            ) : null}
+            {tiers.map((tier) => (
+              <div
+                key={tier.id}
+                className={cn(
+                  "border-b last:border-b-0",
+                  editingId === tier.id ? "bg-muted/10" : undefined,
+                )}
+              >
+                <div className={cn(TIER_GRID, "px-4 py-3")}>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate font-medium">{tier.name}</span>
+                    {tier.isDefault ? (
+                      <Badge variant="secondary" className="shrink-0">Default</Badge>
+                    ) : null}
                   </div>
-                  <div className="w-full space-y-1.5 sm:w-36">
-                    <Label htmlFor="selected-tier-allowance">Allowance (USD)</Label>
-                    <Input
-                      id="selected-tier-allowance"
-                      className="h-9"
-                      aria-invalid={selectedAllowance !== "" && selectedAllowanceMicros === undefined}
-                      inputMode="decimal"
-                      placeholder="Unlimited"
-                      value={selectedAllowance}
-                      onChange={(event) => updateDraft({ allowance: event.target.value })}
-                    />
+                  <span className="truncate font-mono text-xs text-muted-foreground">{tier.id}</span>
+                  <div className="min-w-0">
+                    <div className="truncate font-mono text-sm tabular-nums">{usd(tier.allowanceMicros)}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {cycleSuffix(tier.cycleUnit, tier.cycleCount)}
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Label htmlFor="selected-tier-name">Tier name</Label>
-                    <Input
-                      id="selected-tier-name"
-                      className="h-9"
-                      value={selectedName}
-                      onChange={(event) => updateDraft({ name: event.target.value })}
-                    />
-                  </div>
-                  <div className="w-full space-y-1.5 sm:w-36">
-                    <Label htmlFor="selected-tier-unit">Cadence</Label>
-                    <Select
-                      value={selectedCycleUnit}
-                      onValueChange={(value) => updateDraft({ cycleUnit: value as CycleUnit })}
-                    >
-                      <SelectTrigger id="selected-tier-unit" size="compact" className="w-full" aria-label="Tier cadence unit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="MONTH">Months</SelectItem>
-                        <SelectItem value="WEEK">Weeks</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-full space-y-1.5 sm:w-24">
-                    <Label htmlFor="selected-tier-count">Every</Label>
-                    <Select
-                      value={selectedCycleCount}
-                      onValueChange={(value) => updateDraft({ cycleCount: value ?? "1" })}
-                    >
-                      <SelectTrigger id="selected-tier-count" size="compact" className="w-full" aria-label="Tier cadence count">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CYCLE_COUNTS.map((count) => <SelectItem key={count} value={String(count)}>{count}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <dl className="grid gap-3 border-t pt-3 text-sm sm:grid-cols-3">
-                  <div><dt className="text-muted-foreground">Members</dt><dd className="mt-1 font-mono">{selectedTier.memberCount}</dd></div>
-                  <div><dt className="text-muted-foreground">Open-period spend</dt><dd className="mt-1 font-mono">{usd(selectedTier.spendMicros)}</dd></div>
-                  <div><dt className="text-muted-foreground">Current cycle</dt><dd className="mt-1">{readableCycle(selectedTier.cycleUnit, selectedTier.cycleCount)}</dd></div>
-                </dl>
-                <div className="flex justify-end gap-2 border-t pt-3">
-                  {!selectedTier.isDefault ? (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={!reason.trim() || archive.isPending}
-                      onClick={() => archive.mutate()}
-                    >
-                      {archive.isPending ? "Archiving…" : "Archive tier"}
-                    </Button>
-                  ) : null}
-                  <Button size="sm" disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
-                    {save.isPending ? "Saving…" : "Save tier"}
+                  <span className="text-right font-mono text-sm tabular-nums">{tier.memberCount}</span>
+                  <span className="text-right font-mono text-sm tabular-nums">{usd(tier.spendMicros)}</span>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    className="justify-self-end"
+                    aria-expanded={editingId === tier.id}
+                    aria-label={`${editingId === tier.id ? "Close" : "Edit"} ${tier.name} tier`}
+                    onClick={() => (editingId === tier.id ? closeEditor() : startEdit(tier))}
+                  >
+                    {editingId === tier.id ? "Close" : "Edit"}
                   </Button>
                 </div>
+                {editingId === tier.id ? (
+                  <TierEditor
+                    form={form}
+                    onChange={updateForm}
+                    mode="edit"
+                    tier={tier}
+                    onCancel={closeEditor}
+                    onSubmit={() => save.mutate()}
+                    onArchive={() => archive.mutate()}
+                    isSaving={save.isPending}
+                    isArchiving={archive.isPending}
+                    error={save.error?.message ?? archive.error?.message ?? null}
+                  />
+                ) : null}
               </div>
-            ) : (
-              <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                Create a tier to begin configuring it.
-              </p>
-            )}
-          </section>
+            ))}
+            {tiers.length === 0 && !creating ? (
+              <div className="px-4 py-12 text-center">
+                <p className="font-medium">No allowance tiers yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Create a tier to start granting members a recurring allowance.
+                </p>
+              </div>
+            ) : null}
           </div>
-          {create.isError || save.isError || archive.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>Tier update failed</AlertTitle>
-              <AlertDescription>{create.error?.message ?? save.error?.message ?? archive.error?.message}</AlertDescription>
-            </Alert>
-          ) : null}
         </CardContent>
       </Card>
 
@@ -931,35 +1108,8 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
         tiers={tiers}
         targetTypes={["TIER"]}
         title="Tier balance operation"
-        description="Apply one audited credit or period action to the members currently assigned to a selected tier."
+        description="Apply one audited credit or period action to every member currently on a tier."
       />
-
-      <section aria-labelledby="tier-overview-title" className="space-y-3">
-        <div>
-          <h2 id="tier-overview-title" className="font-medium">Tier overview</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Choose a tier above to edit it; these cards are read-only summaries.</p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {tiers.map((tier) => (
-            <Card key={tier.id} className={selectedTier?.id === tier.id ? "border-primary/50" : undefined}>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle><h3 className="text-base">{tier.name}</h3></CardTitle>
-                  <Badge variant={tier.isDefault ? "default" : "outline"}>{tier.id}</Badge>
-                </div>
-                <CardDescription>{readableCycle(tier.cycleUnit, tier.cycleCount)} · {tier.memberCount} members</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="font-mono text-3xl font-semibold">{usd(tier.allowanceMicros)}</div>
-                <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                  <span>Open-period spend</span>
-                  <span className="font-mono">{usd(tier.spendMicros)}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
@@ -1062,60 +1212,52 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="w-full space-y-1.5 sm:w-40">
-            <Label htmlFor="rate-provider">Provider</Label>
+          <Field label="Provider" htmlFor="rate-provider" className="w-full sm:w-40">
             <Select value={provider} onValueChange={(value) => changeProvider(value as (typeof PROVIDERS)[number])}>
-              <SelectTrigger id="rate-provider" size="compact" className="w-full" aria-label="Rate provider"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="rate-provider" size="compact" className={CONTROL_TRIGGER} aria-label="Rate provider"><SelectValue>{(value) => String(value ?? "")}</SelectValue></SelectTrigger>
               <SelectContent>
                 {PROVIDERS.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="w-full space-y-1.5 sm:w-64">
-            <Label htmlFor="rate-model">Model</Label>
+          </Field>
+          <Field label="Model" htmlFor="rate-model" className="w-full sm:w-64">
             <Select value={modelChoice} onValueChange={(value) => setModelChoice(value ?? CUSTOM_MODEL)}>
-              <SelectTrigger id="rate-model" size="compact" className="w-full" aria-label="Rate model"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="rate-model" size="compact" className={CONTROL_TRIGGER} aria-label="Rate model"><SelectValue>{(value) => (value === CUSTOM_MODEL ? "Another model identifier" : String(value ?? ""))}</SelectValue></SelectTrigger>
               <SelectContent>
                 {models.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
                 <SelectItem value={CUSTOM_MODEL}>Another model identifier</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           {modelChoice === CUSTOM_MODEL ? (
-            <div className="min-w-0 flex-1 space-y-1.5 sm:min-w-56">
-              <Label htmlFor="custom-rate-model">Model identifier</Label>
+            <Field label="Model identifier" htmlFor="custom-rate-model" className="min-w-0 flex-1 sm:min-w-56">
               <Input id="custom-rate-model" className="h-9" placeholder="model-id" value={customModel} onChange={(event) => setCustomModel(event.target.value)} />
-            </div>
+            </Field>
           ) : null}
-          <div className="w-full space-y-1.5 sm:w-40">
-            <Label htmlFor="rate-input">Input (USD / 1M)</Label>
+          <Field label="Input (USD / 1M)" htmlFor="rate-input" className="w-full sm:w-40">
             <Input id="rate-input" className="h-9" aria-invalid={input !== "" && inputMicros == null} inputMode="decimal" placeholder="e.g. 3.00" value={input} onChange={(event) => setInput(event.target.value)} />
-          </div>
-          <div className="w-full space-y-1.5 sm:w-40">
-            <Label htmlFor="rate-output">Output (USD / 1M)</Label>
+          </Field>
+          <Field label="Output (USD / 1M)" htmlFor="rate-output" className="w-full sm:w-40">
             <Input id="rate-output" className="h-9" aria-invalid={output !== "" && outputMicros == null} inputMode="decimal" placeholder="e.g. 15.00" value={output} onChange={(event) => setOutput(event.target.value)} />
-          </div>
+          </Field>
           {provider === "deepseek" ? (
-            <div className="w-full space-y-1.5 sm:w-40">
-              <Label htmlFor="rate-period">Billing hours</Label>
+            <Field label="Billing hours" htmlFor="rate-period" className="w-full sm:w-40">
               <Select value={ratePeriod} onValueChange={(value) => setRatePeriod(value as RatePeriodChoice)}>
-                <SelectTrigger id="rate-period" size="compact" className="w-full" aria-label="Rate billing hours"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="rate-period" size="compact" className={CONTROL_TRIGGER} aria-label="Rate billing hours"><SelectValue>{(value) => RATE_PERIOD_LABELS[value as RatePeriodChoice]}</SelectValue></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Every hour</SelectItem>
-                  <SelectItem value="peak">Peak hours</SelectItem>
-                  <SelectItem value="off_peak">Off-peak hours</SelectItem>
+                  {(Object.keys(RATE_PERIOD_LABELS) as RatePeriodChoice[]).map((period) => (
+                    <SelectItem key={period} value={period}>{RATE_PERIOD_LABELS[period]}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : null}
-          <div className="w-full space-y-1.5 sm:w-56">
-            <Label htmlFor="rate-effective">Effective from</Label>
+          <Field label="Effective from" htmlFor="rate-effective" className="w-full sm:w-56">
             <Input id="rate-effective" className="h-9" type="datetime-local" value={effective} onChange={(event) => setEffective(event.target.value)} />
-          </div>
-          <div className="min-w-0 flex-1 space-y-1.5 sm:min-w-72">
-            <Label htmlFor="rate-source">Official pricing source</Label>
+          </Field>
+          <Field label="Official pricing source" htmlFor="rate-source" className="min-w-0 flex-1 sm:min-w-72">
             <Input id="rate-source" className="h-9" type="url" placeholder="https://…" value={source} onChange={(event) => setSource(event.target.value)} />
-          </div>
+          </Field>
         </div>
 
         <div className="rounded-lg border bg-muted/10 p-3">
@@ -1128,18 +1270,17 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
           </div>
           {showOptionalRates ? (
             <div className="mt-3 flex flex-wrap gap-3">
-              <div className="w-full space-y-1.5 sm:w-52"><Label htmlFor="rate-cache-read">Cache read (USD / 1M)</Label><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></div>
-              <div className="w-full space-y-1.5 sm:w-52"><Label htmlFor="rate-cache-write">Cache write (USD / 1M)</Label><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></div>
-              <div className="w-full space-y-1.5 sm:w-48"><Label htmlFor="rate-tool-fee">Tool fee (USD / unit)</Label><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></div>
+              <Field label="Cache read (USD / 1M)" htmlFor="rate-cache-read" className="w-full sm:w-52"><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></Field>
+              <Field label="Cache write (USD / 1M)" htmlFor="rate-cache-write" className="w-full sm:w-52"><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></Field>
+              <Field label="Tool fee (USD / unit)" htmlFor="rate-tool-fee" className="w-full sm:w-48"><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></Field>
             </div>
           ) : null}
         </div>
 
         <div className="flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="w-full space-y-1.5 lg:max-w-2xl">
-            <Label htmlFor="rate-reason">Audit reason</Label>
+          <Field label="Reason for this rate version" htmlFor="rate-reason" className="w-full lg:max-w-2xl">
             <Input id="rate-reason" className="h-9" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this pricing version being added?" />
-          </div>
+          </Field>
           <Button size="sm" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
             {create.isPending ? "Creating…" : "Create immutable version"}
           </Button>
@@ -1262,13 +1403,11 @@ export function AdminQuotasPage() {
                 <Input className="h-9 pl-9" aria-label="Search members" placeholder="Search member…" value={search} onChange={(event) => setSearch(event.target.value)} />
               </div>
               <Select value={balanceFilter} onValueChange={(value) => setBalanceFilter(value ?? "")}>
-                <SelectTrigger size="compact" className="w-full sm:w-44" aria-label="Balance filter"><SelectValue placeholder="All balances" /></SelectTrigger>
+                <SelectTrigger size="compact" className={cn(CONTROL_TRIGGER, "sm:w-44")} aria-label="Balance filter"><SelectValue>{(value) => BALANCE_LABELS[value as string] ?? "All balances"}</SelectValue></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_BALANCES}>All balances</SelectItem>
-                  <SelectItem value="POSITIVE">Positive</SelectItem>
-                  <SelectItem value="ZERO">Depleted</SelectItem>
-                  <SelectItem value="OVERAGE">Overage</SelectItem>
-                  <SelectItem value="UNLIMITED">Unlimited</SelectItem>
+                  {Object.entries(BALANCE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
