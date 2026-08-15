@@ -41,7 +41,15 @@ class ReviewerSpec(ExtensibleModel):
 
 
 class LengthBudget(ExtensibleModel):
-    """One-page guidance handed to the tailor and surfaced to reviewers."""
+    """One-page guidance handed to the tailor and surfaced to reviewers.
+
+    Every field below bounds prose EXCEPT the two skill fields, which set a
+    floor. That asymmetry is the point: bullets and skills do not cost the same
+    page space. A bullet is a line; the skills section renders one comma-joined
+    line per category, so ~40 entries cost about five lines. Without a stated
+    skills target the writer applied the same "prefer the most relevant, drop
+    the rest" pressure to both, and shipped ~17 of a ~335-skill profile.
+    """
 
     max_experiences: int = 4
     max_projects: int = 2
@@ -49,6 +57,9 @@ class LengthBudget(ExtensibleModel):
     max_bullets_per_role: int = 5
     max_bullets_per_project: int = 3
     target_total_bullets: int = 20
+    # A target, not a cap: the writer is asked to reach it, not to stop there.
+    target_skills: int = 40
+    max_skills_per_category: int = 12
 
 
 class ReviewConfig(ExtensibleModel):

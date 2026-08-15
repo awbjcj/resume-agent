@@ -34,10 +34,16 @@ CRAFT_WRITER = [
     "Name the specific technologies, tools, or methods inside a bullet when "
     "the cited fact names them; a job-critical skill shown in working context "
     "outweighs the same token sitting only in the skills list.",
-    "Order the skills section by this job's priorities: must-have skills "
-    "first, then supporting skills. Cut low-signal entries (default office "
-    "tools, tech irrelevant to this role) before cutting anything the job "
-    "asks for.",
+    "Make the skills section broad, then ordered. Breadth first: include every "
+    "profile skill this job names, then every adjacent skill from the same "
+    "stack, toolchain, or domain, each listed under its own true name from the "
+    "cited fact - an adjacent skill named truthfully is a legitimate entry, "
+    "renaming one to the job's own term is not. Then order by this job's "
+    "priorities: must-have skills first, then supporting skills. Cut only "
+    "low-signal entries (default office tools, tech irrelevant to this role); "
+    "a bullet costs a line but the skills section renders one comma-joined "
+    "line per category, so trimming it saves almost no space and loses "
+    "keyword coverage.",
     "Give the most recent and most role-relevant positions the largest bullet "
     "share; compress older or off-target roles to one or two bullets instead "
     "of trimming every role evenly.",

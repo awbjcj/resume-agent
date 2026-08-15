@@ -39,6 +39,11 @@ reviewers:
 
 # Optional one-page budget handed to the tailor and surfaced to the concision
 # reviewer. Omit the block to accept these defaults.
+#
+# The bullet/experience numbers are CAPS. The two skill numbers are a TARGET:
+# the skills section renders one comma-joined line per category, so ~40 entries
+# cost about five lines, and trimming it saves almost no space while losing
+# keyword coverage. Raise target_skills for a broader skills section.
 length_budget:
   max_experiences: 4
   max_projects: 2
@@ -46,3 +51,5 @@ length_budget:
   max_bullets_per_role: 5
   max_bullets_per_project: 3
   target_total_bullets: 20
+  target_skills: 40
+  max_skills_per_category: 12

@@ -329,8 +329,13 @@ def test_coverage_critique_scores_the_rendered_share_and_never_blocks():
     assert critique.score == 50
     assert critique.model_dump(mode="json")["covered_total"] == 2
     assert critique.model_dump(mode="json")["rendered_total"] == 1
-    assert [i.severity for i in critique.issues] == [Severity.major]
-    assert "LangChain" in critique.issues[0].message
+    # Score still reports the MUST-HAVE share only; supporting coverage rides
+    # alongside as its own issue and must not move this number.
+    assert critique.score == 50
+    assert all(issue.severity == Severity.major for issue in critique.issues)
+    must_issues = [i for i in critique.issues if i.message.startswith("must-have")]
+    assert len(must_issues) == 1
+    assert "LangChain" in must_issues[0].message
 
 
 def test_coverage_critique_is_none_without_evidenced_must_haves():
@@ -338,3 +343,99 @@ def test_coverage_critique_is_none_without_evidenced_must_haves():
 
     assert coverage_critique(content, None) is None
     assert coverage_critique(content, SkillMatchContext()) is None
+
+
+def _supporting_context(count: int = 3) -> SkillMatchContext:
+    """Only nice-to-have / tech-stack requirements, all evidenced."""
+    return SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement=f"Tool{index}",
+                source="nice" if index % 2 else "tech",
+                coverage="covered",
+                row=MatrixRow(
+                    key=f"tool{index}",
+                    display=f"Tool{index}",
+                    evidence_fact_ids=[f"s{index}"],
+                ),
+            )
+            for index in range(count)
+        ]
+    )
+
+
+def test_coverage_report_measures_supporting_tiers_separately():
+    # Under-inclusion was invisible: the report skipped every non-must match, so
+    # a resume could omit every evidenced nice-to-have and tech-stack skill and
+    # no reviewer could observe it.
+    content = ResumeContent(
+        contact=Contact(name="Ada"),
+        skills={"Core": [TailoredSkill(name="Tool0", provenance="s0")]},
+    )
+
+    report = coverage_report(content, _supporting_context())
+
+    assert report.supporting_total == 3
+    assert report.supporting_rendered == ["Tool0"]
+    assert report.supporting_missed == ["Tool1", "Tool2"]
+    # Must-have accounting is untouched.
+    assert report.covered_total == 0
+
+
+def test_coverage_report_keeps_must_haves_out_of_the_supporting_tally():
+    content = ResumeContent(
+        contact=Contact(name="Ada"),
+        skills={"Core": [TailoredSkill(name="Python", provenance="s1")]},
+    )
+
+    report = coverage_report(content, _context())
+
+    assert report.covered_total == 2
+    assert report.missed == ["LangChain"]
+    # 'Docker' is the only evidenced nice-to-have in _context().
+    assert report.supporting_total == 1
+    assert report.supporting_missed == ["Docker"]
+
+
+def test_coverage_critique_aggregates_omitted_supporting_skills_into_one_issue():
+    # One issue per omitted supporting skill would flood the reviser prompt on a
+    # profile with hundreds of skills, so the omissions are named in a single
+    # bounded issue.
+    content = ResumeContent(contact=Contact(name="Ada"))
+
+    critique = coverage_critique(content, _supporting_context(count=30))
+
+    assert critique is not None
+    supporting_issues = [
+        issue for issue in critique.issues if "supporting" in issue.message
+    ]
+    assert len(supporting_issues) == 1
+    assert supporting_issues[0].severity == Severity.major
+    assert "Tool0" in supporting_issues[0].message
+    # Bounded: the message names a sample and counts the remainder.
+    assert "more" in supporting_issues[0].message
+
+
+def test_coverage_critique_reports_supporting_totals_through_json():
+    content = ResumeContent(
+        contact=Contact(name="Ada"),
+        skills={"Core": [TailoredSkill(name="Tool0", provenance="s0")]},
+    )
+
+    critique = coverage_critique(content, _supporting_context())
+    assert critique is not None
+    dumped = critique.model_dump(mode="json")
+
+    assert dumped["supporting_total"] == 3
+    assert dumped["supporting_rendered_total"] == 1
+
+
+def test_coverage_critique_exists_when_only_supporting_skills_are_evidenced():
+    # Previously returned None whenever no must-have was evidenced, which is
+    # exactly the case where breadth feedback matters most.
+    content = ResumeContent(contact=Contact(name="Ada"))
+
+    critique = coverage_critique(content, _supporting_context())
+
+    assert critique is not None
+    assert critique.passed is True

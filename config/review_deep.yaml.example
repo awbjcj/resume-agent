@@ -40,3 +40,7 @@ length_budget:
   max_bullets_per_role: 5
   max_bullets_per_project: 3
   target_total_bullets: 20
+  # A target, not a cap: skills cost ~one line per category, so breadth here is
+  # nearly free. See config/review.yaml.example for the full note.
+  target_skills: 40
+  max_skills_per_category: 12

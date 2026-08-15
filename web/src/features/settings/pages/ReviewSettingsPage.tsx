@@ -37,6 +37,11 @@ const DEFAULT_LENGTH_BUDGET = {
   maxBulletsPerRole: 5,
   maxBulletsPerProject: 3,
   targetTotalBullets: 20,
+  // The skills budget, added alongside the prose caps. No inputs are rendered
+  // for these two yet; they carry the domain defaults so enabling the budget
+  // never sends a partial one.
+  targetSkills: 40,
+  maxSkillsPerCategory: 12,
 };
 
 const ROSTERS = [

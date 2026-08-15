@@ -12,6 +12,7 @@ from typing import Any, Literal
 from pydantic import Field, field_validator
 
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.tailor.review_config import LengthBudget as DomainLengthBudget
 
 
 class SearchConfigDoc(CamelModel):
@@ -59,13 +60,32 @@ class ReviewerEntry(CamelModel):
     score_bands: bool = False
 
 
+def _budget_default(field: str) -> int:
+    """The domain budget's own default, never a restated literal.
+
+    This DTO used to copy all six numbers by hand. That is the same drift the
+    model-tier defaults hit: the domain model moves, the wire contract quietly
+    keeps serving last release's numbers, and a test that restates the literals
+    too keeps passing.
+    """
+    default = DomainLengthBudget.model_fields[field].default
+    assert isinstance(default, int)
+    return default
+
+
 class LengthBudget(CamelModel):
-    max_experiences: int = 4
-    max_projects: int = 2
-    max_evidence_owners: int = 5
-    max_bullets_per_role: int = 5
-    max_bullets_per_project: int = 3
-    target_total_bullets: int = 20
+    # Plain defaults, resolved at class-definition time - NOT default_factory.
+    # A factory is invisible to JSON Schema, which silently stripped every
+    # `default` from the published OpenAPI contract and cost API consumers the
+    # documented values.
+    max_experiences: int = _budget_default("max_experiences")
+    max_projects: int = _budget_default("max_projects")
+    max_evidence_owners: int = _budget_default("max_evidence_owners")
+    max_bullets_per_role: int = _budget_default("max_bullets_per_role")
+    max_bullets_per_project: int = _budget_default("max_bullets_per_project")
+    target_total_bullets: int = _budget_default("target_total_bullets")
+    target_skills: int = _budget_default("target_skills")
+    max_skills_per_category: int = _budget_default("max_skills_per_category")
 
 
 def _default_reviewers() -> list[ReviewerEntry]:
