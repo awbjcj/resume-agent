@@ -1096,6 +1096,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cover-letters/bulk-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Delete Cover Letters Endpoint */
+        post: operations["bulk_delete_cover_letters_endpoint_api_cover_letters_bulk_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cover-letters/{cover_letter_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Cover Letter Endpoint */
+        delete: operations["delete_cover_letter_endpoint_api_cover_letters__cover_letter_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cover-letters/{cover_letter_id}/pdf": {
         parameters: {
             query?: never;
@@ -1631,6 +1665,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/select-cover-letter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Deselect Cover Letter Endpoint
+         * @description Clear the application's cover-letter selection -- the way past the gate.
+         */
+        delete: operations["deselect_cover_letter_endpoint_api_jobs__job_id__select_cover_letter_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/select-cover-letter/{cover_letter_id}": {
         parameters: {
             query?: never;
@@ -1643,6 +1697,26 @@ export interface paths {
         /** Select Cover Letter Endpoint */
         post: operations["select_cover_letter_endpoint_api_jobs__job_id__select_cover_letter__cover_letter_id__post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/select-resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Deselect Resume Endpoint
+         * @description Clear the application's resume selection -- the way past the delete gate.
+         */
+        delete: operations["deselect_resume_endpoint_api_jobs__job_id__select_resume_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2304,6 +2378,40 @@ export interface paths {
         /** Launch Reprocess */
         post: operations["launch_reprocess_api_reprocess_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-versions/bulk-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Delete Resume Versions Endpoint */
+        post: operations["bulk_delete_resume_versions_endpoint_api_resume_versions_bulk_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Resume Version Endpoint */
+        delete: operations["delete_resume_version_endpoint_api_resume_versions__version_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3255,6 +3363,16 @@ export interface components {
             notes?: string | null;
             /** Status */
             status: string;
+        };
+        /** ArtifactDeleteOut */
+        ArtifactDeleteOut: {
+            /** Deleted */
+            deleted: number;
+        };
+        /** ArtifactDeleteRequest */
+        ArtifactDeleteRequest: {
+            /** Ids */
+            ids: number[];
         };
         /** BoardPage[PipelineItem] */
         BoardPage_PipelineItem_: {
@@ -4789,6 +4907,16 @@ export interface components {
              * @default 2
              */
             maxProjects: number;
+            /**
+             * Maxskillspercategory
+             * @default 12
+             */
+            maxSkillsPerCategory: number;
+            /**
+             * Targetskills
+             * @default 40
+             */
+            targetSkills: number;
             /**
              * Targettotalbullets
              * @default 20
@@ -9877,6 +10005,72 @@ export interface operations {
             };
         };
     };
+    bulk_delete_cover_letters_endpoint_api_cover_letters_bulk_delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtifactDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactDeleteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_cover_letter_endpoint_api_cover_letters__cover_letter_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cover_letter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     download_cover_letter_pdf_api_cover_letters__cover_letter_id__pdf_get: {
         parameters: {
             query?: never;
@@ -11078,6 +11272,39 @@ export interface operations {
             };
         };
     };
+    deselect_cover_letter_endpoint_api_jobs__job_id__select_cover_letter_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     select_cover_letter_endpoint_api_jobs__job_id__select_cover_letter__cover_letter_id__post: {
         parameters: {
             query?: never;
@@ -11087,6 +11314,39 @@ export interface operations {
             path: {
                 job_id: number;
                 cover_letter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deselect_resume_endpoint_api_jobs__job_id__select_resume_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
             };
             cookie?: never;
         };
@@ -12693,6 +12953,72 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RunOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_delete_resume_versions_endpoint_api_resume_versions_bulk_delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtifactDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactDeleteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resume_version_endpoint_api_resume_versions__version_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

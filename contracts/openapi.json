@@ -648,6 +648,36 @@
         "title": "ApplicationUpsert",
         "type": "object"
       },
+      "ArtifactDeleteOut": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "ArtifactDeleteOut",
+        "type": "object"
+      },
+      "ArtifactDeleteRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "ArtifactDeleteRequest",
+        "type": "object"
+      },
       "BoardPage_PipelineItem_": {
         "properties": {
           "data": {
@@ -4737,6 +4767,16 @@
           "maxProjects": {
             "default": 2,
             "title": "Maxprojects",
+            "type": "integer"
+          },
+          "maxSkillsPerCategory": {
+            "default": 12,
+            "title": "Maxskillspercategory",
+            "type": "integer"
+          },
+          "targetSkills": {
+            "default": 40,
+            "title": "Targetskills",
             "type": "integer"
           },
           "targetTotalBullets": {
@@ -15844,6 +15884,110 @@
         "summary": "Launch Cover Letters"
       }
     },
+    "/api/cover-letters/bulk-delete": {
+      "post": {
+        "operationId": "bulk_delete_cover_letters_endpoint_api_cover_letters_bulk_delete_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDeleteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Delete Cover Letters Endpoint"
+      }
+    },
+    "/api/cover-letters/{cover_letter_id}": {
+      "delete": {
+        "operationId": "delete_cover_letter_endpoint_api_cover_letters__cover_letter_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cover_letter_id",
+            "required": true,
+            "schema": {
+              "title": "Cover Letter Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Cover Letter Endpoint"
+      }
+    },
     "/api/cover-letters/{cover_letter_id}/pdf": {
       "get": {
         "operationId": "download_cover_letter_pdf_api_cover_letters__cover_letter_id__pdf_get",
@@ -17850,6 +17994,62 @@
         "summary": "Check H1B Sponsorship"
       }
     },
+    "/api/jobs/{job_id}/select-cover-letter": {
+      "delete": {
+        "description": "Clear the application's cover-letter selection -- the way past the gate.",
+        "operationId": "deselect_cover_letter_endpoint_api_jobs__job_id__select_cover_letter_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deselect Cover Letter Endpoint"
+      }
+    },
     "/api/jobs/{job_id}/select-cover-letter/{cover_letter_id}": {
       "post": {
         "operationId": "select_cover_letter_endpoint_api_jobs__job_id__select_cover_letter__cover_letter_id__post",
@@ -17912,6 +18112,62 @@
           }
         },
         "summary": "Select Cover Letter Endpoint"
+      }
+    },
+    "/api/jobs/{job_id}/select-resume": {
+      "delete": {
+        "description": "Clear the application's resume selection -- the way past the delete gate.",
+        "operationId": "deselect_resume_endpoint_api_jobs__job_id__select_resume_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deselect Resume Endpoint"
       }
     },
     "/api/jobs/{job_id}/select-resume/{version_id}": {
@@ -20857,6 +21113,110 @@
           }
         },
         "summary": "Launch Reprocess"
+      }
+    },
+    "/api/resume-versions/bulk-delete": {
+      "post": {
+        "operationId": "bulk_delete_resume_versions_endpoint_api_resume_versions_bulk_delete_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDeleteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Delete Resume Versions Endpoint"
+      }
+    },
+    "/api/resume-versions/{version_id}": {
+      "delete": {
+        "operationId": "delete_resume_version_endpoint_api_resume_versions__version_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Resume Version Endpoint"
       }
     },
     "/api/resume-versions/{version_id}/evidence-portfolio": {
