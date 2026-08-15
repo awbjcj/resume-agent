@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from resume_agent.discovery.connectors import http as board
 
-from resume_agent.discovery.connectors.base import RawJob, SkipSeen
+from resume_agent.discovery.connectors.base import RawJob, SkipSeen, provenance_for
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
@@ -68,7 +68,7 @@ def parse_postings(payload: dict, company: str) -> list[SmartRecruitersRow]:
                 jd_text="",
                 posted_at=parse_iso_datetime(item.get("releasedDate")),
                 posting_id=posting_id,
-                company_provenance="provider" if provider_company else "token",
+                company_provenance=provenance_for(provider_company),
             )
         )
     return rows

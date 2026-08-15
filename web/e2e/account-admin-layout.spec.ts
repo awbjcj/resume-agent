@@ -104,6 +104,38 @@ test("cost quotas keeps one sidebar destination active and contains narrow layou
   await expect(page.getByRole("link", { name: "Admin", exact: true })).not.toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("link", { name: "View my usage" })).toHaveAttribute("href", "/account");
 
+  const memberSearch = page.getByRole("textbox", { name: "Search members" });
+  const balanceFilter = page.getByRole("combobox", { name: "Balance filter" });
+  await expect(memberSearch).toHaveCSS("height", "36px");
+  await expect(balanceFilter).toHaveCSS("height", "36px");
+
+  await page.getByRole("tab", { name: "Tiers" }).click();
+  const tierName = page.getByLabel("Tier name");
+  const tierReason = page.getByLabel("Audit reason for the next tier action");
+  const tierCadence = page.getByRole("combobox", { name: "New tier cadence unit" });
+  const tierCount = page.getByRole("combobox", { name: "New tier cadence count" });
+  for (const control of [tierName, tierReason, tierCadence, tierCount]) {
+    await expect(control).toHaveCSS("height", "36px");
+  }
+  const tierNameBox = await tierName.boundingBox();
+  const createTierBox = await page.getByRole("button", { name: "Create tier" }).boundingBox();
+  expect(createTierBox?.x).toBeGreaterThan(tierNameBox?.x ?? 0);
+
+  await page.getByRole("tab", { name: "Rate cards" }).click();
+  const rateProvider = page.getByRole("combobox", { name: "Rate provider" });
+  const rateModel = page.getByRole("combobox", { name: "Rate model" });
+  const customModel = page.getByLabel("Model identifier");
+  const rateReason = page.locator("#rate-reason");
+  for (const control of [rateProvider, rateModel, customModel, rateReason]) {
+    await expect(control).toHaveCSS("height", "36px");
+  }
+  const rateReasonBox = await rateReason.boundingBox();
+  const createRateBox = await page.getByRole("button", { name: "Create immutable version" }).boundingBox();
+  expect(createRateBox?.x).toBeGreaterThan(rateReasonBox?.x ?? 0);
+
   await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.getByRole("tab", { name: "Tiers" }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

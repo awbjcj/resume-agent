@@ -1,7 +1,7 @@
 
 from resume_agent.discovery.connectors import http as board
 
-from resume_agent.discovery.connectors.base import RawJob, SkipSeen
+from resume_agent.discovery.connectors.base import RawJob, SkipSeen, provenance_for
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
@@ -19,14 +19,14 @@ def parse_breezy(payload: list, token: str) -> list[RawJob]:
         provider_company = (item.get("company") or {}).get("name")
         rows.append(
             RawJob(
-            source="breezy",
-            url=item.get("url"),
-            company=provider_company or token,
-            title=item.get("name"),
-            location=(item.get("location") or {}).get("name"),
-            jd_text="",
-            posted_at=parse_iso_datetime(item.get("published_date")),
-                company_provenance="provider" if provider_company else "token",
+                source="breezy",
+                url=item.get("url"),
+                company=provider_company or token,
+                title=item.get("name"),
+                location=(item.get("location") or {}).get("name"),
+                jd_text="",
+                posted_at=parse_iso_datetime(item.get("published_date")),
+                company_provenance=provenance_for(provider_company),
             )
         )
     return rows

@@ -1,7 +1,7 @@
 
 from resume_agent.discovery.connectors import http as board
 
-from resume_agent.discovery.connectors.base import RawJob, SkipSeen
+from resume_agent.discovery.connectors.base import RawJob, SkipSeen, provenance_for
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.text import html_to_markdown
@@ -50,7 +50,7 @@ def parse_workable(payload: dict, account: str) -> list[RawJob]:
             location=_location(item),
             jd_text=html_to_markdown(_jd_html(item)),
             posted_at=parse_iso_datetime(item.get("published_on")),
-            company_provenance="provider" if provider_company else "token",
+            company_provenance=provenance_for(provider_company),
         )
         for item in payload.get("jobs") or []
     ]

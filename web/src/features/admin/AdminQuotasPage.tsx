@@ -39,7 +39,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { useMe } from "@/features/auth/AuthGate";
 import { api, unwrap } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
@@ -209,7 +208,7 @@ function AccountDrawer({
           </SheetDescription>
         </SheetHeader>
         {account ? (
-          <div className="space-y-6 p-6">
+          <div className="space-y-5 p-6">
             <dl className="grid grid-cols-2 gap-4 rounded-lg border bg-muted/15 p-4 text-sm">
               <div>
                 <dt className="text-muted-foreground">Tier</dt>
@@ -233,10 +232,10 @@ function AccountDrawer({
               </div>
             </dl>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="drawer-tier">Assign tier</Label>
               <Select value={tierId} onValueChange={(value) => setTierId(value ?? "")}>
-                <SelectTrigger id="drawer-tier" className="w-full" aria-label="Assign member tier">
+                <SelectTrigger id="drawer-tier" size="compact" className="w-full" aria-label="Assign member tier">
                   <SelectValue placeholder={`Keep ${account.tierId}`} />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,6 +257,7 @@ function AccountDrawer({
               </div>
               <Input
                 id="drawer-override"
+                className="h-9"
                 aria-invalid={!overrideIsValid}
                 inputMode="decimal"
                 disabled={clearOverride}
@@ -280,10 +280,11 @@ function AccountDrawer({
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="drawer-reason">Audit reason</Label>
-              <Textarea
+              <Input
                 id="drawer-reason"
+                className="h-9"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="Why is this member change needed?"
@@ -295,17 +296,20 @@ function AccountDrawer({
                 <AlertDescription>{patch.error.message}</AlertDescription>
               </Alert>
             ) : null}
-            <Button
-              disabled={
-                !reason.trim()
-                || (!tierId && override === "" && !clearOverride)
-                || !overrideIsValid
-                || patch.isPending
-              }
-              onClick={() => patch.mutate()}
-            >
-              {patch.isPending ? "Saving…" : "Save member change"}
-            </Button>
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                disabled={
+                  !reason.trim()
+                  || (!tierId && override === "" && !clearOverride)
+                  || !overrideIsValid
+                  || patch.isPending
+                }
+                onClick={() => patch.mutate()}
+              >
+                {patch.isPending ? "Saving…" : "Save member change"}
+              </Button>
+            </div>
 
             <section aria-labelledby="member-ledger" className="space-y-3 border-t pt-5">
               <h3 id="member-ledger" className="font-semibold">Recent ledger</h3>
@@ -414,12 +418,18 @@ function QuotaOperationCard({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <div
+          className={`grid gap-3 sm:grid-cols-2 ${
+            targetTypes.length > 1
+              ? "xl:grid-cols-[10rem_minmax(14rem,1fr)_13rem_10rem]"
+              : "xl:grid-cols-[minmax(14rem,1fr)_13rem_10rem]"
+          }`}
+        >
           {targetTypes.length > 1 ? (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor={`${title}-scope`}>Scope</Label>
               <Select value={targetType} onValueChange={(value) => changeTargetType(value as QuotaTargetType)}>
-                <SelectTrigger id={`${title}-scope`} className="w-full" aria-label="Target scope">
+                <SelectTrigger id={`${title}-scope`} size="compact" className="w-full" aria-label="Target scope">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -432,7 +442,7 @@ function QuotaOperationCard({
           ) : null}
 
           {targetType === "USER" ? (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor={`${title}-member`}>Member</Label>
               <Select
                 value={targetValue}
@@ -441,7 +451,7 @@ function QuotaOperationCard({
                   clearPreview();
                 }}
               >
-                <SelectTrigger id={`${title}-member`} className="w-full" aria-label="Target member">
+                <SelectTrigger id={`${title}-member`} size="compact" className="w-full" aria-label="Target member">
                   <SelectValue placeholder="Choose a member" />
                 </SelectTrigger>
                 <SelectContent>
@@ -456,7 +466,7 @@ function QuotaOperationCard({
           ) : null}
 
           {targetType === "TIER" ? (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor={`${title}-tier`}>Tier</Label>
               <Select
                 value={targetValue}
@@ -465,7 +475,7 @@ function QuotaOperationCard({
                   clearPreview();
                 }}
               >
-                <SelectTrigger id={`${title}-tier`} className="w-full" aria-label="Target tier">
+                <SelectTrigger id={`${title}-tier`} size="compact" className="w-full" aria-label="Target tier">
                   <SelectValue placeholder="Choose a tier" />
                 </SelectTrigger>
                 <SelectContent>
@@ -480,16 +490,15 @@ function QuotaOperationCard({
           ) : null}
 
           {targetType === "ALL_MEMBERS" ? (
-            <div className="rounded-lg border bg-background/70 p-3">
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Target</p>
-              <p className="mt-1 text-sm font-medium">Every member account</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Administrators are excluded; disabled members remain included.
-              </p>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Target</p>
+              <div className="flex h-9 items-center rounded-lg border bg-background/70 px-3 text-sm">
+                All {accounts.length} member accounts
+              </div>
             </div>
           ) : null}
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor={`${title}-action`}>Action</Label>
             <Select
               value={actionType}
@@ -498,7 +507,7 @@ function QuotaOperationCard({
                 clearPreview();
               }}
             >
-              <SelectTrigger id={`${title}-action`} className="w-full" aria-label="Quota action">
+              <SelectTrigger id={`${title}-action`} size="compact" className="w-full" aria-label="Quota action">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -510,10 +519,11 @@ function QuotaOperationCard({
           </div>
 
           {requiresAmount ? (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor={`${title}-amount`}>Amount (USD)</Label>
               <Input
                 id={`${title}-amount`}
+                className="h-9"
                 aria-invalid={amount !== "" && amountMicros == null}
                 inputMode="decimal"
                 placeholder="e.g. 10.00"
@@ -525,26 +535,28 @@ function QuotaOperationCard({
               />
             </div>
           ) : (
-            <div className="rounded-lg border bg-background/70 p-3">
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Effect</p>
-              <p className="mt-1 text-sm font-medium">Reset current period</p>
-              <p className="mt-1 text-xs text-muted-foreground">No dollar amount is needed.</p>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Effect</p>
+              <div className="flex h-9 items-center rounded-lg border bg-background/70 px-3 text-sm">
+                Reset current period
+              </div>
             </div>
           )}
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div className="space-y-2">
+        <div className="flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="w-full space-y-1.5 lg:max-w-2xl">
             <Label htmlFor={`${title}-reason`}>Audit reason</Label>
-            <Textarea
+            <Input
               id={`${title}-reason`}
+              className="h-9"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="Required only when confirming this operation"
             />
           </div>
           <Button
-            className="lg:mb-0.5"
+            size="sm"
             variant="outline"
             disabled={!targetIsSelected || (requiresAmount && amountMicros == null) || previewMutation.isPending}
             onClick={() => previewMutation.mutate()}
@@ -565,6 +577,7 @@ function QuotaOperationCard({
               </div>
             </div>
             <Button
+              size="sm"
               variant={actionType === "DEBIT_CREDIT" || actionType === "RESET_CURRENT_PERIOD" ? "destructive" : "default"}
               disabled={!reason.trim() || commit.isPending}
               onClick={() => commit.mutate()}
@@ -713,34 +726,60 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
   return (
     <div className="space-y-5 pt-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle><h2 className="text-base">Tier configuration</h2></CardTitle>
           <CardDescription>
             Name a new plan once; its stable identifier is derived automatically. Select an existing tier to revise it.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <section className="space-y-4" aria-labelledby="create-tier-title">
+        <CardContent className="space-y-4">
+          <div className="max-w-2xl space-y-1.5">
+            <Label htmlFor="tier-change-reason">Audit reason for the next tier action</Label>
+            <Input
+              id="tier-change-reason"
+              className="h-9"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Why is this tier being created, changed, or archived?"
+            />
+            <p className="text-xs text-muted-foreground">Shared by create, save, and archive actions below.</p>
+          </div>
+
+          <div className="grid gap-4 border-t pt-4 xl:grid-cols-2 xl:items-start">
+          <section className="space-y-4 rounded-lg border bg-muted/10 p-4" aria-labelledby="create-tier-title">
             <div>
               <h3 id="create-tier-title" className="font-medium">Create allowance tier</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Identifier: <span className="font-mono">{derivedId}</span>
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">Add a recurring allowance plan.</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="space-y-2 xl:col-span-2">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="min-w-0 flex-1 space-y-1.5">
                 <Label htmlFor="new-tier-name">Tier name</Label>
                 <Input
                   id="new-tier-name"
+                  className="h-9"
                   placeholder="e.g. Team"
                   value={newName}
                   onChange={(event) => setNewName(event.target.value)}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="w-full space-y-1.5 sm:w-36">
+                <Label htmlFor="new-tier-allowance">Allowance (USD)</Label>
+                <Input
+                  id="new-tier-allowance"
+                  className="h-9"
+                  aria-invalid={newAllowance !== "" && newAllowanceMicros === undefined}
+                  inputMode="decimal"
+                  placeholder="Unlimited"
+                  value={newAllowance}
+                  onChange={(event) => setNewAllowance(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="w-full space-y-1.5 sm:w-36">
                 <Label htmlFor="new-tier-unit">Cadence</Label>
                 <Select value={newCycleUnit} onValueChange={(value) => setNewCycleUnit(value as CycleUnit)}>
-                  <SelectTrigger id="new-tier-unit" className="w-full" aria-label="New tier cadence unit">
+                  <SelectTrigger id="new-tier-unit" size="compact" className="w-full" aria-label="New tier cadence unit">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -749,10 +788,10 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="w-full space-y-1.5 sm:w-24">
                 <Label htmlFor="new-tier-count">Every</Label>
                 <Select value={newCycleCount} onValueChange={(value) => setNewCycleCount(value ?? "1")}>
-                  <SelectTrigger id="new-tier-count" className="w-full" aria-label="New tier cadence count">
+                  <SelectTrigger id="new-tier-count" size="compact" className="w-full" aria-label="New tier cadence count">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -760,52 +799,34 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 xl:col-span-2">
-                <Label htmlFor="new-tier-allowance">Allowance (USD)</Label>
-                <Input
-                  id="new-tier-allowance"
-                  aria-invalid={newAllowance !== "" && newAllowanceMicros === undefined}
-                  inputMode="decimal"
-                  placeholder="Leave blank for unlimited"
-                  value={newAllowance}
-                  onChange={(event) => setNewAllowance(event.target.value)}
-                />
-              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t pt-3">
+              <p className="truncate text-xs text-muted-foreground">
+                ID <span className="font-mono text-foreground">{derivedId}</span>
+              </p>
+              <Button size="sm" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
+                {create.isPending ? "Creating…" : "Create tier"}
+              </Button>
             </div>
           </section>
 
-          <div className="grid gap-4 border-t pt-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <div className="space-y-2">
-              <Label htmlFor="tier-change-reason">Audit reason for the next tier action</Label>
-              <Textarea
-                id="tier-change-reason"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Why is this tier being created, changed, or archived?"
-              />
-            </div>
-            <Button disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
-              {create.isPending ? "Creating…" : "Create tier"}
-            </Button>
-          </div>
-
-          <section className="space-y-4 border-t pt-6" aria-labelledby="edit-tier-title">
+          <section className="space-y-4 rounded-lg border bg-muted/10 p-4" aria-labelledby="edit-tier-title">
             <div>
               <h3 id="edit-tier-title" className="font-medium">Edit existing tier</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                The same audit note above is used for this change.
+                Choose a tier, then adjust only the values that need to change.
               </p>
             </div>
             {selectedTier ? (
-              <div className="space-y-4 rounded-lg border bg-muted/10 p-4">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="space-y-2">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="selected-tier">Tier</Label>
                     <Select
                       value={selectedTier.id}
                       onValueChange={(value) => setSelectedTierId(value ?? "")}
                     >
-                      <SelectTrigger id="selected-tier" className="w-full" aria-label="Tier to edit">
+                      <SelectTrigger id="selected-tier" size="compact" className="w-full" aria-label="Tier to edit">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -815,32 +836,36 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 xl:col-span-2">
-                    <Label htmlFor="selected-tier-name">Tier name</Label>
-                    <Input
-                      id="selected-tier-name"
-                      value={selectedName}
-                      onChange={(event) => updateDraft({ name: event.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
+                  <div className="w-full space-y-1.5 sm:w-36">
                     <Label htmlFor="selected-tier-allowance">Allowance (USD)</Label>
                     <Input
                       id="selected-tier-allowance"
+                      className="h-9"
                       aria-invalid={selectedAllowance !== "" && selectedAllowanceMicros === undefined}
                       inputMode="decimal"
-                      placeholder="Blank means unlimited"
+                      placeholder="Unlimited"
                       value={selectedAllowance}
                       onChange={(event) => updateDraft({ allowance: event.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="selected-tier-name">Tier name</Label>
+                    <Input
+                      id="selected-tier-name"
+                      className="h-9"
+                      value={selectedName}
+                      onChange={(event) => updateDraft({ name: event.target.value })}
+                    />
+                  </div>
+                  <div className="w-full space-y-1.5 sm:w-36">
                     <Label htmlFor="selected-tier-unit">Cadence</Label>
                     <Select
                       value={selectedCycleUnit}
                       onValueChange={(value) => updateDraft({ cycleUnit: value as CycleUnit })}
                     >
-                      <SelectTrigger id="selected-tier-unit" className="w-full" aria-label="Tier cadence unit">
+                      <SelectTrigger id="selected-tier-unit" size="compact" className="w-full" aria-label="Tier cadence unit">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -849,13 +874,13 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className="w-full space-y-1.5 sm:w-24">
                     <Label htmlFor="selected-tier-count">Every</Label>
                     <Select
                       value={selectedCycleCount}
                       onValueChange={(value) => updateDraft({ cycleCount: value ?? "1" })}
                     >
-                      <SelectTrigger id="selected-tier-count" className="w-full" aria-label="Tier cadence count">
+                      <SelectTrigger id="selected-tier-count" size="compact" className="w-full" aria-label="Tier cadence count">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -863,26 +888,27 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-end gap-2 xl:col-span-2">
-                    <Button disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
-                      {save.isPending ? "Saving…" : "Save tier"}
-                    </Button>
-                    {!selectedTier.isDefault ? (
-                      <Button
-                        variant="ghost"
-                        disabled={!reason.trim() || archive.isPending}
-                        onClick={() => archive.mutate()}
-                      >
-                        {archive.isPending ? "Archiving…" : "Archive tier"}
-                      </Button>
-                    ) : null}
-                  </div>
                 </div>
-                <dl className="grid gap-3 border-t pt-4 text-sm sm:grid-cols-3">
+                <dl className="grid gap-3 border-t pt-3 text-sm sm:grid-cols-3">
                   <div><dt className="text-muted-foreground">Members</dt><dd className="mt-1 font-mono">{selectedTier.memberCount}</dd></div>
                   <div><dt className="text-muted-foreground">Open-period spend</dt><dd className="mt-1 font-mono">{usd(selectedTier.spendMicros)}</dd></div>
                   <div><dt className="text-muted-foreground">Current cycle</dt><dd className="mt-1">{readableCycle(selectedTier.cycleUnit, selectedTier.cycleCount)}</dd></div>
                 </dl>
+                <div className="flex justify-end gap-2 border-t pt-3">
+                  {!selectedTier.isDefault ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={!reason.trim() || archive.isPending}
+                      onClick={() => archive.mutate()}
+                    >
+                      {archive.isPending ? "Archiving…" : "Archive tier"}
+                    </Button>
+                  ) : null}
+                  <Button size="sm" disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
+                    {save.isPending ? "Saving…" : "Save tier"}
+                  </Button>
+                </div>
               </div>
             ) : (
               <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
@@ -890,6 +916,7 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
               </p>
             )}
           </section>
+          </div>
           {create.isError || save.isError || archive.isError ? (
             <Alert variant="destructive">
               <AlertTitle>Tier update failed</AlertTitle>
@@ -1027,27 +1054,27 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle><h2 className="text-base">Create future rate version</h2></CardTitle>
         <CardDescription>
           Start with the provider and model already billed by the app. Historical rows remain immutable.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-2">
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-full space-y-1.5 sm:w-40">
             <Label htmlFor="rate-provider">Provider</Label>
             <Select value={provider} onValueChange={(value) => changeProvider(value as (typeof PROVIDERS)[number])}>
-              <SelectTrigger id="rate-provider" className="w-full" aria-label="Rate provider"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="rate-provider" size="compact" className="w-full" aria-label="Rate provider"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PROVIDERS.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="w-full space-y-1.5 sm:w-64">
             <Label htmlFor="rate-model">Model</Label>
             <Select value={modelChoice} onValueChange={(value) => setModelChoice(value ?? CUSTOM_MODEL)}>
-              <SelectTrigger id="rate-model" className="w-full" aria-label="Rate model"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="rate-model" size="compact" className="w-full" aria-label="Rate model"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {models.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
                 <SelectItem value={CUSTOM_MODEL}>Another model identifier</SelectItem>
@@ -1055,24 +1082,24 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
             </Select>
           </div>
           {modelChoice === CUSTOM_MODEL ? (
-            <div className="space-y-2">
+            <div className="min-w-0 flex-1 space-y-1.5 sm:min-w-56">
               <Label htmlFor="custom-rate-model">Model identifier</Label>
-              <Input id="custom-rate-model" placeholder="model-id" value={customModel} onChange={(event) => setCustomModel(event.target.value)} />
+              <Input id="custom-rate-model" className="h-9" placeholder="model-id" value={customModel} onChange={(event) => setCustomModel(event.target.value)} />
             </div>
           ) : null}
-          <div className="space-y-2">
+          <div className="w-full space-y-1.5 sm:w-40">
             <Label htmlFor="rate-input">Input (USD / 1M)</Label>
-            <Input id="rate-input" aria-invalid={input !== "" && inputMicros == null} inputMode="decimal" placeholder="e.g. 3.00" value={input} onChange={(event) => setInput(event.target.value)} />
+            <Input id="rate-input" className="h-9" aria-invalid={input !== "" && inputMicros == null} inputMode="decimal" placeholder="e.g. 3.00" value={input} onChange={(event) => setInput(event.target.value)} />
           </div>
-          <div className="space-y-2">
+          <div className="w-full space-y-1.5 sm:w-40">
             <Label htmlFor="rate-output">Output (USD / 1M)</Label>
-            <Input id="rate-output" aria-invalid={output !== "" && outputMicros == null} inputMode="decimal" placeholder="e.g. 15.00" value={output} onChange={(event) => setOutput(event.target.value)} />
+            <Input id="rate-output" className="h-9" aria-invalid={output !== "" && outputMicros == null} inputMode="decimal" placeholder="e.g. 15.00" value={output} onChange={(event) => setOutput(event.target.value)} />
           </div>
           {provider === "deepseek" ? (
-            <div className="space-y-2">
+            <div className="w-full space-y-1.5 sm:w-40">
               <Label htmlFor="rate-period">Billing hours</Label>
               <Select value={ratePeriod} onValueChange={(value) => setRatePeriod(value as RatePeriodChoice)}>
-                <SelectTrigger id="rate-period" className="w-full" aria-label="Rate billing hours"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="rate-period" size="compact" className="w-full" aria-label="Rate billing hours"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Every hour</SelectItem>
                   <SelectItem value="peak">Peak hours</SelectItem>
@@ -1081,39 +1108,39 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
               </Select>
             </div>
           ) : null}
-          <div className="space-y-2">
+          <div className="w-full space-y-1.5 sm:w-56">
             <Label htmlFor="rate-effective">Effective from</Label>
-            <Input id="rate-effective" type="datetime-local" value={effective} onChange={(event) => setEffective(event.target.value)} />
+            <Input id="rate-effective" className="h-9" type="datetime-local" value={effective} onChange={(event) => setEffective(event.target.value)} />
           </div>
-          <div className="space-y-2 xl:col-span-2">
+          <div className="min-w-0 flex-1 space-y-1.5 sm:min-w-72">
             <Label htmlFor="rate-source">Official pricing source</Label>
-            <Input id="rate-source" type="url" placeholder="https://…" value={source} onChange={(event) => setSource(event.target.value)} />
+            <Input id="rate-source" className="h-9" type="url" placeholder="https://…" value={source} onChange={(event) => setSource(event.target.value)} />
           </div>
         </div>
 
-        <div className="rounded-lg border bg-muted/10 p-4">
+        <div className="rounded-lg border bg-muted/10 p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium">Optional cache and tool rates</h3>
+              <Label htmlFor="optional-rate-fields" className="text-sm font-medium">Optional cache and tool rates</Label>
               <p className="mt-1 text-xs text-muted-foreground">Leave these blank when the provider does not charge them.</p>
             </div>
             <Switch id="optional-rate-fields" checked={showOptionalRates} onCheckedChange={setShowOptionalRates} />
           </div>
           {showOptionalRates ? (
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="space-y-2"><Label htmlFor="rate-cache-read">Cache read (USD / 1M)</Label><Input id="rate-cache-read" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></div>
-              <div className="space-y-2"><Label htmlFor="rate-cache-write">Cache write (USD / 1M)</Label><Input id="rate-cache-write" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></div>
-              <div className="space-y-2"><Label htmlFor="rate-tool-fee">Tool fee (USD / unit)</Label><Input id="rate-tool-fee" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></div>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <div className="w-full space-y-1.5 sm:w-52"><Label htmlFor="rate-cache-read">Cache read (USD / 1M)</Label><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></div>
+              <div className="w-full space-y-1.5 sm:w-52"><Label htmlFor="rate-cache-write">Cache write (USD / 1M)</Label><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></div>
+              <div className="w-full space-y-1.5 sm:w-48"><Label htmlFor="rate-tool-fee">Tool fee (USD / unit)</Label><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></div>
             </div>
           ) : null}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div className="space-y-2">
+        <div className="flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="w-full space-y-1.5 lg:max-w-2xl">
             <Label htmlFor="rate-reason">Audit reason</Label>
-            <Textarea id="rate-reason" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this pricing version being added?" />
+            <Input id="rate-reason" className="h-9" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this pricing version being added?" />
           </div>
-          <Button disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
+          <Button size="sm" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
             {create.isPending ? "Creating…" : "Create immutable version"}
           </Button>
         </div>
@@ -1232,10 +1259,10 @@ export function AdminQuotasPage() {
             <div className="flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <Input className="pl-9" aria-label="Search members" placeholder="Search member…" value={search} onChange={(event) => setSearch(event.target.value)} />
+                <Input className="h-9 pl-9" aria-label="Search members" placeholder="Search member…" value={search} onChange={(event) => setSearch(event.target.value)} />
               </div>
               <Select value={balanceFilter} onValueChange={(value) => setBalanceFilter(value ?? "")}>
-                <SelectTrigger className="w-full sm:w-44" aria-label="Balance filter"><SelectValue placeholder="All balances" /></SelectTrigger>
+                <SelectTrigger size="compact" className="w-full sm:w-44" aria-label="Balance filter"><SelectValue placeholder="All balances" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_BALANCES}>All balances</SelectItem>
                   <SelectItem value="POSITIVE">Positive</SelectItem>

@@ -44,6 +44,11 @@ class RawJob:
     ] = "unknown"
 
 
+def provenance_for(provider_value: str | None) -> Literal["provider", "token"]:
+    """``"provider"`` when a provider-owned field carried a name, else ``"token"``."""
+    return "provider" if provider_value else "token"
+
+
 SkipSeen = Callable[[RawJob], bool]
 
 

@@ -118,6 +118,7 @@ class FirstPartyCrawler:
             if not first_party_domain:
                 first_party_domain = domain
             if domain != first_party_domain:
+                self._add_redirect_candidate(candidates, url, page.final_url)
                 continue
             strong = page_matches_company(company, page.final_url, page.text)
             first_party_verified = first_party_verified or strong
@@ -155,16 +156,50 @@ class FirstPartyCrawler:
     def _career_links(base_url: str, html: str) -> list[str]:
         soup = BeautifulSoup(html, "html.parser")
         links: list[str] = []
-        for tag in soup.select("a[href]"):
-            href = str(tag.get("href") or "")
-            text = tag.get_text(" ", strip=True)
-            if not any(word in f"{href} {text}".casefold() for word in _CAREER_WORDS):
-                continue
-            url = urljoin(base_url, href)
-            parsed = urlsplit(url)
-            if parsed.scheme in {"http", "https"} and parsed.netloc:
-                links.append(url)
+        for selector, attr in (
+            ("a[href]", "href"),
+            ("iframe[src]", "src"),
+            ("script[src]", "src"),
+            ("form[action]", "action"),
+        ):
+            for tag in soup.select(selector):
+                href = str(tag.get(attr) or "")
+                text = tag.get_text(" ", strip=True)
+                if not any(word in f"{href} {text}".casefold() for word in _CAREER_WORDS):
+                    continue
+                url = urljoin(base_url, href)
+                parsed = urlsplit(url)
+                if parsed.scheme in {"http", "https"} and parsed.netloc:
+                    links.append(url)
         return list(dict.fromkeys(links))
+
+    @staticmethod
+    def _add_redirect_candidate(
+        candidates: dict[str, CrawlCandidate], source_url: str, redirected_url: str
+    ) -> None:
+        """A same-domain link that redirects off-domain to a supported ATS board
+        is itself strong first-party proof (design: "a link or redirect from the
+        company's first-party site to the exact canonical ATS board")."""
+        if len(candidates) >= MAX_ATS_CANDIDATES:
+            return
+        target = identify_host(redirected_url)
+        if target is None:
+            return
+        canonical = canonical_target_url(target)
+        if not canonical or canonical in candidates:
+            return
+        candidates[canonical] = CrawlCandidate(
+            url=canonical,
+            strong_first_party=True,
+            evidence=[
+                SourceEvidence(
+                    kind="first_party_redirect",
+                    source_url=source_url,
+                    target_url=canonical,
+                    summary="First-party page redirected to this ATS board.",
+                )
+            ],
+        )
 
     @staticmethod
     def _add_candidates(
