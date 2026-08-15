@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Literal
 
-from ddgs.exceptions import RatelimitException, TimeoutException
+from ddgs.exceptions import DDGSException, RatelimitException, TimeoutException
 
 from resume_agent.discovery.source_resolution.catalog import BOARD_FAMILIES
 from resume_agent.sessions.stream import StreamEvent, StreamSink, ToolCompleted, ToolStarted
@@ -64,6 +64,8 @@ def make_budgeted_web_search_tool(
             return _error_payload("SEARCH_RATE_LIMITED")
         except TimeoutException:
             return _error_payload("SEARCH_BUDGET_EXHAUSTED")
+        except DDGSException:
+            return json.dumps({"ok": True, "results": []})
 
     return web_search
 

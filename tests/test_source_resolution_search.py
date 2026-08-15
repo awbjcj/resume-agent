@@ -1,6 +1,6 @@
 import json
 
-from ddgs.exceptions import RatelimitException
+from ddgs.exceptions import DDGSException, RatelimitException
 
 from resume_agent.discovery.source_resolution.search import (
     SearchBudget,
@@ -27,6 +27,18 @@ def test_fallback_search_opens_the_circuit_after_rate_limit():
     assert first["error_code"] == "SEARCH_RATE_LIMITED"
     assert second["error_code"] == "SEARCH_RATE_LIMITED"
     assert backend_calls == 1
+
+
+def test_fallback_search_returns_empty_results_when_no_results_found():
+    def backend(query: str, max_results: int = 5) -> str:
+        del query, max_results
+        raise DDGSException("No results found.")
+
+    search = make_budgeted_web_search_tool(SearchBudget(max_uses=5), backend=backend)
+
+    result = json.loads(search("Intuitive careers"))
+
+    assert result == {"ok": True, "results": []}
 
 
 def test_search_coverage_forwards_events_and_tracks_unsearched_families():
