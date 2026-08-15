@@ -90,6 +90,12 @@ Workday boards can have thousands of global listings — pulling all then gating
 locally is infeasible.
 
 1. **POST** `…/wday/cxs/{tenant}/{site}/jobs` with `{"searchText": ..., "limit": 20, "offset": N, "appliedFacets": ...}` — paginated list, title + location only. Location facets are tenant-resolved and cached when every configured location matches; misses stay unfaceted.
+   - **Location facets are sent when safely resolvable.** The first plain page's
+     location facet descriptors are matched case-insensitively against every
+     configured `search.yaml` location, then cached under
+     `data/workday_facets/{tenant}-{site}.json`. Partial/malformed matches,
+     cache failures, and empty faceted restarts fall back to searchText-only
+     paging. Category/job-family facets remain out of scope.
 2. **`title_relevance_gate`** prunes the list _before_ any detail fetch.
 3. **GET** `…/wday/cxs/{tenant}/{site}{externalPath}` for each survivor → `jobPostingInfo.jobDescription` (HTML → text via `html_to_text`).
 
@@ -123,23 +129,80 @@ detail fetches, not a speculative chunk of 20.
 
 Every connector calls `board.get` / `board.post` rather than module-level
 `httpx.get`, which built a fresh client — and therefore a fresh pool, TCP
-connection, and TLS handshake — per request. `BoardSession` owns the pool
-(HTTP/2, keep-alive), the single timeout, and the retry policy above.
-`board_session()` installs one per pull run via a `ContextVar`; a connector
-called outside a run gets a private session and behaves identically.
+connection, and TLS handshake — per request.
+
+- **Connectors talk HTTP through one pooled seam.** `discovery/connectors/http.py`'s
+  `BoardSession` owns the connection pool, the single `timeout` (it was a bare
+  `timeout=30` in ~15 modules), and the 429/5xx retry that only Workday had.
+  `board_session()` installs one per pull run through a `ContextVar`, so worker
+  threads inherit it and its connections are released when the run ends; a
+  connector called outside a run gets a private session and behaves
+  identically. Measured: 1.0 → 12.0 requests per client on one host.
+  **Scope is operator-configured endpoints only** — board APIs and ATS API URLs
+  rebuilt from a validated `AtsTarget`. A user-supplied URL still goes through
+  `security/outbound.py`, and that gateway is deliberately **not** given this
+  pool: it pins each request to the IP it validated and carries the hostname in
+  an `sni_hostname` extension, but httpx keys its pool on the request origin
+  (the IP), so a shared pool could hand a connection negotiated with one
+  hostname's SNI to a request for another hostname on the same address.
 
 `get`/`post` keep `httpx.get`'s contract — they **return** the response and do
 not raise for status — so a call site that tolerates a 404 or inspects the
 status is unchanged. Only transient statuses are retried before that response
 comes back.
 
-This serves **operator-configured** endpoints only. A user-supplied URL still
-goes through `security/outbound.py`, which is deliberately not given this pool
-(see the module docstring: httpx keys its pool on the request origin, which for
-a pinned request is the IP, so a shared pool could cross SNI).
-
 Tests fake at this seam — `monkeypatch.setattr(<module>.board, "get", ...)` —
 not at `httpx`.
+
+---
+
+## Tesla/Google portals (`tesla.py`, `google.py`)
+
+- **Tesla/Google portals are reverse-engineered.** Google's `ds:1`
+  `AF_initDataCallback` carries complete list rows and full JDs; a missing or
+  malformed jobs callback raises a per-URL parse failure. Tesla's site is
+  Akamai-gated: the visible `TeslaPortal` only passes with **real Chrome**
+  (`channel="chrome"`), `--disable-blink-features=AutomationControlled` (so
+  `navigator.webdriver` is `false`), and a **fresh non-persistent context** (a
+  persistent profile keeps a poisoned `_abck` cookie from a prior denial). All
+  three are required; bundled Chromium or `webdriver=true` is served "Access
+  Denied" and the `state` XHR never fires. `_capture_state` retries past a
+  throttled cold denial and raises `TeslaStateUnavailable` (isolated by
+  `_failure_reason`, never aborting the pull). Live schema: listing location is
+  a code resolved via `state.lookup.locations`; the detail endpoint is
+  `cua-api/careers/job/{id}` (no `apps/`) and JD prose lives in
+  `jobDescription`/`jobResponsibilities`/`jobRequirements`/`jobCompensationAndBenefits`
+  (`description` is empty). A companies connector containing Tesla opts out of
+  concurrent fetch and is serialized with other visible-browser connectors by
+  the pull runner. Either portal can change without notice, but its failure
+  never aborts other company URLs.
+
+## Per-source-unit limits
+
+- **Limits are per source unit.** Every board, careers URL, aggregator, and
+  scrape target can set an optional positive `limit` in `connectors.yaml` or
+  Source Manager. The global `--limit` is the per-unit fallback; `harvest`
+  gates, skips known rows, and caps each unit independently, never the union.
+
+## Adzuna enrichment (`adzuna.py`)
+
+- **Adzuna enrichment needs a real (non-headless) browser.** The API returns
+  only a truncated snippet, and `redirect_url` is a bot-gated `/land/ad/`
+  click-tracker — bare `httpx` gets `403` and _headless_ Chromium is challenged
+  ("suspicious behaviour"); only a non-headless browser follows the redirect to
+  the employer/aggregator posting (Dice, Greenhouse, …). So
+  `AdzunaConnector.fetch` (when `enrich_details=True`, the default)
+  relevance-gates the snippets, then `enrich_adzuna_jobs` calls
+  `browser.render_pages` to drive **one shared visible browser context** over
+  every survivor's `redirect_url` (distinct ads are safe; re-clicking the
+  _same_ ad boomerangs to a search page), captures each post-redirect
+  `final_url`, and extracts the JD via `enrich_adzuna_job(job, page)`
+  (LinkedIn/Greenhouse branches, else JSON-LD → description selectors →
+  whole-page markdown, taking the **first** materially-richer candidate in
+  specificity order, with logo `![](…)` images stripped). Any render/extract
+  failure leaves the snippet intact and is recorded in `.failures`. Enrichment
+  is un-exercised by the offline suite (the browser is faked); a pull is
+  slower and pops a window.
 
 ## Relevance gates (`text.py`)
 
