@@ -2611,6 +2611,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scout/sessions/{session_id}/proposals/{proposal_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Scout Proposal */
+        post: operations["resolve_scout_proposal_api_scout_sessions__session_id__proposals__proposal_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/scout/sessions/{session_id}/unarchive": {
         parameters: {
             query?: never;
@@ -6034,6 +6051,14 @@ export interface components {
          * @enum {string}
          */
         RunState: "pending" | "running" | "cancelling" | "done" | "error" | "cancelled";
+        /** ScoutApproveIn */
+        ScoutApproveIn: {
+            /**
+             * Manualconfirmation
+             * @default false
+             */
+            manualConfirmation: boolean;
+        };
         /** ScoutCitationOut */
         ScoutCitationOut: {
             /**
@@ -6052,6 +6077,36 @@ export interface components {
              */
             reason: string;
         };
+        /** ScoutEvidenceOut */
+        ScoutEvidenceOut: {
+            /** Kind */
+            kind: string;
+            /** Sourceurl */
+            sourceUrl: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /**
+             * Targeturl
+             * @default
+             */
+            targetUrl: string;
+        };
+        /** ScoutManualConfirmationOut */
+        ScoutManualConfirmationOut: {
+            /** Ats */
+            ats?: string | null;
+            /** Company */
+            company: string;
+            /** Confirmedat */
+            confirmedAt: string;
+            /** Resolutionreason */
+            resolutionReason: string;
+            /** Url */
+            url: string;
+        };
         /** ScoutMessageIn */
         ScoutMessageIn: {
             /** Message */
@@ -6063,7 +6118,7 @@ export interface components {
              * Check
              * @enum {string}
              */
-            check: "validated" | "unverified" | "failed" | "duplicate" | "avoid" | "new";
+            check: "validated" | "unverified" | "conflict" | "failed" | "duplicate" | "avoid" | "new";
             /**
              * Checkerror
              * @default
@@ -6085,6 +6140,7 @@ export interface components {
              * @enum {string}
              */
             kind: "source" | "search_term";
+            manualConfirmation?: components["schemas"]["ScoutManualConfirmationOut"] | null;
             /**
              * Reason
              * @default
@@ -6099,6 +6155,14 @@ export interface components {
              */
             status: "pending" | "added" | "dismissed";
             term?: components["schemas"]["ScoutTermOut"] | null;
+        };
+        /** ScoutResolveSourceIn */
+        ScoutResolveSourceIn: {
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
         };
         /** ScoutSessionOut */
         ScoutSessionOut: {
@@ -6184,14 +6248,37 @@ export interface components {
         ScoutSourceOut: {
             /** Ats */
             ats?: string | null;
+            /**
+             * Canonicalboardurl
+             * @default
+             */
+            canonicalBoardUrl: string;
             /** Company */
             company: string;
             /** Errorcode */
             errorCode?: string | null;
+            /** Evidence */
+            evidence?: components["schemas"]["ScoutEvidenceOut"][];
+            /**
+             * Requestedurl
+             * @default
+             */
+            requestedUrl: string;
+            /**
+             * Resolutionreason
+             * @default
+             */
+            resolutionReason: string;
+            /** Resolutionstatus */
+            resolutionStatus?: ("verified" | "unverified" | "conflict" | "failed") | null;
             /** Rolecount */
             roleCount?: number | null;
+            /** Searchedfamilies */
+            searchedFamilies?: string[];
             /** Token */
             token?: string | null;
+            /** Unsearchedfamilies */
+            unsearchedFamilies?: string[];
             /**
              * Url
              * @default
@@ -13236,7 +13323,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ScoutApproveIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -13273,6 +13364,44 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ScoutDismissIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_scout_proposal_api_scout_sessions__session_id__proposals__proposal_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScoutResolveSourceIn"];
             };
         };
         responses: {

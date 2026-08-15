@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
 const approve = vi.fn();
-vi.mock("./use-scout", async (original) => ({ ...(await original()), useApproveScoutProposal: () => ({ mutateAsync: approve, isPending: false }), useDismissScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }) }));
+vi.mock("./use-scout", async (original) => ({ ...(await original()), useApproveScoutProposal: () => ({ mutateAsync: approve, isPending: false }), useDismissScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }), useResolveScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }) }));
 import { ProposalRail } from "./ProposalRail";
 import type { ScoutProposal } from "./use-scout";
 
@@ -12,7 +12,12 @@ const base = (): Pick<ScoutProposal, "checkError" | "dismissReason" | "resolvedA
 
 const source = (id: string, company: string, check: ScoutProposal["check"] = "validated"): ScoutProposal => ({
   ...base(), id, kind: "source", status: "pending", check,
-  source: { company, url: `https://${company}.test`, ats: "greenhouse", roleCount: 1, token: company, errorCode: null }, term: null,
+  source: {
+    company, url: `https://${company}.test`, requestedUrl: `https://${company}.test/careers`, canonicalBoardUrl: `https://${company}.test`,
+    ats: "greenhouse", roleCount: 1, token: company, errorCode: null,
+    resolutionStatus: check === "validated" ? "verified" : check === "conflict" ? "conflict" : check === "failed" ? "failed" : "unverified",
+    resolutionReason: "OWNERSHIP_NOT_PROVEN", evidence: [], searchedFamilies: [], unsearchedFamilies: [],
+  }, term: null,
 });
 
 const term = (id: string, value: string, check: ScoutProposal["check"] = "new"): ScoutProposal => ({
@@ -56,17 +61,20 @@ it("counts exactly the proposals whose own Add button is enabled", async () => {
     term("t-dup", "already there", "duplicate"),
   ];
   render(<ProposalRail sessionId="s1" proposals={proposals} scrapeAvailable />);
-  // acme + scrapeme (browser available) + platform engineering
-  expect(screen.getByRole("button", { name: "Add all ready proposals" })).toHaveTextContent("Add all ready (3)");
-  for (const [name, enabled] of [["Add acme", true], ["Add dupe", false], ["Add broken", false], ["Add scrapeme", true], ["Add platform engineering", true], ["Add already there", false]] as const) {
-    expect(screen.getByRole("button", { name }), name)[enabled ? "toBeEnabled" : "toBeDisabled"]();
+  // acme + platform engineering. An unverified source has an individual,
+  // explicit confirmation flow and must never enter a normal batch add.
+  expect(screen.getByRole("button", { name: "Add all ready proposals" })).toHaveTextContent("Add all ready (2)");
+  expect(screen.getByRole("button", { name: "Add acme" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Add platform engineering" })).toBeEnabled();
+  for (const name of ["Add dupe", "Add broken", "Add scrapeme", "Add already there"]) {
+    expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
   }
 });
 
 it("drops unverified scrape targets from the batch when no browser is available", () => {
   render(<ProposalRail sessionId="s1" proposals={[source("s-ok", "acme"), source("s-scrape", "scrapeme", "unverified")]} scrapeAvailable={false} />);
   expect(screen.getByRole("button", { name: "Add all ready proposals" })).toHaveTextContent("Add all ready (1)");
-  expect(screen.getByRole("button", { name: "Add scrapeme" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Add scrapeme" })).not.toBeInTheDocument();
 });
 
 it("disables the batch button when nothing is ready", () => {

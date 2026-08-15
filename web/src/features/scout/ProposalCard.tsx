@@ -9,7 +9,13 @@ import { cn } from "@/lib/utils";
 import {
   blockedReason, canAddProposal, proposalBadge, proposalDetail, proposalLabel,
 } from "./proposals";
-import { useApproveScoutProposal, useDismissScoutProposal, type ScoutProposal } from "./use-scout";
+import { SourceVerificationActions } from "./SourceVerificationActions";
+import {
+  useApproveScoutProposal,
+  useDismissScoutProposal,
+  useResolveScoutProposal,
+  type ScoutProposal,
+} from "./use-scout";
 
 export { proposalBadge, proposalLabel } from "./proposals";
 
@@ -23,6 +29,7 @@ export { proposalBadge, proposalLabel } from "./proposals";
 export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, locallyAdded = false }: { sessionId: string; proposal: ScoutProposal; scrapeAvailable: boolean; error?: string; locallyAdded?: boolean }) {
   const approve = useApproveScoutProposal();
   const dismiss = useDismissScoutProposal();
+  const resolve = useResolveScoutProposal();
   const [open, setOpen] = useState(false);
   const [editingReason, setEditingReason] = useState(false);
   const [reason, setReason] = useState("");
@@ -32,7 +39,8 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
   const label = proposalLabel(proposal);
   const detail = proposalDetail(proposal);
   const pending = proposal.status === "pending" && !locallyAdded;
-  const addDisabled = !pending || !canAddProposal(proposal, scrapeAvailable) || approve.isPending;
+  const normalAddable = canAddProposal(proposal);
+  const addDisabled = !pending || !normalAddable || approve.isPending;
   const blocked = pending ? blockedReason(proposal, scrapeAvailable) : "";
   const citations = (proposal.citations ?? []).filter((item) => /^https?:\/\//i.test(item.url));
   // The dismissal editor lives in the detail region, so opening it must open the
@@ -63,7 +71,7 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
         {pending ? (
           <div className="flex shrink-0 items-center gap-0.5">
             <Button ref={dismissButton} size="icon-sm" variant="ghost" aria-label={`Dismiss ${label}`} onClick={() => { setEditingReason(true); setOpen(true); }}><X /></Button>
-            <Button size="icon-sm" aria-label={`Add ${label}`} disabled={addDisabled} onClick={() => { void approve.mutateAsync({ sessionId, proposalId: proposal.id }).catch(() => undefined); }}><Plus /></Button>
+            {normalAddable ? <Button size="icon-sm" aria-label={`Add ${label}`} disabled={addDisabled} onClick={() => { void approve.mutateAsync({ sessionId, proposalId: proposal.id }).catch(() => undefined); }}><Plus /></Button> : null}
           </div>
         ) : null}
       </div>
@@ -78,11 +86,15 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
       </div>
       <CollapsibleContent keepMounted id={detailId} className="translate-y-0 space-y-2 overflow-hidden px-3 pb-3 pl-8 text-xs opacity-100 transition-[opacity,transform] duration-[160ms] ease-out-strong data-starting-style:-translate-y-1 data-starting-style:opacity-0 data-ending-style:-translate-y-1 data-ending-style:opacity-0 motion-reduce:translate-y-0 motion-reduce:transition-opacity">
         {proposal.reason ? <p className="leading-relaxed text-muted-foreground">{proposal.reason}</p> : null}
-        {proposal.source?.url ? <a href={proposal.source.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"><span className="truncate">{proposal.source.url}</span><ExternalLink className="size-3 shrink-0" aria-hidden="true" /></a> : null}
+        {proposal.source?.url && proposal.check === "validated" ? <a href={proposal.source.canonicalBoardUrl || proposal.source.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"><span className="truncate">{proposal.source.canonicalBoardUrl || proposal.source.url}</span><ExternalLink className="size-3 shrink-0" aria-hidden="true" /></a> : null}
         {citations.length ? <div className="flex flex-wrap gap-2">{citations.map((item) => <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline">{item.title || "Evidence"}<ExternalLink className="size-3" aria-hidden="true" /></a>)}</div> : null}
+        {proposal.source?.evidence?.length ? <div className="space-y-1 text-muted-foreground"><p className="font-medium text-foreground">Verification evidence</p>{proposal.source.evidence.map((item, index) => <p key={`${item.kind}-${item.sourceUrl}-${index}`}>{item.summary || item.kind.replaceAll("_", " ")}</p>)}</div> : null}
+        {proposal.source?.searchedFamilies?.length ? <p className="text-muted-foreground">Checked: {proposal.source.searchedFamilies.join(", ")}</p> : null}
+        {proposal.source?.unsearchedFamilies?.length ? <p className="text-muted-foreground">Not checked: {proposal.source.unsearchedFamilies.join(", ")}</p> : null}
         {proposal.checkError ? <p className="text-destructive">{proposal.checkError}</p> : null}
         {proposal.dismissReason ? <p className="text-muted-foreground">Dismissed: {proposal.dismissReason}</p> : null}
         {blocked ? <p className="text-muted-foreground">{blocked}</p> : null}
+        {pending && proposal.kind === "source" ? <SourceVerificationActions proposal={proposal} scrapeAvailable={scrapeAvailable} resolvePending={resolve.isPending} confirmPending={approve.isPending} onResolve={(url) => resolve.mutateAsync({ sessionId, proposalId: proposal.id, url })} onConfirm={() => approve.mutateAsync({ sessionId, proposalId: proposal.id, manualConfirmation: true })} /> : null}
         {error ? <p role="alert" className="text-destructive">{error}</p> : null}
         {pending && editingReason ? (
           <div className="space-y-2">

@@ -51,8 +51,8 @@ export function ProposalRail({ sessionId, proposals, scrapeAvailable, className 
   // The one predicate the row's Add button also uses, so the batch button can no
   // longer offer fewer (or more) proposals than the rows individually accept.
   const ready = useMemo(
-    () => [...groups.companies, ...groups.terms].filter((row) => canAddProposal(row, scrapeAvailable)),
-    [groups, scrapeAvailable],
+    () => [...groups.companies, ...groups.terms].filter(canAddProposal),
+    [groups],
   );
   const pendingCount = groups.companies.length + groups.terms.length;
 

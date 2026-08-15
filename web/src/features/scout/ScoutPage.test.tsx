@@ -13,7 +13,7 @@ vi.mock("./use-scout", async (original) => ({
   useEndScoutSession: () => ({ mutateAsync: mocks.end, isPending: false }),
   useArchiveScoutSession: () => ({ mutate: vi.fn() }), useUnarchiveScoutSession: () => ({ mutate: vi.fn() }), useDeleteScoutSession: () => ({ mutate: mocks.remove, isPending: false }),
   useRenameScoutSession: () => ({ mutate: vi.fn(), isPending: false }),
-  useApproveScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }), useDismissScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useApproveScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }), useDismissScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }), useResolveScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("@/lib/chat/useChatStream", () => ({ useChatStream: () => ({ parts: [], status: "idle", error: null, stop: vi.fn(), reset: vi.fn() }) }));
 vi.mock("@/lib/runs/store", () => ({ useRunStore: () => null }));

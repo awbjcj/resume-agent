@@ -21,7 +21,16 @@ const proposals = [
     reason: `${company} runs a large platform organisation and is hiring into it; the board lists roles that match the standing goal.`,
     fitScore: 95 - index * 3, citations: [{ url: "https://example.com/e", title: "Careers" }],
     checkError: "", dismissReason: "", resolvedAt: null, term: null,
-    source: { company, url: `https://job-boards.greenhouse.io/${company.toLowerCase()}`, ats: "greenhouse", token: company.toLowerCase(), roleCount: 4 + index, errorCode: null },
+    source: {
+      company,
+      url: `https://job-boards.greenhouse.io/${company.toLowerCase()}`,
+      requestedUrl: `https://job-boards.greenhouse.io/${company.toLowerCase()}`,
+      canonicalBoardUrl: `https://job-boards.greenhouse.io/${company.toLowerCase()}`,
+      ats: "greenhouse", token: company.toLowerCase(), roleCount: 4 + index, errorCode: null,
+      resolutionStatus: index % 7 === 3 ? "unverified" : "verified",
+      resolutionReason: index % 7 === 3 ? "OWNERSHIP_NOT_PROVEN" : "VERIFIED_PROVIDER_METADATA",
+      evidence: [], searchedFamilies: ["greenhouse"], unsearchedFamilies: [],
+    },
   })),
   ...TERMS.map(([value, termKind], index) => ({
     id: `t${index}`, kind: "search_term", status: "pending", check: "new",
@@ -32,7 +41,14 @@ const proposals = [
   {
     id: "r0", kind: "source", status: "dismissed", check: "validated", reason: "Not a fit.",
     fitScore: 40, citations: [], checkError: "", dismissReason: "Wrong industry", resolvedAt: "2026-08-02T00:00:00Z",
-    term: null, source: { company: "Acme", url: "https://job-boards.greenhouse.io/acme", ats: "greenhouse", token: "acme", roleCount: 2, errorCode: null },
+    term: null, source: {
+      company: "Acme", url: "https://job-boards.greenhouse.io/acme",
+      requestedUrl: "https://job-boards.greenhouse.io/acme",
+      canonicalBoardUrl: "https://job-boards.greenhouse.io/acme",
+      ats: "greenhouse", token: "acme", roleCount: 2, errorCode: null,
+      resolutionStatus: "verified", resolutionReason: "VERIFIED_PROVIDER_METADATA",
+      evidence: [], searchedFamilies: ["greenhouse"], unsearchedFamilies: [],
+    },
   },
 ];
 
@@ -72,4 +88,45 @@ test("the ledger stays bounded and grouped at twenty-plus proposals", async ({ p
   expect(scrollHeight - clientHeight).toBeLessThan(700);
 
   await page.screenshot({ path: "e2e/__screenshots__/scout-ledger-1920.png", fullPage: false });
+});
+
+test("an unverified board cannot be added until its URL resolves", async ({ page }) => {
+  await mockEmptyRuns(page);
+  const currentSession = structuredClone(session);
+  let resolvedUrl = "";
+  await page.route("**/api/scout/sessions**", (route) => route.fulfill({ json: { sessions: [{ sessionId: "sess-1", startedAt: session.startedAt, endedAt: null, status: "active", archivedAt: null, goal: session.goal, proposalCount: proposals.length, pendingCount: proposals.length - 1, addedCount: 0, dismissedCount: 1 }] } }));
+  await page.route("**/api/scout/sessions/sess-1**", (route) => route.fulfill({ json: currentSession }));
+  await page.route("**/api/scout/sessions/sess-1/proposals/s3/resolve", async (route) => {
+    const body = route.request().postDataJSON() as { url: string };
+    resolvedUrl = body.url;
+    const plaid = currentSession.proposals.find((proposal) => proposal.id === "s3");
+    if (!plaid?.source) throw new Error("expected Plaid source fixture");
+    plaid.check = "validated";
+    plaid.source = {
+      ...plaid.source,
+      url: body.url,
+      requestedUrl: body.url,
+      canonicalBoardUrl: body.url,
+      ats: "workday",
+      resolutionStatus: "verified",
+      resolutionReason: "VERIFIED_FIRST_PARTY",
+      searchedFamilies: ["workday"],
+      unsearchedFamilies: [],
+    };
+    await route.fulfill({ json: currentSession });
+  });
+
+  await page.goto("/scout");
+  const ledger = page.getByRole("complementary", { name: "Scout proposals" });
+  await expect(ledger.getByRole("button", { name: "Add Plaid" })).toHaveCount(0);
+  await expect(ledger.getByRole("button", { name: "Add all ready proposals" })).toHaveText(/\(19\)/);
+
+  await ledger.getByRole("button", { name: "Plaid", exact: true }).click();
+  await ledger.getByRole("button", { name: "Try another URL" }).click();
+  const boardUrl = "https://plaid.wd5.myworkdayjobs.com/Plaid_Careers";
+  await ledger.getByLabel("Board URL for Plaid").fill(boardUrl);
+  await ledger.getByRole("button", { name: "Resolve URL" }).click();
+
+  await expect(ledger.getByRole("button", { name: "Add Plaid" })).toBeVisible();
+  expect(resolvedUrl).toBe(boardUrl);
 });

@@ -79,14 +79,31 @@ export function useEndScoutSession() {
 export function useApproveScoutProposal() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ sessionId, proposalId }: { sessionId: string; proposalId: string }) =>
-      unwrap(api.POST("/api/scout/sessions/{session_id}/proposals/{proposal_id}/approve", { params: { path: { session_id: sessionId, proposal_id: proposalId } } })),
+    mutationFn: ({ sessionId, proposalId, manualConfirmation = false }: { sessionId: string; proposalId: string; manualConfirmation?: boolean }) => {
+      const params = { params: { path: { session_id: sessionId, proposal_id: proposalId } } };
+      return manualConfirmation
+        ? unwrap(api.POST("/api/scout/sessions/{session_id}/proposals/{proposal_id}/approve", { ...params, body: { manualConfirmation: true } }))
+        : unwrap(api.POST("/api/scout/sessions/{session_id}/proposals/{proposal_id}/approve", params));
+    },
     onSuccess: () => Promise.all([
       client.invalidateQueries({ queryKey: ["scout-session"] }),
       client.invalidateQueries({ queryKey: ["scout-sessions"] }),
       client.invalidateQueries({ queryKey: ["sources"] }),
       client.invalidateQueries({ queryKey: ["config", "/api/config/search"] }),
     ]),
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useResolveScoutProposal() {
+  const invalidate = useScoutInvalidation();
+  return useMutation({
+    mutationFn: ({ sessionId, proposalId, url }: { sessionId: string; proposalId: string; url: string }) =>
+      unwrap(api.POST("/api/scout/sessions/{session_id}/proposals/{proposal_id}/resolve", {
+        params: { path: { session_id: sessionId, proposal_id: proposalId } },
+        body: { url },
+      })),
+    onSuccess: invalidate,
     onError: (error: Error) => toast.error(error.message),
   });
 }

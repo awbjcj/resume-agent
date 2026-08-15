@@ -25,6 +25,7 @@ dist-ssr
 
 # Test / build artifacts
 .vite
+.remember
 coverage
 playwright-report
 test-results
