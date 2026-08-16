@@ -1,12 +1,36 @@
 # Bullet Supply Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** Implement directly with red-green-refactor TDD. This implementation is deliberately inline; do not delegate tasks to subagents.
 
 **Goal:** Make the Profile Coach able to actually raise a role's bullet supply — its elicited bullets must land on the role they describe, its agenda must be driven by measured gaps, and its questions must be grounded in the user's own unmined documents.
 
 **Architecture:** A coach note gains a deterministic `owner_id` and is written to the corpus as `mode="synthesis"` with `anchor=<owner_id>`, which routes it through the existing pinned-anchor pipeline that forces `stub.id` to the anchor target and merges by id — bypassing the `_same_experience` heuristic that a coach note cannot satisfy. The opening agenda is seeded in code from Spec A's `owner_depth()` rather than invented by the model. Documents that contributed zero bullets become bounded question material.
 
 **Tech Stack:** Python 3, pydantic v2, FastAPI, Typer CLI, pytest (offline — all agent calls faked), ruff.
+
+## Implementation audit amendment (2026-08-15)
+
+The approved design specification is authoritative. The following corrections
+supersede any conflicting detail in the task text below:
+
+- Write the `approve_draft()` anchored/unanchored behavior test before changing
+  note intake. The existing merge-only regression is useful coverage, but it
+  cannot be the red test because pinned synthesis merge already works.
+- A seeded topic describes the **source supply** gap, not a rendered count:
+  its explanation says the owner has `{source_total} of {target}` source
+  bullets and that the resume can only use facts the profile holds.
+- `unmined_sources()` counts every `FactItem.source_ref` in `ProfileFacts`, not
+  only selected top-level collections. Its bounded context includes the
+  required policy sentence, truncates a document rather than dropping the
+  boundary document, and degrades unreadable input to an empty optional block.
+- Keep the 12 KB cap inclusive of the fixed header in production. Tests using
+  smaller injected budgets may exercise header-only degradation rather than
+  require an excerpt that cannot fit safely.
+- `CoachTopicOut.ownerId` is an additive API-contract parity field only; no
+  new web UI is introduced. Model-added topics remain unanchored and preserve
+  the literal-mode `_same_experience` behavior exactly.
+- Replace live coach/user-data/API-spend acceptance with offline fixture tests.
+  Any real coach session is opt-in manual acceptance and not part of the suite.
 
 ## DEPENDENCY: Spec A must ship first
 

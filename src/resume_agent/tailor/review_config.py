@@ -41,7 +41,7 @@ class ReviewerSpec(ExtensibleModel):
 
 
 class LengthBudget(ExtensibleModel):
-    """One-page guidance handed to the tailor and surfaced to reviewers.
+    """Page and evidence-owner guidance handed to tailoring and reviewers.
 
     Every field below bounds prose EXCEPT the two skill fields, which set a
     floor. That asymmetry is the point: bullets and skills do not cost the same
@@ -51,15 +51,52 @@ class LengthBudget(ExtensibleModel):
     the rest" pressure to both, and shipped ~17 of a ~335-skill profile.
     """
 
-    max_experiences: int = 4
-    max_projects: int = 2
-    max_evidence_owners: int = 5
-    max_bullets_per_role: int = 5
-    max_bullets_per_project: int = 3
-    target_total_bullets: int = 20
+    page_target: int = Field(default=2, ge=1)
+    max_experiences: int = Field(default=5, ge=0)
+    max_projects: int = Field(default=4, ge=0)
+    max_evidence_owners: int = Field(default=8, ge=0)
+    min_bullets_per_role: int = Field(default=5, ge=0)
+    max_bullets_per_role: int = Field(default=7, ge=0)
+    min_bullets_per_project: int = Field(default=4, ge=0)
+    max_bullets_per_project: int = Field(default=6, ge=0)
+    target_total_bullets: int = Field(default=40, ge=0)
+    min_aspects_per_owner: int = Field(default=3, ge=0)
     # A target, not a cap: the writer is asked to reach it, not to stop there.
     target_skills: int = 40
     max_skills_per_category: int = 12
+
+    @model_validator(mode="before")
+    @classmethod
+    def _backfill_legacy_floors(cls, data: object) -> object:
+        """Keep cap-only YAML and callers valid after floors were introduced.
+
+        A pre-depth budget could intentionally set a cap of one or two.  Its
+        missing floor should mean that same achievable cap, not the new default
+        floor of five. Explicitly supplied floor/cap pairs still go through the
+        stricter validator below.
+        """
+        if not isinstance(data, dict):
+            return data
+        result = dict(data)
+        for floor_key, cap_key, default_floor in (
+            ("min_bullets_per_role", "max_bullets_per_role", 5),
+            ("min_bullets_per_project", "max_bullets_per_project", 4),
+        ):
+            if floor_key in result or not isinstance(result.get(cap_key), int):
+                continue
+            if result[cap_key] < default_floor:
+                result[floor_key] = result[cap_key]
+        return result
+
+    @model_validator(mode="after")
+    def _validate_bullet_ranges(self) -> "LengthBudget":
+        if self.min_bullets_per_role > self.max_bullets_per_role:
+            raise ValueError("min_bullets_per_role cannot exceed max_bullets_per_role")
+        if self.min_bullets_per_project > self.max_bullets_per_project:
+            raise ValueError(
+                "min_bullets_per_project cannot exceed max_bullets_per_project"
+            )
+        return self
 
 
 class ReviewConfig(ExtensibleModel):

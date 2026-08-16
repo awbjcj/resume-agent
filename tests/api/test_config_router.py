@@ -120,6 +120,61 @@ def test_review_provenance_retry_budget_survives_unrelated_saves(client):
     assert saved["mergedAdvisory"] is True
 
 
+def test_review_length_budget_exposes_depth_controls_on_the_wire(client):
+    """The API carries the complete runtime budget, even without a settings UI."""
+    body = client.get("/api/config/review").json()
+    response = client.put(
+        "/api/config/review",
+        json={
+            **body,
+            "lengthBudget": {
+                "pageTarget": 2,
+                "maxExperiences": 5,
+                "maxProjects": 4,
+                "maxEvidenceOwners": 8,
+                "minBulletsPerRole": 5,
+                "maxBulletsPerRole": 7,
+                "minBulletsPerProject": 4,
+                "maxBulletsPerProject": 6,
+                "targetTotalBullets": 40,
+                "minAspectsPerOwner": 3,
+                "targetSkills": 40,
+                "maxSkillsPerCategory": 12,
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    budget = response.json()["lengthBudget"]
+    assert budget["pageTarget"] == 2
+    assert budget["minBulletsPerRole"] == 5
+    assert budget["minBulletsPerProject"] == 4
+    assert budget["minAspectsPerOwner"] == 3
+
+
+def test_review_length_budget_accepts_a_legacy_cap_only_payload(client):
+    body = client.get("/api/config/review").json()
+    response = client.put(
+        "/api/config/review",
+        json={
+            **body,
+            "lengthBudget": {
+                "maxExperiences": 1,
+                "maxProjects": 1,
+                "maxEvidenceOwners": 2,
+                "maxBulletsPerRole": 2,
+                "maxBulletsPerProject": 3,
+                "targetTotalBullets": 3,
+                "targetSkills": 40,
+                "maxSkillsPerCategory": 12,
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["lengthBudget"]["minBulletsPerRole"] == 2
+    assert response.json()["lengthBudget"]["minBulletsPerProject"] == 3
+
+
 def test_review_deep_is_a_separate_document_from_review(client):
     """The deep roster is its own file — saving one must not touch the other."""
     fast = client.get("/api/config/review").json()

@@ -79,7 +79,7 @@ def _project_text(project: Project) -> str:
             project.name,
             project.description or "",
             ", ".join(project.tech),
-            "; ".join(project.highlights),
+            "; ".join(highlight.text for highlight in project.highlights),
         )
         if value
     )

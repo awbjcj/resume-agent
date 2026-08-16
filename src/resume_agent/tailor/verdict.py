@@ -5,11 +5,13 @@ from pydantic import Field
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.coverage import CoverageCritique
+from resume_agent.tailor.depth import DepthCritique
 from resume_agent.tailor.review_config import RESERVED_REVIEWER_NAMES, ReviewConfig
 
 # Gates decided in-process, not by a configured reviewer agent. They ride in the
 # critiques list like any gate, so aggregate stays the only verdict constructor.
 DETERMINISTIC_GATES = RESERVED_REVIEWER_NAMES
+_ADVISORY_MEASUREMENTS = (CoverageCritique, DepthCritique)
 
 # The default configured gate when the caller has no ReviewConfig to consult
 # (e.g. reading a stored version outside a request that loaded one). `fact-check`
@@ -40,7 +42,7 @@ def failing_gate_names(
     return [
         critique.reviewer
         for critique in critiques
-        if not isinstance(critique, CoverageCritique)
+        if not isinstance(critique, _ADVISORY_MEASUREMENTS)
         if critique.reviewer in gates and not critique.passed
     ]
 
@@ -64,7 +66,9 @@ def aggregate(critiques: list[ReviewCritique], config: ReviewConfig) -> PanelVer
     # and weighted-review selection. A real configured reviewer with the same
     # name therefore remains authoritative.
     decision_critiques = [
-        critique for critique in critiques if not isinstance(critique, CoverageCritique)
+        critique
+        for critique in critiques
+        if not isinstance(critique, _ADVISORY_MEASUREMENTS)
     ]
     by_name = {c.reviewer: c for c in decision_critiques}
 

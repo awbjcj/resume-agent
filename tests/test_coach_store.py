@@ -168,3 +168,15 @@ def test_archived_session_does_not_block_new_active_session(tmp_path):
     current = active_session(tmp_path)
     assert current is not None
     assert current["session_id"] == "s2"
+
+
+def test_topic_owner_id_defaults_for_legacy_sessions_and_round_trips(tmp_path):
+    assert CoachTopic(id="legacy").owner_id == ""
+    create_session(
+        tmp_path,
+        "s1",
+        [CoachTopic(id="t1", gap="gap", owner_id="exp-acme")],
+        CoachTurnRecord(role="coach", kind="question", text="First?", topic_id="t1"),
+    )
+
+    assert load_session(tmp_path, "s1")["topics"][0]["owner_id"] == "exp-acme"

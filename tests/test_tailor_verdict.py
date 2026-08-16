@@ -2,6 +2,7 @@ import pytest
 
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.coverage import COVERAGE_REVIEWER, CoverageCritique
+from resume_agent.tailor.depth import DEPTH_REVIEWER, DepthCritique
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
 from resume_agent.tailor.verdict import aggregate, failing_gate_names
 
@@ -177,3 +178,18 @@ def test_coverage_measurement_does_not_mutate_review_config():
     )
 
     assert config.model_dump(mode="json") == before
+
+
+def test_tagged_depth_measurement_never_shadows_a_same_named_configured_reviewer():
+    config = ReviewConfig(
+        score_threshold=85,
+        reviewers=[ReviewerSpec(name=DEPTH_REVIEWER, gate=True, weight=0)],
+    )
+    deterministic = DepthCritique(reviewer=DEPTH_REVIEWER, score=0, passed=False)
+    configured = ReviewCritique(reviewer=DEPTH_REVIEWER, score=90, passed=True)
+
+    verdict = aggregate([deterministic, configured], config)
+
+    assert verdict.gate_passed is True
+    assert verdict.passed is True
+    assert failing_gate_names([deterministic, configured], {DEPTH_REVIEWER}) == []

@@ -1637,6 +1637,9 @@ def build_search_equipped(
         kwargs: dict[str, Any] = {
             "id": model_name,
             "api_key": api_key,
+            # Agno maps this to Gemini's provider-native Google Search tool;
+            # unlike tool-backed search it belongs to the model request and
+            # therefore returns no callable in the agent tool list.
             "search": True,
             "store": False,
         }

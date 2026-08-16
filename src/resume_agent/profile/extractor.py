@@ -17,7 +17,7 @@ from resume_agent.llm_runner import (
 from resume_agent.models.profile import ProfileFacts
 
 # Bump whenever _INSTRUCTIONS change so cached fragments re-extract.
-PROMPT_VERSION = 2
+PROMPT_VERSION = 3
 
 
 _INSTRUCTIONS = [
@@ -31,6 +31,9 @@ _INSTRUCTIONS = [
     "volunteer record. Split accomplishments into individual bullet facts rather than merging them.",
     "Associate nested bullets and technologies with the role or project that actually contains them. "
     "Do not duplicate the same claim into multiple sections merely to fill the schema.",
+    "Assign every experience bullet and project highlight exactly one schema-defined aspect: "
+    "scope, technical, impact, collaboration, leadership, process, tooling, or problem. "
+    "Classify only what the explicit bullet says; aspect metadata never adds a fact.",
     "Keep skill categories from the source when clear; otherwise use a concise conventional category. "
     "A skill's context may summarize only context explicitly present in the resume.",
     "Leave unsupported nullable fields null and unsupported collections empty. Schema metadata and "

@@ -79,9 +79,9 @@ def test_seeded_rate_prices_cache_and_reasoning_without_double_charge(tmp_path):
     assert priced.rate_id
 
 
-def test_seeded_model_prices_use_current_openai_and_deepseek_rates(tmp_path):
+def test_seeded_model_prices_use_current_openai_deepseek_and_gemini_rates(tmp_path):
     engine = _engine(tmp_path)
-    current = datetime(2026, 8, 2, tzinfo=UTC)
+    current = datetime(2026, 8, 15, tzinfo=UTC)
 
     expected_openai = {
         "gpt-5.6-sol": (5_000_000, 500_000, 6_250_000, 30_000_000),
@@ -109,6 +109,23 @@ def test_seeded_model_prices_use_current_openai_and_deepseek_rates(tmp_path):
             rate.input_micros_per_million,
             rate.cache_read_micros_per_million,
             rate.output_micros_per_million,
+        ) == expected
+
+    # Google publishes Gemini 3.6 Flash at $0.75/M input, $0.075/M cached
+    # input, and $3.75/M output (including thinking). Gemini 3.1 Flash Lite
+    # is a catalog option and therefore must have an active metering rate too.
+    expected_gemini = {
+        "gemini-3.6-flash": (750_000, 75_000, 3_750_000, 14_000),
+        "gemini-3.1-flash-lite": (250_000, 25_000, 1_500_000, 14_000),
+    }
+    for model, expected in expected_gemini.items():
+        rate = find_rate(engine, "gemini", model, now=current)
+        assert rate is not None
+        assert (
+            rate.input_micros_per_million,
+            rate.cache_read_micros_per_million,
+            rate.output_micros_per_million,
+            rate.tool_micros_per_unit,
         ) == expected
 
 
@@ -193,6 +210,25 @@ def test_openai_price_version_preserves_previous_gpt_5_6_rate(tmp_path):
 
     assert before_update.total_micros == 17_500_000
     assert after_update.total_micros == 14_000_000
+    assert before_update.rate_id != after_update.rate_id
+
+
+def test_gemini_price_version_preserves_the_pre_update_flash_rate(tmp_path):
+    engine = _engine(tmp_path)
+    usage = MeteredUsage(
+        provider="gemini",
+        model="gemini-3.6-flash",
+        input_tokens=1_000_000,
+        output_tokens=1_000_000,
+    )
+
+    before_update = calculate_cost(engine, usage, now=NOW)
+    after_update = calculate_cost(
+        engine, usage, now=datetime(2026, 8, 15, tzinfo=UTC)
+    )
+
+    assert before_update.total_micros == 9_000_000
+    assert after_update.total_micros == 4_500_000
     assert before_update.rate_id != after_update.rate_id
 
 

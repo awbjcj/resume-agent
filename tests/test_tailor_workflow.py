@@ -332,6 +332,7 @@ def test_broken_provenance_still_runs_the_panel():
         "provenance",
         "skill-naming",
         "numeric-evidence",
+        "bullet-depth",
         "fact-check",
         "ats-keyword",
     ]

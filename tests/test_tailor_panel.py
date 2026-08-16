@@ -152,6 +152,8 @@ def test_run_panel_routes_gate_to_evidence_and_others_to_lean():
     assert "SecretRust" not in agents["ats-keyword"].received
     assert "SUPPORTING FACTS" in agents["fact-check"].received
     assert coverage in agents["ats-keyword"].received
+    assert "BULLET DEPTH PLAN" in agents["ats-keyword"].received
+    assert 'e1 "AE — Eng": 1 source -> render 1 (supply-limited' in agents["ats-keyword"].received
 
 
 def test_run_panel_rejects_non_merged_reviewer_identity_mismatch():

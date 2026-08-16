@@ -163,6 +163,52 @@ def test_opening_and_message_turn_create_durable_views(tmp_path):
     assert updated["turns"][-1]["kind"] == "question"
 
 
+def test_opening_turn_seeds_measured_depth_topics_before_model_topics(tmp_path):
+    from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
+    from resume_agent.profile.store import save_facts
+
+    _seed_primary(tmp_path)
+    save_facts(
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[
+                Experience(
+                    id="exp-acme",
+                    company="Acme",
+                    title="Engineer",
+                    bullets=[Bullet(id="b1", text="Built it")],
+                )
+            ],
+        ),
+        tmp_path / "facts.json",
+    )
+    coach = FakeAgent("notes")
+    view = run_opening_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        coach_agent=coach,
+        formatter_agent=FakeAgent(
+            OpeningTurn(message="What changed at Acme?", action="ask", topics=[])
+        ),
+    )
+
+    assert view["topics"][0]["ownerId"] == "exp-acme"
+    assert "SEEDED DEPTH AGENDA" in coach.prompts[0]
+
+
+def test_session_view_exposes_owner_id_in_camel_case(tmp_path):
+    from resume_agent.profile.coach_store import CoachTopic, CoachTurnRecord, create_session
+
+    create_session(
+        tmp_path,
+        "owner",
+        [CoachTopic(id="t1", gap="Acme", owner_id="exp-acme")],
+        CoachTurnRecord(role="coach", kind="question", text="First?", topic_id="t1"),
+    )
+
+    assert session_view(tmp_path, "owner")["topics"][0]["ownerId"] == "exp-acme"
+
+
 def test_message_streams_prose_and_stores_the_same_text(tmp_path):
     sid = _open(tmp_path)["sessionId"]
     sink = RecordingSink()
@@ -450,6 +496,52 @@ def test_approval_requires_quote_and_is_exactly_once_under_concurrency(tmp_path)
     from resume_agent.profile.corpus import load_manifest
 
     assert len(load_manifest(profile_dir).docs) == 2
+
+
+def test_approving_a_seeded_topic_writes_a_pinned_synthesis_note(tmp_path):
+    from resume_agent.profile.coach_store import (
+        CoachDraftNote,
+        CoachTopic,
+        CoachTurnRecord,
+        apply_turn_delta,
+        create_session,
+    )
+    from resume_agent.profile.corpus import load_manifest
+
+    profile_dir = tmp_path / "profile"
+    _seed_primary(profile_dir)
+    create_session(
+        profile_dir,
+        "seeded",
+        [CoachTopic(id="t1", gap="Acme", owner_id="exp-acme")],
+        CoachTurnRecord(role="coach", kind="question", text="First?", topic_id="t1"),
+    )
+    apply_turn_delta(
+        profile_dir,
+        "seeded",
+        user_text="I cut deploy time from 40 minutes to 6 minutes.",
+        coach_turn=CoachTurnRecord(role="coach", kind="draft_note", text="Draft", topic_id="t1"),
+        new_topics=[],
+        skipped_topic_ids=[],
+        draft=CoachDraftNote(
+            topic_id="t1",
+            title="Deploy speed",
+            summary="Cut deploy time.",
+            quotes=["I cut deploy time from 40 minutes to 6 minutes."],
+        ),
+    )
+
+    doc_id = approve_draft(
+        profile_dir,
+        "seeded",
+        "t1",
+        title="Deploy speed",
+        summary="Cut deploy time.",
+        quotes=["I cut deploy time from 40 minutes to 6 minutes."],
+    )
+
+    doc = next(doc for doc in load_manifest(profile_dir).docs if doc.id == doc_id)
+    assert (doc.mode, doc.anchor) == ("synthesis", "exp-acme")
 
 
 def test_recap_without_user_input_ends_deterministically_and_skips_llm(tmp_path):

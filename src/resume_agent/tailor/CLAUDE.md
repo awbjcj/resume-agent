@@ -138,3 +138,13 @@ Web Services`) is advisory, since `CRAFT_WRITER` allows it and no alias table
   `early_stop_on_regression: true`. The threshold stays at 85 and the match plan
   stays off until the eval arms in `evals/RESULTS.md` are actually run — see the
   2026-07-27 baseline entry there.
+- **A cap without a floor reads as zero.** `LengthBudget` gives each selected
+  evidence owner a source-clamped render range through `format_depth_plan`.
+  The writer, reviser, and advisory reviewers receive that deterministic block;
+  a floor can never demand more bullets than the profile holds.
+- **Depth has two audiences.** `profile/depth.py` reports source supply and
+  aspect gaps to the profile owner. `tailor/depth.py` reports only fixable
+  under-rendering to the reviser as an advisory, runtime-marked
+  `DepthCritique`; `bullet-depth` is deliberately neither a deterministic gate
+  nor a reserved configured-reviewer name. Its score denominator is the depth
+  plan, so a dropped owner cannot disappear from the measurement.

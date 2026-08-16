@@ -86,6 +86,7 @@ def build_corpus_profile(
     synthesis_agent: Runner | None = None,
     entailment_agent: Runner | None = None,
     project_agent: Runner | None = None,
+    aspect_agent: Runner | None = None,
     github_allow: tuple[str, ...] = (),
     github_deny: tuple[str, ...] = (),
     github_limit: int = 20,
@@ -211,4 +212,14 @@ def build_corpus_profile(
             )
         except Exception as exc:
             report.warnings.append(f"skill inference failed: {exc}")
+    if aspect_agent is not None:
+        try:
+            from resume_agent.profile.aspect_classifier import classify_aspects
+
+            merged = classify_aspects(merged, aspect_agent)
+        except Exception as exc:
+            # An aspect is a useful durable classification, not a fact-lock
+            # prerequisite. Legacy/incomplete data remains valid when this
+            # cheap-tier backfill is temporarily unavailable.
+            report.warnings.append(f"bullet aspect classification failed: {exc}")
     return merged, report

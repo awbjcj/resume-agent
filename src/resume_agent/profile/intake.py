@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from resume_agent.discovery.connectors.text import html_to_text
-from resume_agent.profile.corpus import SourceDoc, add_source
+from resume_agent.profile.corpus import SourceDoc, SourceMode, add_source
 from resume_agent.security.outbound import Resolver, fetch_public_text, resolve_host
 
 _SLUG = re.compile(r"[^a-z0-9]+")
@@ -22,21 +22,41 @@ def _slug(value: str, fallback: str) -> str:
     return _SLUG.sub("-", value.casefold()).strip("-") or fallback
 
 
-def _stage_and_add(profile_dir: str | Path, filename: str, body: str) -> SourceDoc:
+def _stage_and_add(
+    profile_dir: str | Path,
+    filename: str,
+    body: str,
+    *,
+    mode: SourceMode = "literal",
+    anchor: str | None = None,
+) -> SourceDoc:
     with tempfile.TemporaryDirectory() as scratch:
         staged = Path(scratch) / filename
         staged.write_text(body, encoding="utf-8", newline="\n")
-        return add_source(profile_dir, staged, mode="literal")
+        return add_source(profile_dir, staged, mode=mode, anchor=anchor)
 
 
-def add_note_source(profile_dir: str | Path, title: str, text: str) -> SourceDoc:
+def add_note_source(
+    profile_dir: str | Path,
+    title: str,
+    text: str,
+    *,
+    anchor: str | None = None,
+) -> SourceDoc:
     if not text.strip():
         raise ValueError("note text is empty")
     if len(text) > 100_000:
         raise ValueError("note text is too large")
     heading = (title.strip() or "Note")[:200]
     body = f"# {heading}\n\n{text.strip()}\n"
-    return _stage_and_add(profile_dir, f"note--{_slug(heading, 'note')}.md", body)
+    target = anchor.strip() if anchor else None
+    return _stage_and_add(
+        profile_dir,
+        f"note--{_slug(heading, 'note')}.md",
+        body,
+        mode="synthesis" if target else "literal",
+        anchor=target,
+    )
 
 
 def _fetch_text(

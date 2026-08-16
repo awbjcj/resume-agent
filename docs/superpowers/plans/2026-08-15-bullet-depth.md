@@ -1,12 +1,43 @@
 # Bullet Depth Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** Implement directly with red-green-refactor TDD. This implementation is deliberately inline; do not delegate tasks to subagents.
 
 **Goal:** Make the tailor render at least five bullets for every experience and project that has the supply to support them, and measure — separately — where the resume under-renders and where the profile under-supplies.
 
 **Architecture:** `LengthBudget` gains floors alongside its existing caps, and a new deterministic `format_depth_plan` block hands the writer a per-owner render range already clamped to available supply, so the model never has to do the arithmetic and is never told to invent. A fixed eight-value `Aspect` vocabulary lands on `Bullet` so diversity is measurable. `Project.highlights` is promoted from `list[str]` to `list[Bullet]` so project bullets become provenance-addressable. Two reports split by audience: `profile/depth.py` measures supply for the profile owner, `tailor/depth.py` measures render for the reviser.
 
 **Tech Stack:** Python 3, pydantic v2, FastAPI, Typer CLI, pytest (offline — all agent calls faked), ruff.
+
+## Implementation audit amendment (2026-08-15)
+
+The approved design specification is authoritative. The following corrections
+supersede any conflicting detail in the task text below:
+
+- Legacy `Project.highlights: list[str]` must become `Bullet` objects with
+  **stable, non-empty deterministic ids at deserialization time**. Empty ids
+  cannot be deferred to `assign_fact_ids`, because stored `facts.json` is read
+  directly by tailor/provenance paths.
+- Keep `evidence_owners()` as the complete supply accessor, but introduce one
+  deterministic budget-selection helper for `format_depth_plan()` and
+  `depth_report()`. It must honor the experience/project/combined caps; only
+  those planned owners form the depth-plan or its score denominator.
+- New fragment, synthesis, and project extraction schemas and prompts assign
+  `Bullet.aspect` at extraction time. The cheap-tier classifier is an
+  idempotent backfill only for `aspect is None`, including legacy or incomplete
+  extraction output; it never overwrites a populated aspect.
+- `format_depth_plan()` is composed locally wherever writer, reviser, and
+  advisory-panel prompt input is built. It is never supplied as an empty
+  placeholder or threaded through unrelated public workflow APIs.
+- The approved scope excludes web UI. Keep the additive configuration schema
+  fields and generated client contract, but omit the proposed settings-page
+  inputs.
+- Replace live tailoring/credential-dependent acceptance steps with offline
+  fixture coverage. A real stored-job tailoring run is optional manual
+  acceptance only and is not part of automated verification.
+
+The implementation also updates the current Gemini rate table and verifies the
+existing native Google Search integration with offline construction tests; this
+cross-cutting maintenance remains outside the bullet-depth UI scope.
 
 ## Global Constraints
 

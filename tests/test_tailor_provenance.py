@@ -64,6 +64,25 @@ def test_index_facts_collects_every_id():
     assert set(idx) == {"e1", "b1", "p1", "s1"}
 
 
+def test_project_highlights_are_individually_fact_locked():
+    facts = _facts()
+    facts.projects[0].highlights = [
+        Bullet(id="project-highlight-1", text="Processed 2M events per day")
+    ]
+    content = _content()
+    content.projects[0].bullets = [
+        TailoredBullet(
+            text="Processed 2M events per day", provenance="project-highlight-1"
+        )
+    ]
+
+    assert "project-highlight-1" in index_facts(facts)
+    assert check_provenance(content, facts).ok is True
+
+    content.projects[0].bullets[0].provenance = "fabricated-project-highlight"
+    assert check_provenance(content, facts).missing == ["fabricated-project-highlight"]
+
+
 def test_referenced_ids_walks_content():
     assert referenced_ids(_content()) == {"e1", "b1", "p1", "s1"}
 

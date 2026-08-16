@@ -1,8 +1,10 @@
+import hashlib
 from typing import Literal
 
 from pydantic import Field, model_validator
 
 from resume_agent.models.base import ExtensibleModel, FactItem, Source
+from resume_agent.profile.aspects import Aspect
 
 
 class Link(ExtensibleModel):
@@ -23,6 +25,8 @@ class Contact(ExtensibleModel):
 
 class Bullet(FactItem):
     text: str
+    # ``None`` preserves stored profiles written before aspect classification.
+    aspect: Aspect | None = None
 
 
 class Skill(FactItem):
@@ -71,7 +75,7 @@ class Project(FactItem):
     tech: list[str] = Field(default_factory=list)
     url: str | None = None
     repo_url: str | None = None
-    highlights: list[str] = Field(default_factory=list)
+    highlights: list[Bullet] = Field(default_factory=list)
     start: str | None = None
     end: str | None = None
     stars: int | None = None
@@ -82,6 +86,42 @@ class Project(FactItem):
     homepage_url: str | None = None
     last_updated: str | None = None
     is_fork: bool | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_legacy_highlights(cls, data: object) -> object:
+        """Migrate stored ``list[str]`` highlights into addressable bullets.
+
+        Stored facts can be loaded directly by tailoring, bypassing corpus
+        extraction and ``assign_fact_ids``.  The migration consequently gives
+        each legacy string a deterministic non-empty id immediately.  Repeated
+        text remains distinct by occurrence order.
+        """
+        if not isinstance(data, dict) or not isinstance(
+            highlights := data.get("highlights"), list
+        ):
+            return data
+        owner_key = str(data.get("id") or data.get("name") or "project")
+        occurrences: dict[str, int] = {}
+        converted: list[object] = []
+        changed = False
+        for value in highlights:
+            if not isinstance(value, str):
+                converted.append(value)
+                continue
+            changed = True
+            normalized = " ".join(value.split()).casefold()
+            occurrence = occurrences.get(normalized, 0)
+            occurrences[normalized] = occurrence + 1
+            digest = hashlib.sha1(
+                f"legacy-highlight|{owner_key}|{normalized}|{occurrence}".encode()
+            ).hexdigest()[:12]
+            bullet: dict[str, object] = {"id": digest, "text": value}
+            for field in ("source", "source_ref", "synthesized"):
+                if field in data:
+                    bullet[field] = data[field]
+            converted.append(bullet)
+        return {**data, "highlights": converted} if changed else data
 
 
 class Certification(FactItem):

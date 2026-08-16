@@ -12,6 +12,7 @@ from resume_agent.models.profile import (
     Skill,
 )
 from resume_agent.profile.build import build_corpus_profile, build_profile
+from resume_agent.profile.aspect_classifier import AspectAssignment, AspectAssignments
 from resume_agent.profile.corpus import add_source
 from resume_agent.profile.inference import InferredSkill, InferredSkills
 from resume_agent.profile.synthesis import (
@@ -193,6 +194,49 @@ def test_build_corpus_profile_runs_inference(tmp_path):
     )
     assert report.inferred_added == ["Mentorship"]
     assert facts.skills["soft"][0].inferred is True
+
+
+def test_build_corpus_profile_backfills_only_missing_bullet_aspects(tmp_path):
+    profile_dir = tmp_path / "profile"
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada resume", encoding="utf-8")
+    add_source(profile_dir, resume, primary=True)
+    extracted = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[
+            Experience(
+                company="Acme",
+                title="Engineer",
+                bullets=[Bullet(text="Built the platform")],
+            )
+        ],
+    )
+    classifier = _FakeAgent(
+        AspectAssignments(
+            assignments=[AspectAssignment(bullet_id="ignored", aspect="technical")]
+        )
+    )
+
+    # The corpus assigns deterministic ids before the backfill, so the fake
+    # adapts the response to the id it was actually asked to classify.
+    def classify(prompt):
+        bullet_id = json.loads(prompt)[0]["id"]
+        return _FakeResult(
+            AspectAssignments(
+                assignments=[AspectAssignment(bullet_id=bullet_id, aspect="technical")]
+            )
+        )
+
+    classifier.run = classify
+    facts, report = build_corpus_profile(
+        profile_dir,
+        github_username="",
+        extractor_agent=_FakeAgent(extracted),
+        aspect_agent=classifier,
+    )
+
+    assert facts.experience[0].bullets[0].aspect == "technical"
+    assert report.warnings == []
 
 
 def test_build_corpus_profile_requires_sources(tmp_path):

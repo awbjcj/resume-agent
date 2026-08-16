@@ -2407,6 +2407,11 @@
             ],
             "title": "Notedocid"
           },
+          "ownerId": {
+            "default": "",
+            "title": "Ownerid",
+            "type": "string"
+          },
           "relatedRef": {
             "default": "",
             "title": "Relatedref",
@@ -4745,27 +4750,32 @@
       "LengthBudget": {
         "properties": {
           "maxBulletsPerProject": {
-            "default": 3,
+            "default": 6,
+            "minimum": 0.0,
             "title": "Maxbulletsperproject",
             "type": "integer"
           },
           "maxBulletsPerRole": {
-            "default": 5,
+            "default": 7,
+            "minimum": 0.0,
             "title": "Maxbulletsperrole",
             "type": "integer"
           },
           "maxEvidenceOwners": {
-            "default": 5,
+            "default": 8,
+            "minimum": 0.0,
             "title": "Maxevidenceowners",
             "type": "integer"
           },
           "maxExperiences": {
-            "default": 4,
+            "default": 5,
+            "minimum": 0.0,
             "title": "Maxexperiences",
             "type": "integer"
           },
           "maxProjects": {
-            "default": 2,
+            "default": 4,
+            "minimum": 0.0,
             "title": "Maxprojects",
             "type": "integer"
           },
@@ -4774,13 +4784,38 @@
             "title": "Maxskillspercategory",
             "type": "integer"
           },
+          "minAspectsPerOwner": {
+            "default": 3,
+            "minimum": 0.0,
+            "title": "Minaspectsperowner",
+            "type": "integer"
+          },
+          "minBulletsPerProject": {
+            "default": 4,
+            "minimum": 0.0,
+            "title": "Minbulletsperproject",
+            "type": "integer"
+          },
+          "minBulletsPerRole": {
+            "default": 5,
+            "minimum": 0.0,
+            "title": "Minbulletsperrole",
+            "type": "integer"
+          },
+          "pageTarget": {
+            "default": 2,
+            "minimum": 1.0,
+            "title": "Pagetarget",
+            "type": "integer"
+          },
           "targetSkills": {
             "default": 40,
             "title": "Targetskills",
             "type": "integer"
           },
           "targetTotalBullets": {
-            "default": 20,
+            "default": 40,
+            "minimum": 0.0,
             "title": "Targettotalbullets",
             "type": "integer"
           }

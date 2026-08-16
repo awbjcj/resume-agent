@@ -28,6 +28,7 @@ class CoachTopicOut(CamelModel):
     gap: str = ""
     why_it_matters: str = ""
     related_ref: str = ""
+    owner_id: str = ""
     status: str = "open"
     note_doc_id: str | None = None
 

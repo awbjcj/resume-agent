@@ -188,6 +188,7 @@ def test_a_citation_slip_scores_normally_gets_a_retry_and_still_fails_its_gate()
         "provenance",
         "skill-naming",
         "numeric-evidence",
+        "bullet-depth",
         "fact-check",
         "ats-keyword",
     ]

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from resume_agent.api.schemas.base import CamelModel
 from resume_agent.tailor.review_config import LengthBudget as DomainLengthBudget
@@ -78,14 +78,70 @@ class LengthBudget(CamelModel):
     # A factory is invisible to JSON Schema, which silently stripped every
     # `default` from the published OpenAPI contract and cost API consumers the
     # documented values.
-    max_experiences: int = _budget_default("max_experiences")
-    max_projects: int = _budget_default("max_projects")
-    max_evidence_owners: int = _budget_default("max_evidence_owners")
-    max_bullets_per_role: int = _budget_default("max_bullets_per_role")
-    max_bullets_per_project: int = _budget_default("max_bullets_per_project")
-    target_total_bullets: int = _budget_default("target_total_bullets")
+    page_target: int = Field(default=_budget_default("page_target"), ge=1)
+    max_experiences: int = Field(default=_budget_default("max_experiences"), ge=0)
+    max_projects: int = Field(default=_budget_default("max_projects"), ge=0)
+    max_evidence_owners: int = Field(
+        default=_budget_default("max_evidence_owners"), ge=0
+    )
+    min_bullets_per_role: int = Field(
+        default=_budget_default("min_bullets_per_role"), ge=0
+    )
+    max_bullets_per_role: int = Field(
+        default=_budget_default("max_bullets_per_role"), ge=0
+    )
+    min_bullets_per_project: int = Field(
+        default=_budget_default("min_bullets_per_project"), ge=0
+    )
+    max_bullets_per_project: int = Field(
+        default=_budget_default("max_bullets_per_project"), ge=0
+    )
+    target_total_bullets: int = Field(
+        default=_budget_default("target_total_bullets"), ge=0
+    )
+    min_aspects_per_owner: int = Field(
+        default=_budget_default("min_aspects_per_owner"), ge=0
+    )
     target_skills: int = _budget_default("target_skills")
     max_skills_per_category: int = _budget_default("max_skills_per_category")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _backfill_legacy_floors(cls, data: Any) -> Any:
+        """Accept cap-only payloads emitted by clients before depth floors."""
+        if not isinstance(data, dict):
+            return data
+        result = dict(data)
+        for floor_key, floor_alias, cap_key, cap_alias in (
+            (
+                "min_bullets_per_role",
+                "minBulletsPerRole",
+                "max_bullets_per_role",
+                "maxBulletsPerRole",
+            ),
+            (
+                "min_bullets_per_project",
+                "minBulletsPerProject",
+                "max_bullets_per_project",
+                "maxBulletsPerProject",
+            ),
+        ):
+            if floor_key in result or floor_alias in result:
+                continue
+            cap = result.get(cap_key, result.get(cap_alias))
+            if isinstance(cap, int) and cap < _budget_default(floor_key):
+                result[floor_key] = cap
+        return result
+
+    @model_validator(mode="after")
+    def _validate_bullet_ranges(self) -> "LengthBudget":
+        if self.min_bullets_per_role > self.max_bullets_per_role:
+            raise ValueError("min_bullets_per_role cannot exceed max_bullets_per_role")
+        if self.min_bullets_per_project > self.max_bullets_per_project:
+            raise ValueError(
+                "min_bullets_per_project cannot exceed max_bullets_per_project"
+            )
+        return self
 
 
 def _default_reviewers() -> list[ReviewerEntry]:

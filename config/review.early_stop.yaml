@@ -25,6 +25,13 @@ reviewers:
     model_tier: mid
 
 length_budget:
-  max_experiences: 4
-  max_bullets_per_role: 5
-  target_total_bullets: 20
+  page_target: 2
+  max_experiences: 5
+  max_projects: 4
+  max_evidence_owners: 8
+  min_bullets_per_role: 5
+  max_bullets_per_role: 7
+  min_bullets_per_project: 4
+  max_bullets_per_project: 6
+  target_total_bullets: 40
+  min_aspects_per_owner: 3

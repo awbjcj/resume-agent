@@ -1,7 +1,8 @@
 from typer.testing import CliRunner
 
-from resume_agent.models.profile import Contact, Project, ProfileFacts
+from resume_agent.models.profile import Bullet, Contact, Experience, Project, ProfileFacts
 from resume_agent.profile.build import BuildReport
+from resume_agent.profile.store import save_facts
 from resume_agent import cli
 
 runner = CliRunner()
@@ -340,3 +341,28 @@ def test_profile_add_note_url_and_sync_github_commands(tmp_path, monkeypatch):
     )
     assert synced.exit_code == 0, synced.output
     assert "written:1" in synced.output
+
+
+def test_profile_depth_reports_supply_and_aspect_gaps(tmp_path):
+    facts_path = tmp_path / "profile" / "facts.json"
+    save_facts(
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[
+                Experience(
+                    id="e1",
+                    company="Acme",
+                    title="Engineer",
+                    bullets=[Bullet(id="b1", text="Built it", aspect="technical")],
+                )
+            ],
+        ),
+        facts_path,
+    )
+
+    result = runner.invoke(cli.app, ["profile", "depth", "--facts", str(facts_path)])
+
+    assert result.exit_code == 0, result.output
+    assert "GAP Acme — Engineer (experience): 1/10 bullets" in result.output
+    assert "missing aspects:" in result.output
+    assert "Run `profile coach`" in result.output

@@ -27,6 +27,8 @@ def index_facts(facts: ProfileFacts) -> dict[str, Any]:
             index[bullet.id] = bullet
     for proj in facts.projects:
         index[proj.id] = proj
+        for highlight in proj.highlights:
+            index[highlight.id] = highlight
     for skills in facts.skills.values():
         for skill in skills:
             index[skill.id] = skill

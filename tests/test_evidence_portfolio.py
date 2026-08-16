@@ -63,7 +63,7 @@ def _facts() -> ProfileFacts:
                 name="Event platform",
                 description="Python event processing service",
                 tech=["Python", "Kafka"],
-                highlights=["Processed 2M events per day"],
+                highlights=[Bullet(text="Processed 2M events per day")],
                 last_updated="2025-01-01",
             )
         ],

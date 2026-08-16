@@ -256,6 +256,7 @@ def seed_llm_rates(engine: Engine) -> None:
     # must resolve to a separately versioned rate rather than retroactively
     # repricing events from July.
     openai_price_update = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    gemini_price_update = datetime(2026, 8, 15, tzinfo=timezone.utc)
     sonnet_intro_end = datetime(2026, 9, 1, tzinfo=timezone.utc)
     deepseek_price_update = datetime(2026, 8, 16, 16, 0, tzinfo=timezone.utc)
     openai = "https://developers.openai.com/api/docs/pricing"
@@ -451,6 +452,63 @@ def seed_llm_rates(engine: Engine) -> None:
             current_rate.output_micros_per_million = _micros_per_million(output_rate)
             current_rate.tool_micros_per_unit = 10_000
             current_rate.source_url = openai
+
+        # Google changed Gemini 3.6 Flash's standard pricing on 2026-08-15.
+        # Keep the former rate for historical usage, then add the current row
+        # rather than silently repricing the usage events recorded before the
+        # correction. Gemini 3.1 Flash Lite is selectable in MODEL_CATALOG and
+        # needs a rate for shared-key budget enforcement as well.
+        legacy_flash = (
+            session.execute(
+                select(LlmRate).where(
+                    LlmRate.provider == "gemini",
+                    LlmRate.model == "gemini-3.6-flash",
+                    LlmRate.effective_from == start,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if legacy_flash is not None:
+            legacy_flash.effective_to = gemini_price_update
+        for model, input_rate, cache_read, output_rate in (
+            ("gemini-3.6-flash", 0.75, 0.075, 3.75),
+            ("gemini-3.1-flash-lite", 0.25, 0.025, 1.5),
+        ):
+            key = ("gemini", model, 0, stamp(gemini_price_update))
+            current_rate = None
+            if key in existing:
+                current_rate = (
+                    session.execute(
+                        select(LlmRate).where(
+                            LlmRate.provider == "gemini",
+                            LlmRate.model == model,
+                            LlmRate.context_min_tokens == 0,
+                            LlmRate.effective_from == gemini_price_update,
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+            if current_rate is None:
+                current_rate = LlmRate(
+                    id=uuid.uuid4().hex,
+                    provider="gemini",
+                    model=model,
+                    effective_from=gemini_price_update,
+                )
+                session.add(current_rate)
+            current_rate.input_micros_per_million = _micros_per_million(input_rate)
+            current_rate.cache_read_micros_per_million = _micros_per_million(
+                cache_read
+            )
+            current_rate.cache_write_micros_per_million = None
+            current_rate.output_micros_per_million = _micros_per_million(output_rate)
+            # Google Search is $14 / 1,000 paid grounded prompts. The provider's
+            # monthly included allowance is account-level state we cannot infer
+            # from one request, so shared-key metering records the billed unit.
+            current_rate.tool_micros_per_unit = 14_000
+            current_rate.source_url = gemini
 
         # DeepSeek moves both models from a flat rate to peak/off-peak hourly
         # billing at deepseek_price_update (see _rate_period for the UTC hour

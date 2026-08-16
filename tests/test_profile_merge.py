@@ -95,7 +95,7 @@ def test_project_identity_prefers_repo_url_across_fragment_and_metadata_merges()
             Project(
                 name="resume-agent",
                 repo_url="git@github.com:Me/Resume-Agent.git",
-                highlights=["From dossier"],
+                highlights=[Bullet(text="From dossier")],
             )
         ],
     )
@@ -119,7 +119,7 @@ def test_project_identity_prefers_repo_url_across_fragment_and_metadata_merges()
     assert len(enriched.projects) == 1
     project = enriched.projects[0]
     assert project.description == "from resume"
-    assert project.highlights == ["From dossier"]
+    assert [highlight.text for highlight in project.highlights] == ["From dossier"]
     assert project.stars == 42
     assert project.languages == ["Python"]
     assert project.topics == ["agents"]
@@ -247,7 +247,7 @@ def test_duplicate_projects_merge_all_fields_and_report_conflicts():
                 role="Lead",
                 start="2024",
                 tech=["Rust"],
-                highlights=["Published"],
+                highlights=[Bullet(text="Published")],
             )
         ],
     )
@@ -259,7 +259,7 @@ def test_duplicate_projects_merge_all_fields_and_report_conflicts():
     assert project.role == "Lead"
     assert project.start == "2024"
     assert project.tech == ["Python", "Rust"]
-    assert project.highlights == ["Published"]
+    assert [highlight.text for highlight in project.highlights] == ["Published"]
     assert any("project Compiler: description" in conflict for conflict in report.conflicts)
 
 
@@ -394,7 +394,7 @@ def _synth_fragment(anchor_id="exp1"):
         skills={"hard": [Skill(id="sk1", name="Kubernetes", category="hard",
                                synthesized=True)]},
         projects=[Project(id="sp1", name="Side tool", synthesized=True,
-                          highlights=["Built a CLI"])],
+                          highlights=[Bullet(text="Built a CLI")])],
     )
 
 
@@ -424,7 +424,7 @@ def test_unresolvable_anchor_falls_back_to_project():
     assert touched == set()
     assert len(merged.experience[0].bullets) == 1  # untouched
     fallback = next(p for p in merged.projects if p.synthesized and p.name != "Side tool")
-    assert "Cut p99 latency 30%" in fallback.highlights
+    assert "Cut p99 latency 30%" in [highlight.text for highlight in fallback.highlights]
     assert any("not found" in line for line in decisions)
 
 
@@ -441,13 +441,15 @@ def test_synthesis_project_merges_by_repo_url_when_names_differ():
             Project(
                 name="tool",
                 repo_url="git@github.com:me/tool.git",
-                highlights=["Synthesized detail"],
+                highlights=[Bullet(text="Synthesized detail")],
             )
         ],
     )
     apply_synthesis_fragments(merged, [(_deck_doc(), fragment)], MergeReport())
     assert len(merged.projects) == 1
-    assert merged.projects[0].highlights == ["Synthesized detail"]
+    assert [highlight.text for highlight in merged.projects[0].highlights] == [
+        "Synthesized detail"
+    ]
 
 
 def test_synthesized_scalars_never_win():

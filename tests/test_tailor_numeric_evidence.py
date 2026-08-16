@@ -38,7 +38,11 @@ def _facts() -> ProfileFacts:
             )
         ],
         projects=[
-            Project(id="p1", name="Looms", highlights=["Cut p95 latency to 500ms"])
+            Project(
+                id="p1",
+                name="Looms",
+                highlights=[Bullet(text="Cut p95 latency to 500ms")],
+            )
         ],
         awards=[Award(id="a1", name="Innovation Award")],
     )

@@ -25,6 +25,7 @@ def run_corpus_build(
     profile_dir = resolve_tenant_path(profile_dir)
     facts_out = resolve_tenant_path(facts_out)
     from resume_agent.profile.build import build_corpus_profile
+    from resume_agent.profile.aspect_classifier import build_aspect_classifier_agent
     from resume_agent.profile.inference import build_inference_agent
     from resume_agent.profile.manual_skills import (
         apply_manual_skills,
@@ -65,6 +66,7 @@ def run_corpus_build(
         synthesis_agent=build_synthesis_agent(),
         entailment_agent=build_entailment_agent(),
         project_agent=build_project_extractor_agent(),
+        aspect_agent=build_aspect_classifier_agent(),
         github_allow=github_allow,
         github_deny=github_deny,
         github_limit=github_limit,

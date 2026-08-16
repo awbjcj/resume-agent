@@ -1,27 +1,52 @@
-from resume_agent.models.profile import Contact
+from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
 )
-from resume_agent.tailor.length import format_budget, resume_stats
+from resume_agent.tailor.length import format_budget, format_depth_plan, resume_stats
 from resume_agent.tailor.review_config import LengthBudget, ReviewConfig
 
 
 def test_length_budget_defaults_present_on_config():
     cfg = ReviewConfig()
-    assert cfg.length_budget.max_experiences == 4
-    assert cfg.length_budget.max_bullets_per_role == 5
-    assert cfg.length_budget.target_total_bullets == 20
+    assert cfg.length_budget.page_target == 2
+    assert cfg.length_budget.max_experiences == 5
+    assert cfg.length_budget.max_bullets_per_role == 7
+    assert cfg.length_budget.min_bullets_per_role == 5
+    assert cfg.length_budget.min_bullets_per_project == 4
+    assert cfg.length_budget.target_total_bullets == 40
 
 
-def test_format_budget_mentions_one_page_and_numbers():
+def test_budget_tells_the_writer_to_span_the_configured_aspects():
+    text = format_budget(LengthBudget(min_aspects_per_owner=3))
+
+    assert "at least 3 different aspects" in text
+
+
+def test_depth_plan_omits_an_empty_profile():
+    assert format_depth_plan(ProfileFacts(contact=Contact(name="Ada")), LengthBudget()) == ""
+
+
+def test_legacy_cap_only_budget_derives_an_achievable_floor():
+    budget = LengthBudget(max_bullets_per_role=2, max_bullets_per_project=3)
+
+    assert (budget.min_bullets_per_role, budget.min_bullets_per_project) == (2, 3)
+
+
+def test_format_budget_mentions_page_target_and_numbers():
     text = format_budget(
-        LengthBudget(max_experiences=3, max_bullets_per_role=4, target_total_bullets=15)
+        LengthBudget(
+            page_target=2,
+            max_experiences=3,
+            max_bullets_per_role=6,
+            min_bullets_per_role=4,
+            target_total_bullets=15,
+        )
     )
-    assert "single page" in text
-    assert "3" in text and "4" in text and "15" in text
+    assert "2 pages" in text
+    assert "3" in text and "4" in text and "6" in text and "15" in text
 
 
 def test_length_budget_declares_a_skills_target():

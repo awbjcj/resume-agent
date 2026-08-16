@@ -110,6 +110,9 @@ before changing code near the invariant.
 | `src/resume_agent/profile/github_harvest.py`         | Deterministic GitHub project-source selection, materialization, supersession, and cleanup                                 |
 | `src/resume_agent/profile/project_extractor.py`      | Project-only structured extraction that cannot emit employment or education facts                                         |
 | `src/resume_agent/profile/coach.py`                  | Coach turn validation, topic-aware context, and structured-output agents                                                  |
+| `src/resume_agent/profile/depth.py`                  | Evidence-owner supply, agenda seeds, and safe unmined-source question material                                             |
+| `src/resume_agent/profile/aspects.py`                | Closed bullet-aspect vocabulary shared by extraction and depth measurement                                                  |
+| `src/resume_agent/tailor/depth.py`                   | Advisory rendered-depth measurement against the source-clamped owner plan                                                   |
 | `src/resume_agent/interview/agent.py`                | Mock interviewer persona, turn/debrief validation, transcript elision                                                     |
 | `src/resume_agent/services/profile_coach.py`         | Coach session turns, draft approval, recap, rebuild, and impact orchestration                                             |
 | `src/resume_agent/sessions/store.py`                 | Session substrate: file custody every turn-per-run session kind rides (ADR 0006)                                          |

@@ -12,6 +12,7 @@ from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
 from resume_agent.llm_runner import missing_model_keys, plan_search, resolve_api_key
+from resume_agent.profile.depth import SUPPLY_TARGET
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
@@ -165,6 +166,39 @@ def profile_sources(dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir")) -> No
         typer.echo(
             f"{doc.id}  {doc.filename}  mode:{doc.mode}  sha:{doc.sha256[:8]}  "
             f"added:{doc.added_at}  fragment:{status}{anchor}{flags}"
+        )
+
+
+@profile_app.command("depth")
+def profile_depth_cmd(
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    target: int = typer.Option(
+        SUPPLY_TARGET, help="Source bullets an owner needs to clear the bar."
+    ),
+) -> None:
+    """Show per-owner bullet supply and aspect coverage."""
+    from resume_agent.profile.aspects import ASPECTS
+    from resume_agent.profile.depth import owner_depth
+
+    rows = owner_depth(load_facts(_tenant_cli_path(facts)), target=target)
+    if not rows:
+        typer.echo("No evidence owners found.")
+        return
+    for row in rows:
+        mark = "OK " if row.meets_target else "GAP"
+        typer.echo(
+            f"{mark} {row.label} ({row.kind}): {row.source_total}/{target} bullets, "
+            f"{len(row.aspects_present)}/{len(ASPECTS)} aspects"
+        )
+        if row.aspects_missing:
+            typer.echo(f"      missing aspects: {', '.join(row.aspects_missing)}")
+        if row.unclassified:
+            typer.echo(f"      unclassified bullets: {row.unclassified}")
+    gaps = [row for row in rows if not row.meets_target]
+    if gaps:
+        typer.echo(
+            f"\n{len(gaps)} of {len(rows)} owners are below the supply target. "
+            "Run `profile coach` to add evidence for them."
         )
 
 

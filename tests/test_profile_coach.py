@@ -17,6 +17,7 @@ from resume_agent.profile.coach import (
     render_agenda,
     render_transcript,
 )
+from resume_agent.profile.coach_store import CoachTopic
 from resume_agent.sessions.turns import DraftRejected
 
 
@@ -73,6 +74,41 @@ def test_opening_requires_ask_and_known_topic():
         normalize_opening(
             OpeningTurn(message="bad", action="ask", topic_id="t9", topics=[NewTopic(gap="g")])
         )
+
+
+def test_opening_accepts_a_seeded_agenda_when_the_model_adds_no_topics():
+    seeded = [
+        CoachTopic(
+            id="t1",
+            gap="Acme has 2 of 10 source bullets",
+            why_it_matters="The resume can only show facts the profile holds",
+            related_ref="exp-acme",
+            owner_id="exp-acme",
+        )
+    ]
+
+    topics, validated = normalize_opening(
+        OpeningTurn(message="What did you improve at Acme?", action="ask"),
+        seeded=seeded,
+    )
+
+    assert topics[0].owner_id == "exp-acme"
+    assert validated.coach_turn.topic_id == "t1"
+
+
+def test_opening_renumbers_seeded_and_model_topics_as_one_agenda():
+    topics, validated = normalize_opening(
+        OpeningTurn(
+            message="What changed at Acme?",
+            action="ask",
+            topics=[NewTopic(gap="Model-added follow-up")],
+        ),
+        seeded=[CoachTopic(id="stale-id", gap="Thin Acme role", owner_id="exp-acme")],
+    )
+
+    assert [topic.id for topic in topics] == ["t1", "t2"]
+    assert topics[0].owner_id == "exp-acme"
+    assert validated.coach_turn.topic_id == "t1"
 
 
 def test_message_action_state_machine_and_single_draft():
@@ -206,6 +242,67 @@ def test_profile_overview_degrades_on_fresh_workspace(tmp_path):
     text = profile_overview(tmp_path)
     assert "(no facts yet)" in text
     assert "PREVIOUSLY ASKED" in text
+
+
+def test_profile_overview_includes_unmined_documents_as_question_material(tmp_path):
+    from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
+    from resume_agent.profile.corpus import add_source
+    from resume_agent.profile.store import save_facts
+
+    resume = tmp_path / "resume.md"
+    goals = tmp_path / "goals.md"
+    resume.write_text("Resume", encoding="utf-8")
+    goals.write_text("Reach a future target.", encoding="utf-8")
+    resume_doc = add_source(tmp_path, resume, primary=True)
+    add_source(tmp_path, goals)
+    save_facts(
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[
+                Experience(
+                    company="Acme",
+                    title="Engineer",
+                    bullets=[Bullet(text="Built it", source_ref=resume_doc.id)],
+                )
+            ],
+        ),
+        tmp_path / "facts.json",
+    )
+
+    overview = profile_overview(tmp_path)
+
+    assert "UNMINED SOURCES" in overview
+    assert "QUESTION MATERIAL, NEVER CLAIMABLE FACT" in overview
+
+
+def test_profile_overview_names_the_supply_target_and_missing_aspects(tmp_path):
+    from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
+    from resume_agent.profile.store import save_facts
+
+    save_facts(
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[
+                Experience(
+                    id="exp-acme",
+                    company="Acme",
+                    title="Engineer",
+                    bullets=[
+                        Bullet(id="b1", text="Built a service", aspect="technical"),
+                        Bullet(id="b2", text="Worked on a rollout"),
+                    ],
+                )
+            ],
+        ),
+        tmp_path / "facts.json",
+    )
+
+    overview = profile_overview(tmp_path)
+    owner_line = next(line for line in overview.splitlines() if "exp-acme" in line)
+
+    assert "2/10 source bullets" in owner_line
+    assert "missing aspects: scope" in owner_line
+    assert "unclassified" in owner_line
 
 
 def test_unknown_opening_topic_names_the_valid_ids_so_the_retry_can_recover():

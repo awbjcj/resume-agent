@@ -34,6 +34,7 @@ def project_doc() -> ProjectDocFacts:
             "name": "resume-agent",
             "repo_url": "https://github.com/me/resume-agent",
             "tech": ["Python"],
+            "highlights": [{"text": "Automated releases"}],
             "experience": [{"company": "Injected"}],
         }
     )
@@ -51,6 +52,7 @@ def test_project_doc_schema_forbids_foreign_top_level_sections():
 def test_project_projection_strips_nested_extras_and_sets_source():
     facts = project_facts_to_profile(project_doc(), source=Source.github)
     assert facts.projects[0].source == Source.github
+    assert facts.projects[0].highlights[0].source == Source.github
     assert facts.skills["backend"][0].source == Source.github
     assert "experience" not in (facts.projects[0].model_extra or {})
     assert "employer" not in (facts.skills["backend"][0].model_extra or {})

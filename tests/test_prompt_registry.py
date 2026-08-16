@@ -69,6 +69,7 @@ def test_interviewer_registers_the_persona_core() -> None:
 
 
 def test_composed_registry_entries_match_their_built_agents() -> None:
+    from resume_agent.profile.aspect_classifier import build_aspect_classifier_agent
     from resume_agent.tailor.agents import build_reviewer_agent, build_tailor_agent
     from resume_agent.tailor.match_plan import build_match_plan_agent
 
@@ -80,4 +81,7 @@ def test_composed_registry_entries_match_their_built_agents() -> None:
     )
     assert SPECS_BY_KEY["match-plan"].instructions == tuple(
         _instructions(build_match_plan_agent())
+    )
+    assert SPECS_BY_KEY["aspect-classifier"].instructions == tuple(
+        _instructions(build_aspect_classifier_agent())
     )

@@ -4,6 +4,7 @@ from resume_agent.models.profile import (
     Experience,
     GitHubProfile,
     ProfileFacts,
+    Project,
     Skill,
 )
 from resume_agent.profile.ids import assign_fact_ids, deterministic_id
@@ -56,6 +57,24 @@ def test_source_ref_set_everywhere():
     assert facts.skills["Languages"][0].source_ref == "resume-abc"
     assert facts.github_profile is not None
     assert facts.github_profile.source_ref == "resume-abc"
+
+
+def test_project_highlights_receive_stable_ids_and_source_refs():
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        projects=[Project(name="Tool", highlights=[Bullet(text="Automated deploys")])],
+    )
+
+    assigned = assign_fact_ids(facts, "project-source")
+    project = assigned.projects[0]
+    highlight = project.highlights[0]
+
+    assert project.id
+    assert highlight.id
+    assert (project.source_ref, highlight.source_ref) == (
+        "project-source",
+        "project-source",
+    )
 
 
 def test_assign_fact_ids_returns_deep_copy():

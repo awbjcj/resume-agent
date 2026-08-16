@@ -14,6 +14,7 @@ from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 from resume_agent.profile.matrix import SkillMatchContext
 from resume_agent.tailor.coverage import coverage_critique, format_coverage
+from resume_agent.tailor.depth import depth_critique
 from resume_agent.tailor.evidence_portfolio import (
     PortfolioPlanRequest,
     aplan_portfolio,
@@ -23,7 +24,7 @@ from resume_agent.tailor.numeric_evidence import numeric_evidence_critique
 from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.portfolio_alignment import portfolio_alignment_critique
 from resume_agent.tailor.provenance import PROVENANCE_REVIEWER, provenance_critique
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_agent.tailor.review_config import LengthBudget, ReviewConfig
 from resume_agent.tailor.skill_naming import skill_naming_critique
 from resume_agent.tailor.tailoring import (
     RevisionRoundContext,
@@ -80,6 +81,7 @@ class _WorkflowState:
             self.content,
             self.request.profile_facts,
             self.request.skill_context,
+            self.request.config.length_budget,
             self.portfolio,
         )
         verdict = aggregate([*deterministic, *panel], self.request.config)
@@ -124,6 +126,7 @@ def _deterministic_critiques(
     content: ResumeContent,
     profile_facts: ProfileFacts,
     skill_context: SkillMatchContext | None,
+    budget: LengthBudget,
     evidence_portfolio: EvidencePortfolio | None = None,
 ) -> list[ReviewCritique]:
     """Every in-process critique for one round, gates first.
@@ -144,6 +147,8 @@ def _deterministic_critiques(
     ]
     if (coverage := coverage_critique(content, skill_context)) is not None:
         critiques.append(coverage)
+    if (depth := depth_critique(content, profile_facts, budget)) is not None:
+        critiques.append(depth)
     if (
         alignment := portfolio_alignment_critique(content, evidence_portfolio)
     ) is not None:

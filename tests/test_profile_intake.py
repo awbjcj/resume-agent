@@ -185,3 +185,15 @@ def test_add_url_source_stops_streaming_at_the_response_limit(tmp_path):
 
     assert stream.yielded == 2
     http.close()
+def test_note_source_uses_pinned_synthesis_only_when_an_owner_anchor_is_given(tmp_path):
+    from resume_agent.profile.corpus import add_source
+    from resume_agent.profile.intake import add_note_source
+
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada", encoding="utf-8")
+    add_source(tmp_path, resume, primary=True)
+    anchored = add_note_source(tmp_path, "Acme", "I cut deploy time.", anchor="exp-acme")
+    unanchored = add_note_source(tmp_path, "Other", "I wrote a tool.")
+
+    assert (anchored.mode, anchored.anchor) == ("synthesis", "exp-acme")
+    assert (unanchored.mode, unanchored.anchor) == ("literal", None)

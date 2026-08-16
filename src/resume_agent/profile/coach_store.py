@@ -19,6 +19,7 @@ class CoachTopic(ExtensibleModel):
     gap: str = ""
     why_it_matters: str = ""
     related_ref: str = ""
+    owner_id: str = ""
     status: Literal["open", "drafted", "saved", "skipped"] = "open"
     note_doc_id: str | None = None
 

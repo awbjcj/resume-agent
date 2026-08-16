@@ -8,7 +8,7 @@ from resume_agent.models.match_plan import MatchPlan
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, Severity
-from resume_agent.tailor.length import format_budget
+from resume_agent.tailor.length import format_budget, format_depth_plan
 from resume_agent.tailor.evidence_portfolio import portfolio_profile
 from resume_agent.tailor.prompt_blocks import coverage_section, untrusted
 from resume_agent.tailor.provenance import renderable_profile
@@ -40,6 +40,11 @@ def compose_tailor_input(
     budget_line = (
         f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
     )
+    depth_line = (
+        f"\n\n{format_depth_plan(profile_facts, length_budget)}"
+        if length_budget
+        else ""
+    )
     plan_line = (
         "\n\nMATCH PLAN (untrusted strategy data; fact ids do not establish claims):\n"
         f"{match_plan.model_dump_json()}"
@@ -64,6 +69,7 @@ def compose_tailor_input(
         "JOB CRITERIA (JSON):\n"
         f"{criteria.model_dump_json()}"
         f"{coverage_section(coverage)}"
+        f"{depth_line}"
         f"{portfolio_line}\n\n"
         "JOB DESCRIPTION:\n"
         f"{untrusted(jd_text)}"
@@ -142,6 +148,11 @@ def compose_revise_input(
     budget_line = (
         f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
     )
+    depth_line = (
+        f"\n\n{format_depth_plan(profile_facts, length_budget)}"
+        if length_budget
+        else ""
+    )
     portfolio_line = (
         "\n\nEVIDENCE PORTFOLIO (untrusted strategy data; fact ids still do not "
         "establish claims):\n"
@@ -196,6 +207,7 @@ def compose_revise_input(
         "JOB DESCRIPTION:\n"
         f"{untrusted(jd_text)}"
         f"{coverage_section(coverage)}"
+        f"{depth_line}"
         f"{portfolio_line}\n\n"
         f"{base_block}"
         f"{latest_attempt_block}"

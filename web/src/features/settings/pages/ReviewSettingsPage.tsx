@@ -31,12 +31,18 @@ type ReviewerEntry = NonNullable<ReviewDoc["reviewers"]>[number];
 const MODEL_TIERS = ["cheap", "mid", "premium"];
 
 const DEFAULT_LENGTH_BUDGET = {
-  maxExperiences: 4,
-  maxProjects: 2,
-  maxEvidenceOwners: 5,
-  maxBulletsPerRole: 5,
-  maxBulletsPerProject: 3,
-  targetTotalBullets: 20,
+  // This default must remain a complete generated-contract value even though
+  // the approved scope does not add new settings controls for the depth knobs.
+  pageTarget: 2,
+  maxExperiences: 5,
+  maxProjects: 4,
+  maxEvidenceOwners: 8,
+  minBulletsPerRole: 5,
+  maxBulletsPerRole: 7,
+  minBulletsPerProject: 4,
+  maxBulletsPerProject: 6,
+  targetTotalBullets: 40,
+  minAspectsPerOwner: 3,
   // The skills budget, added alongside the prose caps. No inputs are rendered
   // for these two yet; they carry the domain defaults so enabling the budget
   // never sends a partial one.

@@ -39,7 +39,6 @@ AGENDA_CAP = 12
 TRANSCRIPT_CHAR_CAP = 12_000
 _TOP_GAPS = 10
 _TOP_SKILLS = 20
-_METRIC = re.compile(r"\d")
 _WS = re.compile(r"\s+")
 
 
@@ -89,12 +88,15 @@ def _norm(text: str) -> str:
     return _WS.sub(" ", text).strip().casefold()
 
 
-def _make_topic(index: int, topic: NewTopic | TopicUpdate) -> CoachTopic:
+def _make_topic(
+    index: int, topic: NewTopic | TopicUpdate, *, owner_id: str = ""
+) -> CoachTopic:
     return CoachTopic(
         id=f"t{index}",
         gap=topic.gap.strip(),
         why_it_matters=topic.why_it_matters.strip(),
         related_ref=topic.related_ref.strip(),
+        owner_id=owner_id,
     )
 
 
@@ -109,7 +111,10 @@ def _actions(turn: CoachTurn) -> list[ResearchAction]:
 
 
 def normalize_opening(
-    turn: OpeningTurn, strict: bool = True
+    turn: OpeningTurn,
+    strict: bool = True,
+    *,
+    seeded: list[CoachTopic] | None = None,
 ) -> tuple[list[CoachTopic], ValidatedTurn]:
     del strict
     message = turn.message.strip()
@@ -117,10 +122,21 @@ def normalize_opening(
         raise TurnRejected("empty message")
     if turn.action != "ask":
         raise TurnRejected("opening action must be ask")
-    raw_topics = [topic for topic in turn.topics if topic.gap.strip()][:AGENDA_CAP]
-    if not raw_topics:
-        raise TurnRejected("opening turn proposed no topics")
-    topics = [_make_topic(index, topic) for index, topic in enumerate(raw_topics, 1)]
+    seeded_topics = [
+        topic.model_copy(update={"id": f"t{index}"})
+        for index, topic in enumerate((seeded or [])[:AGENDA_CAP], 1)
+    ]
+    remaining = AGENDA_CAP - len(seeded_topics)
+    raw_topics = [topic for topic in turn.topics if topic.gap.strip()][:remaining]
+    topics = [
+        *seeded_topics,
+        *(
+            _make_topic(index, topic)
+            for index, topic in enumerate(raw_topics, len(seeded_topics) + 1)
+        ),
+    ]
+    if not topics:
+        raise TurnRejected("opening turn has no seeded or model-proposed topics")
     topic_id = turn.topic_id.strip() or topics[0].id
     if topic_id not in {topic.id for topic in topics}:
         # Opening ids are generated positionally right here, so the formatter is
@@ -286,23 +302,27 @@ def previously_asked(profile_dir: Path | str) -> list[str]:
 
 
 def profile_overview(profile_dir: Path | str, session=None) -> str:
+    from resume_agent.profile.aspects import ASPECTS
+    from resume_agent.profile.depth import SUPPLY_TARGET, owner_depth, unmined_block
+
     root = Path(profile_dir)
     fact_lines: list[str] = []
     facts_path = root / "facts.json"
     if facts_path.exists():
         facts = load_facts(facts_path)
-        for experience in facts.experience:
-            metrics = sum(
-                1 for bullet in experience.bullets if _METRIC.search(bullet.text)
+        for owner in owner_depth(facts):
+            missing = (
+                f", missing aspects: {', '.join(owner.aspects_missing)}"
+                if owner.aspects_missing
+                else ""
             )
             fact_lines.append(
-                f"experience {experience.id}: {experience.company} — {experience.title} | "
-                f"{len(experience.bullets)} bullets, {metrics} with metrics"
+                f"{owner.kind} {owner.id}: {owner.label} | {owner.source_total}/"
+                f"{SUPPLY_TARGET} source bullets, {len(owner.aspects_present)}/"
+                f"{len(ASPECTS)} aspects"
+                f"{missing}"
+                + (f", {owner.unclassified} unclassified" if owner.unclassified else "")
             )
-        fact_lines.extend(
-            f"project {project.id}: {project.name} | {len(project.highlights)} highlights"
-            for project in facts.projects
-        )
     matrix = load_matrix(root / "matrix.json")
     skill_lines = (
         [
@@ -328,15 +348,20 @@ def profile_overview(profile_dir: Path | str, session=None) -> str:
                 f"{gap.skill} demanded by {gap.demand_count}/{gap.target_total} target jobs"
                 for gap in report.gaps[:_TOP_GAPS]
             ]
-    return "\n\n".join(
-        [
-            _block("FACTS", fact_lines, "(no facts yet)"),
-            _block("TOP SKILLS", skill_lines, "(no matrix yet)"),
-            _block("CORPUS", corpus_lines, "(corpus is empty)"),
-            _block("MARKET GAPS", gap_lines, "(no jobs discovered yet)"),
-            _block("PREVIOUSLY ASKED", previously_asked(root), "(none)"),
-        ]
-    )
+    try:
+        unmined = unmined_block(root)
+    except Exception:  # Optional prompt context must not fail a coach turn.
+        unmined = ""
+    sections = [
+        _block("FACTS", fact_lines, "(no facts yet)"),
+        _block("TOP SKILLS", skill_lines, "(no matrix yet)"),
+        _block("CORPUS", corpus_lines, "(corpus is empty)"),
+        _block("MARKET GAPS", gap_lines, "(no jobs discovered yet)"),
+        _block("PREVIOUSLY ASKED", previously_asked(root), "(none)"),
+    ]
+    if unmined:
+        sections.append(unmined)
+    return "\n\n".join(sections)
 
 
 def render_agenda(session: dict) -> str:
@@ -409,6 +434,7 @@ _COACH_INSTRUCTIONS = [
     "When a topic has what, where, and how measured, emit a draft using only the user's claims and exact quotes.",
     "Honor skip requests and add a bounded agenda topic only when a new evidence gap emerges.",
     "Use corpus tools when the user's existing material would ground the next question.",
+    "UNMINED SOURCES are question material, never claimable fact. Ask what happened; never turn a stated goal or target into an achievement.",
     "Write the user-facing reply first as plain prose. Then emit `---METADATA---` on its own line followed by the action, topic id, topic updates, draft fields with exact quotes, and research actions. Everything above the marker is shown to the user verbatim; everything below it is formatter input and is never shown.",
 ]
 
@@ -421,7 +447,8 @@ _FORMAT_INSTRUCTIONS = [
 _OPENING_FORMAT_INSTRUCTION = (
     "This is the opening turn: copy every agenda item the coach proposed into "
     "`topics`, each with its gap, why it matters, and any related reference. "
-    "An opening turn with no topics is invalid. "
+    "When a deterministic seeded agenda is supplied in the notes, `topics` may be empty; "
+    "those topics are added in code. Otherwise an opening turn with no topics is invalid. "
     "Topic ids are assigned positionally from the order you list them -- the "
     "first topic is `t1`, the second `t2`, and so on. Set `topic_id` to the id "
     "of the topic the coach's question is about (`t1` unless the question is "

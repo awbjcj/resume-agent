@@ -7,7 +7,7 @@ from resume_agent.llm_runner import Runner, acall, expect_schema
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import MergedPanelReview, ReviewCritique
-from resume_agent.tailor.length import resume_stats
+from resume_agent.tailor.length import format_depth_plan, resume_stats
 from resume_agent.tailor.prompt_blocks import coverage_section, untrusted
 from resume_agent.tailor.provenance import resolve_evidence
 from resume_agent.tailor.review_config import ReviewConfig
@@ -29,13 +29,18 @@ def split_merged_critiques(
 
 
 def compose_lean_review_input(
-    content: ResumeContent, jd_text: str, stats: str, coverage: str = ""
+    content: ResumeContent,
+    jd_text: str,
+    stats: str,
+    coverage: str = "",
+    depth_plan: str = "",
 ) -> str:
     """Input for non-gate reviewers: resume + JD + size stats. No raw profile."""
     return (
         "JOB DESCRIPTION:\n"
         f"{untrusted(jd_text)}"
-        f"{coverage_section(coverage)}\n\n"
+        f"{coverage_section(coverage)}"
+        f"{f'\n\n{depth_plan}' if depth_plan else ''}\n\n"
         "RESUME UNDER REVIEW (JSON):\n"
         f"{content.model_dump_json()}\n\n"
         "RESUME STATS:\n"
@@ -85,11 +90,17 @@ def run_panel(
     coverage: str = "",
 ) -> list[ReviewCritique]:
     """Run configured reviewers with the smallest sufficient input per role."""
+    depth_plan = format_depth_plan(profile_facts, config.length_budget)
     if not config.merged_advisory:
         return [
             review_one(text, reviewer_agents[name], expected_reviewer=name)
             for name, text in _panel_inputs(
-                content, profile_facts, jd_text, config, coverage=coverage
+                content,
+                profile_facts,
+                jd_text,
+                config,
+                coverage=coverage,
+                depth_plan=depth_plan,
             )
         ]
 
@@ -107,7 +118,11 @@ def run_panel(
     if advisory_names:
         result = reviewer_agents[MERGED_ADVISORY].run(
             compose_lean_review_input(
-                content, jd_text, resume_stats(content), coverage=coverage
+                content,
+                jd_text,
+                resume_stats(content),
+                coverage=coverage,
+                depth_plan=depth_plan,
             )
         )
         critiques.extend(_merged_review(result, advisory_names))
@@ -132,6 +147,7 @@ def _panel_inputs(
     config: ReviewConfig,
     *,
     coverage: str = "",
+    depth_plan: str,
 ) -> list[tuple[str, str]]:
     """(reviewer_name, input_text) pairs, smallest sufficient input per role."""
     evidence = resolve_evidence(content, profile_facts)
@@ -142,7 +158,7 @@ def _panel_inputs(
             text = compose_evidence_review_input(content, jd_text, evidence)
         else:
             text = compose_lean_review_input(
-                content, jd_text, stats, coverage=coverage
+                content, jd_text, stats, coverage=coverage, depth_plan=depth_plan
             )
         inputs.append((spec.name, text))
     return inputs
@@ -171,9 +187,15 @@ async def arun_panel(
     coverage: str = "",
 ) -> list[ReviewCritique]:
     """Run configured reviewers concurrently; results stay in reviewer order."""
+    depth_plan = format_depth_plan(profile_facts, config.length_budget)
     if not config.merged_advisory:
         inputs = _panel_inputs(
-            content, profile_facts, jd_text, config, coverage=coverage
+            content,
+            profile_facts,
+            jd_text,
+            config,
+            coverage=coverage,
+            depth_plan=depth_plan,
         )
         outputs = await asyncio.gather(
             *(
@@ -206,7 +228,11 @@ async def arun_panel(
             acall(
                 reviewer_agents[MERGED_ADVISORY],
                 compose_lean_review_input(
-                    content, jd_text, resume_stats(content), coverage=coverage
+                    content,
+                    jd_text,
+                    resume_stats(content),
+                    coverage=coverage,
+                    depth_plan=depth_plan,
                 ),
                 sem=sem,
             )

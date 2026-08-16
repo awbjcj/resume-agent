@@ -14,7 +14,7 @@ from resume_agent.llm_runner import (
     ("model_id", "strategy"),
     [
         ("claude-opus-4-8", "native_anthropic"),
-        ("gemini:gemini-2.0-flash", "native_gemini"),
+        ("gemini:gemini-3.6-flash", "native_gemini"),
         ("openai:gpt-4o", "native_openai"),
         ("deepseek:deepseek-v4-flash", "native_deepseek"),
     ],

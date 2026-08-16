@@ -7,8 +7,8 @@ describe("AgendaRail", () => {
   it("marks the open topic as the current evidence step", () => {
     render(
       <AgendaRail topics={[
-        { id: "open", gap: "Quantify impact", whyItMatters: "Metrics strengthen the claim.", relatedRef: "", status: "open", noteDocId: null },
-        { id: "saved", gap: "Show leadership", whyItMatters: "Scope needs evidence.", relatedRef: "", status: "covered", noteDocId: "note-1" },
+        { id: "open", gap: "Quantify impact", whyItMatters: "Metrics strengthen the claim.", relatedRef: "", ownerId: "", status: "open", noteDocId: null },
+        { id: "saved", gap: "Show leadership", whyItMatters: "Scope needs evidence.", relatedRef: "", ownerId: "", status: "covered", noteDocId: "note-1" },
       ]} />,
     );
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Quantify impact");

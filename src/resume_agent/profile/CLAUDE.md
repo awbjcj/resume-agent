@@ -33,3 +33,18 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   `gather_isolated` with the permit acquired only in `llm_runner.acall`. The CLI and API both
   build through `services/profile_build.run_corpus_build` -- the single place the facts+matrix
   bound-artifact pair is written.
+- **Project highlights are addressable facts.** `Project.highlights` holds
+  `Bullet` objects, not strings, so `index_facts` registers a per-highlight id
+  and the provenance gate can reject a fabricated project bullet. Its
+  `mode="before"` migration accepts stored legacy string lists with deterministic
+  non-empty ids; merge retains the full Bullet rather than flattening it to text.
+- **Bullet aspects are durable classifications.** New extractors emit the closed
+  aspect vocabulary, while profile build backfills only bullets with
+  `aspect is None`. A hand-corrected aspect therefore survives rebuilds; an
+  unclassified legacy bullet remains valid and merely has no diversity signal.
+- **Anchored coach notes ride verified synthesis.** A seeded `CoachTopic.owner_id`
+  becomes a synthesis-mode corpus anchor when its draft is approved, so the
+  generated stub merges by the exact experience id rather than heuristic title
+  matching. Model-added topics remain unanchored literal notes. The opening
+  agenda is seeded from non-empty below-target evidence owners, and user uploads
+  that yielded no bullet are question material, never claimable fact.

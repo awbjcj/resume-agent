@@ -31,3 +31,7 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   re-render that re-parses the thread's markdown. A reasoning model streams
   thinking one word at a time, so bypassing the batch cost 1,846 rows on a
   single turn where 33 suffice.
+- **Seeded coach topics carry an owner anchor.** `CoachTopic.owner_id` defaults
+  to `""` so older session JSON remains readable. On approval a non-empty owner
+  id becomes the synthesis-mode corpus anchor for the coach note; model-added
+  topics retain the unanchored literal path.

@@ -56,7 +56,7 @@ _PROJECT_SCALARS = (
     "last_updated",
     "is_fork",
 )
-_PROJECT_COLLECTIONS = ("tech", "highlights", "languages", "topics")
+_PROJECT_COLLECTIONS = ("tech", "languages", "topics")
 
 
 def _norm(name: str) -> str:
@@ -243,6 +243,16 @@ def _merge_experience(
             base.bullets.append(bullet.model_copy(deep=True))
 
 
+def _merge_highlights(base: Project, other: Project) -> None:
+    """Merge project evidence by text while retaining each fact's provenance."""
+    seen = {normalize_skill(highlight.text) for highlight in base.highlights}
+    for highlight in other.highlights:
+        key = normalize_skill(highlight.text)
+        if key not in seen:
+            seen.add(key)
+            base.highlights.append(highlight.model_copy(deep=True))
+
+
 def _merge_entity_list(
     target: list,
     extra: list,
@@ -298,6 +308,7 @@ def _merge_projects(
             doc=doc,
             report=report,
         )
+        _merge_highlights(twin, candidate)
 
 
 def _dedup_bullets(
@@ -528,7 +539,7 @@ def apply_synthesis_fragments(
                     Project(
                         id=deterministic_id(doc.id, "synth-fallback", stub.id),
                         name=stub.title or Path(doc.filename).stem,
-                        highlights=[bullet.text for bullet in stub.bullets],
+                        highlights=[bullet.model_copy(deep=True) for bullet in stub.bullets],
                         tech=list(stub.tech),
                         source_ref=doc.id,
                         synthesized=True,

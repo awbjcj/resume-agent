@@ -22,7 +22,7 @@ def test_native_search_forwards_safe_provider_options():
     assert openai_tools == [{"type": "web_search"}]
 
     gemini, gemini_tools = build_search_equipped(
-        "gemini:gemini-3.5-flash", mode="native", reasoning=True
+        "gemini:gemini-3.6-flash", mode="native", reasoning=True
     )
     assert isinstance(gemini, GeminiInteractions)
     assert gemini.thinking_level == "high"
@@ -43,7 +43,7 @@ def test_native_gemini_search_bounds_thinking_when_not_reasoning():
     # automatic budget), so the non-reasoning research agent has to bound it --
     # the same rule build_model follows. Only reasoning=True was covered before.
     gemini, _ = build_search_equipped(
-        "gemini:gemini-3.5-flash", mode="native", reasoning=False
+        "gemini:gemini-3.6-flash", mode="native", reasoning=False
     )
     assert isinstance(gemini, GeminiInteractions)
     assert gemini.thinking_level == "low"

@@ -50,10 +50,13 @@ def test_compose_tailor_input_includes_budget_when_given():
         JobCriteria(),
         _facts(),
         LengthBudget(
-            max_experiences=3, max_bullets_per_role=4, target_total_bullets=15
+            max_experiences=3,
+            min_bullets_per_role=4,
+            max_bullets_per_role=4,
+            target_total_bullets=15,
         ),
     )
-    assert "single page" in text
+    assert "Target 2 pages" in text
     assert "3" in text
 
 
@@ -153,7 +156,32 @@ def test_compose_revise_input_keeps_complete_latest_round_feedback():
 def test_compose_revise_input_includes_budget_when_given():
     rc = ResumeContent(contact=Contact(name="Ada"))
     text = compose_revise_input(rc, [], _facts(), "Backend role", LengthBudget())
-    assert "single page" in text
+    assert "Target 2 pages" in text
+
+
+def test_writer_and_reviser_receive_unfenced_fact_clamped_depth_plan():
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[
+            Experience(
+                id="e1",
+                company="Acme",
+                title="Engineer",
+                bullets=[Bullet(id=f"b{index}", text=f"Did work {index}") for index in range(5)],
+            )
+        ],
+    )
+    budget = LengthBudget()
+
+    writer = compose_tailor_input("Backend role", JobCriteria(), facts, budget)
+    reviser = compose_revise_input(
+        ResumeContent(contact=Contact(name="Ada")), [], facts, "Backend role", budget
+    )
+
+    for text in (writer, reviser):
+        assert "BULLET DEPTH PLAN" in text
+        assert 'e1 "Acme — Engineer": 5 source -> render 5' in text
+        assert "BULLET DEPTH PLAN" not in _fenced(text)
 
 
 def test_revise_returns_resume_content():

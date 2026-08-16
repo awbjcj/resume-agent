@@ -39,17 +39,20 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
+from resume_agent.profile.aspects import Aspect
 from resume_agent.profile.corpus import SourceDoc
 from resume_agent.profile.ids import deterministic_id
 
 # Bump whenever synthesis or entailment instructions change so cached
 # synthesis fragments re-run.
-SYNTHESIS_PROMPT_VERSION = 1
+SYNTHESIS_PROMPT_VERSION = 2
 
 
 class SynthesizedClaim(ExtensibleModel):
     text: str
     support: list[str] = Field(default_factory=list)
+    # Skill claims do not become bullets, so this remains optional for them.
+    aspect: Aspect | None = None
 
 
 class SynthesizedEntry(ExtensibleModel):
@@ -122,6 +125,9 @@ _SYNTHESIS_INSTRUCTIONS = [
     "Use kind=experience_bullets for work under an anchored role, kind=project for "
     "standalone work, and kind=skills for tools or techniques the document shows in "
     "use (each claim text is one skill name, with support quoting where it is used).",
+    "For every experience_bullets or project claim, assign exactly one aspect: scope, "
+    "technical, impact, collaboration, leadership, process, tooling, or problem. "
+    "The aspect classifies the supported claim and never adds an unsupported fact.",
     "Prefer conventional job-description vocabulary for skill and technology names.",
 ]
 
@@ -506,6 +512,7 @@ def fragment_to_facts(
                         claim.text.casefold(),
                     ),
                     text=claim.text,
+                    aspect=claim.aspect,
                     source_ref=doc.id,
                     synthesized=True,
                 )
@@ -536,7 +543,22 @@ def fragment_to_facts(
                 name=name,
                 source_ref=doc.id,
                 synthesized=True,
-                highlights=[claim.text for claim in entry.claims],
+                highlights=[
+                    Bullet(
+                        id=deterministic_id(
+                            doc.id,
+                            "synth-project-highlight",
+                            name.casefold(),
+                            str(index),
+                            claim.text.casefold(),
+                        ),
+                        text=claim.text,
+                        aspect=claim.aspect,
+                        source_ref=doc.id,
+                        synthesized=True,
+                    )
+                    for index, claim in enumerate(entry.claims)
+                ],
                 tech=list(entry.tech),
             )
             facts.projects.append(project)

@@ -18,6 +18,7 @@ from resume_agent.discovery.url_ingest import llm as url_ingest_llm
 from resume_agent.gmail import classify
 from resume_agent.interview import agent as interview_agent
 from resume_agent.profile import (
+    aspect_classifier,
     coach,
     extractor,
     inference,
@@ -229,6 +230,20 @@ PROMPT_SPECS = (
         "profile",
         "Extracts immutable facts from a document.",
         extractor._INSTRUCTIONS,
+    ),
+    _spec(
+        "aspect-classifier",
+        "Bullet aspect classifier",
+        "profile",
+        "Classifies existing evidence bullets without changing their facts.",
+        [
+            *aspect_classifier._INSTRUCTIONS,
+            "Aspect definitions: "
+            + "; ".join(
+                f"{name}={description}"
+                for name, description in aspect_classifier.ASPECT_DESCRIPTIONS.items()
+            ),
+        ],
     ),
     _spec(
         "profile-synthesis",

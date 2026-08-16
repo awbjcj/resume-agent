@@ -1,23 +1,28 @@
 from resume_agent.models.resume import ResumeContent
+from resume_agent.profile.depth import clamped_ceiling, clamped_floor, planned_owners
+from resume_agent.models.profile import ProfileFacts
 from resume_agent.tailor.review_config import LengthBudget
 
 
 def format_budget(budget: LengthBudget) -> str:
     """Render the budget as one prompt instruction for tailor/reviser agents.
 
-    The prose caps and the skills target are stated as two separate budgets on
+    The prose ranges and the skills target are stated as two separate budgets on
     purpose. Given only caps and "drop the rest", the writer economized on the
     skills section as hard as on bullets, even though the two cost wildly
     different amounts of page space - so the skills sentence has to say what it
     actually costs, or the one-page instruction reads as a reason to cut it.
     """
     return (
-        f"Target a single page. Use at most {budget.max_experiences} experiences, "
+        f"Target {budget.page_target} pages. Use at most {budget.max_experiences} experiences, "
         f"{budget.max_projects} projects, and {budget.max_evidence_owners} combined "
-        f"evidence owners; at most {budget.max_bullets_per_role} bullets per role, "
-        f"{budget.max_bullets_per_project} bullets per project, and about "
-        f"{budget.target_total_bullets} bullets in total. Prefer the most relevant facts; "
-        "drop the rest. "
+        f"evidence owners; roles render {budget.min_bullets_per_role}–"
+        f"{budget.max_bullets_per_role} bullets and projects render "
+        f"{budget.min_bullets_per_project}–{budget.max_bullets_per_project}, "
+        f"subject to the per-owner depth plan. Aim for about "
+        f"{budget.target_total_bullets} bullets in total. Within each owner, "
+        f"cover at least {budget.min_aspects_per_owner} different aspects when "
+        "the cited source supply permits it. "
         "The skills section is budgeted separately and is not where a resume runs "
         f"long: it renders as one comma-joined line per category, so about "
         f"{budget.target_skills} entries cost roughly five lines. Aim for "
@@ -29,6 +34,29 @@ def format_budget(budget: LengthBudget) -> str:
         "term is not, and still fails. Cut only skills genuinely irrelevant to this "
         "role; do not drop a relevant skill to save space."
     )
+
+
+def format_depth_plan(facts: ProfileFacts, budget: LengthBudget) -> str:
+    """Deterministic, fact-clamped render ranges for the selected owners."""
+    owners = planned_owners(facts, budget)
+    if not owners:
+        return ""
+    lines = ["BULLET DEPTH PLAN (deterministic; per evidence owner):"]
+    for owner in owners:
+        supply = len(owner.bullets)
+        floor = clamped_floor(owner, budget)
+        ceiling = clamped_ceiling(owner, budget)
+        span = str(floor) if floor == ceiling else f"{floor}–{ceiling}"
+        limited = supply < (
+            budget.min_bullets_per_role
+            if owner.kind == "experience"
+            else budget.min_bullets_per_project
+        )
+        note = " (supply-limited; do not invent)" if limited else ""
+        lines.append(
+            f'- {owner.id} "{owner.label}": {supply} source -> render {span}{note}'
+        )
+    return "\n".join(lines)
 
 
 def resume_stats(content: ResumeContent) -> str:

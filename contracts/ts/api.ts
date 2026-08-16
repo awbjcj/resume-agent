@@ -3973,6 +3973,11 @@ export interface components {
             /** Notedocid */
             noteDocId?: string | null;
             /**
+             * Ownerid
+             * @default
+             */
+            ownerId: string;
+            /**
              * Relatedref
              * @default
              */
@@ -4884,27 +4889,27 @@ export interface components {
         LengthBudget: {
             /**
              * Maxbulletsperproject
-             * @default 3
+             * @default 6
              */
             maxBulletsPerProject: number;
             /**
              * Maxbulletsperrole
-             * @default 5
+             * @default 7
              */
             maxBulletsPerRole: number;
             /**
              * Maxevidenceowners
-             * @default 5
+             * @default 8
              */
             maxEvidenceOwners: number;
             /**
              * Maxexperiences
-             * @default 4
+             * @default 5
              */
             maxExperiences: number;
             /**
              * Maxprojects
-             * @default 2
+             * @default 4
              */
             maxProjects: number;
             /**
@@ -4913,13 +4918,33 @@ export interface components {
              */
             maxSkillsPerCategory: number;
             /**
+             * Minaspectsperowner
+             * @default 3
+             */
+            minAspectsPerOwner: number;
+            /**
+             * Minbulletsperproject
+             * @default 4
+             */
+            minBulletsPerProject: number;
+            /**
+             * Minbulletsperrole
+             * @default 5
+             */
+            minBulletsPerRole: number;
+            /**
+             * Pagetarget
+             * @default 2
+             */
+            pageTarget: number;
+            /**
              * Targetskills
              * @default 40
              */
             targetSkills: number;
             /**
              * Targettotalbullets
-             * @default 20
+             * @default 40
              */
             targetTotalBullets: number;
         };

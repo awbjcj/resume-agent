@@ -278,8 +278,8 @@ def test_fragment_to_facts_builds_anchored_stub_with_evidence():
         SynthesizedEntry(kind="skills", category="hard",
                          claims=[SynthesizedClaim(text="Kubernetes",
                                                   support=["Built on Kubernetes"])]),
-        SynthesizedEntry(kind="project", title="Billing rewrite",
-                         claims=[SynthesizedClaim(text="Rewrote billing",
+            SynthesizedEntry(kind="project", title="Billing rewrite",
+                         claims=[SynthesizedClaim(text="Rewrote billing", aspect="impact",
                                                   support=["billing rewrite"])]),
     ])
     facts, evidence = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
@@ -295,7 +295,8 @@ def test_fragment_to_facts_builds_anchored_stub_with_evidence():
 
     project = facts.projects[0]
     assert project.name == "Billing rewrite" and project.synthesized
-    assert project.highlights == ["Rewrote billing"]
+    assert [highlight.text for highlight in project.highlights] == ["Rewrote billing"]
+    assert project.highlights[0].aspect == "impact"
 
 
 def test_fragment_to_facts_unknown_anchor_becomes_project():

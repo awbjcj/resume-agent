@@ -154,6 +154,7 @@ def test_run_case_collects_signals():
         "fact-check",
         "skill-naming",
         "numeric-evidence",
+        "bullet-depth",
     }
     assert result.probes[0].trap_id == "k8s"
     assert result.probes[0].detected is True

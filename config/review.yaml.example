@@ -37,19 +37,24 @@ reviewers:
     model_tier: mid
     score_bands: true
 
-# Optional one-page budget handed to the tailor and surfaced to the concision
-# reviewer. Omit the block to accept these defaults.
+# Optional two-page evidence budget handed to the tailor and surfaced to advisory
+# reviewers. Omit the block to accept these defaults.
 #
-# The bullet/experience numbers are CAPS. The two skill numbers are a TARGET:
+# Each owner's floor is clamped to its source-bullet supply before it reaches a
+# writer, so the plan never asks for invented evidence. The skill numbers are a TARGET:
 # the skills section renders one comma-joined line per category, so ~40 entries
 # cost about five lines, and trimming it saves almost no space while losing
 # keyword coverage. Raise target_skills for a broader skills section.
 length_budget:
-  max_experiences: 4
-  max_projects: 2
-  max_evidence_owners: 5
-  max_bullets_per_role: 5
-  max_bullets_per_project: 3
-  target_total_bullets: 20
+  page_target: 2
+  max_experiences: 5
+  max_projects: 4
+  max_evidence_owners: 8
+  min_bullets_per_role: 5
+  max_bullets_per_role: 7
+  min_bullets_per_project: 4
+  max_bullets_per_project: 6
+  target_total_bullets: 40
+  min_aspects_per_owner: 3
   target_skills: 40
   max_skills_per_category: 12

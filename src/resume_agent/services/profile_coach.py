@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 import uuid
+from functools import partial
 from pathlib import Path
 
 from resume_agent.llm_runner import Runner, UnparsedAgentOutput
 from resume_agent.profile.coach import (
+    AGENDA_CAP,
     CoachTurn,
     OpeningTurn,
     ValidatedTurn,
@@ -20,6 +22,7 @@ from resume_agent.profile.coach import (
     render_agenda,
     render_transcript,
 )
+from resume_agent.profile.depth import depth_topics
 from resume_agent.profile.coach_store import (
     apply_turn_delta,
     CoachTurnRecord,
@@ -35,6 +38,7 @@ from resume_agent.profile.corpus import load_manifest
 from resume_agent.profile.intake import add_note_source
 from resume_agent.profile.interview import make_corpus_tools
 from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
+from resume_agent.profile.store import load_facts
 from resume_agent.services.profile_build import run_corpus_build
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
 from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
@@ -82,6 +86,7 @@ def session_view(profile_dir: Path | str, session_id: str) -> dict:
                 "gap": topic["gap"],
                 "whyItMatters": topic["why_it_matters"],
                 "relatedRef": topic["related_ref"],
+                "ownerId": topic.get("owner_id", ""),
                 "status": topic["status"],
                 "noteDocId": topic["note_doc_id"],
             }
@@ -158,8 +163,22 @@ def run_opening_turn(
     root = Path(profile_dir)
     reporter.begin(1, "Reviewing your profile")
     coach, formatter = _agents(root, coach_agent, formatter_agent, OpeningTurn)
+    facts_path = root / "facts.json"
+    seeded = depth_topics(load_facts(facts_path), cap=AGENDA_CAP) if facts_path.exists() else []
+    seeded_context = (
+        "SEEDED DEPTH AGENDA (deterministic; already included in the session):\n"
+        + "\n".join(
+            f"- {topic.id} [{topic.owner_id}] {topic.gap} — {topic.why_it_matters}"
+            for topic in seeded
+        )
+        + "\nDo not repeat these in model-proposed topics. You may add only new, "
+        "bounded topics after them, and may ask about a seeded topic by id."
+        if seeded
+        else ""
+    )
     prompt = (
         f"{_overview(root, engine)}\n\n"
+        f"{seeded_context}\n\n"
         "This is the opening turn. Propose the highest-value bounded agenda and ask the first question."
     )
     output_sink = sink or NullSink()
@@ -170,7 +189,7 @@ def run_opening_turn(
         formatter,
         notes,
         OpeningTurn,
-        normalize_opening,
+        partial(normalize_opening, seeded=seeded),
         label="COACH NOTES",
     )
     if prose:
@@ -321,7 +340,13 @@ def approve_draft(
             raise ValueError(f"unknown draft: {topic_id}")
         if draft["status"] != "pending":
             raise ValueError("draft already resolved")
-        doc = add_note_source(root, f"Coach — {title.strip() or topic_id}", body)
+        topic = next(
+            (row for row in session["topics"] if row["id"] == topic_id), None
+        )
+        anchor = (topic or {}).get("owner_id") or None
+        doc = add_note_source(
+            root, f"Coach — {title.strip() or topic_id}", body, anchor=anchor
+        )
         set_draft_status(root, session_id, topic_id, "saved", note_doc_id=doc.id)
         return doc.id
 

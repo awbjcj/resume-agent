@@ -40,7 +40,9 @@ def assign_fact_ids(facts: ProfileFacts, doc_id: str) -> ProfileFacts:
         for bullet in experience.bullets:
             ids.assign(bullet, "bullet", parent, bullet.text)
     for project in output.projects:
-        ids.assign(project, "proj", project.name)
+        parent = ids.assign(project, "proj", project.name)
+        for highlight in project.highlights:
+            ids.assign(highlight, "highlight", parent, highlight.text)
     for education in output.education:
         ids.assign(education, "edu", education.institution, education.degree)
     for category, skills in output.skills.items():
