@@ -1,4 +1,10 @@
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -59,15 +65,19 @@ export function PruningSettingsPage() {
           </Field>
         </div>
         {RULES.map((rule) => (
-          <Field key={rule.key}>
-            <div className="flex items-center gap-3">
-              <Switch id={rule.key} checked={draft[rule.key]}
-                onCheckedChange={(v: boolean) => setDraft({ ...draft, [rule.key]: v })} />
-              <div>
-                <FieldLabel htmlFor={rule.key}>{rule.label}</FieldLabel>
-                <FieldDescription>{rule.help}</FieldDescription>
-              </div>
-            </div>
+          // Was a vertical Field wrapping a hand-rolled `flex items-center`
+          // row, which reimplemented the horizontal variant and centred the
+          // switch against a two-line label+help block. The primitive already
+          // does this, and correctly: `orientation="horizontal"` plus
+          // FieldContent aligns the switch to the label instead of to the
+          // block's midpoint.
+          <Field key={rule.key} orientation="horizontal">
+            <Switch id={rule.key} checked={draft[rule.key]}
+              onCheckedChange={(v: boolean) => setDraft({ ...draft, [rule.key]: v })} />
+            <FieldContent>
+              <FieldLabel htmlFor={rule.key}>{rule.label}</FieldLabel>
+              <FieldDescription>{rule.help}</FieldDescription>
+            </FieldContent>
           </Field>
         ))}
       </FieldGroup>

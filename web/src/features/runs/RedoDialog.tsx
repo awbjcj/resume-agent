@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -156,10 +157,10 @@ function RedoDialogBody({
                   disabled={isLaunching}
                   onCheckedChange={(checked) => toggle(stage.id, Boolean(checked))}
                 />
-                <div>
+                <FieldContent>
                   <FieldLabel htmlFor={inputId}>{stage.label}</FieldLabel>
                   <FieldDescription>{stage.hint}</FieldDescription>
-                </div>
+                </FieldContent>
               </Field>
             );
           })}
@@ -174,10 +175,10 @@ function RedoDialogBody({
             disabled={isLaunching}
             onCheckedChange={setDeep}
           />
-          <div>
+          <FieldContent>
             <FieldLabel htmlFor="redo-deep-review">Deep review</FieldLabel>
             <FieldDescription>Full review panel; roughly 3–6× slower.</FieldDescription>
-          </div>
+          </FieldContent>
         </Field>
       )}
 

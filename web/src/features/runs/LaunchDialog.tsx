@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -196,10 +197,10 @@ function LaunchDialogBody({
             disabled={isLaunching}
             onCheckedChange={setDeep}
           />
-          <div>
+          <FieldContent>
             <FieldLabel htmlFor="deep-review">Deep review</FieldLabel>
             <FieldDescription>Full review panel; roughly 3–6× slower.</FieldDescription>
-          </div>
+          </FieldContent>
         </Field>
       )}
 

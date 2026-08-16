@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -185,12 +186,12 @@ export function RenderingSettingsPage() {
             onCheckedChange={(fitOnePage: boolean) =>
               setDraft({ ...draft, fitOnePage })}
           />
-          <div className="flex flex-col gap-0.5">
+          <FieldContent>
             <FieldLabel htmlFor="fit-one-page">Fit resume to one page</FieldLabel>
             <FieldDescription>
               Gradually tightens the layout while keeping a readable minimum size.
             </FieldDescription>
-          </div>
+          </FieldContent>
         </Field>
       </FieldGroup>
 
