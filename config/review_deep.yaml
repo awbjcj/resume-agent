@@ -1,7 +1,12 @@
 # Full review roster: legacy five-reviewer, three-round behavior.
+# Each model_tier resolves through CHEAP_MODEL / MID_MODEL / PREMIUM_MODEL.
 max_rounds: 3
 score_threshold: 85
 evidence_portfolio_enabled: true
+# Stop as soon as a round is worse than the best clean one so far. The loop keeps
+# its best round rather than its last, so stopping early never discards work.
+early_stop_on_regression: true
+style_guide_path: config/style_guide.md
 reviewers:
   - name: fact-check
     gate: true
@@ -11,18 +16,22 @@ reviewers:
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
   - name: recruiter
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
   - name: hiring-manager
     gate: false
     weight: 1
     model_tier: premium
+    score_bands: true
   - name: concision
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
 
 length_budget:
   page_target: 2
@@ -35,3 +44,7 @@ length_budget:
   max_bullets_per_project: 6
   target_total_bullets: 40
   min_aspects_per_owner: 3
+  # A target, not a cap: skills cost ~one line per category, so breadth here is
+  # nearly free. See config/review.yaml.example for the full note.
+  target_skills: 40
+  max_skills_per_category: 12

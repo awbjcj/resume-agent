@@ -13,6 +13,7 @@ from pydantic import Field, field_validator, model_validator
 
 from resume_agent.api.schemas.base import CamelModel
 from resume_agent.tailor.review_config import LengthBudget as DomainLengthBudget
+from resume_agent.tailor.review_config import ReviewConfig as DomainReviewConfig
 
 
 class SearchConfigDoc(CamelModel):
@@ -60,15 +61,19 @@ class ReviewerEntry(CamelModel):
     score_bands: bool = False
 
 
-def _budget_default(field: str) -> int:
-    """The domain budget's own default, never a restated literal.
+def _domain_default(model: type[Any], field: str) -> Any:
+    """A DTO default taken from the domain model, never a restated literal.
 
-    This DTO used to copy all six numbers by hand. That is the same drift the
+    These DTOs used to copy the numbers by hand. That is the same drift the
     model-tier defaults hit: the domain model moves, the wire contract quietly
     keeps serving last release's numbers, and a test that restates the literals
     too keeps passing.
     """
-    default = DomainLengthBudget.model_fields[field].default
+    return model.model_fields[field].default
+
+
+def _budget_default(field: str) -> int:
+    default = _domain_default(DomainLengthBudget, field)
     assert isinstance(default, int)
     return default
 
@@ -167,15 +172,47 @@ def _default_reviewers() -> list[ReviewerEntry]:
 
 
 class ReviewConfigDoc(CamelModel):
+    """Every field `ReviewConfig` reads, because `put` rewrites the whole file.
+
+    `YamlConfigStore.put` serializes this DTO over the YAML rather than merging
+    into it, so a domain field missing here is not merely un-editable — it is
+    **deleted** the first time anything on the page is saved. That is how
+    `early_stop_on_regression: true` silently reverted to `false` on the fast
+    roster. `match_plan_enabled` is deliberately still absent: it is the
+    deprecated spelling, and `ReviewConfig` mirrors it from
+    `evidence_portfolio_enabled` on load, so omitting it drops a legacy key
+    rather than losing a setting.
+    """
+
     max_rounds: int = 3
     score_threshold: int = 85
     merged_advisory: bool = False
     tailor_tier: Literal["cheap", "mid", "premium"] = "premium"
     reviser_tier: Literal["cheap", "mid", "premium"] = "premium"
     evidence_portfolio_enabled: bool = False
+    early_stop_on_regression: bool = _domain_default(
+        DomainReviewConfig, "early_stop_on_regression"
+    )
     reviewers: list[ReviewerEntry] = Field(default_factory=_default_reviewers)
     provenance_retry_budget: int = Field(default=1, ge=0)
-    length_budget: LengthBudget | None = None
+    style_guide_path: str = _domain_default(DomainReviewConfig, "style_guide_path")
+    # Not optional, because `ReviewConfig.length_budget` is not: a `null` here
+    # round-tripped to `length_budget: null` on disk, which `ReviewConfig`
+    # rejects outright, so turning the budget "off" in the UI broke every
+    # subsequent tailor run at config load. A plain default (not
+    # `default_factory`) keeps the values in the published JSON Schema.
+    length_budget: LengthBudget = LengthBudget()
+
+    @field_validator("length_budget", mode="before")
+    @classmethod
+    def _heal_null_budget(cls, v: Any) -> Any:
+        """Repair a workspace whose `review.yaml` already holds `null`.
+
+        Those files exist: the removed on/off switch wrote them. Coercing to
+        defaults on read means such a workspace serves its settings page and
+        saves itself clean, instead of 500ing on GET forever.
+        """
+        return LengthBudget() if v is None else v
 
 
 class PruneConfigDoc(CamelModel):
@@ -190,6 +227,10 @@ class PruneConfigDoc(CamelModel):
 class RenderConfigDoc(CamelModel):
     template: str = "classic"
     fit_one_page: bool = True
+    # `template_path` and `output_dir` are deliberately NOT here: rendering is
+    # template-id based on the web (see render/CLAUDE.md) and those two stay
+    # runtime-only CLI fields. They are preserved across a save by
+    # `YamlConfigStore.put`, which no longer drops keys a DTO does not own.
 
 
 class StyleGuideDoc(CamelModel):
@@ -197,6 +238,11 @@ class StyleGuideDoc(CamelModel):
 
 
 class ProfileConfigDoc(CamelModel):
+    # `resume_path` is deliberately absent: the setup wizard writes it
+    # (`setup/yaml_gen.py::build_profile_sources`) and `profile/corpus.py`'s
+    # legacy migration reads it, but the settings UI manages sources through
+    # the corpus registry rather than this one path. `YamlConfigStore.put`
+    # preserves it rather than this DTO re-exposing it.
     github_username: str | None = None
     github_repo_allow: list[str] = Field(default_factory=list)
     github_repo_deny: list[str] = Field(default_factory=list)

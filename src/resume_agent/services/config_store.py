@@ -34,6 +34,20 @@ _FILES: dict[str, str] = {
 }
 
 
+# Keys that must be dropped rather than preserved, because a newer key on the
+# same document now owns their meaning. Preservation is otherwise the rule.
+#
+# `match_plan_enabled` is the deprecated spelling of
+# `evidence_portfolio_enabled`, and `ReviewConfig` *rejects* a file where the
+# two disagree. Carrying the stale one forward would therefore turn a UI toggle
+# into an unloadable config: the DTO writes the new key as `true`, the old key
+# survives as `false`, and the next tailor run raises on config load.
+_SUPERSEDED_KEYS: dict[str, tuple[str, ...]] = {
+    "review": ("match_plan_enabled",),
+    "review_deep": ("match_plan_enabled",),
+}
+
+
 def _atomic_write(target: Path, text: str) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(target.suffix + ".tmp")
@@ -66,8 +80,24 @@ class YamlConfigStore:
         if schema is StyleGuideDoc:
             _atomic_write(path, doc.content)  # type: ignore[attr-defined]
             return doc
-        text = yaml.safe_dump(
-            doc.model_dump(mode="json"), sort_keys=False, allow_unicode=True
-        )
+        payload = doc.model_dump(mode="json")
+        # Write the document OVER the file's existing keys rather than replacing
+        # the file with it. A DTO deliberately does not declare every key its
+        # YAML may hold -- rendering keeps `template_path`/`output_dir` as
+        # runtime-only CLI fields, profile sources keeps the wizard's
+        # `resume_path` -- and a wholesale rewrite silently deleted each of them
+        # the first time an unrelated field on that page was saved. Merging is
+        # shallow on purpose: a key the DTO *does* own is replaced outright, so
+        # removing an item from a list still removes it.
+        if path.exists():
+            existing = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            if isinstance(existing, dict):
+                preserved = {
+                    key: value
+                    for key, value in existing.items()
+                    if key not in payload and key not in _SUPERSEDED_KEYS.get(domain, ())
+                }
+                payload = {**preserved, **payload}
+        text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
         _atomic_write(path, text)
         return doc

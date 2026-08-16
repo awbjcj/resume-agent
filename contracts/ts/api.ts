@@ -6097,14 +6097,47 @@ export interface components {
              */
             retiredAt: string;
         };
-        /** ReviewConfigDoc */
+        /**
+         * ReviewConfigDoc
+         * @description Every field `ReviewConfig` reads, because `put` rewrites the whole file.
+         *
+         *     `YamlConfigStore.put` serializes this DTO over the YAML rather than merging
+         *     into it, so a domain field missing here is not merely un-editable — it is
+         *     **deleted** the first time anything on the page is saved. That is how
+         *     `early_stop_on_regression: true` silently reverted to `false` on the fast
+         *     roster. `match_plan_enabled` is deliberately still absent: it is the
+         *     deprecated spelling, and `ReviewConfig` mirrors it from
+         *     `evidence_portfolio_enabled` on load, so omitting it drops a legacy key
+         *     rather than losing a setting.
+         */
         ReviewConfigDoc: {
+            /**
+             * Earlystoponregression
+             * @default false
+             */
+            earlyStopOnRegression: boolean;
             /**
              * Evidenceportfolioenabled
              * @default false
              */
             evidencePortfolioEnabled: boolean;
-            lengthBudget?: components["schemas"]["LengthBudget"] | null;
+            /**
+             * @default {
+             *       "maxBulletsPerProject": 6,
+             *       "maxBulletsPerRole": 7,
+             *       "maxEvidenceOwners": 8,
+             *       "maxExperiences": 5,
+             *       "maxProjects": 4,
+             *       "maxSkillsPerCategory": 12,
+             *       "minAspectsPerOwner": 3,
+             *       "minBulletsPerProject": 4,
+             *       "minBulletsPerRole": 5,
+             *       "pageTarget": 2,
+             *       "targetSkills": 40,
+             *       "targetTotalBullets": 40
+             *     }
+             */
+            lengthBudget: components["schemas"]["LengthBudget"];
             /**
              * Maxrounds
              * @default 3
@@ -6133,6 +6166,11 @@ export interface components {
              * @default 85
              */
             scoreThreshold: number;
+            /**
+             * Styleguidepath
+             * @default config/style_guide.md
+             */
+            styleGuidePath: string;
             /**
              * Tailortier
              * @default premium

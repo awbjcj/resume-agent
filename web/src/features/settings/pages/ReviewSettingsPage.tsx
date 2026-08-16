@@ -1,10 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ChevronRight } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Field,
+  FieldContent,
   FieldDescription,
-  FieldGroup,
+  FieldError,
   FieldLabel,
   FieldLegend,
   FieldSet,
@@ -19,6 +36,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import type { paths } from "@/lib/api/schema";
 import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
@@ -27,28 +45,10 @@ import { useDraft } from "../use-draft";
 
 type ReviewDoc = paths["/api/config/review"]["get"]["responses"][200]["content"]["application/json"];
 type ReviewerEntry = NonNullable<ReviewDoc["reviewers"]>[number];
+type LengthBudget = ReviewDoc["lengthBudget"];
+type ModelTier = ReviewDoc["tailorTier"];
 
-const MODEL_TIERS = ["cheap", "mid", "premium"];
-
-const DEFAULT_LENGTH_BUDGET = {
-  // This default must remain a complete generated-contract value even though
-  // the approved scope does not add new settings controls for the depth knobs.
-  pageTarget: 2,
-  maxExperiences: 5,
-  maxProjects: 4,
-  maxEvidenceOwners: 8,
-  minBulletsPerRole: 5,
-  maxBulletsPerRole: 7,
-  minBulletsPerProject: 4,
-  maxBulletsPerProject: 6,
-  targetTotalBullets: 40,
-  minAspectsPerOwner: 3,
-  // The skills budget, added alongside the prose caps. No inputs are rendered
-  // for these two yet; they carry the domain defaults so enabling the budget
-  // never sends a partial one.
-  targetSkills: 40,
-  maxSkillsPerCategory: 12,
-};
+const MODEL_TIERS = ["cheap", "mid", "premium"] as const;
 
 const ROSTERS = [
   {
@@ -65,266 +65,541 @@ const ROSTERS = [
   },
 ] as const;
 
+type RosterId = (typeof ROSTERS)[number]["id"];
+
+/** What each shipped reviewer actually judges. The table used to be five bare
+ *  names, which made weight and tier look arbitrary. */
+const REVIEWER_NOTES: Record<string, string> = {
+  "fact-check": "Blocking — any claim not traceable to a profile fact fails the round.",
+  "ats-keyword": "Coverage of the job description's stated requirements.",
+  recruiter: "Six-second skim: does the top of the page land?",
+  "hiring-manager": "Depth and credibility of the evidence for this specific role.",
+  concision: "Density — cuts padding without cutting evidence.",
+  "must-have-coverage": "Share of evidenced must-have requirements actually rendered.",
+};
+
 export function ReviewSettingsPage() {
-  const [rosterId, setRosterId] = useState<(typeof ROSTERS)[number]["id"]>("fast");
+  const [rosterId, setRosterId] = useState<RosterId>("fast");
+  // Switching rosters swaps `key` below, which unmounts the form and takes the
+  // unsaved draft with it. Tracking the active form's dirty state up here lets
+  // the switch ask first instead of silently discarding typing.
+  const [dirty, setDirty] = useState(false);
+  const [pendingRoster, setPendingRoster] = useState<RosterId | null>(null);
   const roster = ROSTERS.find((r) => r.id === rosterId) ?? ROSTERS[0];
+
+  const requestRoster = (next: RosterId) => {
+    if (next === rosterId) return;
+    if (dirty) setPendingRoster(next);
+    else setRosterId(next);
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold">Review panel</h1>
           <p className="text-sm text-muted-foreground">
-            How tailored resumes get scored before they're offered up for approval.
+            How tailored resumes get written, scored, and sized before they're offered up for approval.
           </p>
         </div>
         <ResetSectionButton sectionId="review" label="Review panel" />
       </header>
+
+      {/* Fast/Deep is the SCOPE of this page, not a setting on it — every
+          control below belongs to the selected roster. Rendering it as a
+          labelled Field put it in the same visual class as "Max rounds" and
+          forced a horizontal Field whose description never aligned. */}
+      <div className="flex flex-col gap-1.5 border-b pb-4">
+        <ToggleGroup
+          aria-label="Roster"
+          value={[rosterId]}
+          onValueChange={(values) => {
+            const next = values.at(-1) as RosterId | undefined;
+            if (next) requestRoster(next);
+          }}
+        >
+          {ROSTERS.map((r) => (
+            <ToggleGroupItem key={r.id} value={r.id} aria-label={`${r.label} roster`}>
+              {r.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        {/* Every description occupies the SAME grid cell, with the inactive
+            ones kept in flow but invisible. The box is therefore always as
+            tall as the longest description at the current width, so switching
+            rosters cannot shift the page — and unlike a reserved min-height,
+            that stays true at every viewport instead of just the one the
+            number was measured at. */}
+        <div className="grid text-sm leading-tight text-muted-foreground">
+          {ROSTERS.map((r) => (
+            <p
+              key={r.id}
+              aria-hidden={r.id !== rosterId}
+              className={cn(
+                "col-start-1 row-start-1",
+                r.id !== rosterId && "invisible",
+              )}
+            >
+              {r.description}
+            </p>
+          ))}
+        </div>
+      </div>
+
       <Alert>
         <AlertDescription>
           Defaults are sensible — change reviewer weights only if you know why.
         </AlertDescription>
       </Alert>
-      <Field orientation="horizontal">
-        <div className="flex flex-col gap-2">
-          <FieldLabel>Roster</FieldLabel>
-          <ToggleGroup
-            value={[rosterId]}
-            onValueChange={(values) => {
-              const next = values.at(-1) as (typeof ROSTERS)[number]["id"] | undefined;
-              if (next) setRosterId(next);
-            }}
-          >
-            {ROSTERS.map((r) => (
-              <ToggleGroupItem key={r.id} value={r.id} aria-label={`${r.label} roster`}>
-                {r.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </div>
-        <FieldDescription>{roster.description}</FieldDescription>
-      </Field>
-      <ReviewRosterForm key={roster.id} endpoint={roster.endpoint} />
+
+      <ReviewRosterForm
+        key={roster.id}
+        endpoint={roster.endpoint}
+        onDirtyChange={setDirty}
+      />
+
+      <AlertDialog
+        open={pendingRoster !== null}
+        onOpenChange={(open: boolean) => {
+          if (!open) setPendingRoster(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your edits to the {roster.label} roster haven't been saved. Switching
+              rosters will discard them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingRoster) setRosterId(pendingRoster);
+                setPendingRoster(null);
+              }}
+            >
+              Discard and switch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function ReviewRosterForm({ endpoint }: { endpoint: ConfigPath }) {
+/** A labelled whole-number input bound to one draft field. Twenty-odd of these
+ *  by hand is where transcription bugs live. */
+function NumberField({
+  id, label, description, value, min = 0, onChange, invalid,
+}: {
+  id: string;
+  label: string;
+  description?: string;
+  value: number;
+  min?: number;
+  onChange: (value: number) => void;
+  invalid?: string;
+}) {
+  return (
+    <Field data-invalid={invalid ? true : undefined}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={min}
+        value={value}
+        aria-invalid={invalid ? true : undefined}
+        onChange={(e) => onChange(Number(e.target.value || 0))}
+      />
+      {description && <FieldDescription>{description}</FieldDescription>}
+      {invalid && <FieldError>{invalid}</FieldError>}
+    </Field>
+  );
+}
+
+function TierToggle({
+  label, value, onChange, name,
+}: {
+  label: string;
+  value: ModelTier;
+  onChange: (tier: ModelTier) => void;
+  name: string;
+}) {
+  return (
+    <Field>
+      <FieldLabel>{label}</FieldLabel>
+      <ToggleGroup
+        value={[value]}
+        onValueChange={(values) => {
+          const tier = values.at(-1) as ModelTier | undefined;
+          if (tier) onChange(tier);
+        }}
+      >
+        {MODEL_TIERS.map((tier) => (
+          <ToggleGroupItem key={tier} value={tier} aria-label={`${tier} ${name}`}>
+            {tier}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </Field>
+  );
+}
+
+function SwitchField({
+  id, label, description, checked, onChange,
+}: {
+  id: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    // FieldContent, not a bare div: `fieldVariants.horizontal` only switches
+    // from items-center to items-start via `has-[>[data-slot=field-content]]`,
+    // so a plain wrapper leaves the switch vertically centred against a
+    // two-line label+description block instead of aligned to the label.
+    <Field orientation="horizontal">
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+      <FieldContent>
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        <FieldDescription>{description}</FieldDescription>
+      </FieldContent>
+    </Field>
+  );
+}
+
+const GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
+
+function ReviewRosterForm({
+  endpoint, onDirtyChange,
+}: {
+  endpoint: ConfigPath;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
   const { data } = useConfig(endpoint);
   const save = useSaveConfig(endpoint);
   const { draft, setDraft, dirty, reset } = useDraft(data as ReviewDoc | undefined);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
 
   if (!draft) return <Skeleton className="h-64 w-full" />;
   const reviewers = draft.reviewers ?? [];
+  const budget = draft.lengthBudget;
 
   const setReviewer = (index: number, patch: Partial<ReviewerEntry>) => {
-    const next = reviewers.map((r, i) => (i === index ? { ...r, ...patch } : r));
-    setDraft({ ...draft, reviewers: next });
+    setDraft({
+      ...draft,
+      reviewers: reviewers.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+    });
   };
+  const setBudget = (patch: Partial<LengthBudget>) =>
+    setDraft({ ...draft, lengthBudget: { ...budget, ...patch } });
+
+  // The server 422s on an inverted range (`ReviewConfig._validate_bullet_ranges`).
+  // Catching it inline beats a round-trip that reads as "save is broken".
+  const roleRangeError =
+    budget.minBulletsPerRole > budget.maxBulletsPerRole
+      ? "Minimum cannot exceed the maximum."
+      : undefined;
+  const projectRangeError =
+    budget.minBulletsPerProject > budget.maxBulletsPerProject
+      ? "Minimum cannot exceed the maximum."
+      : undefined;
+  const canSave = !roleRangeError && !projectRangeError;
 
   return (
     <>
-      <FieldGroup>
+      <FieldSet>
+        <FieldLegend>Rounds</FieldLegend>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="maxRounds">Max rounds</FieldLabel>
-            <Input id="maxRounds" type="number" value={draft.maxRounds}
-              onChange={(e) => setDraft({ ...draft, maxRounds: Number(e.target.value || 0) })} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="scoreThreshold">Score threshold</FieldLabel>
-            <Input id="scoreThreshold" type="number" value={draft.scoreThreshold}
-              onChange={(e) => setDraft({ ...draft, scoreThreshold: Number(e.target.value || 0) })} />
-          </Field>
+          <NumberField
+            id="maxRounds"
+            label="Max rounds"
+            min={1}
+            description="How many write-and-review passes before the best attempt is kept."
+            value={draft.maxRounds}
+            onChange={(v) => setDraft({ ...draft, maxRounds: v })}
+          />
+          <NumberField
+            id="scoreThreshold"
+            label="Score threshold"
+            description="Weighted panel score a round must reach to stop early."
+            value={draft.scoreThreshold}
+            onChange={(v) => setDraft({ ...draft, scoreThreshold: v })}
+          />
         </div>
-      </FieldGroup>
+      </FieldSet>
+
       <FieldSet>
         <FieldLegend>Pipeline</FieldLegend>
-        <Field orientation="horizontal">
-          <Switch
-            id="merged-advisory"
-            checked={draft.mergedAdvisory}
-            onCheckedChange={(checked: boolean) =>
-              setDraft({ ...draft, mergedAdvisory: checked })}
-          />
-          <div className="flex flex-col gap-0.5">
-            <FieldLabel htmlFor="merged-advisory">
-              Merge advisory reviews into one call
-            </FieldLabel>
-            <FieldDescription>
-              Faster and cheaper; turn off to run each advisory reviewer separately.
-            </FieldDescription>
-          </div>
-        </Field>
-        <Field orientation="horizontal">
-          <Switch
-            id="evidence-portfolio-enabled"
-            checked={draft.evidencePortfolioEnabled}
-            onCheckedChange={(checked: boolean) =>
-              setDraft({ ...draft, evidencePortfolioEnabled: checked })}
-          />
-          <div className="flex flex-col gap-0.5">
-            <FieldLabel htmlFor="evidence-portfolio-enabled">
-              Evidence portfolio planning
-            </FieldLabel>
-            <FieldDescription>
-              Experimental: rank requirements and freeze the work and project evidence used by the writer.
-            </FieldDescription>
-          </div>
-        </Field>
+        <SwitchField
+          id="merged-advisory"
+          label="Merge advisory reviews into one call"
+          description="Faster and cheaper; turn off to run each advisory reviewer separately."
+          checked={draft.mergedAdvisory}
+          onChange={(v) => setDraft({ ...draft, mergedAdvisory: v })}
+        />
+        <SwitchField
+          id="evidence-portfolio-enabled"
+          label="Evidence portfolio planning"
+          description="Experimental: rank requirements and freeze the work and project evidence used by the writer."
+          checked={draft.evidencePortfolioEnabled}
+          onChange={(v) => setDraft({ ...draft, evidencePortfolioEnabled: v })}
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel>Writer model tier</FieldLabel>
-            <ToggleGroup
-              value={[draft.tailorTier]}
-              onValueChange={(values) => {
-                const tier = values.at(-1) as ReviewDoc["tailorTier"] | undefined;
-                if (tier) setDraft({ ...draft, tailorTier: tier });
-              }}
-            >
-              {MODEL_TIERS.map((tier) => (
-                <ToggleGroupItem
-                  key={tier}
-                  value={tier}
-                  aria-label={`${tier} writer tier`}
-                >
-                  {tier}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </Field>
-          <Field>
-            <FieldLabel>Reviser model tier</FieldLabel>
-            <ToggleGroup
-              value={[draft.reviserTier]}
-              onValueChange={(values) => {
-                const tier = values.at(-1) as ReviewDoc["reviserTier"] | undefined;
-                if (tier) setDraft({ ...draft, reviserTier: tier });
-              }}
-            >
-              {MODEL_TIERS.map((tier) => (
-                <ToggleGroupItem
-                  key={tier}
-                  value={tier}
-                  aria-label={`${tier} reviser tier`}
-                >
-                  {tier}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </Field>
+          <TierToggle
+            label="Writer model tier"
+            name="writer tier"
+            value={draft.tailorTier}
+            onChange={(tier) => setDraft({ ...draft, tailorTier: tier })}
+          />
+          <TierToggle
+            label="Reviser model tier"
+            name="reviser tier"
+            value={draft.reviserTier}
+            onChange={(tier) => setDraft({ ...draft, reviserTier: tier })}
+          />
         </div>
       </FieldSet>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Reviewer</TableHead>
-            <TableHead>Gate</TableHead>
-            <TableHead>Weight</TableHead>
-            <TableHead>Model tier</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {reviewers.map((r, i) => (
-            <TableRow key={r.name}>
-              <TableCell>
-                <div className="font-medium">{r.name}</div>
-                {r.name === "fact-check" && (
-                  <div className="text-xs text-muted-foreground">
-                    Blocking — unsupported claims fail the round
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                <Switch aria-label={`${r.name} gate`} checked={r.gate}
-                  onCheckedChange={(v: boolean) => setReviewer(i, { gate: v })} />
-              </TableCell>
-              <TableCell>
-                <Input type="number" aria-label={`${r.name} weight`} className="w-20"
-                  value={r.weight} onChange={(e) => setReviewer(i, { weight: Number(e.target.value || 0) })} />
-              </TableCell>
-              <TableCell>
-                <Select value={r.modelTier}
-                  onValueChange={(v) => v && setReviewer(i, { modelTier: v })}>
-                  <SelectTrigger aria-label={`${r.name} model tier`} className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {MODEL_TIERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+
       <FieldSet>
-        <FieldLegend>Length budget</FieldLegend>
-        <Field>
-          <div className="flex items-center gap-3">
-            <Switch id="length-budget-enabled" checked={draft.lengthBudget != null}
-              onCheckedChange={(v: boolean) =>
-                setDraft({ ...draft, lengthBudget: v ? DEFAULT_LENGTH_BUDGET : null })} />
-            <FieldLabel htmlFor="length-budget-enabled">Enforce a length budget</FieldLabel>
-          </div>
-        </Field>
-        {draft.lengthBudget && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field>
-              <FieldLabel htmlFor="maxExperiences">Max experiences</FieldLabel>
-              <Input id="maxExperiences" type="number" value={draft.lengthBudget.maxExperiences}
-                onChange={(e) => setDraft({
-                  ...draft,
-                  lengthBudget: { ...draft.lengthBudget!, maxExperiences: Number(e.target.value || 0) },
-                })} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="maxProjects">Max projects</FieldLabel>
-              <Input id="maxProjects" type="number" value={draft.lengthBudget.maxProjects}
-                onChange={(e) => setDraft({
-                  ...draft,
-                  lengthBudget: { ...draft.lengthBudget!, maxProjects: Number(e.target.value || 0) },
-                })} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="maxEvidenceOwners">Max work and project entries</FieldLabel>
-              <Input id="maxEvidenceOwners" type="number" value={draft.lengthBudget.maxEvidenceOwners}
-                onChange={(e) => setDraft({
-                  ...draft,
-                  lengthBudget: { ...draft.lengthBudget!, maxEvidenceOwners: Number(e.target.value || 0) },
-                })} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="maxBulletsPerRole">Max bullets per role</FieldLabel>
-              <Input id="maxBulletsPerRole" type="number" value={draft.lengthBudget.maxBulletsPerRole}
-                onChange={(e) => setDraft({
-                  ...draft,
-                  lengthBudget: { ...draft.lengthBudget!, maxBulletsPerRole: Number(e.target.value || 0) },
-                })} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="maxBulletsPerProject">Max bullets per project</FieldLabel>
-              <Input id="maxBulletsPerProject" type="number" value={draft.lengthBudget.maxBulletsPerProject}
-                onChange={(e) => setDraft({
-                  ...draft,
-                  lengthBudget: { ...draft.lengthBudget!, maxBulletsPerProject: Number(e.target.value || 0) },
-                })} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="targetTotalBullets">Target total bullets</FieldLabel>
-              <Input id="targetTotalBullets" type="number" value={draft.lengthBudget.targetTotalBullets}
-                onChange={(e) => setDraft({
-                  ...draft,
-                  lengthBudget: { ...draft.lengthBudget!, targetTotalBullets: Number(e.target.value || 0) },
-                })} />
-            </Field>
-          </div>
-        )}
+        <FieldLegend>Reviewers</FieldLegend>
+        <FieldDescription>
+          A gated reviewer blocks the round outright, so it is never scored —
+          its weight and score bands are disabled rather than silently ignored.
+        </FieldDescription>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Reviewer</TableHead>
+              <TableHead>Gate</TableHead>
+              <TableHead>Weight</TableHead>
+              <TableHead>Score bands</TableHead>
+              <TableHead>Model tier</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reviewers.map((r, i) => (
+              <TableRow key={r.name}>
+                <TableCell className="align-top">
+                  <div className="font-medium">{r.name}</div>
+                  {REVIEWER_NOTES[r.name] && (
+                    <div className="max-w-[26ch] text-xs leading-snug text-muted-foreground">
+                      {REVIEWER_NOTES[r.name]}
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell className="align-top">
+                  <Switch
+                    aria-label={`${r.name} gate`}
+                    checked={r.gate}
+                    onCheckedChange={(v: boolean) => setReviewer(i, { gate: v })}
+                  />
+                </TableCell>
+                <TableCell className="align-top">
+                  <Input
+                    type="number"
+                    aria-label={`${r.name} weight`}
+                    className="w-20"
+                    // Preserved, not zeroed: un-gating should restore the
+                    // weight you had, not hand back a silent 0-weight reviewer.
+                    disabled={r.gate}
+                    value={r.weight}
+                    onChange={(e) => setReviewer(i, { weight: Number(e.target.value || 0) })}
+                  />
+                  {r.gate && (
+                    <div className="mt-1 text-xs text-muted-foreground">not scored</div>
+                  )}
+                </TableCell>
+                <TableCell className="align-top">
+                  <Switch
+                    aria-label={`${r.name} score bands`}
+                    disabled={r.gate}
+                    checked={r.scoreBands}
+                    onCheckedChange={(v: boolean) => setReviewer(i, { scoreBands: v })}
+                  />
+                </TableCell>
+                <TableCell className="align-top">
+                  <Select
+                    value={r.modelTier}
+                    onValueChange={(v) => v && setReviewer(i, { modelTier: v })}
+                  >
+                    <SelectTrigger aria-label={`${r.name} model tier`} className="w-32">
+                      <SelectValue>{(v) => String(v ?? r.modelTier)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {MODEL_TIERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </FieldSet>
-      <SaveBar dirty={dirty} saving={save.isPending}
-        onSave={() => save.mutate(draft)} onDiscard={reset} />
+
+      <FieldSet>
+        <FieldLegend>Resume shape</FieldLegend>
+        <FieldDescription>
+          Handed to the writer, the reviser, and the advisory panel. Floors are
+          clamped to what your profile can actually support, so a minimum never
+          asks for invented evidence.
+        </FieldDescription>
+
+        <FieldSet className="gap-3">
+          <FieldLegend variant="label">Length</FieldLegend>
+          <div className={GRID}>
+            <NumberField
+              id="pageTarget" label="Page target" min={1}
+              value={budget.pageTarget}
+              onChange={(v) => setBudget({ pageTarget: v })}
+            />
+            <NumberField
+              id="maxExperiences" label="Max experiences"
+              value={budget.maxExperiences}
+              onChange={(v) => setBudget({ maxExperiences: v })}
+            />
+            <NumberField
+              id="maxProjects" label="Max projects"
+              value={budget.maxProjects}
+              onChange={(v) => setBudget({ maxProjects: v })}
+            />
+            <NumberField
+              id="maxEvidenceOwners" label="Max work and project entries"
+              value={budget.maxEvidenceOwners}
+              onChange={(v) => setBudget({ maxEvidenceOwners: v })}
+            />
+            <NumberField
+              id="targetTotalBullets" label="Target total bullets"
+              value={budget.targetTotalBullets}
+              onChange={(v) => setBudget({ targetTotalBullets: v })}
+            />
+          </div>
+        </FieldSet>
+
+        <FieldSet className="gap-3">
+          <FieldLegend variant="label">Depth</FieldLegend>
+          <FieldDescription>
+            How much each surviving role or project gets to say.
+          </FieldDescription>
+          <div className={GRID}>
+            <NumberField
+              id="minBulletsPerRole" label="Min bullets per role"
+              value={budget.minBulletsPerRole} invalid={roleRangeError}
+              onChange={(v) => setBudget({ minBulletsPerRole: v })}
+            />
+            <NumberField
+              id="maxBulletsPerRole" label="Max bullets per role"
+              value={budget.maxBulletsPerRole} invalid={roleRangeError}
+              onChange={(v) => setBudget({ maxBulletsPerRole: v })}
+            />
+            <NumberField
+              id="minBulletsPerProject" label="Min bullets per project"
+              value={budget.minBulletsPerProject} invalid={projectRangeError}
+              onChange={(v) => setBudget({ minBulletsPerProject: v })}
+            />
+            <NumberField
+              id="maxBulletsPerProject" label="Max bullets per project"
+              value={budget.maxBulletsPerProject} invalid={projectRangeError}
+              onChange={(v) => setBudget({ maxBulletsPerProject: v })}
+            />
+            <NumberField
+              id="minAspectsPerOwner" label="Min aspects per entry"
+              description="Distinct kinds of contribution — scope, impact, technique — per entry."
+              value={budget.minAspectsPerOwner}
+              onChange={(v) => setBudget({ minAspectsPerOwner: v })}
+            />
+          </div>
+        </FieldSet>
+
+        <FieldSet className="gap-3">
+          <FieldLegend variant="label">Skills</FieldLegend>
+          <FieldDescription>
+            A target, not a cap. The skills section renders one comma-joined line
+            per category, so about 40 entries cost roughly five lines — trimming
+            it saves almost no space and loses keyword coverage.
+          </FieldDescription>
+          <div className={GRID}>
+            <NumberField
+              id="targetSkills" label="Target skills"
+              value={budget.targetSkills}
+              onChange={(v) => setBudget({ targetSkills: v })}
+            />
+            <NumberField
+              id="maxSkillsPerCategory" label="Max skills per category"
+              value={budget.maxSkillsPerCategory}
+              onChange={(v) => setBudget({ maxSkillsPerCategory: v })}
+            />
+          </div>
+        </FieldSet>
+      </FieldSet>
+
+      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CollapsibleTrigger className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors duration-150 ease-out-strong hover:text-foreground">
+          <ChevronRight
+            aria-hidden="true"
+            className={cn(
+              "size-4 transition-transform duration-200 ease-out-strong motion-reduce:transition-none",
+              advancedOpen && "rotate-90",
+            )}
+          />
+          Advanced
+        </CollapsibleTrigger>
+        {/* Base UI measures the panel and publishes --collapsible-panel-height,
+            so this transitions to real content height with no magic number.
+            The open state IS the variable and the starting/ending styles
+            collapse to zero — the same shape components/ui/accordion.tsx uses,
+            because those are the attributes Base UI sets on a transition. */}
+        <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height,opacity] duration-200 ease-out-strong data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-[opacity]">
+          <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2">
+            <NumberField
+              id="provenanceRetryBudget"
+              label="Provenance retry budget"
+              description="Extra rounds granted when a round failed only on citation ids. 0 makes a citation slip cost a full round."
+              value={draft.provenanceRetryBudget}
+              onChange={(v) => setDraft({ ...draft, provenanceRetryBudget: v })}
+            />
+            <Field>
+              <FieldLabel htmlFor="styleGuidePath">Style guide path</FieldLabel>
+              <Input
+                id="styleGuidePath"
+                value={draft.styleGuidePath}
+                onChange={(e) => setDraft({ ...draft, styleGuidePath: e.target.value })}
+              />
+              <FieldDescription>
+                Markdown file whose rules are handed to the writer.
+              </FieldDescription>
+            </Field>
+            <div className="sm:col-span-2">
+              <SwitchField
+                id="early-stop-on-regression"
+                label="Stop early on regression"
+                description="End the loop when a round scores worse than the best so far, instead of spending the remaining rounds."
+                checked={draft.earlyStopOnRegression}
+                onChange={(v) => setDraft({ ...draft, earlyStopOnRegression: v })}
+              />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <SaveBar
+        dirty={dirty}
+        saving={save.isPending}
+        canSave={canSave}
+        onSave={() => save.mutate(draft)}
+        onDiscard={reset}
+      />
     </>
   );
 }
