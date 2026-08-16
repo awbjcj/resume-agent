@@ -689,6 +689,17 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
         ),
     ],
     "gemini": [
+        # 3.7 Flash drops `minimal` -- 3.6 Flash has it, 3.7's documented levels
+        # are low/medium/high only (default medium, thinking always on). The
+        # tuple is the whole guard: `_gemini_interactions_thinking_level_for`
+        # can only return "minimal" for an effort that is *in* this tuple, and
+        # `build_model`'s non-reasoning Gemini-3 branch bounds at "low", which
+        # 3.7 accepts. So no generation check is needed here.
+        ModelCatalogEntry(
+            "gemini:gemini-3.7-flash",
+            "Gemini 3.7 Flash",
+            ("low", "medium", "high"),
+        ),
         ModelCatalogEntry(
             "gemini:gemini-3.5-flash-lite",
             "Gemini 3.5 Flash Lite",

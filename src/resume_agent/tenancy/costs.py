@@ -257,6 +257,12 @@ def seed_llm_rates(engine: Engine) -> None:
     # repricing events from July.
     openai_price_update = datetime(2026, 8, 1, tzinfo=timezone.utc)
     gemini_price_update = datetime(2026, 8, 15, tzinfo=timezone.utc)
+    # Google publishes both Flash models' current rate as promotional "through
+    # 2026-12-31", doubling on 2027-01-01. Seeding only the promo left the
+    # quota system under-billing shared-key spend 2x from January, on a date
+    # nobody would be watching -- so the reversion is scheduled now, the same
+    # way `sonnet_intro_end` is.
+    gemini_promo_end = datetime(2027, 1, 1, tzinfo=timezone.utc)
     sonnet_intro_end = datetime(2026, 9, 1, tzinfo=timezone.utc)
     deepseek_price_update = datetime(2026, 8, 16, 16, 0, tzinfo=timezone.utc)
     openai = "https://developers.openai.com/api/docs/pricing"
@@ -291,6 +297,21 @@ def seed_llm_rates(engine: Engine) -> None:
             None,
         ),
         ("gemini", "gemini-3.6-flash", 1.5, 0.15, None, 7.5, 14_000, gemini, 0, None),
+        # Selectable in MODEL_CATALOG, so it needs a rate for shared-key budget
+        # enforcement. Seeded straight at the promotional rate -- unlike 3.6
+        # Flash there is no earlier usage at a different price to preserve.
+        (
+            "gemini",
+            "gemini-3.7-flash",
+            0.75,
+            0.075,
+            None,
+            3.75,
+            14_000,
+            gemini,
+            0,
+            None,
+        ),
         ("gemini", "gemini-3.5-flash", 1.5, 0.15, None, 9, 14_000, gemini, 0, None),
         (
             "gemini",
@@ -509,6 +530,47 @@ def seed_llm_rates(engine: Engine) -> None:
             # from one request, so shared-key metering records the billed unit.
             current_rate.tool_micros_per_unit = 14_000
             current_rate.source_url = gemini
+
+        # Close both Flash promos on 2027-01-01 and schedule the doubled rate
+        # from that moment. `find_rate` filters `effective_from <= moment <
+        # effective_to`, so the future row is inert until the promo lapses and
+        # authoritative the instant it does -- no dated migration to remember.
+        # 3.1 Flash-Lite is deliberately excluded: its $0.25 is the plain listed
+        # rate, not a promotional one.
+        for model, promo_from, input_rate, cache_read, output_rate in (
+            ("gemini-3.6-flash", gemini_price_update, 1.5, 0.15, 7.5),
+            ("gemini-3.7-flash", start, 1.5, 0.15, 7.5),
+        ):
+            promo_rate = (
+                session.execute(
+                    select(LlmRate).where(
+                        LlmRate.provider == "gemini",
+                        LlmRate.model == model,
+                        LlmRate.context_min_tokens == 0,
+                        LlmRate.effective_from == promo_from,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if promo_rate is not None:
+                promo_rate.effective_to = gemini_promo_end
+            future_key = ("gemini", model, 0, stamp(gemini_promo_end))
+            if future_key not in existing:
+                session.add(
+                    LlmRate(
+                        id=uuid.uuid4().hex,
+                        provider="gemini",
+                        model=model,
+                        input_micros_per_million=_micros_per_million(input_rate),
+                        cache_read_micros_per_million=_micros_per_million(cache_read),
+                        cache_write_micros_per_million=None,
+                        output_micros_per_million=_micros_per_million(output_rate),
+                        tool_micros_per_unit=14_000,
+                        effective_from=gemini_promo_end,
+                        source_url=gemini,
+                    )
+                )
 
         # DeepSeek moves both models from a flat rate to peak/off-peak hourly
         # billing at deepseek_price_update (see _rate_period for the UTC hour

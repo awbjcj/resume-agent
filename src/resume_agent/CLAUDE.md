@@ -66,6 +66,16 @@ INVALID_ARGUMENT` before generating anything, and agno then hands back the
   `thinking_budget=0` only for pre-3 ids. Verified live against
   `gemini-3.6-flash`: `thinking_level="low"` reports no thought tokens;
   `thinking_budget=0` is a hard 400.
+- **A Gemini model's thinking vocabulary is per-snapshot, and the catalog tuple
+  is the enforcement.** `gemini-3.7-flash` supports only `low`/`medium`/`high`
+  — it dropped the `minimal` level that `gemini-3.6-flash` and
+  `gemini-3.5-flash` both have. No generation check guards this because none is
+  needed: `_gemini_interactions_thinking_level_for` returns `"minimal"` only
+  for an effort that is *in* the entry's `reasoning_efforts`, so omitting it
+  from the tuple makes it unreachable, and `build_model`'s non-reasoning branch
+  bounds at `"low"`, which every Gemini 3 snapshot accepts. Do not borrow a
+  sibling model's levels when adding a snapshot — read its own row in the
+  provider matrix.
 - **DeepSeek runs on the Responses API, and its whole request surface changed
   with it.** DeepSeek serves the OpenAI Responses wire format at
   `base_url="https://api.deepseek.com"`, so `_compatible_deepseek_responses_class`
