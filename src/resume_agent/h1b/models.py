@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -31,6 +31,27 @@ class H1BCompanyResolution(BaseModel):
     status: Literal["resolved", "unchanged", "uncertain"]
     legal_name: str = Field(min_length=1, max_length=300)
     confidence: float = Field(ge=0, le=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_schema_echo(cls, data: Any) -> Any:
+        """Tolerate a provider that echoes the JSON-Schema shape it was given.
+
+        Observed live on DeepSeek (whose ``strict`` flag validates the request
+        schema, not the generation -- see llm_runner.py's DeepSeek notes): the
+        real answer arrived wrapped as ``{"description": ..., "properties":
+        {"status": ..., "legal_name": ..., "confidence": ...}}``, mirroring the
+        JSON Schema definition instead of filling it in. Unwrapping here lets
+        the first parse attempt succeed instead of burning both retries on a
+        shape no amount of JSON-repair fixes.
+        """
+        if (
+            isinstance(data, dict)
+            and "status" not in data
+            and isinstance(data.get("properties"), dict)
+        ):
+            return data["properties"]
+        return data
 
 
 class H1BPeriodStat(BaseModel):
@@ -78,15 +99,34 @@ class H1BSponsorshipEvidence(BaseModel):
     wage_summary: dict[str, float] | None = None
     source_url: str | None = None
     data_version: str | None = None
-    retrieved_at: datetime
-    expires_at: datetime
+    retrieved_at: datetime | None = None
+    expires_at: datetime | None = None
     confidence: float = Field(ge=0, le=1)
     caveat: str
     unavailable_reason: str | None = None
 
+    @field_validator("periods", mode="before")
+    @classmethod
+    def _cap_periods(cls, value: Any) -> Any:
+        """Keep the newest four quarters instead of rejecting an over-long list.
+
+        The agent is instructed to return at most four quarters, newest first,
+        but a provider that over-reports should not lose an otherwise-valid
+        response to the ``max_length`` constraint below -- truncate instead.
+        """
+        if isinstance(value, list) and len(value) > 4:
+            return value[:4]
+        return value
+
     @field_validator("retrieved_at", "expires_at")
     @classmethod
-    def require_timezone(cls, value: datetime) -> datetime:
+    def require_timezone(cls, value: datetime | None) -> datetime | None:
+        # Both fields are always overwritten with real timestamps by
+        # `enrich_companies` after the agent call returns (see h1b/service.py),
+        # so an agent that leaves them blank -- most do, since it has no real
+        # clock to report from -- must not fail validation over it.
+        if value is None:
+            return None
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("H1B timestamps must be timezone-aware")
         return value
@@ -114,7 +154,11 @@ class H1BSponsorshipEvidence(BaseModel):
             self.filing_count = _rollup(self.periods, "filing_count")
             self.certified_count = _rollup(self.periods, "certified_count")
             self.denied_count = _rollup(self.periods, "denied_count")
-        if self.expires_at <= self.retrieved_at:
+        if (
+            self.expires_at is not None
+            and self.retrieved_at is not None
+            and self.expires_at <= self.retrieved_at
+        ):
             raise ValueError("H1B evidence must expire after retrieval")
         if self.caveat != HISTORICAL_ONLY_CAVEAT:
             raise ValueError("H1B evidence must use the application caveat")
@@ -139,8 +183,10 @@ class H1BSponsorshipEvidence(BaseModel):
         The single definition of "fresh" -- every caller that needs to decide
         whether to reuse cached evidence or label it stale for display goes
         through this instead of re-deriving the ``expires_at`` comparison.
+        Evidence with no ``expires_at`` (only possible on the transient,
+        not-yet-persisted object an agent call returns) is never fresh.
         """
-        return self.expires_at > now
+        return self.expires_at is not None and self.expires_at > now
 
 
 class H1BEnrichmentReport(BaseModel):
