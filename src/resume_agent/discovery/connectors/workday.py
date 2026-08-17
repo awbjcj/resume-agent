@@ -10,7 +10,11 @@ from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
+from resume_agent.discovery.connectors.text import (
+    html_to_markdown,
+    join_locations,
+    primary_search_term,
+)
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.tenancy.context import current_context
 
@@ -257,13 +261,25 @@ def detail_company_name(detail: dict) -> str | None:
     return None
 
 
+def detail_location(info: dict) -> str | None:
+    """Join Workday's primary and additional posting locations."""
+    primary = info.get("location") or info.get("jobRequisitionLocation")
+    if isinstance(primary, dict):
+        primary = primary.get("descriptor")
+    additional = [
+        item.get("descriptor") if isinstance(item, dict) else item
+        for item in info.get("additionalLocations") or []
+    ]
+    return join_locations([primary, *additional])
+
+
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
     info = detail.get("jobPostingInfo") or {}
     row.jd_text = html_to_markdown(info.get("jobDescription", ""))
     if info.get("externalUrl"):
         row.url = info["externalUrl"]
-    if info.get("location"):
-        row.location = info["location"]
+    if location := detail_location(info):
+        row.location = location
     if company := detail_company_name(detail):
         if row.company and company.casefold() != row.company.casefold():
             row.stale_company = row.stale_company or row.company

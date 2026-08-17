@@ -16,7 +16,11 @@ from resume_agent.discovery.connectors import http as board
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import gate_and_limit
-from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
+from resume_agent.discovery.connectors.text import (
+    html_to_markdown,
+    join_locations,
+    primary_search_term,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
 _RESULTS_URL = "https://www.google.com/about/careers/applications/jobs/results"
@@ -63,13 +67,15 @@ def _html_cell(row: list, index: int) -> str:
     return ""
 
 
-def _first_location(row: list) -> str | None:
+def _locations(row: list) -> str | None:
     cell = row[9] if len(row) > 9 else None
-    if isinstance(cell, list) and cell and isinstance(cell[0], list) and cell[0]:
-        display = cell[0][0]
-        if isinstance(display, str):
-            return display
-    return None
+    if not isinstance(cell, list):
+        return None
+    return join_locations(
+        item[0]
+        for item in cell
+        if isinstance(item, list) and item
+    )
 
 
 def _posted_at(row: list) -> datetime | None:
@@ -103,7 +109,7 @@ def parse_job_rows(rows: Sequence[object]) -> list[RawJob]:
                 url=f"{_RESULTS_URL}/{job_id}",
                 company="Google",
                 title=title,
-                location=_first_location(row),
+                location=_locations(row),
                 jd_text=html_to_markdown(description),
                 posted_at=_posted_at(row),
             )

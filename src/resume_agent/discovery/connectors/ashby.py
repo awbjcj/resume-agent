@@ -10,7 +10,7 @@ from resume_agent.discovery.connectors.base import (
 from resume_agent.discovery.connectors.config import AshbyBoard
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import harvest
-from resume_agent.discovery.connectors.text import html_to_markdown
+from resume_agent.discovery.connectors.text import html_to_markdown, join_locations
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://api.ashbyhq.com/posting-api/job-board"
@@ -24,6 +24,15 @@ _EMPLOYMENT_TYPE_LABELS = {
     "Contract": "Contract",
     "Apprenticeship": "Apprenticeship",
 }
+
+
+def _location(item: dict) -> str | None:
+    secondary = [
+        entry.get("location")
+        for entry in item.get("secondaryLocations") or []
+        if isinstance(entry, dict)
+    ]
+    return join_locations([item.get("location"), *secondary])
 
 
 def _sidebar_lines(item: dict) -> list[str]:
@@ -88,7 +97,7 @@ def parse_ashby(payload: dict, company: str) -> list[RawJob]:
                 url=item.get("jobUrl"),
                 company=company,
                 title=item.get("title"),
-                location=item.get("location"),
+                location=_location(item),
                 jd_text=jd_text,
                 posted_at=parse_iso_datetime(item.get("publishedAt")),
             )

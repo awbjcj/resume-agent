@@ -10,7 +10,7 @@ from resume_agent.discovery.connectors.base import (
 from resume_agent.discovery.connectors.config import LeverBoard
 from resume_agent.discovery.connectors.dates import parse_epoch_millis
 from resume_agent.discovery.connectors.harvest import harvest
-from resume_agent.discovery.connectors.text import html_to_markdown
+from resume_agent.discovery.connectors.text import html_to_markdown, join_locations
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://api.lever.co/v0/postings"
@@ -25,6 +25,13 @@ _SALARY_INTERVALS = {
     "per-day-wage": "per day",
     "per-hour-wage": "per hour",
 }
+
+
+def _location(item: dict) -> str | None:
+    categories = item.get("categories") or {}
+    return join_locations(
+        [categories.get("location"), *(categories.get("allLocations") or [])]
+    )
 
 
 def _amount(value) -> str | None:
@@ -148,7 +155,6 @@ def parse_lever(payload: list, company: str) -> list[RawJob]:
     """Map a Lever board postings array to RawJobs."""
     jobs: list[RawJob] = []
     for item in payload:
-        categories = item.get("categories") or {}
         jd_text = _assemble_jd(item)
         if sidebar := _sidebar_lines(item):
             jd_text = "\n".join(sidebar) + ("\n\n" + jd_text if jd_text else "")
@@ -158,7 +164,7 @@ def parse_lever(payload: list, company: str) -> list[RawJob]:
                 url=item.get("hostedUrl"),
                 company=company,
                 title=item.get("text"),
-                location=categories.get("location"),
+                location=_location(item),
                 jd_text=jd_text,
                 posted_at=parse_epoch_millis(item.get("createdAt")),
             )

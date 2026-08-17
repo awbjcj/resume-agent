@@ -55,12 +55,20 @@ from resume_agent.discovery.connectors.recruitee import offers_url, parse_recrui
 from resume_agent.discovery.connectors.smartrecruiters import (
     detail_url as sr_detail_url,
 )
-from resume_agent.discovery.connectors.text import html_to_markdown, jobposting_json_ld
+from resume_agent.discovery.connectors.text import (
+    html_to_markdown,
+    jobposting_json_ld,
+    jobposting_location,
+)
 from resume_agent.discovery.connectors.workable import (
     account_url as workable_account_url,
 )
 from resume_agent.discovery.connectors.workable import parse_workable
-from resume_agent.discovery.connectors.workday import detail_company_name, fetch_job_detail
+from resume_agent.discovery.connectors.workday import (
+    detail_company_name,
+    detail_location,
+    fetch_job_detail,
+)
 from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
 from resume_agent.discovery.url_ingest.models import ExtractedJob
 
@@ -207,30 +215,6 @@ _JSON_LD_PERIODS = {
 }
 
 
-def _json_ld_location(posting: dict) -> str | None:
-    if posting.get("jobLocationType") == "TELECOMMUTE":
-        return "Remote"
-    job_location = posting.get("jobLocation")
-    candidates = job_location if isinstance(job_location, list) else [job_location]
-    for location in candidates:
-        if not isinstance(location, dict):
-            continue
-        address = location.get("address")
-        if isinstance(address, str) and address.strip():
-            return address.strip()
-        if not isinstance(address, dict):
-            continue
-        parts = (
-            address.get("addressLocality"),
-            address.get("addressRegion"),
-            address.get("addressCountry"),
-        )
-        joined = ", ".join(part for part in parts if part)
-        if joined:
-            return joined
-    return None
-
-
 def _names(value) -> list[str]:
     """Flatten a schema.org field that may be a string, an object, or a list of either."""
     items = value if isinstance(value, list) else [value]
@@ -283,7 +267,7 @@ def _json_ld_meta_lines(posting: dict) -> list[str]:
     through either path produces the same text shape.
     """
     lines = []
-    if location := _json_ld_location(posting):
+    if location := jobposting_location(posting):
         lines.append(f"Location: {location}")
 
     remote = posting.get("jobLocationType") == "TELECOMMUTE"
@@ -320,7 +304,7 @@ def _from_json_ld(html: str) -> ExtractedJob | None:
     return ExtractedJob(
         company=company,
         title=posting.get("title"),
-        location=_json_ld_location(posting),
+        location=jobposting_location(posting),
         jd_text=_with_meta(_json_ld_meta_lines(posting), body),
     )
 
@@ -375,7 +359,7 @@ def _from_json_ld_scalars(posting: dict) -> ExtractedJob:
     return ExtractedJob(
         company=organization.get("name") if isinstance(organization, dict) else None,
         title=posting.get("title"),
-        location=_json_ld_location(posting),
+        location=jobposting_location(posting),
         jd_text="",
     )
 
@@ -654,7 +638,6 @@ def _read_workday(target: AtsTarget, url: str, html: str) -> ExtractedJob | None
         info = detail.get("jobPostingInfo") or {}
         if not info:
             return None
-        location = info.get("location")
         return ExtractedJob(
             # Prefer the payload's own company name; target.tenant is a URL slug
             # ("generalmotors"), and a slug as the company breaks dedup against
@@ -664,7 +647,7 @@ def _read_workday(target: AtsTarget, url: str, html: str) -> ExtractedJob | None
             # top level (see workday.detail_company_name).
             company=detail_company_name(detail) or target.tenant,
             title=info.get("title"),
-            location=location if isinstance(location, str) else None,
+            location=detail_location(info),
             jd_text=_with_meta(
                 _workday_meta(info), html_to_markdown(info.get("jobDescription") or "")
             ),

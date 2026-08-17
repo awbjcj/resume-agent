@@ -8,7 +8,11 @@ from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.connectors.text import html_to_markdown, jobposting_json_ld
+from resume_agent.discovery.connectors.text import (
+    html_to_markdown,
+    jobposting_json_ld,
+    jobposting_location,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
 
@@ -56,8 +60,8 @@ def apply_detail(row: RawJob, detail: dict) -> None:
     row.company = organization.get("name") or row.company
     if organization.get("name"):
         row.company_provenance = "provider"
-    if posting.get("jobLocationType") == "TELECOMMUTE":
-        row.location = "Remote"
+    if location := jobposting_location(posting):
+        row.location = location
 
 
 def fetch_jazzhr(

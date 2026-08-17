@@ -1,6 +1,7 @@
 import html
 import json
 import re
+from collections.abc import Iterable
 
 from bs4 import BeautifulSoup
 from markdownify import markdownify as _markdownify
@@ -68,6 +69,50 @@ def html_to_markdown(raw: str) -> str:
         html.unescape(raw), heading_style="ATX", bullets="-"
     ).strip()
     return clean_job_description_text(converted)
+
+
+def join_locations(values: Iterable[object]) -> str | None:
+    """Join provider-owned location alternatives without repeats."""
+    locations: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str) or not (location := value.strip()):
+            continue
+        key = location.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        locations.append(location)
+    return " | ".join(locations) or None
+
+
+def jobposting_location(posting: dict) -> str | None:
+    """Read every work location from schema.org ``JobPosting`` data."""
+    locations: list[object] = []
+    if posting.get("jobLocationType") == "TELECOMMUTE":
+        locations.append("Remote")
+
+    raw_locations = posting.get("jobLocation")
+    candidates = raw_locations if isinstance(raw_locations, list) else [raw_locations]
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        address = candidate.get("address")
+        if isinstance(address, str):
+            locations.append(address)
+            continue
+        if not isinstance(address, dict):
+            continue
+        parts: list[str] = []
+        for key in ("addressLocality", "addressRegion", "addressCountry"):
+            part = address.get(key)
+            if isinstance(part, dict):
+                part = part.get("name")
+            if isinstance(part, str) and part.strip():
+                parts.append(part.strip())
+        if parts:
+            locations.append(", ".join(parts))
+    return join_locations(locations)
 
 
 def jobposting_json_ld(raw_html: str) -> dict | None:
