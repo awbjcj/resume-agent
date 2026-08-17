@@ -78,7 +78,9 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
                 extracted = with_json_ld_meta(
                     extract_fields(html_to_text(page.html), agent), page.html
                 )
-    jd_text = clean_job_description_text(extracted.jd_text if extracted else "")
+    if extracted is None:
+        return None
+    jd_text = clean_job_description_text(extracted.jd_text)
     if not jd_text:
         return None
     return RawJob(

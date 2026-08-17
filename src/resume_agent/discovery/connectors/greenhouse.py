@@ -40,13 +40,13 @@ def _names(items) -> str | None:
     """Join the `name` of a Greenhouse `departments`/`offices` list."""
     if not isinstance(items, list):
         return None
-    names = [
-        item.get("name").strip()
-        for item in items
-        if isinstance(item, dict)
-        and isinstance(item.get("name"), str)
-        and item.get("name").strip()
-    ]
+    names = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        if isinstance(name, str) and name.strip():
+            names.append(name.strip())
     return ", ".join(dict.fromkeys(names)) or None
 
 

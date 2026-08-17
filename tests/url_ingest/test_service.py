@@ -325,6 +325,9 @@ def test_unknown_host_recovers_sidebar_facts_from_json_ld(monkeypatch):
 
             return R()
 
+        async def arun(self, prompt):
+            return self.run(prompt)
+
     job = service.job_from_url("https://stripe.com/careers/listing/x/1", agent=_LLM())
 
     assert job is not None
