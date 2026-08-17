@@ -7,7 +7,11 @@ from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
-from resume_agent.career_skills.models import AgentRunMeta, JobAnalysisMeta, read_job_analysis_meta
+from resume_agent.career_skills.models import (
+    AgentRunMeta,
+    JobAnalysisMeta,
+    read_job_analysis_meta,
+)
 from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.discovery.extract import (  # noqa: F401
     Runner,
@@ -114,7 +118,10 @@ def run_extract(
     failures: dict[int, StageFailure] = {}
     if reporter:
         reporter.begin(
-            len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
+            len(jobs),
+            "Extracting criteria",
+            phase_index=2,
+            phase_count=_DISCOVER_PHASES,
         )
     if jobs:
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
@@ -232,7 +239,9 @@ def _normalize_job_industries(
 
     additions: dict[tuple[str, str], str] = {}
     if unresolved and classifier is not None:
-        existing = sorted(set(taxonomy.aliases.values()) | set(taxonomy.companies.values()))
+        existing = sorted(
+            set(taxonomy.aliases.values()) | set(taxonomy.companies.values())
+        )
         try:
             additions = classify_industries(
                 list(unresolved.values()), existing, classifier
@@ -299,7 +308,9 @@ def run_score(
     jobs = _stage_jobs(session, JobStatus.filtered.value, scope)
     failures: dict[int, StageFailure] = {}
     if reporter:
-        reporter.begin(len(jobs), "Scoring fit", phase_index=4, phase_count=_DISCOVER_PHASES)
+        reporter.begin(
+            len(jobs), "Scoring fit", phase_index=4, phase_count=_DISCOVER_PHASES
+        )
     if jobs:
         # The profile scores every job in this phase identically, so it goes
         # into the agent's cacheable system block once instead of leading all N
@@ -327,9 +338,9 @@ def run_score(
                             None if profile_in_prefix else profile_facts,
                             pair[1],
                             skill_context=_skill_context(pair[0]),
-                            sponsorship_evidence=(
-                                sponsorship_evidence or {}
-                            ).get(pair[0].id or -1),
+                            sponsorship_evidence=(sponsorship_evidence or {}).get(
+                                pair[0].id or -1
+                            ),
                         ),
                         agent,
                         sem=sem,
@@ -357,7 +368,9 @@ def run_score(
     session.commit()
     if canonicalizer is not None:
         _refresh_skill_aliases(
-            jobs_by_status(session, JobStatus.shortlisted.value), canonicalizer, aliases_path
+            jobs_by_status(session, JobStatus.shortlisted.value),
+            canonicalizer,
+            aliases_path,
         )
     return failures
 
@@ -509,9 +522,14 @@ def discover(
         reporter=reporter,
     )
     run_score(
-        session, profile_facts, fit_agent, canonicalizer=canonicalizer,
-        reporter=reporter, scope=scope,
-        matrix=matrix, cluster_map=cluster_map,
+        session,
+        profile_facts,
+        fit_agent,
+        canonicalizer=canonicalizer,
+        reporter=reporter,
+        scope=scope,
+        matrix=matrix,
+        cluster_map=cluster_map,
         sponsorship_evidence=sponsorship_evidence,
     )
     if reporter:
@@ -533,12 +551,14 @@ def _scope_jobs(session: Session, scope: str) -> list[Job]:
         return jobs_by_status(session, JobStatus.shortlisted.value)
     if scope == "rejected:relevance":
         return [
-            j for j in jobs_by_status(session, JobStatus.rejected.value)
+            j
+            for j in jobs_by_status(session, JobStatus.rejected.value)
             if j.reject_category == "relevance"
         ]
     if scope == "rejected:filtered":
         return [
-            j for j in jobs_by_status(session, JobStatus.rejected.value)
+            j
+            for j in jobs_by_status(session, JobStatus.rejected.value)
             if j.reject_category == "filtered"
         ]
     if scope == "all":
@@ -584,7 +604,12 @@ def reprocess(
         session.add(job)
     session.commit()
     return discover(
-        session, config, profile_facts, extract_agent, fit_agent, relevance_agent,
+        session,
+        config,
+        profile_facts,
+        extract_agent,
+        fit_agent,
+        relevance_agent,
         canonicalizer=canonicalizer,
         industry_classifier=industry_classifier,
         industry_taxonomy_path=industry_taxonomy_path,
