@@ -44,7 +44,7 @@ to a deterministic reader — the browser is never used for a recognized ATS.
   4-field description-only mapping used to discard.
 - **The page's JSON-LD enriches whatever produced the body, via
   `with_json_ld_meta` — `_prefer` cannot do this.** `_prefer` merges only
-  *scalar* fields, so the candidate that wins on `jd_text` keeps its own meta
+  _scalar_ fields, so the candidate that wins on `jd_text` keeps its own meta
   lines and every other candidate's are dropped. `service.job_from_url`
   therefore runs `with_json_ld_meta` over **both** branches — the reader result
   and the LLM result — adding only labels the body does not already carry, so a
@@ -55,13 +55,13 @@ to a deterministic reader — the browser is never used for a recognized ATS.
   JSON-LD carries Toronto / `FULL_TIME` / CAD 208,000–312,000). And an
   **employer-hosted posting is not a detectable ATS at all** — `stripe.com`
   links Greenhouse only as a `greenhouseId` inside `__NEXT_DATA__`, never as a
-  `boards.greenhouse.io` URL, so the L2 sniff correctly declines it and the URL
-  falls to the LLM. That fallback is *told* to drop "generic site chrome", and
-  the sidebar reaches it as bare colon-less lines positioned after the apply
-  button — so it dropped location/employment type every time while keeping the
-  prose. Routing such a URL to the Greenhouse API instead would be a
-  regression: the API body omits the employer's own page-only sections
-  (Stripe's "In-office expectations" and "Pay and benefits").
+  `boards.greenhouse.io` URL, so the L2 sniff correctly declines it.
+  `read_employer_hosted_greenhouse` recognizes that structured listing and
+  reads its server-rendered semantic body blocks before the LLM fallback. This
+  preserves Stripe's page-only "In-office expectations" and "Pay and
+  benefits" sections, while the listing data and JSON-LD supply location,
+  employment type, and compensation. Routing such a URL to the Greenhouse API
+  would be a regression because its body omits those employer-owned sections.
 - **A reader returns `None`, never an `ExtractedJob` with an empty `jd_text`.**
   That is the contract `service.job_from_url` keys its LLM fallback on; an
   empty-but-present result suppresses the fallback and fails the ingest even
@@ -119,6 +119,9 @@ Two Greenhouse-specific traps:
 
 - **`location.name` is the literal string `"N/A"` when unset** — a value, not
   an absent key (23 of Stripe's 578 jobs). It is suppressed, not rendered.
+- **Composite `location.name` values can repeat the same cities across `;` and
+  `|` groups.** Normalize only when duplicates are present, preserving the
+  first-seen order (live Anthropic example: SF / NYC repeated before Seattle).
 - **`metadata` is per-board custom fields, not an API enum.** Only names known
   to carry a sidebar fact are mapped (`_METADATA_LABELS`); a blanket
   passthrough would write a board's internal bookkeeping (req owner, budget
@@ -134,7 +137,7 @@ Compensation from the structured `salaryRange`. Live: zoox 244/244 · 244/244 ·
 `workplaceType` arrives lowercase (`hybrid`, `onsite`) and is capitalized.
 
 **Lever also has a second, larger loss: `salaryDescription`.** `_assemble_jd`
-read only `description`/`lists`/`additional`, so the pay-and-benefits *prose*
+read only `description`/`lists`/`additional`, so the pay-and-benefits _prose_
 was dropped whole — 212 of zoox's 244 postings carry one, and **none** of those
 texts appear anywhere in the other three fields, so this was not a duplicate.
 It is now joined before `additional`, keeping the closing boilerplate last as
@@ -162,7 +165,7 @@ locally is infeasible.
 serves that documented key as `null`: measured live on four unrelated tenants
 (generalmotors, phinia, toyota, nvidia) it was null on every one, with the real
 name at the payload's **top level** under `hiringOrganization.name`. Note the
-helper takes the *whole* detail payload, not `jobPostingInfo`.
+helper takes the _whole_ detail payload, not `jobPostingInfo`.
 
 This drift was silent and cost two things. Every row kept the URL slug as its
 company with `company_provenance == "token"` — the slug-as-company case
@@ -190,13 +193,13 @@ the default policy of every board endpoint and lives in `http.py` with the
 pool: transient statuses (`429`, `500`, `502`, `503`, `504`) are retried with
 backoff, honoring a numeric `Retry-After` when present, else exponential
 (`RETRY_BACKOFF_S · 2ⁿ`, capped at `MAX_RETRY_SLEEP_S`), for `RETRY_ATTEMPTS`
-tries. `BoardSession` then *returns* the last transient response rather than
+tries. `BoardSession` then _returns_ the last transient response rather than
 raising, so Workday's `_checked` is what turns an exhausted retry into an
 `HTTPStatusError` — which is what lets a persistently-throttled board surface
 as a per-URL failure (the companies connector isolates it) rather than aborting
 sibling URLs. Workday's `_RETRY_*` names now alias the shared constants.
 
-**Detail fetches are concurrent.** `harvest_detailed` fans the *detail* half of
+**Detail fetches are concurrent.** `harvest_detailed` fans the _detail_ half of
 the N+1 out across `Settings.detail_fetch_concurrency` (default 4) threads, each
 running in its own `copy_context()` so the run's pool and the active
 `UserContext` survive the hop. The title gate and the final relevance gate stay
@@ -293,4 +296,3 @@ not at `httpx`.
 | `relevance_gate`       | Full gate on title + JD; falls back to keyword search when no `role_anchors` are configured                                             |
 | `primary_search_term`  | Picks the strongest term to send as `searchText` to Workday / Google; falls back to `role_anchors` if `titles` and `keywords` are empty |
 | `primary_location`     | Picks the first configured location for ATS endpoints such as Lever that accept a free-form location filter                             |
-

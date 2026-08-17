@@ -4,7 +4,11 @@ from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import SINGLETON_ATS, identify_host
 from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
-from resume_agent.discovery.url_ingest.ats_readers import ATS_READERS, with_json_ld_meta
+from resume_agent.discovery.url_ingest.ats_readers import (
+    ATS_READERS,
+    read_employer_hosted_greenhouse,
+    with_json_ld_meta,
+)
 from resume_agent.discovery.url_ingest.fetch import (
     fetch_page,
     fetch_static,
@@ -63,8 +67,8 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
             extracted = read_linkedin_posting(page.html)
         else:
             target = identify_host(static_page.final_url)
-            extracted = None
-            if target is not None:
+            extracted = read_employer_hosted_greenhouse(static_page.html)
+            if extracted is None and target is not None:
                 reader = ATS_READERS.get(target.ats)
                 if reader is not None:
                     extracted = reader(target, static_page.final_url, static_page.html)

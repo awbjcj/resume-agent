@@ -28,11 +28,14 @@ A reader returns ``None`` -- never an ``ExtractedJob`` with an empty
 would silently suppress the fallback and fail the ingest.
 """
 
+import json
 import re
 from collections.abc import Callable
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
+from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 from resume_agent.discovery.connectors import http as board
 
@@ -97,6 +100,62 @@ def _with_meta(lines: list[str], jd_text: str) -> str:
     if not kept:
         return jd_text
     return "\n".join(kept) + ("\n\n" + jd_text if jd_text else "")
+
+
+def read_employer_hosted_greenhouse(html: str) -> ExtractedJob | None:
+    """Read a Greenhouse-backed listing rendered on an employer's own site.
+
+    Some employers keep their page-only sections outside both Greenhouse's job
+    API and schema.org ``description``. Stripe identifies the underlying row as
+    ``listing.greenhouseId`` in Next.js data while server-rendering the complete
+    posting in semantic body blocks. Prefer those blocks so in-office, pay, and
+    benefits sections are not reduced to the shorter JSON-LD/API description.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    script = soup.select_one('script#__NEXT_DATA__[type="application/json"]')
+    if not isinstance(script, Tag):
+        return None
+    try:
+        payload = json.loads(script.get_text())
+        listing = payload["props"]["pageProps"]["listing"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None
+    if not isinstance(listing, dict) or not listing.get("greenhouseId"):
+        return None
+
+    nodes = soup.select(
+        ".careers-detail-layout__main > .careers-listing-details__body, "
+        ".careers-detail-layout__main > .careers-listing-closing"
+    )
+    body = "\n\n".join(html_to_markdown(str(node)) for node in nodes)
+    if not body:
+        content = listing.get("contentMarkdown")
+        body = content.strip() if isinstance(content, str) else ""
+    if not body:
+        return None
+
+    raw_location = listing.get("location")
+    location = None
+    if isinstance(raw_location, dict):
+        location_parts = [raw_location.get("name"), raw_location.get("countryCode")]
+        location = ", ".join(str(part) for part in location_parts if part) or None
+        if raw_location.get("remote") and not location:
+            location = "Remote"
+
+    employment_type = listing.get("employmentType")
+    meta = [
+        f"Location: {location}" if location else "",
+        f"Employment Type: {employment_type}"
+        if isinstance(employment_type, str) and employment_type.strip()
+        else "",
+    ]
+    scalars = _from_json_ld(html)
+    return ExtractedJob(
+        company=scalars.company if scalars is not None else None,
+        title=listing.get("title") if isinstance(listing.get("title"), str) else None,
+        location=location,
+        jd_text=_with_meta(meta, body),
+    )
 
 
 def _api(call: Callable[[], ExtractedJob | None]) -> ExtractedJob | None:

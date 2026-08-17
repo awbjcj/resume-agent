@@ -339,3 +339,58 @@ def test_unknown_host_recovers_sidebar_facts_from_json_ld(monkeypatch):
     assert "Pay and benefits" in job.jd_text
     # a scalar the LLM could not resolve fills from the markup
     assert job.location == "Toronto, CA"
+
+
+def test_employer_hosted_greenhouse_keeps_page_only_sections_and_sidebar(monkeypatch):
+    html = """
+    <html><head>
+      <script type="application/ld+json">
+        {"@context":"https://schema.org","@type":"JobPosting",
+         "title":"Backend Engineer","description":"<p>Build SDKs.</p>",
+         "hiringOrganization":{"name":"Stripe"}}
+      </script>
+      <script id="__NEXT_DATA__" type="application/json">
+        {"props":{"pageProps":{"listing":{"greenhouseId":7557899,
+         "title":"Backend Engineer","contentMarkdown":"## Who we are\\n\\nBuild SDKs.",
+         "location":{"name":"Toronto","countryCode":"CA","remote":false},
+         "employmentType":"Full time"}}}}
+      </script>
+    </head><body><main>
+      <h1>Backend Engineer</h1>
+      <div class="careers-detail-layout__main">
+        <div class="careers-listing-details__body">
+          <h2>Who we are</h2><p>Build SDKs.</p>
+        </div>
+        <div class="careers-listing-details__body">
+          <h2>In-office expectations</h2>
+          <p>Office-assigned employees spend at least 50% of each month in the office.</p>
+        </div>
+        <div class="careers-listing-details__body">
+          <h2>Pay and benefits</h2>
+          <p>The annual salary range is CA$135,200 - CA$258,000.</p>
+          <p>Benefits include equity, retirement plans, health benefits, and wellness stipends.</p>
+        </div>
+      </div>
+      <aside><dl>
+        <dt>Company</dt><dd>Stripe</dd>
+        <dt>Office location</dt><dd>Toronto</dd>
+        <dt>Employment type</dt><dd>Full time</dd>
+      </dl></aside>
+    </main></body></html>
+    """
+    url = "https://stripe.com/careers/listing/backend-engineer/7557899?gh_jid=7557899"
+    _patch_fetch(monkeypatch, html, url)
+
+    job = service.job_from_url(url, agent=_Agent())
+
+    assert job is not None
+    assert job.company == "Stripe"
+    assert job.title == "Backend Engineer"
+    assert job.location == "Toronto, CA"
+    assert "In-office expectations" in job.jd_text
+    assert "at least 50%" in job.jd_text
+    assert "Pay and benefits" in job.jd_text
+    assert "CA$135,200 - CA$258,000" in job.jd_text
+    assert "health benefits" in job.jd_text
+    assert "Location: Toronto, CA" in job.jd_text
+    assert "Employment Type: Full time" in job.jd_text
