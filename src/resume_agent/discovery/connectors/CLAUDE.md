@@ -52,7 +52,7 @@ to a deterministic reader — the browser is never used for a recognized ATS.
   Two cases need it. Greenhouse's board API carries the description but none of
   the pay band or employment type (measured on Stripe's board: the job API
   returns `location: {"name": "N/A"}` and no compensation, while the page's
-  JSON-LD carries Toronto / `FULL_TIME` / CAD 208,000–312,000). And an
+  JSON-LD carries Toronto / `FULL_TIME` / CAD 135,200–258,000). And an
   **employer-hosted posting is not a detectable ATS at all** — `stripe.com`
   links Greenhouse only as a `greenhouseId` inside `__NEXT_DATA__`, never as a
   `boards.greenhouse.io` URL, so the L2 sniff correctly declines it.
@@ -62,6 +62,10 @@ to a deterministic reader — the browser is never used for a recognized ATS.
   benefits" sections, while the listing data and JSON-LD supply location,
   employment type, and compensation. Routing such a URL to the Greenhouse API
   would be a regression because its body omits those employer-owned sections.
+  The normal Greenhouse board connector applies the same employer-page reader
+  to its kept employer-hosted rows after relevance gating, known-row filtering,
+  and the per-board cap. This covers source pulls as well as pasted URLs without
+  issuing an extra page request for every role on a large board.
 - **A reader returns `None`, never an `ExtractedJob` with an empty `jd_text`.**
   That is the contract `service.job_from_url` keys its LLM fallback on; an
   empty-but-present result suppresses the fallback and fails the ingest even

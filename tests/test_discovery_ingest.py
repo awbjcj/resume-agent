@@ -1,6 +1,12 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.ingest import IngestOutcome, add_job, save_or_upgrade
+from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.ingest import (
+    IngestOutcome,
+    add_job,
+    ingest_jobs_with_outcomes,
+    save_or_upgrade,
+)
 from resume_agent.tracking.repository import (
     application_for_job,
     archive_job,
@@ -250,6 +256,140 @@ def test_equal_tier_keeps_first_seen():
         )
         assert outcome is IngestOutcome.skipped
         assert job is None
+
+
+def test_direct_url_refreshes_richer_greenhouse_copy():
+    with _session() as session:
+        existing, _ = save_or_upgrade(
+            session,
+            source="greenhouse",
+            jd_text="Who we are\nBuild SDKs.",
+            url="https://stripe.com/jobs/search?gh_jid=7557899",
+            company="Stripe",
+            title="Backend Engineer, Developer SDKs (Golang)",
+        )
+        refreshed, outcome = save_or_upgrade(
+            session,
+            source="url",
+            jd_text=" ".join(
+                [
+                    "Who we are. Build SDKs.",
+                    "In-office expectations: spend at least 50% of each month in the office.",
+                    "Pay and benefits: CA$135,200 - CA$258,000 plus health benefits.",
+                ]
+                * 8
+            ),
+            url=(
+                "https://stripe.com/careers/listing/"
+                "backend-engineer-developer-sdks-golang/7557899?gh_jid=7557899"
+            ),
+            company="Stripe",
+            title="Backend Engineer, Developer SDKs (Golang)",
+            location="Toronto, CA",
+        )
+
+        assert existing is not None
+        assert outcome is IngestOutcome.upgraded
+        assert refreshed is not None and refreshed.id == existing.id
+        assert refreshed.location == "Toronto, CA"
+        assert "Pay and benefits" in refreshed.jd_text
+
+
+def test_richer_direct_url_refresh_requeues_stale_analysis():
+    with _session() as session:
+        existing, _ = save_or_upgrade(
+            session,
+            source="greenhouse",
+            jd_text="Who we are\nBuild SDKs.",
+            url="https://stripe.com/jobs/search?gh_jid=7557899",
+            company="Stripe",
+            title="Backend Engineer, Developer SDKs (Golang)",
+        )
+        assert existing is not None and existing.id is not None
+        existing.status = JobStatus.shortlisted.value
+        existing.criteria_json = {"employment_type": None, "salary_range": None}
+        existing.analysis_meta_json = {"criteria": {"model": "stale"}}
+        existing.fit_score = 82
+        existing.fit_rationale = "Based on the incomplete description."
+        session.add(existing)
+        session.commit()
+
+        richer = " ".join(
+            [
+                "Who we are. Build SDKs.",
+                "In-office expectations: spend at least 50% of each month in the office.",
+                "Pay and benefits: CA$135,200 - CA$258,000 plus health benefits.",
+            ]
+            * 8
+        )
+        counts = ingest_jobs_with_outcomes(
+            session,
+            [
+                RawJob(
+                    source="url",
+                    jd_text=richer,
+                    url=(
+                        "https://stripe.com/careers/listing/"
+                        "backend-engineer-developer-sdks-golang/7557899?gh_jid=7557899"
+                    ),
+                    company="Stripe",
+                    title="Backend Engineer, Developer SDKs (Golang)",
+                    location="Toronto, CA",
+                )
+            ],
+        )
+
+        session.refresh(existing)
+        assert counts.upgraded == {"url": 1}
+        assert counts.changed_raw_job_ids == [existing.id]
+        assert existing.status == JobStatus.raw.value
+        assert existing.criteria_json is None
+        assert existing.analysis_meta_json is None
+        assert existing.fit_score is None
+        assert existing.fit_rationale is None
+        assert existing.location == "Toronto, CA"
+        assert "Pay and benefits" in existing.jd_text
+
+
+def test_richer_direct_url_refresh_does_not_replace_user_progress():
+    with _session() as session:
+        existing, _ = save_or_upgrade(
+            session,
+            source="greenhouse",
+            jd_text="Who we are\nBuild SDKs.",
+            url="https://stripe.com/jobs/search?gh_jid=7557899",
+            company="Stripe",
+            title="Backend Engineer, Developer SDKs (Golang)",
+        )
+        assert existing is not None and existing.id is not None
+        existing.status = JobStatus.shortlisted.value
+        session.add(existing)
+        session.add(
+            Application(
+                job_id=existing.id,
+                status=ApplicationStatus.submitted.value,
+            )
+        )
+        session.commit()
+
+        refreshed, outcome = save_or_upgrade(
+            session,
+            source="url",
+            jd_text=" ".join(f"richer{i}" for i in range(80)),
+            url=(
+                "https://stripe.com/careers/listing/"
+                "backend-engineer-developer-sdks-golang/7557899?gh_jid=7557899"
+            ),
+            company="Stripe",
+            title="Backend Engineer, Developer SDKs (Golang)",
+            location="Toronto, CA",
+        )
+
+        session.refresh(existing)
+        assert outcome is IngestOutcome.skipped
+        assert refreshed is None
+        assert existing.jd_text == "Who we are\nBuild SDKs."
+        assert existing.location is None
 
 
 def test_upgrade_preserves_application_and_status():

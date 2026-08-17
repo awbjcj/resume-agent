@@ -134,11 +134,19 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
     ):
         return Insert()
 
-    if (
+    same_source_url = (
         incoming.source == existing.source
-        and incoming.url
-        and existing.url
+        and incoming.url is not None
         and incoming.url == existing.url
+    )
+    direct_detail_for_same_job = (
+        incoming.source == "url"
+        and incoming.dedup_key is not None
+        and incoming.dedup_key == existing.dedup_key
+        and source_rank(incoming.source) == source_rank(existing.source)
+    )
+    if (
+        (same_source_url or direct_detail_for_same_job)
         and existing.status not in _TEXT_REFRESH_FROZEN
         and is_materially_richer(incoming.jd_text, existing.jd_text)
     ):
@@ -164,8 +172,7 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
             incoming.company
             and incoming.stale_company
             and existing.company
-            and existing.company.strip().casefold()
-            == incoming.stale_company.casefold()
+            and existing.company.strip().casefold() == incoming.stale_company.casefold()
             and incoming.company.strip().casefold()
             != existing.company.strip().casefold()
         ):

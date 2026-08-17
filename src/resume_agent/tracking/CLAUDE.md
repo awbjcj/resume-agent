@@ -51,10 +51,13 @@ reads status, which is a high-water mark. Pinned by
 ### Redo — forward-only, never destructive
 
 `services/redo.py` re-runs any stage (`pull`/`extract`/`tailor`/`render`) over
-explicitly chosen jobs at any status. It exists because the automatic paths are
-deliberately one-way: `merge.decide()` freezes `jd_text` once a job leaves
-`raw`, and `reprocess()` skips anything `has_progress()` covers. Those guards
-stay; redo is the explicit escape hatch, never a mode.
+explicitly chosen jobs at any status. The automatic paths are deliberately
+one-way for user-invested rows: `save_or_upgrade()` freezes a materially richer
+`jd_text` replacement when `has_progress()` is true, and `reprocess()` skips the
+same rows. For an unprogressed extracted/shortlisted row, accepting richer
+source text clears its stale criteria and scoring and returns it to `raw`, so
+the next discovery pass does not show metadata derived from the truncated copy.
+Redo is the explicit escape hatch for progressed rows, never a mode.
 
 Three invariants, all enforced by `tracking/stages.py::advance`:
 
@@ -78,7 +81,6 @@ writes an `ErrorRecord` with `kind="job"` keyed `job:{id}:{stage}` (so repeats
 coalesce into `count`), and `resolve_job_failures` closes it when that stage
 later succeeds. `gather_isolated` no longer discards the exception — the cause
 reaches the run result, the log, and the dashboard.
-
 
 ---
 

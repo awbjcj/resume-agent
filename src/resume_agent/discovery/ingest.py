@@ -19,7 +19,11 @@ from resume_agent.discovery.merge import (
     UpgradeUrlOnly,
     decide,
 )
-from resume_agent.tracking.repository import company_rename_collides, find_existing
+from resume_agent.tracking.repository import (
+    company_rename_collides,
+    find_existing,
+    has_progress,
+)
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -85,6 +89,17 @@ def save_or_upgrade(
         incoming.location,
     )
     action = decide(existing, incoming)
+    if (
+        isinstance(action, RefreshText)
+        and existing is not None
+        and existing.id is not None
+        and has_progress(session, existing.id)
+    ):
+        # A materially richer page invalidates extraction and scoring, but a
+        # user-invested row must not be silently rewritten underneath an
+        # application or authored artifact. Explicit Redo remains available
+        # for those rows because it re-pulls and re-extracts as one operation.
+        action = Skip()
     refreshed_key: str | None = None
     changes_identity = False
     if isinstance(action, RefreshCompany):
@@ -97,9 +112,7 @@ def save_or_upgrade(
         changes_identity
         and existing is not None
         and refreshed_key != existing.dedup_key
-        and company_rename_collides(
-            session, existing=existing, dedup_key=refreshed_key
-        )
+        and company_rename_collides(session, existing=existing, dedup_key=refreshed_key)
     ):
         action = Skip()
     if isinstance(action, Insert) and not allow_insert:
@@ -137,6 +150,18 @@ def _apply(
         existing.url = action.url
         existing.source = action.source
     elif isinstance(action, (Rebase, RefreshText)):
+        if isinstance(action, RefreshText) and existing.status != JobStatus.raw.value:
+            # Text-derived fields must never describe the previous, truncated
+            # posting. Reset unprogressed rows so refresh/discovery extracts
+            # salary, employment type, and other facts from the richer copy.
+            existing.status = JobStatus.raw.value
+            existing.criteria_json = None
+            existing.analysis_meta_json = None
+            existing.fit_score = None
+            existing.fit_rationale = None
+            existing.reject_reason = None
+            existing.reject_category = None
+            existing.industry_pending = False
         for field, value in action.updates.items():
             setattr(existing, field, value)
     elif isinstance(action, RefreshCompany):

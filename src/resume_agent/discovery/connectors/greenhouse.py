@@ -1,5 +1,8 @@
 import re
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from typing import Literal
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -16,6 +19,7 @@ from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import harvest
 from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.discovery.url_ingest import fetch as url_fetch
 
 _BASE = "https://boards-api.greenhouse.io/v1/boards"
 
@@ -35,6 +39,8 @@ _METADATA_LABELS = {
     "employment type": "Employment Type",
     "job type": "Employment Type",
 }
+
+_GREENHOUSE_HOSTS = {"boards.greenhouse.io", "job-boards.greenhouse.io"}
 
 
 def _normalize_location(value) -> str | None:
@@ -168,6 +174,49 @@ def parse_greenhouse(
     return jobs
 
 
+def _employer_hosted(url: str | None) -> bool:
+    return bool(url and (urlsplit(url).hostname or "").lower() not in _GREENHOUSE_HOSTS)
+
+
+def _enrich_employer_hosted(row: RawJob) -> RawJob:
+    if not _employer_hosted(row.url):
+        return row
+    try:
+        page = url_fetch.fetch_static(row.url or "")
+        # Import at call time: ats_readers reuses parse_greenhouse, so importing
+        # it while this connector module initializes would create a cycle.
+        from resume_agent.discovery.url_ingest.ats_readers import (
+            read_employer_hosted_greenhouse,
+            with_json_ld_meta,
+        )
+
+        extracted = with_json_ld_meta(
+            read_employer_hosted_greenhouse(page.html), page.html
+        )
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return row
+    if extracted is None:
+        return row
+    if extracted.jd_text:
+        row.jd_text = extracted.jd_text
+    if extracted.location:
+        row.location = extracted.location
+    return row
+
+
+def _enrich_employer_hosted_rows(rows: list[RawJob]) -> list[RawJob]:
+    if len(rows) < 2:
+        return [_enrich_employer_hosted(row) for row in rows]
+    from resume_agent.config import get_settings
+
+    workers = min(len(rows), max(1, get_settings().detail_fetch_concurrency))
+    tasks = [(copy_context(), row) for row in rows]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(
+            pool.map(lambda task: task[0].run(_enrich_employer_hosted, task[1]), tasks)
+        )
+
+
 class GreenhouseConnector:
     """Pulls every open role from each configured Greenhouse board, then filters.
 
@@ -198,6 +247,7 @@ class GreenhouseConnector:
             on_error=http_failure,
             skip_seen=skip_seen,
             unit_limit=lambda board: board.limit,
+            transform_kept=lambda board, rows: _enrich_employer_hosted_rows(rows),
         )
 
     def _get_board(self, token: str) -> dict:

@@ -54,6 +54,7 @@ def harvest(
     on_error: Callable[[Exception], str | None],
     skip_seen: SkipSeen | None = None,
     unit_limit: Callable[[U], int | None] | None = None,
+    transform_kept: Callable[[U, list[RawJob]], list[RawJob]] | None = None,
 ) -> FetchResult:
     """Fan out, isolate failures, then gate and cap each unit independently.
 
@@ -61,6 +62,9 @@ def harvest(
     a returned string records ``failures[key(unit)] = reason`` and continues; ``None``
     re-raises (the connector does not tolerate this failure). A unit's configured
     limit overrides the global fallback. ``skip_seen`` runs before each cap.
+    ``transform_kept`` performs optional detail enrichment only after gating,
+    deduplication, and the cap, so large boards do not fetch pages that cannot
+    enter the result.
     """
     jobs: list[RawJob] = []
     failures: dict[str, str] = {}
@@ -81,6 +85,8 @@ def harvest(
             configured_limit if configured_limit is not None else limit,
             skip_seen,
         )
+        if transform_kept is not None:
+            kept = transform_kept(unit, kept)
         jobs.extend(kept)
         filtered += unit_filtered
     return FetchResult(jobs=jobs, failures=failures, filtered=filtered)
@@ -166,9 +172,7 @@ def _fetch_details(
     tasks = [(copy_context(), row) for row in chunk]
     with ThreadPoolExecutor(max_workers=len(chunk)) as pool:
         return list(
-            pool.map(
-                lambda task: task[0].run(_fetch_one, task[1], fetch_detail), tasks
-            )
+            pool.map(lambda task: task[0].run(_fetch_one, task[1], fetch_detail), tasks)
         )
 
 

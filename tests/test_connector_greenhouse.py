@@ -4,11 +4,18 @@ from pathlib import Path
 
 import httpx
 
+from resume_agent.discovery.url_ingest import fetch as url_fetch
 from resume_agent.discovery.connectors.config import GreenhouseBoard
-from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector, parse_greenhouse
+from resume_agent.discovery.connectors.greenhouse import (
+    GreenhouseConnector,
+    parse_greenhouse,
+)
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.discovery.url_ingest.models import PageContent
 
-FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "greenhouse" / "jobs.json").read_text())
+FIXTURE = json.loads(
+    (Path(__file__).parent / "fixtures" / "greenhouse" / "jobs.json").read_text()
+)
 
 
 def test_parse_greenhouse_maps_and_decodes_content():
@@ -60,8 +67,16 @@ def test_greenhouse_gate_drops_offtarget_and_records_count(monkeypatch):
     conn = GreenhouseConnector([GreenhouseBoard(token="acme", company="Acme")])
     payload = {
         "jobs": [
-            {"title": "AI Engineer", "absolute_url": "u1", "content": "build llm systems"},
-            {"title": "Class A CDL Driver", "absolute_url": "u2", "content": "drive a truck"},
+            {
+                "title": "AI Engineer",
+                "absolute_url": "u1",
+                "content": "build llm systems",
+            },
+            {
+                "title": "Class A CDL Driver",
+                "absolute_url": "u2",
+                "content": "drive a truck",
+            },
         ]
     }
     monkeypatch.setattr(conn, "_get_board", lambda token: payload)
@@ -77,7 +92,8 @@ class _PartlyBrokenGreenhouse(GreenhouseConnector):
     def _get_board(self, token):
         if token == "dead":
             raise httpx.HTTPStatusError(
-                "404", request=httpx.Request("GET", "http://x"),
+                "404",
+                request=httpx.Request("GET", "http://x"),
                 response=httpx.Response(404),
             )
         return FIXTURE
@@ -151,7 +167,11 @@ def test_parse_greenhouse_prepends_sidebar_facts():
                 "location": {"name": "Toronto, ON"},
                 "departments": [{"name": "Payments Eng"}],
                 "metadata": [
-                    {"name": "Location Type", "value": "Hybrid", "value_type": "single_select"}
+                    {
+                        "name": "Location Type",
+                        "value": "Hybrid",
+                        "value_type": "single_select",
+                    }
                 ],
             }
         ]
@@ -174,7 +194,11 @@ def test_parse_greenhouse_omits_placeholder_location_and_null_metadata():
                 "content": "<p>Build things.</p>",
                 "location": {"name": "N/A"},
                 "metadata": [
-                    {"name": "Location Type", "value": None, "value_type": "single_select"}
+                    {
+                        "name": "Location Type",
+                        "value": None,
+                        "value_type": "single_select",
+                    }
                 ],
             }
         ]
@@ -207,3 +231,63 @@ def test_parse_greenhouse_deduplicates_composite_location():
     expected = "San Francisco, CA | New York City, NY | Seattle, WA"
     assert job.location == expected
     assert job.jd_text.startswith(f"Location: {expected}")
+
+
+def test_connector_enriches_employer_hosted_greenhouse_posting(monkeypatch):
+    payload = {
+        "jobs": [
+            {
+                "title": "Backend Engineer, Developer SDKs (Golang)",
+                "absolute_url": "https://stripe.com/jobs/search?gh_jid=7557899",
+                "location": {"name": "N/A"},
+                "content": "<h2>Who we are</h2><p>Build SDKs.</p>",
+            }
+        ]
+    }
+    html = """
+    <html><head>
+      <script type="application/ld+json">
+        {"@type":"JobPosting","title":"Backend Engineer, Developer SDKs (Golang)",
+         "description":"<p>Build SDKs.</p>","hiringOrganization":{"name":"Stripe"},
+         "employmentType":"FULL_TIME","jobLocation":{"address":{"addressLocality":"Toronto",
+         "addressCountry":"CA"}},"baseSalary":{"currency":"CAD","value":{"minValue":135200,
+         "maxValue":258000,"unitText":"YEAR"}}}
+      </script>
+      <script id="__NEXT_DATA__" type="application/json">
+        {"props":{"pageProps":{"listing":{"greenhouseId":7557899,
+         "title":"Backend Engineer, Developer SDKs (Golang)",
+         "contentMarkdown":"## Who we are\\n\\nBuild SDKs.",
+         "location":{"name":"Toronto","countryCode":"CA","remote":false},
+         "employmentType":"Full time"}}}}
+      </script>
+    </head><body><main><div class="careers-detail-layout__main">
+      <div class="careers-listing-details__body"><h2>Who we are</h2><p>Build SDKs.</p></div>
+      <div class="careers-listing-details__body"><h2>In-office expectations</h2>
+        <p>Spend at least 50% of each month in the office.</p></div>
+      <div class="careers-listing-details__body"><h2>Pay and benefits</h2>
+        <p>CA$135,200 - CA$258,000 plus health benefits.</p></div>
+    </div></main></body></html>
+    """
+    connector = GreenhouseConnector([GreenhouseBoard(token="stripe", company="Stripe")])
+    monkeypatch.setattr(connector, "_get_board", lambda token: payload)
+    monkeypatch.setattr(
+        url_fetch,
+        "fetch_static",
+        lambda url: PageContent(
+            html=html,
+            final_url=(
+                "https://stripe.com/careers/listing/"
+                "backend-engineer-developer-sdks-golang/7557899?gh_jid=7557899"
+            ),
+            rendered=False,
+        ),
+    )
+
+    result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=1)
+
+    assert len(result.jobs) == 1
+    job = result.jobs[0]
+    assert job.location == "Toronto, CA"
+    assert "In-office expectations" in job.jd_text
+    assert "Pay and benefits" in job.jd_text
+    assert "Compensation: CAD 135,200 - 258,000 per year" in job.jd_text
