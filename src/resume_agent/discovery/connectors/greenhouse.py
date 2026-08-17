@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 
 import httpx
@@ -34,6 +35,26 @@ _METADATA_LABELS = {
     "employment type": "Employment Type",
     "job type": "Employment Type",
 }
+
+
+def _normalize_location(value) -> str | None:
+    """Remove repeated entries from Greenhouse's composite location label."""
+    if not isinstance(value, str):
+        return None
+    location = value.strip()
+    if not location or location.lower() in _PLACEHOLDER_LOCATIONS:
+        return None
+    parts = [part.strip() for part in re.split(r"\s*[;|]\s*", location) if part.strip()]
+    unique: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        key = part.casefold()
+        if key not in seen:
+            seen.add(key)
+            unique.append(part)
+    if len(unique) == len(parts):
+        return location
+    return " | ".join(unique)
 
 
 def _names(items) -> str | None:
@@ -79,12 +100,9 @@ def _sidebar_lines(item: dict) -> list[str]:
     """
     lines: list[str] = []
 
-    location = (item.get("location") or {}).get("name")
-    if isinstance(location, str) and location.strip().lower() not in (
-        *_PLACEHOLDER_LOCATIONS,
-        "",
-    ):
-        lines.append(f"Location: {location.strip()}")
+    location = _normalize_location((item.get("location") or {}).get("name"))
+    if location:
+        lines.append(f"Location: {location}")
 
     lines.extend(_metadata_lines(item.get("metadata")))
 
@@ -130,7 +148,7 @@ def parse_greenhouse(
     """Map a Greenhouse board `jobs` payload to RawJobs."""
     jobs: list[RawJob] = []
     for item in payload.get("jobs", []):
-        location = (item.get("location") or {}).get("name")
+        location = _normalize_location((item.get("location") or {}).get("name"))
         jd_text = html_to_markdown(item.get("content", ""))
         if sidebar := _sidebar_lines(item):
             jd_text = "\n".join(sidebar) + ("\n\n" + jd_text if jd_text else "")

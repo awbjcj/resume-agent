@@ -183,3 +183,27 @@ def test_parse_greenhouse_omits_placeholder_location_and_null_metadata():
     assert "Location:" not in jd
     assert "Workplace Type:" not in jd
     assert jd.startswith("Build things.")
+
+
+def test_parse_greenhouse_deduplicates_composite_location():
+    payload = {
+        "jobs": [
+            {
+                "title": "Software Engineer, Research Tools",
+                "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/4981828008",
+                "content": "<p>Build research tools.</p>",
+                "location": {
+                    "name": (
+                        "San Francisco, CA | New York City, NY; "
+                        "San Francisco, CA | New York City, NY | Seattle, WA"
+                    )
+                },
+            }
+        ]
+    }
+
+    job = parse_greenhouse(payload, "Anthropic")[0]
+
+    expected = "San Francisco, CA | New York City, NY | Seattle, WA"
+    assert job.location == expected
+    assert job.jd_text.startswith(f"Location: {expected}")
