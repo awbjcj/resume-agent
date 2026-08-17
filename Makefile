@@ -7,20 +7,45 @@ HOST ?= 127.0.0.1
 PORT ?= 8000
 WEB_HOST ?= localhost
 WEB_PORT ?= 5173
+H1B_DIR ?= ../h1b-job-search-mcp
+H1B_HOST ?= 127.0.0.1
+H1B_PORT ?= 8001
+H1B_MCP_ENABLED ?= false
+H1B_MCP_TRANSPORT ?= streamable-http
+H1B_MCP_COMMAND ?=
+H1B_MCP_URL ?= http://$(H1B_HOST):$(H1B_PORT)/mcp
+H1B_MCP_TIMEOUT_SECONDS ?= 30
+H1B_MCP_MAX_RESULT_CHARS ?= 200000
 PYTEST_ARGS ?= tests/api -v
 RAILWAY_URL ?= https://resume-agent.up.railway.app
 API_TOKEN ?= $(shell sed -n 's/^API_TOKEN=//p' .env 2>/dev/null)
 BACKUP_DIR ?= backups
 SEED_FILE ?= seed.tar.gz
 
-.PHONY: help setup setup-browser api web dev test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port backup-remote seed
+# H1B_MCP_* must be exported to the API process, but only when a caller has
+# explicitly enabled the integration (the full-stack target does this below).
+# Keeping the defaults disabled means tests and the standalone API target keep
+# their existing .env-driven behavior.
+ifneq ($(filter true TRUE yes YES 1,$(H1B_MCP_ENABLED)),)
+export H1B_MCP_ENABLED H1B_MCP_TRANSPORT H1B_MCP_COMMAND H1B_MCP_URL
+export H1B_MCP_TIMEOUT_SECONDS H1B_MCP_MAX_RESULT_CHARS
+endif
+
+# These names are consumed by the local H1B server only. They intentionally do
+# not reuse PORT, which belongs to the resume-agent API.
+export H1B_HOST H1B_PORT
+
+.PHONY: help setup setup-browser api web h1b dev full-stack h1b-health api-health mcp-health stack-health test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port backup-remote seed
 
 help:
 	@echo "Common targets:"
 	@echo "  make setup          Install Python and web dependencies"
 	@echo "  make api            Run FastAPI backend at http://$(HOST):$(PORT)"
 	@echo "  make web            Run Vite frontend at http://$(WEB_HOST):$(WEB_PORT)"
-	@echo "  make dev            Run backend and frontend together"
+	@echo "  make dev            Run API, frontend, and the local H-1B MCP server together"
+	@echo "  make full-stack     Alias for make dev"
+	@echo "  make h1b            Run H-1B MCP at http://$(H1B_HOST):$(H1B_PORT)/mcp"
+	@echo "  make stack-health   Check API health and the H-1B MCP connection"
 	@echo "  make test           Run API and frontend tests"
 	@echo "  make test-py        Run the full Python test suite"
 	@echo "  make lint           Run Python and frontend linters"
@@ -55,8 +80,24 @@ kill-port:
 web:
 	cd web && $(NPX) vite --host $(WEB_HOST) --port $(WEB_PORT)
 
-dev:
-	$(MAKE) -j2 api web
+h1b:
+	$(UV) --directory "$(H1B_DIR)" run python src/server.py
+
+dev: full-stack
+
+full-stack:
+	+$(MAKE) -j3 H1B_MCP_ENABLED=true H1B_MCP_TRANSPORT=streamable-http H1B_MCP_COMMAND= H1B_MCP_URL=http://$(H1B_HOST):$(H1B_PORT)/mcp api web h1b
+
+h1b-health:
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-RestMethod -ErrorAction Stop -Uri 'http://$(H1B_HOST):$(H1B_PORT)/health' -TimeoutSec 15 | ConvertTo-Json -Compress"
+
+api-health:
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-RestMethod -ErrorAction Stop -Uri 'http://$(HOST):$(PORT)/api/health' -TimeoutSec 15 | ConvertTo-Json -Compress"
+
+mcp-health:
+	$(UV) run python scripts/check_h1b_mcp.py --url "$(H1B_MCP_URL)" --timeout $(H1B_MCP_TIMEOUT_SECONDS)
+
+stack-health: api-health h1b-health mcp-health
 
 test: test-api test-web
 
