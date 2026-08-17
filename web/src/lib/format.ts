@@ -93,15 +93,17 @@ export function formatLocationText(raw: string | null | undefined): string | nul
 }
 
 /** The single source of truth for how a job's location renders anywhere in the
- * UI: prefers the backend-normalized city/region/country facets (already
- * correctly cased — ISO2 country, USPS state) and only falls back to
- * formatting the raw scraped string when those facets are absent. */
+ * UI. A normalized city/region/country tuple cannot represent multiple
+ * alternatives, so preserve a provider's composite value; otherwise prefer
+ * the normalized facets and fall back to the raw scraped string. */
 export function locationLabel(job: {
   location?: string | null;
   locationCity?: string | null;
   locationRegion?: string | null;
   locationCountry?: string | null;
 }): string | null {
+  const raw = job.location?.trim();
+  if (raw && /[|;]/.test(raw)) return raw;
   const structured = [job.locationCity, job.locationRegion, job.locationCountry]
     .filter(Boolean)
     .map((part) => formatLocationSegment(part!))

@@ -20,4 +20,34 @@ describe("location display formatting", () => {
       }),
     ).toBe("Bengaluru, Karnataka, IN");
   });
+
+  it.each([
+    {
+      raw: "San Francisco, CA | New York City, NY | Seattle, WA",
+      city: null,
+      region: null,
+      country: "US",
+    },
+    {
+      raw: "New York City, NY; San Francisco, CA; Seattle, WA",
+      city: "San Francisco",
+      region: "CA",
+      country: "US",
+    },
+    {
+      raw: "Remote-Friendly (Travel-Required) | San Francisco, CA | Seattle, WA | New York City, NY",
+      city: "Remote-Friendly",
+      region: null,
+      country: "US",
+    },
+  ])("keeps every provider location in $raw", ({ raw, city, region, country }) => {
+    expect(
+      locationLabel({
+        location: raw,
+        locationCity: city,
+        locationRegion: region,
+        locationCountry: country,
+      }),
+    ).toBe(raw);
+  });
 });
