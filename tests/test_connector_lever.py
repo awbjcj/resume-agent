@@ -171,7 +171,9 @@ def test_parse_lever_prepends_sidebar_facts():
             },
         }
     ]
-    jd = parse_lever(payload, "Zoox")[0].jd_text
+    job = parse_lever(payload, "Zoox")[0]
+    jd = job.jd_text
+    assert job.location == "Foster City, CA | San Diego, CA"
     assert jd.startswith("Location: Foster City, CA (also: San Diego, CA)")
     assert "Workplace Type: Hybrid" in jd
     assert "Employment Type: Full-time" in jd

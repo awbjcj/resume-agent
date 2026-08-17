@@ -21,6 +21,21 @@ def test_jazzhr_maps_listing_then_jsonld_detail():
     assert "Develop Python integration tooling" in rows[0].jd_text
 
 
+def test_jazzhr_detail_keeps_every_jsonld_location():
+    rows = parse_listing((FIXTURES / "list.html").read_text(), "utilidata")
+    html = """
+    <script type="application/ld+json">
+    {"@type":"JobPosting","title":"Engineer","description":"<p>Build things.</p>",
+     "jobLocation":[{"address":{"addressLocality":"Austin","addressRegion":"TX"}},
+                    {"address":{"addressLocality":"New York","addressRegion":"NY"}}]}
+    </script>
+    """
+
+    apply_detail(rows[0], {"html": html})
+
+    assert rows[0].location == "Austin, TX | New York, NY"
+
+
 def test_jazzhr_deduplicates_desktop_and_mobile_listing_links():
     html = (FIXTURES / "list.html").read_text()
 

@@ -43,25 +43,25 @@ that Claude auto-discovers once you're working inside that directory. Read
 the linked file before touching that area; don't duplicate its content back
 into this one.
 
-| Area | Lives in |
-| --- | --- |
-| API layer, runs, auth, job-scoped surfaces | `src/resume_agent/api/CLAUDE.md` |
-| Core package: `llm_runner.py` provider seam, deployment, cross-cutting infra | `src/resume_agent/CLAUDE.md` |
-| Tenancy (ADR-0003, ADR-0009) | `src/resume_agent/tenancy/CLAUDE.md` |
-| Public network trust boundary (ADR-0008) | `src/resume_agent/security/CLAUDE.md` |
-| Tailoring pipeline: fact-lock, review/scoring | `src/resume_agent/tailor/CLAUDE.md` |
-| Agent prompts (registry + guidance layer) | `src/resume_agent/prompts/CLAUDE.md` |
-| Rendering (template-id, Typst) | `src/resume_agent/render/CLAUDE.md` |
-| Tracking / board: archive-delete-prune, redo, dedup | `src/resume_agent/tracking/CLAUDE.md` |
-| Discovery pipeline: source priority, concurrency | `src/resume_agent/discovery/CLAUDE.md` |
+| Area                                                                              | Lives in                                          |
+| --------------------------------------------------------------------------------- | ------------------------------------------------- |
+| API layer, runs, auth, job-scoped surfaces                                        | `src/resume_agent/api/CLAUDE.md`                  |
+| Core package: `llm_runner.py` provider seam, deployment, cross-cutting infra      | `src/resume_agent/CLAUDE.md`                      |
+| Tenancy (ADR-0003, ADR-0009)                                                      | `src/resume_agent/tenancy/CLAUDE.md`              |
+| Public network trust boundary (ADR-0008)                                          | `src/resume_agent/security/CLAUDE.md`             |
+| Tailoring pipeline: fact-lock, review/scoring                                     | `src/resume_agent/tailor/CLAUDE.md`               |
+| Agent prompts (registry + guidance layer)                                         | `src/resume_agent/prompts/CLAUDE.md`              |
+| Rendering (template-id, Typst)                                                    | `src/resume_agent/render/CLAUDE.md`               |
+| Tracking / board: archive-delete-prune, redo, dedup                               | `src/resume_agent/tracking/CLAUDE.md`             |
+| Discovery pipeline: source priority, concurrency                                  | `src/resume_agent/discovery/CLAUDE.md`            |
 | ATS/job-board connectors (detection, readers, Workday, Tesla/Google, pooled HTTP) | `src/resume_agent/discovery/connectors/CLAUDE.md` |
-| H-1B sponsorship evidence | `src/resume_agent/h1b/CLAUDE.md` |
-| Profile: coaching, GitHub harvest, synthesis | `src/resume_agent/profile/CLAUDE.md` |
-| Skill taxonomy / skill groups | `src/resume_agent/taxonomy/CLAUDE.md` |
-| Session substrate (coach, interview, Career Lab adapters) | `src/resume_agent/sessions/CLAUDE.md` |
-| Career Lab | `src/resume_agent/career_lab/CLAUDE.md` |
-| Gmail integration | `src/resume_agent/gmail/CLAUDE.md` |
-| Services layer: settings bundle | `src/resume_agent/services/CLAUDE.md` |
+| H-1B sponsorship evidence                                                         | `src/resume_agent/h1b/CLAUDE.md`                  |
+| Profile: coaching, GitHub harvest, synthesis                                      | `src/resume_agent/profile/CLAUDE.md`              |
+| Skill taxonomy / skill groups                                                     | `src/resume_agent/taxonomy/CLAUDE.md`             |
+| Session substrate (coach, interview, Career Lab adapters)                         | `src/resume_agent/sessions/CLAUDE.md`             |
+| Career Lab                                                                        | `src/resume_agent/career_lab/CLAUDE.md`           |
+| Gmail integration                                                                 | `src/resume_agent/gmail/CLAUDE.md`                |
+| Services layer: settings bundle                                                   | `src/resume_agent/services/CLAUDE.md`             |
 
 ## Core invariants (never break these)
 
@@ -110,9 +110,9 @@ before changing code near the invariant.
 | `src/resume_agent/profile/github_harvest.py`         | Deterministic GitHub project-source selection, materialization, supersession, and cleanup                                 |
 | `src/resume_agent/profile/project_extractor.py`      | Project-only structured extraction that cannot emit employment or education facts                                         |
 | `src/resume_agent/profile/coach.py`                  | Coach turn validation, topic-aware context, and structured-output agents                                                  |
-| `src/resume_agent/profile/depth.py`                  | Evidence-owner supply, agenda seeds, and safe unmined-source question material                                             |
-| `src/resume_agent/profile/aspects.py`                | Closed bullet-aspect vocabulary shared by extraction and depth measurement                                                  |
-| `src/resume_agent/tailor/depth.py`                   | Advisory rendered-depth measurement against the source-clamped owner plan                                                   |
+| `src/resume_agent/profile/depth.py`                  | Evidence-owner supply, agenda seeds, and safe unmined-source question material                                            |
+| `src/resume_agent/profile/aspects.py`                | Closed bullet-aspect vocabulary shared by extraction and depth measurement                                                |
+| `src/resume_agent/tailor/depth.py`                   | Advisory rendered-depth measurement against the source-clamped owner plan                                                 |
 | `src/resume_agent/interview/agent.py`                | Mock interviewer persona, turn/debrief validation, transcript elision                                                     |
 | `src/resume_agent/services/profile_coach.py`         | Coach session turns, draft approval, recap, rebuild, and impact orchestration                                             |
 | `src/resume_agent/sessions/store.py`                 | Session substrate: file custody every turn-per-run session kind rides (ADR 0006)                                          |

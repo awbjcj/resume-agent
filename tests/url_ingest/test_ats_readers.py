@@ -53,6 +53,21 @@ def test_from_json_ld_reads_job_location_address():
     assert extracted.location == "New York, NY"
 
 
+def test_from_json_ld_keeps_every_job_location():
+    html = (
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Eng",'
+        '"description":"<p>Build things.</p>","jobLocation":['
+        '{"address":{"addressLocality":"Austin","addressRegion":"TX",'
+        '"addressCountry":"US"}},{"address":{"addressLocality":"New York",'
+        '"addressRegion":"NY","addressCountry":"US"}}]}</script>'
+    )
+
+    extracted = _from_json_ld(html)
+
+    assert extracted is not None
+    assert extracted.location == "Austin, TX, US | New York, NY, US"
+
+
 def test_from_json_ld_absent_returns_none():
     assert _from_json_ld("<html><body>nothing here</body></html>") is None
 
@@ -410,6 +425,7 @@ def test_workday_carries_the_header_strip_into_jd_text(monkeypatch):
         "jobPostingInfo": {
             "title": "Software Engineer",
             "location": "Detroit, Michigan",
+            "additionalLocations": [{"descriptor": "Chicago, Illinois"}],
             "timeType": "Full time",
             "remoteType": "Hybrid",
             "jobReqId": "JR-12345",
@@ -420,7 +436,9 @@ def test_workday_carries_the_header_strip_into_jd_text(monkeypatch):
     monkeypatch.setattr(ats_readers, "fetch_job_detail", lambda target, path: detail)
     extracted = ATS_READERS["workday"](_WORKDAY_TARGET, _WORKDAY_URL, "<html></html>")
     assert extracted is not None
+    assert extracted.location == "Detroit, Michigan | Chicago, Illinois"
     assert "Location: Detroit, Michigan" in extracted.jd_text
+    assert "Additional Locations: Chicago, Illinois" in extracted.jd_text
     assert "Employment Type: Full time" in extracted.jd_text
     assert "Workplace Type: Hybrid" in extracted.jd_text
     assert "Requisition ID: JR-12345" in extracted.jd_text

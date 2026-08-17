@@ -16,7 +16,7 @@ def test_parse_ashby_maps_fields():
     assert first.source == "ashby"
     assert first.company == "Acme"
     assert first.title == "Senior ML Engineer"
-    assert first.location == "Remote - US"
+    assert first.location == "Remote - US | New York City | Seattle"
     assert first.url == "https://jobs.ashbyhq.com/acme/abc-123"
     assert "Python" in first.jd_text
     assert first.posted_at == datetime(2026, 6, 1, tzinfo=timezone.utc)
@@ -43,6 +43,12 @@ def test_parse_ashby_prepends_sidebar_metadata_to_jd_text():
     assert "Compensation: $150K – $200K • Offers Equity" in jd_text
     # Sidebar comes before the JD body.
     assert jd_text.index("Compensation:") < jd_text.index("Build LLM systems")
+
+
+def test_parse_ashby_keeps_secondary_locations_in_the_job_location():
+    job = parse_ashby(FIXTURE, company="Acme")[0]
+
+    assert job.location == "Remote - US | New York City | Seattle"
 
 
 def test_parse_ashby_normalizes_employment_type():

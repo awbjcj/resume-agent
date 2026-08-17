@@ -108,6 +108,25 @@ def test_apply_detail_fills_jd_url_posted_at():
     assert row.posted_at == datetime(2026, 6, 1, tzinfo=timezone.utc)
 
 
+def test_apply_detail_keeps_every_workday_location():
+    row = parse_list_rows(TARGET, LIST_PAGE)[0]
+    detail = {
+        **DETAIL,
+        "jobPostingInfo": {
+            **DETAIL["jobPostingInfo"],
+            "additionalLocations": [
+                {"descriptor": "Chicago, IL"},
+                {"descriptor": "Austin, TX"},
+                "Remote - US",
+            ],
+        },
+    }
+
+    apply_detail(row, detail)
+
+    assert row.location == "Austin, TX | Chicago, IL | Remote - US"
+
+
 class _Resp:
     def __init__(self, payload):
         self._payload = payload

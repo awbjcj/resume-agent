@@ -193,10 +193,10 @@ _Avoid_: outcome (reserve IngestOutcome for the inserted/upgraded/skipped tag)
 The location-compatibility check inside matching (`find_existing`): a candidate
 row only matches when `locations_compatible` holds — blank on either side is a
 wildcard; otherwise the normalized city segments (text before the first comma)
-must be token-subset-related. Guards the identical-JD, dedup_key, and
+must be token-subset-related. Guards the identical-JD, dedup*key, and
 keyless-fingerprint branches; never the URL branch. Splits multi-location
 same-title reqs into sibling rows without changing `compute_dedup_key`.
-_Avoid_: location filter (filtering is a pipeline stage), dedupe rule (the key
+\_Avoid*: location filter (filtering is a pipeline stage), dedupe rule (the key
 is unchanged; this guards the match)
 
 ## Runs & skill classification
@@ -414,7 +414,7 @@ _Avoid_: budget, rate limit (rate limiting is auth brute-force protection)
 
 **Personal access token (PAT)**:
 A long-lived, revocable, role-equivalent bearer secret a user mints for
-scripting the API; shown once, stored hashed, header-only. The PAT *is* the
+scripting the API; shown once, stored hashed, header-only. The PAT _is_ the
 user.
 _Avoid_: API token (that named the removed static shared secret), key
 

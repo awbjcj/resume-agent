@@ -87,6 +87,20 @@ def test_parse_job_rows_maps_fields():
     assert job.posted_at.tzinfo == timezone.utc
 
 
+def test_parse_job_rows_keeps_every_google_location():
+    row = _row(location="Austin, TX, USA")
+    row[9].extend(
+        [
+            ["New York, NY, USA", [], "New York", None, "NY", "US"],
+            ["Austin, TX, USA", [], "Austin", None, "TX", "US"],
+        ]
+    )
+
+    job = google.parse_job_rows([row])[0]
+
+    assert job.location == "Austin, TX, USA | New York, NY, USA"
+
+
 def test_parse_job_rows_strips_material_icon_tokens():
     job = google.parse_job_rows(
         [_row(about="<p>Google _corporate_fare_ Google _place_ Austin</p>")]

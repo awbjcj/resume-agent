@@ -21,6 +21,21 @@ def test_breezy_maps_list_then_jsonld_detail():
     assert "Explain market trends" in rows[0].jd_text
 
 
+def test_breezy_detail_keeps_every_jsonld_location():
+    rows = parse_breezy(json.loads((FIXTURES / "list.json").read_text()), "masterworks")
+    html = """
+    <script type="application/ld+json">
+    {"@type":"JobPosting","title":"Engineer","description":"<p>Build things.</p>",
+     "jobLocation":[{"address":{"addressLocality":"Austin","addressRegion":"TX"}},
+                    {"address":{"addressLocality":"New York","addressRegion":"NY"}}]}
+    </script>
+    """
+
+    apply_detail(rows[0], {"html": html})
+
+    assert rows[0].location == "Austin, TX | New York, NY"
+
+
 def test_breezy_skip_seen_prevents_detail_request(monkeypatch):
     payload = json.loads((FIXTURES / "list.json").read_text())
 
