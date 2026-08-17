@@ -4,7 +4,7 @@ from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import SINGLETON_ATS, identify_host
 from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
-from resume_agent.discovery.url_ingest.ats_readers import ATS_READERS
+from resume_agent.discovery.url_ingest.ats_readers import ATS_READERS, with_json_ld_meta
 from resume_agent.discovery.url_ingest.fetch import (
     fetch_page,
     fetch_static,
@@ -42,6 +42,12 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
     holds nothing for either a reader or the LLM to read. Both reuse the
     already-fetched page rather than issuing a second request for it.
 
+    Whichever branch produces the body, the page's own schema.org ``JobPosting``
+    markup then fills in the sidebar facts it did not carry
+    (``with_json_ld_meta``). That is what an employer-hosted posting needs: it
+    is not a detectable ATS, so it falls to the LLM, which is instructed to drop
+    site chrome and therefore discards the location/employment-type/pay strip.
+
     Returns None when no job-description text could be extracted.
     """
     host = urlsplit(url).netloc.lower()
@@ -62,13 +68,17 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
                 reader = ATS_READERS.get(target.ats)
                 if reader is not None:
                     extracted = reader(target, static_page.final_url, static_page.html)
-            if extracted is None:
+            if extracted is not None:
+                extracted = with_json_ld_meta(extracted, static_page.html)
+            else:
                 if target is not None and target.ats not in SINGLETON_ATS:
                     page = static_page
                 else:
                     page = upgrade_if_shell(static_page, allow_browser=allow_browser)
-                extracted = extract_fields(html_to_text(page.html), agent)
-    jd_text = clean_job_description_text(extracted.jd_text or "")
+                extracted = with_json_ld_meta(
+                    extract_fields(html_to_text(page.html), agent), page.html
+                )
+    jd_text = clean_job_description_text(extracted.jd_text if extracted else "")
     if not jd_text:
         return None
     return RawJob(

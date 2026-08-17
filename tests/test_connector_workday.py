@@ -429,3 +429,44 @@ def test_fetch_workday_cache_write_failure_falls_back_plain(monkeypatch, tmp_pat
     assert len(bodies) == 1
     assert bodies[0]["appliedFacets"] == {}
     assert len(jobs) == 1
+
+
+def test_apply_detail_reads_top_level_hiring_organization():
+    """Workday moved the employer name out of ``jobPostingInfo``.
+
+    Measured live on four tenants (generalmotors, phinia, toyota, nvidia):
+    ``jobPostingInfo.companyName`` is ``null`` on every one, and the real name
+    sits at the payload's top level under ``hiringOrganization.name``. Reading
+    only the old key left every row's company as the URL slug with
+    ``company_provenance == "token"`` -- which is what Scout's board
+    verification keys ownership on, so no Workday board could ever verify.
+    """
+    row = parse_list_rows(TARGET, LIST_PAGE)[0]
+    assert row.company == "acme"
+    apply_detail(row, {**DETAIL, "hiringOrganization": {"name": "Acme Corp LLC", "url": ""}})
+    assert row.company == "Acme Corp LLC"
+    assert row.company_provenance == "provider"
+    assert row.stale_company == "acme"
+
+
+def test_apply_detail_prefers_company_name_when_a_tenant_still_sets_it():
+    """The old key wins when present -- the fallback must not override a
+    tenant that still populates ``companyName``."""
+    row = parse_list_rows(TARGET, LIST_PAGE)[0]
+    apply_detail(
+        row,
+        {
+            **DETAIL,
+            "jobPostingInfo": {**DETAIL["jobPostingInfo"], "companyName": "Acme Corp"},
+            "hiringOrganization": {"name": "Acme Holdings International"},
+        },
+    )
+    assert row.company == "Acme Corp"
+    assert row.company_provenance == "provider"
+
+
+def test_apply_detail_ignores_a_blank_hiring_organization():
+    row = parse_list_rows(TARGET, LIST_PAGE)[0]
+    apply_detail(row, {**DETAIL, "hiringOrganization": {"name": "   ", "url": ""}})
+    assert row.company == "acme"
+    assert row.company_provenance == "token"

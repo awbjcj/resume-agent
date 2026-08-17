@@ -134,3 +134,52 @@ def test_greenhouse_per_board_limit_overrides_global(monkeypatch):
     result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
     assert len(result.jobs) == 3
     assert [job.company for job in result.jobs] == ["alpha", "beta", "beta"]
+
+
+def test_parse_greenhouse_prepends_sidebar_facts():
+    """Location/workplace/department ride in jd_text as `Label: value` lines.
+
+    The board API returns these as dedicated fields the posting page renders
+    beside the body; dropping them lost the facts the fit scorer reads.
+    """
+    payload = {
+        "jobs": [
+            {
+                "title": "Eng",
+                "absolute_url": "u",
+                "content": "<p>Build things.</p>",
+                "location": {"name": "Toronto, ON"},
+                "departments": [{"name": "Payments Eng"}],
+                "metadata": [
+                    {"name": "Location Type", "value": "Hybrid", "value_type": "single_select"}
+                ],
+            }
+        ]
+    }
+    jd = parse_greenhouse(payload, "Acme")[0].jd_text
+    assert jd.startswith("Location: Toronto, ON")
+    assert "Workplace Type: Hybrid" in jd
+    assert "Department: Payments Eng" in jd
+    assert "Build things." in jd
+
+
+def test_parse_greenhouse_omits_placeholder_location_and_null_metadata():
+    """Greenhouse serves the literal string "N/A" for an unset location, and a
+    metadata entry whose value is null. Neither may become a meta line."""
+    payload = {
+        "jobs": [
+            {
+                "title": "Eng",
+                "absolute_url": "u",
+                "content": "<p>Build things.</p>",
+                "location": {"name": "N/A"},
+                "metadata": [
+                    {"name": "Location Type", "value": None, "value_type": "single_select"}
+                ],
+            }
+        ]
+    }
+    jd = parse_greenhouse(payload, "Acme")[0].jd_text
+    assert "Location:" not in jd
+    assert "Workplace Type:" not in jd
+    assert jd.startswith("Build things.")

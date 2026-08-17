@@ -141,3 +141,82 @@ def test_lever_per_board_limit_overrides_global(monkeypatch):
     result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
     assert len(result.jobs) == 3
     assert [job.company for job in result.jobs] == ["alpha", "beta", "beta"]
+
+
+def test_parse_lever_prepends_sidebar_facts():
+    """Lever's sidebar facts live in dedicated fields, not in the JD body.
+
+    Field names and shapes verified live against the zoox and matchgroup
+    boards (328 postings).
+    """
+    payload = [
+        {
+            "text": "Eng",
+            "hostedUrl": "u",
+            "description": "<p>Build things.</p>",
+            "workplaceType": "hybrid",
+            "categories": {
+                "location": "Foster City, CA",
+                "allLocations": ["Foster City, CA", "San Diego, CA"],
+                "commitment": "Full-time",
+                "department": "Software",
+                "team": "Software Quality Assurance",
+                "level": "Senior",
+            },
+            "salaryRange": {
+                "min": 143000,
+                "max": 177000,
+                "currency": "USD",
+                "interval": "per-year-salary",
+            },
+        }
+    ]
+    jd = parse_lever(payload, "Zoox")[0].jd_text
+    assert jd.startswith("Location: Foster City, CA (also: San Diego, CA)")
+    assert "Workplace Type: Hybrid" in jd
+    assert "Employment Type: Full-time" in jd
+    assert "Department: Software (Software Quality Assurance)" in jd
+    assert "Level: Senior" in jd
+    assert "Compensation: USD 143,000 - 177,000 per year" in jd
+    assert "Build things." in jd
+
+
+def test_parse_lever_sidebar_omits_absent_fields_and_redundant_team():
+    """A posting with no salary/level/commitment renders none of those lines,
+    and a team identical to the department is not repeated in parentheses."""
+    payload = [
+        {
+            "text": "Eng",
+            "hostedUrl": "u",
+            "description": "<p>Build things.</p>",
+            "categories": {"location": "Remote", "department": "Eng", "team": "Eng"},
+        }
+    ]
+    jd = parse_lever(payload, "Acme")[0].jd_text
+    assert jd.startswith("Location: Remote\nDepartment: Eng\n\n")
+    assert "Compensation:" not in jd
+    assert "Level:" not in jd
+    assert "Employment Type:" not in jd
+    assert "Workplace Type:" not in jd
+
+
+def test_parse_lever_includes_salary_description_prose():
+    """`salaryDescription` is a separate pay-and-benefits section Lever renders
+    below the body -- present on 212 of zoox's 244 postings and previously
+    dropped entirely, since _assemble_jd read only description/lists/additional.
+    """
+    payload = [
+        {
+            "text": "Eng",
+            "hostedUrl": "u",
+            "description": "<p>Build things.</p>",
+            "salaryDescription": "<p>Base Salary Range: RSUs and a sign-on bonus may apply.</p>",
+            "additional": "<p>Equal opportunity employer.</p>",
+        }
+    ]
+    jd = parse_lever(payload, "Acme")[0].jd_text
+    assert "Base Salary Range" in jd
+    assert "sign-on bonus" in jd
+    # ordering: body, then pay prose, then the closing boilerplate
+    assert jd.index("Build things.") < jd.index("Base Salary Range")
+    assert jd.index("Base Salary Range") < jd.index("Equal opportunity employer.")

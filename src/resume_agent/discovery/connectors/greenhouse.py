@@ -18,6 +18,81 @@ from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://boards-api.greenhouse.io/v1/boards"
 
+# Greenhouse serves this literal string for a job whose location is unset, so it
+# reaches us as a value rather than as an absent key. Observed live on Stripe's
+# board (22 of 578 jobs).
+_PLACEHOLDER_LOCATIONS = {"n/a", "none", "-", "tbd"}
+
+# Boards define their own `metadata` custom fields, so the names are per-board
+# rather than an API enum. Only names that are known to carry a sidebar fact are
+# rendered -- a blanket passthrough would dump a board's internal bookkeeping
+# fields (req owner, budget code) into the JD.
+_METADATA_LABELS = {
+    "location type": "Workplace Type",
+    "workplace type": "Workplace Type",
+    "remote status": "Workplace Type",
+    "employment type": "Employment Type",
+    "job type": "Employment Type",
+}
+
+
+def _names(items) -> str | None:
+    """Join the `name` of a Greenhouse `departments`/`offices` list."""
+    if not isinstance(items, list):
+        return None
+    names = [
+        item.get("name").strip()
+        for item in items
+        if isinstance(item, dict)
+        and isinstance(item.get("name"), str)
+        and item.get("name").strip()
+    ]
+    return ", ".join(dict.fromkeys(names)) or None
+
+
+def _metadata_lines(items) -> list[str]:
+    lines = []
+    if not isinstance(items, list):
+        return lines
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        label = _METADATA_LABELS.get(str(item.get("name") or "").strip().lower())
+        value = item.get("value")
+        # `value` is null on an unanswered custom field, and a list on a
+        # multi-select one.
+        if isinstance(value, list):
+            value = ", ".join(str(part) for part in value if part)
+        if label and isinstance(value, str) and value.strip():
+            lines.append(f"{label}: {value.strip()}")
+    return lines
+
+
+def _sidebar_lines(item: dict) -> list[str]:
+    """The facts a Greenhouse posting shows beside its body, as text lines.
+
+    Location, department, and the board's workplace-type custom field live in
+    dedicated API fields rather than in ``content``, so they are rendered as
+    ``Label: value`` lines prepended to jd_text -- the same shape
+    ``ashby.parse_ashby`` uses -- for the relevance gate, criteria extraction,
+    and tailoring to read.
+    """
+    lines: list[str] = []
+
+    location = (item.get("location") or {}).get("name")
+    if isinstance(location, str) and location.strip().lower() not in (
+        *_PLACEHOLDER_LOCATIONS,
+        "",
+    ):
+        lines.append(f"Location: {location.strip()}")
+
+    lines.extend(_metadata_lines(item.get("metadata")))
+
+    if department := _names(item.get("departments")):
+        lines.append(f"Department: {department}")
+
+    return lines
+
 
 def fetch_greenhouse_board(token: str) -> dict:
     """GET a Greenhouse board's jobs payload with content."""
@@ -56,6 +131,9 @@ def parse_greenhouse(
     jobs: list[RawJob] = []
     for item in payload.get("jobs", []):
         location = (item.get("location") or {}).get("name")
+        jd_text = html_to_markdown(item.get("content", ""))
+        if sidebar := _sidebar_lines(item):
+            jd_text = "\n".join(sidebar) + ("\n\n" + jd_text if jd_text else "")
         jobs.append(
             RawJob(
                 source="greenhouse",
@@ -63,7 +141,7 @@ def parse_greenhouse(
                 company=company,
                 title=item.get("title"),
                 location=location,
-                jd_text=html_to_markdown(item.get("content", "")),
+                jd_text=jd_text,
                 posted_at=parse_iso_datetime(item.get("updated_at")),
                 stale_company=stale_company,
                 company_provenance=company_provenance,

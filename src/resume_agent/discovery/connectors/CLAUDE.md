@@ -42,6 +42,26 @@ to a deterministic reader — the browser is never used for a recognized ATS.
   `_json_ld_meta_lines` renders the schema.org equivalents — `baseSalary`,
   `employmentType`, `jobLocationType`, `occupationalCategory` — which the
   4-field description-only mapping used to discard.
+- **The page's JSON-LD enriches whatever produced the body, via
+  `with_json_ld_meta` — `_prefer` cannot do this.** `_prefer` merges only
+  *scalar* fields, so the candidate that wins on `jd_text` keeps its own meta
+  lines and every other candidate's are dropped. `service.job_from_url`
+  therefore runs `with_json_ld_meta` over **both** branches — the reader result
+  and the LLM result — adding only labels the body does not already carry, so a
+  reader that renders its own sidebar is unchanged and the pass is idempotent.
+  Two cases need it. Greenhouse's board API carries the description but none of
+  the pay band or employment type (measured on Stripe's board: the job API
+  returns `location: {"name": "N/A"}` and no compensation, while the page's
+  JSON-LD carries Toronto / `FULL_TIME` / CAD 208,000–312,000). And an
+  **employer-hosted posting is not a detectable ATS at all** — `stripe.com`
+  links Greenhouse only as a `greenhouseId` inside `__NEXT_DATA__`, never as a
+  `boards.greenhouse.io` URL, so the L2 sniff correctly declines it and the URL
+  falls to the LLM. That fallback is *told* to drop "generic site chrome", and
+  the sidebar reaches it as bare colon-less lines positioned after the apply
+  button — so it dropped location/employment type every time while keeping the
+  prose. Routing such a URL to the Greenhouse API instead would be a
+  regression: the API body omits the employer's own page-only sections
+  (Stripe's "In-office expectations" and "Pay and benefits").
 - **A reader returns `None`, never an `ExtractedJob` with an empty `jd_text`.**
   That is the contract `service.job_from_url` keys its LLM fallback on; an
   empty-but-present result suppresses the fallback and fails the ingest even
@@ -84,6 +104,44 @@ unit-addressing half (`section`/`unit_items`/`admits`/`new_unit`) plus `find_uni
 
 ---
 
+## Board-level sidebar lines (`greenhouse.py`, `lever.py`, `ashby.py`)
+
+A board connector owes `jd_text` the same `Label: value` header the single-URL
+readers render — the board API returns those facts as dedicated fields, not
+inside `content`, so mapping only the description drops them. `parse_greenhouse`
+was doing exactly that: measured across two workspaces, **0 of 1,159** stored
+greenhouse rows carried a `Location:` / `Employment Type:` / `Compensation:`
+line, against 561/561 for ashby. It now emits Location, Workplace Type, and
+Department (live: anthropic 441/441 · 389/441 · 441/441; stripe 555/578 · 0 ·
+578/578; figma 161/161 · 0 · 161/161).
+
+Two Greenhouse-specific traps:
+
+- **`location.name` is the literal string `"N/A"` when unset** — a value, not
+  an absent key (23 of Stripe's 578 jobs). It is suppressed, not rendered.
+- **`metadata` is per-board custom fields, not an API enum.** Only names known
+  to carry a sidebar fact are mapped (`_METADATA_LABELS`); a blanket
+  passthrough would write a board's internal bookkeeping (req owner, budget
+  code) into the JD. Anthropic's "Location Type" is the workplace-type field;
+  Stripe and Figma set no metadata at all, and an unanswered field has
+  `value: null`.
+
+`parse_lever` had the same gap (0/133 rows) and now emits Location (with
+`allLocations` extras as `(also: …)`), Workplace Type, Employment Type
+(`categories.commitment`), Department (`department (team)`), Level, and
+Compensation from the structured `salaryRange`. Live: zoox 244/244 · 244/244 ·
+237/244 · 244/244 · 235/244; matchgroup 84/84 · 84/84 · 79/84 · 84/84 · 51/84.
+`workplaceType` arrives lowercase (`hybrid`, `onsite`) and is capitalized.
+
+**Lever also has a second, larger loss: `salaryDescription`.** `_assemble_jd`
+read only `description`/`lists`/`additional`, so the pay-and-benefits *prose*
+was dropped whole — 212 of zoox's 244 postings carry one, and **none** of those
+texts appear anywhere in the other three fields, so this was not a duplicate.
+It is now joined before `additional`, keeping the closing boilerplate last as
+the page renders it.
+
+---
+
 ## Workday N+1 pattern (`workday.py`)
 
 Workday boards can have thousands of global listings — pulling all then gating
@@ -98,6 +156,29 @@ locally is infeasible.
      paging. Category/job-family facets remain out of scope.
 2. **`title_relevance_gate`** prunes the list _before_ any detail fetch.
 3. **GET** `…/wday/cxs/{tenant}/{site}{externalPath}` for each survivor → `jobPostingInfo.jobDescription` (HTML → text via `html_to_text`).
+
+**The employer name is not where the docs say it is — read it via
+`detail_company_name(detail)`, never `jobPostingInfo.companyName`.** Workday now
+serves that documented key as `null`: measured live on four unrelated tenants
+(generalmotors, phinia, toyota, nvidia) it was null on every one, with the real
+name at the payload's **top level** under `hiringOrganization.name`. Note the
+helper takes the *whole* detail payload, not `jobPostingInfo`.
+
+This drift was silent and cost two things. Every row kept the URL slug as its
+company with `company_provenance == "token"` — the slug-as-company case
+`dedup_key` cannot reconcile. And because Scout's board verification proves
+ownership from provider-attributed company names
+(`services/sources.py::preview_source` collects `observed_companies` from rows
+whose provenance is `provider`), **no Workday board could verify at all**:
+`observed_companies` was always empty, so even
+`generalmotors.wd5.myworkdayjobs.com` came back `OWNERSHIP_NOT_PROVEN`. It now
+resolves `VERIFIED_PROVIDER_METADATA`, while a mismatched pair (Ford vs the GM
+board) still returns `ATS_CONFLICT`.
+
+The names are legal entities, not trade names — "2100 NVIDIA USA", "PHINIA
+Delphi India Private Limited - (India)". `identity.company_names_match` is what
+absorbs that (legal-suffix stripping plus a subset rule); do not "clean up"
+these strings at the connector.
 
 Safety ceiling: `_MAX_OFFSET = 1000` (≤51 pages) even if the tenant ignores
 `searchText`. Keep `search.yaml` role anchors tight — the title-gate's

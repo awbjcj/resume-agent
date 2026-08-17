@@ -224,6 +224,39 @@ def fetch_job_detail(target: AtsTarget, external_path: str) -> dict:
     return _checked(board.get(cxs_detail_url(target, external_path))).json()
 
 
+def detail_company_name(detail: dict) -> str | None:
+    """The employer name a cxs detail payload actually carries.
+
+    ``jobPostingInfo.companyName`` is the documented field and is still
+    preferred, but Workday now serves it as ``null``: measured live on four
+    unrelated tenants (generalmotors, phinia, toyota, nvidia) it was null on
+    every one, while the real name sat at the payload's **top level** under
+    ``hiringOrganization.name`` ("General Motors LLC", "2100 NVIDIA USA").
+
+    Reading only the old key had two consequences. Every row kept the URL slug
+    as its company with ``company_provenance == "token"`` — the exact
+    slug-as-company case ``dedup_key`` cannot reconcile against the same
+    requisition seen elsewhere — and, because Scout's board verification proves
+    ownership from provider-attributed company names
+    (``services/sources.py::preview_source``), **no Workday board could ever
+    verify**: `observed_companies` was always empty, so even
+    ``generalmotors.wd5.myworkdayjobs.com`` resolved as
+    ``OWNERSHIP_NOT_PROVEN``.
+
+    The names are legal entities rather than trade names, which is why the
+    caller matches them through ``identity.company_names_match`` (its
+    legal-suffix stripping and subset rule are what make "PHINIA" match
+    "PHINIA Delphi India Private Limited - (India)").
+    """
+    for value in (
+        (detail.get("jobPostingInfo") or {}).get("companyName"),
+        (detail.get("hiringOrganization") or {}).get("name"),
+    ):
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
     info = detail.get("jobPostingInfo") or {}
     row.jd_text = html_to_markdown(info.get("jobDescription", ""))
@@ -231,9 +264,7 @@ def apply_detail(row: WorkdayRow, detail: dict) -> None:
         row.url = info["externalUrl"]
     if info.get("location"):
         row.location = info["location"]
-    info_company = info.get("companyName")
-    if isinstance(info_company, str) and info_company.strip():
-        company = info_company.strip()
+    if company := detail_company_name(detail):
         if row.company and company.casefold() != row.company.casefold():
             row.stale_company = row.stale_company or row.company
         row.company = company

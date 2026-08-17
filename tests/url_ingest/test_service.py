@@ -290,3 +290,49 @@ def test_spoof_host_does_not_route_to_known_parser(monkeypatch):
 
     assert job is not None
     assert job.jd_text == "real jd"
+
+
+_STRIPE_SHAPED_PAGE = """
+<html><head><script type="application/ld+json">
+{"@context":"https://schema.org","@type":"JobPosting","title":"Staff Software Engineer, Link",
+ "description":"<p>Body.</p>",
+ "hiringOrganization":{"@type":"Organization","name":"Stripe"},
+ "employmentType":"FULL_TIME",
+ "jobLocation":[{"@type":"Place","address":{"@type":"PostalAddress",
+   "addressLocality":"Toronto","addressCountry":"CA"}}],
+ "baseSalary":{"@type":"MonetaryAmount","currency":"CAD","value":
+   {"@type":"QuantitativeValue","minValue":208000,"maxValue":312000,"unitText":"YEAR"}}}
+</script></head><body><p>Long enough body text to avoid the JS-shell upgrade path.</p>
+</body></html>
+"""
+
+
+def test_unknown_host_recovers_sidebar_facts_from_json_ld(monkeypatch):
+    """An employer-hosted posting (stripe.com) is not a detectable ATS, so it
+    falls to the LLM -- which is told to drop site chrome and therefore loses
+    the sidebar. The page's own JSON-LD restores those facts deterministically."""
+    _patch_fetch(monkeypatch, _STRIPE_SHAPED_PAGE, "https://stripe.com/careers/listing/x/1")
+
+    class _LLM:
+        def run(self, prompt):
+            class R:
+                content = ExtractedJob(
+                    company="Stripe",
+                    title="Staff Software Engineer, Link",
+                    location=None,
+                    jd_text="Who we are\nIn-office expectations\nPay and benefits",
+                )
+
+            return R()
+
+    job = service.job_from_url("https://stripe.com/careers/listing/x/1", agent=_LLM())
+
+    assert job is not None
+    assert "Location: Toronto, CA" in job.jd_text
+    assert "Employment Type: Full time" in job.jd_text
+    assert "Compensation: CAD 208,000 - 312,000 per year" in job.jd_text
+    # the LLM's richer body survives -- it is not replaced by the markup blurb
+    assert "In-office expectations" in job.jd_text
+    assert "Pay and benefits" in job.jd_text
+    # a scalar the LLM could not resolve fills from the markup
+    assert job.location == "Toronto, CA"

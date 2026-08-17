@@ -57,7 +57,7 @@ from resume_agent.discovery.connectors.workable import (
     account_url as workable_account_url,
 )
 from resume_agent.discovery.connectors.workable import parse_workable
-from resume_agent.discovery.connectors.workday import fetch_job_detail
+from resume_agent.discovery.connectors.workday import detail_company_name, fetch_job_detail
 from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
 from resume_agent.discovery.url_ingest.models import ExtractedJob
 
@@ -263,6 +263,61 @@ def _from_json_ld(html: str) -> ExtractedJob | None:
         title=posting.get("title"),
         location=_json_ld_location(posting),
         jd_text=_with_meta(_json_ld_meta_lines(posting), body),
+    )
+
+
+def with_json_ld_meta(extracted: ExtractedJob | None, html: str) -> ExtractedJob | None:
+    """Enrich a body sourced elsewhere with the page's own schema.org facts.
+
+    ``_prefer`` cannot do this: it merges only *scalar* fields, so a candidate
+    that wins on ``jd_text`` keeps its own meta lines and every other
+    candidate's are discarded. Two callers need the opposite -- the richer body
+    plus the markup's sidebar facts:
+
+    - **Greenhouse**, whose board API carries the description but none of the
+      pay band, employment type, or workplace type an employer's posting page
+      renders beside it (verified live: Stripe's job API returns
+      ``location: {"name": "N/A"}`` and no compensation, while the page's
+      JSON-LD carries Toronto/FULL_TIME/CAD 208,000-312,000).
+    - **The LLM fallback on an unrecognized host**, which is instructed to drop
+      "generic site chrome" and therefore discards the sidebar -- those facts
+      reach it as bare, colon-less lines positioned *after* the apply button.
+
+    Only labels the body does not already carry are added, so a reader that
+    renders its own sidebar is unchanged. ``None`` passes through as ``None``:
+    that is the "could not resolve" contract ``service.job_from_url`` keys its
+    fallback on.
+    """
+    if extracted is None or not extracted.jd_text:
+        return extracted
+    posting = jobposting_json_ld(html)
+    if posting is None:
+        return extracted
+    existing = extracted.jd_text
+    lines = [
+        line
+        for line in _json_ld_meta_lines(posting)
+        if line.split(":", 1)[0] + ":" not in existing
+    ]
+    update = {
+        field: value
+        for field in ("company", "title", "location")
+        if getattr(extracted, field) is None
+        and (value := getattr(_from_json_ld_scalars(posting), field))
+    }
+    if lines:
+        update["jd_text"] = _with_meta(lines, existing)
+    return extracted.model_copy(update=update) if update else extracted
+
+
+def _from_json_ld_scalars(posting: dict) -> ExtractedJob:
+    """The markup's scalar fields only -- no body, so it can never win a body."""
+    organization = posting.get("hiringOrganization")
+    return ExtractedJob(
+        company=organization.get("name") if isinstance(organization, dict) else None,
+        title=posting.get("title"),
+        location=_json_ld_location(posting),
+        jd_text="",
     )
 
 
@@ -536,17 +591,19 @@ def _read_workday(target: AtsTarget, url: str, html: str) -> ExtractedJob | None
         external_path = workday_external_path(target, url)
         if external_path is None:
             return None
-        info = fetch_job_detail(target, external_path).get("jobPostingInfo") or {}
+        detail = fetch_job_detail(target, external_path)
+        info = detail.get("jobPostingInfo") or {}
         if not info:
             return None
-        company = info.get("companyName")
         location = info.get("location")
         return ExtractedJob(
             # Prefer the payload's own company name; target.tenant is a URL slug
             # ("generalmotors"), and a slug as the company breaks dedup against
-            # the same requisition ingested by the board connector.
-            company=(company.strip() if isinstance(company, str) and company.strip() else None)
-            or target.tenant,
+            # the same requisition ingested by the board connector. The name is
+            # read from the whole payload, not just jobPostingInfo -- Workday
+            # now serves companyName as null and carries the real name at the
+            # top level (see workday.detail_company_name).
+            company=detail_company_name(detail) or target.tenant,
             title=info.get("title"),
             location=location if isinstance(location, str) else None,
             jd_text=_with_meta(

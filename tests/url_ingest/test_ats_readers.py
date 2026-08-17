@@ -613,3 +613,57 @@ def test_smartrecruiters_oneclick_url_resolves_the_real_company(monkeypatch):
     extracted = ATS_READERS["smartrecruiters"](target, url, "<html></html>")
     assert extracted is not None
     assert "/companies/acme/postings/8f1e-4b2c" in seen[0]
+
+
+# -- JSON-LD meta enrichment of a body sourced elsewhere ---------------------
+
+_JSON_LD_PAGE = """
+<html><head><script type="application/ld+json">
+{"@context":"https://schema.org","@type":"JobPosting","title":"Staff Engineer",
+ "description":"<p>Short blurb.</p>",
+ "hiringOrganization":{"@type":"Organization","name":"Stripe"},
+ "employmentType":"FULL_TIME",
+ "jobLocation":[{"@type":"Place","address":{"@type":"PostalAddress",
+   "addressLocality":"Toronto","addressCountry":"CA"}}],
+ "baseSalary":{"@type":"MonetaryAmount","currency":"CAD","value":
+   {"@type":"QuantitativeValue","minValue":208000,"maxValue":312000,"unitText":"YEAR"}}}
+</script></head><body>page</body></html>
+"""
+
+
+def test_with_json_ld_meta_adds_sidebar_facts_to_foreign_body():
+    body = ats_readers.ExtractedJob(company=None, title=None, location=None, jd_text="Full body prose.")
+    merged = ats_readers.with_json_ld_meta(body, _JSON_LD_PAGE)
+    assert merged is not None
+    assert "Location: Toronto, CA" in merged.jd_text
+    assert "Employment Type: Full time" in merged.jd_text
+    assert "Compensation: CAD 208,000 - 312,000 per year" in merged.jd_text
+    # the richer body is kept, not replaced by the JSON-LD description
+    assert "Full body prose." in merged.jd_text
+    assert "Short blurb." not in merged.jd_text
+    # scalar gaps fill from the markup
+    assert merged.company == "Stripe"
+    assert merged.location == "Toronto, CA"
+
+
+def test_with_json_ld_meta_does_not_duplicate_labels_the_body_already_has():
+    body = ats_readers.ExtractedJob(
+        company="Stripe", title="Staff Engineer", location="Toronto",
+        jd_text="Location: Toronto, ON\n\nFull body prose.",
+    )
+    merged = ats_readers.with_json_ld_meta(body, _JSON_LD_PAGE)
+    assert merged is not None
+    assert merged.jd_text.count("Location:") == 1
+    assert "Toronto, ON" in merged.jd_text
+    assert "Employment Type: Full time" in merged.jd_text
+    assert merged.location == "Toronto"
+
+
+def test_with_json_ld_meta_passes_through_when_page_has_no_markup():
+    body = ats_readers.ExtractedJob(company=None, title=None, location=None, jd_text="Body.")
+    assert ats_readers.with_json_ld_meta(body, "<html><body>no markup</body></html>") is body
+
+
+def test_with_json_ld_meta_keeps_none_none():
+    """None is the 'could not resolve' contract service.job_from_url keys on."""
+    assert ats_readers.with_json_ld_meta(None, _JSON_LD_PAGE) is None
