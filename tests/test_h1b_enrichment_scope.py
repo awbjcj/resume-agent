@@ -30,6 +30,8 @@ def _evidence(company: str) -> H1BSponsorshipEvidence:
 def _persist_cache(
     session: Session, company: str, evidence: H1BSponsorshipEvidence
 ) -> None:
+    assert evidence.expires_at is not None
+    assert evidence.retrieved_at is not None
     session.add(
         H1BCompanyEvidence(
             normalized_company=company,

@@ -30,6 +30,8 @@ def _evidence(company: str, *, expires_in_days: int = 30) -> H1BSponsorshipEvide
 
 def _seed(session: Session, company: str, **kwargs) -> None:
     evidence = _evidence(company, **kwargs)
+    assert evidence.expires_at is not None
+    assert evidence.retrieved_at is not None
     session.add(
         H1BCompanyEvidence(
             normalized_company=company,

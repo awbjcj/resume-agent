@@ -67,6 +67,8 @@ def _persist_h1b_cache(engine, report: H1BEnrichmentReport) -> None:
     """Mirror enrich_companies' durable company-cache write in mocked runs."""
     with get_session(engine) as session:
         for normalized, evidence in report.by_company.items():
+            assert evidence.retrieved_at is not None
+            assert evidence.expires_at is not None
             session.add(
                 H1BCompanyEvidence(
                     normalized_company=normalized,

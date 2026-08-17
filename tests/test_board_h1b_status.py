@@ -24,8 +24,8 @@ def _seed_evidence(session: Session, company: str) -> None:
             normalized_company=company,
             status="matched",
             evidence_json=evidence.model_dump(mode="json"),
-            expires_at=evidence.expires_at,
-            retrieved_at=evidence.retrieved_at,
+            expires_at=now + timedelta(days=30),
+            retrieved_at=now,
         )
     )
 

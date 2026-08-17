@@ -88,8 +88,8 @@ def test_pipeline_exposes_persisted_h1b_sponsorship_status():
                     display_company=evidence.display_company,
                     status=evidence.status,
                     evidence_json=evidence.model_dump(mode="json"),
-                    expires_at=evidence.expires_at,
-                    retrieved_at=evidence.retrieved_at,
+                    expires_at=now + timedelta(days=1),
+                    retrieved_at=now,
                 )
             )
             session.commit()

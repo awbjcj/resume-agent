@@ -75,6 +75,7 @@ def test_expired_evidence_is_stale():
 
 def test_stale_flips_exactly_at_expiry():
     evidence = _evidence(expires_in_days=1)
+    assert evidence.expires_at is not None
     assert _h1b_sponsorship_response(
         evidence, now=evidence.expires_at - timedelta(microseconds=1)
     ).stale is False
@@ -93,6 +94,8 @@ def test_job_detail_reads_evidence_cached_by_a_sibling_job(tmp_path):
     evidence = _evidence(
         periods=[H1BPeriodStat(period="FY2026-Q1", filing_count=7, certified_count=6)]
     )
+    assert evidence.expires_at is not None
+    assert evidence.retrieved_at is not None
 
     with TestClient(app) as client:
         with get_session(app.state.engine) as session:

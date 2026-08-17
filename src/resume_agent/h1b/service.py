@@ -394,29 +394,30 @@ async def enrich_companies(
             ).all()
         }
         for normalized, evidence in results:
+            expires_at = (
+                now + _UNAVAILABLE_CACHE_TTL
+                if evidence.status == "unavailable"
+                else now + timedelta(days=settings.h1b_cache_ttl_days)
+            )
             evidence = evidence.model_copy(
                 update={
                     "display_company": evidence.display_company or missing[normalized],
                     "retrieved_at": now,
-                    "expires_at": (
-                        now + _UNAVAILABLE_CACHE_TTL
-                        if evidence.status == "unavailable"
-                        else now + timedelta(days=settings.h1b_cache_ttl_days)
-                    ),
+                    "expires_at": expires_at,
                 }
             )
             by_company[normalized] = evidence
             row = existing.get(normalized)
             if row is None:
-                row = H1BCompanyEvidence(normalized_company=normalized, status=evidence.status, expires_at=evidence.expires_at)
+                row = H1BCompanyEvidence(normalized_company=normalized, status=evidence.status, expires_at=expires_at)
             row.display_company = evidence.display_company
             row.status = evidence.status
             row.schema_version = 2
             row.evidence_json = evidence.model_dump(mode="json")
             row.source_url = evidence.source_url
             row.data_version = evidence.data_version
-            row.retrieved_at = evidence.retrieved_at
-            row.expires_at = evidence.expires_at
+            row.retrieved_at = now
+            row.expires_at = expires_at
             session.add(row)
         session.commit()
 
