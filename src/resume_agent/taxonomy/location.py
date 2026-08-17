@@ -8,7 +8,9 @@ inference, rather than country gating region.
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from typing import Any
 
 # Minimal controlled vocab; extend as real data demands.
 _COUNTRY_TO_ISO2 = {
@@ -71,6 +73,8 @@ _METRO_ALIASES: dict[str, tuple[str | None, str]] = {
 }
 
 _ZIP_RE = re.compile(r"\s+\d{5}(?:-\d{4})?$")
+_LOCATION_SEPARATOR_RE = re.compile(r"\s*(?:\||;|//)\s*")
+_REMOTE_RE = re.compile(r"\bremote\b", re.IGNORECASE)
 
 
 def _key(raw: str | None) -> str:
@@ -163,6 +167,131 @@ class StructuredLocation:
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+
+def split_locations(raw: str | None) -> list[str]:
+    """Split a provider location field into ordered, distinct alternatives.
+
+    Connectors normalize multi-location fields with `` | ``, while a few
+    provider payloads historically used semicolons. Accept both at this
+    boundary so every downstream consumer sees the same instance model.
+    """
+    if not raw:
+        return []
+    values: list[str] = []
+    seen: set[str] = set()
+    for candidate in _LOCATION_SEPARATOR_RE.split(raw):
+        value = " ".join(candidate.split())
+        key = value.casefold()
+        if not value or key in seen:
+            continue
+        seen.add(key)
+        values.append(value)
+    return values
+
+
+def join_locations(values: Iterable[object]) -> str | None:
+    """Render ordered location alternatives in the canonical storage format."""
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        for location in split_locations(value):
+            key = location.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized.append(location)
+    return " | ".join(normalized) or None
+
+
+def _parse_location(raw: str) -> StructuredLocation:
+    """Best-effort deterministic parsing for one provider location instance."""
+    parts = [part.strip() for part in raw.split(",") if part.strip()]
+    country: str | None = None
+    region: str | None = None
+    city: str | None = None
+
+    if parts and normalize_country(parts[-1]) is not None:
+        country = parts.pop()
+    if _REMOTE_RE.search(raw):
+        if country is None:
+            trailing = re.search(r"(?:[-(]\s*)([A-Za-z.]{2,24})\)?\s*$", raw)
+            if trailing and normalize_country(trailing.group(1)) is not None:
+                country = trailing.group(1)
+        return build_location(None, None, country, raw=raw)
+
+    if len(parts) >= 2:
+        region = parts.pop()
+    city = ", ".join(parts) if parts else None
+    if city is None and region is None:
+        city = raw
+    return build_location(city, region, country, raw=raw)
+
+
+def build_locations(
+    raw: str | None,
+    *,
+    primary: StructuredLocation | None = None,
+) -> list[StructuredLocation]:
+    """Build the canonical ordered location instances for a job.
+
+    ``primary`` carries the fit agent's more informed parse for the first
+    provider location. Remaining alternatives are parsed deterministically so
+    a multi-location posting never collapses to one city/region/country tuple.
+    """
+    raw_values = split_locations(raw)
+    locations: list[StructuredLocation] = []
+    for index, value in enumerate(raw_values):
+        if index == 0 and primary is not None:
+            location = build_location(
+                primary.city,
+                primary.region,
+                primary.country,
+                raw=value,
+            )
+        else:
+            location = _parse_location(value)
+        locations.append(location)
+
+    if not locations and primary is not None:
+        locations.append(
+            build_location(
+                primary.city,
+                primary.region,
+                primary.country,
+                raw=primary.raw,
+            )
+        )
+    return locations
+
+
+def location_instances_from_criteria(
+    criteria: dict[str, Any] | None,
+) -> list[StructuredLocation]:
+    """Read canonical instances, falling back to the pre-array singular key."""
+    data = criteria or {}
+    raw_locations = data.get("locations")
+    candidates = raw_locations if isinstance(raw_locations, list) else []
+    if not candidates and isinstance(data.get("location_parts"), dict):
+        candidates = [data["location_parts"]]
+
+    locations: list[StructuredLocation] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        country = normalize_country(candidate.get("country"))
+        locations.append(
+            StructuredLocation(
+                city=candidate.get("city"),
+                region=candidate.get("region"),
+                country=country,
+                is_us=bool(candidate.get("is_us", country == "US")),
+                raw=candidate.get("raw"),
+            )
+        )
+    return locations
 
 
 def build_location(

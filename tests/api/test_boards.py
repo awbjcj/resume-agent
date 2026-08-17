@@ -241,3 +241,32 @@ def test_shortlist_item_exposes_facet_fields():
         "locationCity",
     ):
         assert key in item
+
+
+def test_shortlist_multi_location_filters_and_contract():
+    client = _client()
+    locations = [
+        {"city": "Austin", "region": "TX", "country": "US", "is_us": True, "raw": "Austin, TX"},
+        {"city": "Toronto", "region": "Ontario", "country": "CA", "is_us": False, "raw": "Toronto, Ontario"},
+    ]
+    with client:
+        _seed(
+            client.app,
+            status=JobStatus.shortlisted.value,
+            fit_score=80,
+            company="Multi",
+            location="Austin, TX | Toronto, Ontario",
+            criteria_json={"locations": locations, "location_parts": locations[0]},
+        )
+        by_canada = client.get("/api/shortlist?country=CA&city=Toronto").json()
+        crossed = client.get("/api/shortlist?country=CA&city=Austin").json()
+        unfiltered = client.get("/api/shortlist").json()
+
+    assert [row["company"] for row in by_canada["data"]] == ["Multi"]
+    assert crossed["data"] == []
+    assert by_canada["data"][0]["locations"] == [
+        {"city": "Austin", "region": "TX", "country": "US", "isUs": True, "raw": "Austin, TX"},
+        {"city": "Toronto", "region": "Ontario", "country": "CA", "isUs": False, "raw": "Toronto, Ontario"},
+    ]
+    assert by_canada["facets"]["country"] == {"CA": 1}
+    assert unfiltered["facets"]["country"] == {"CA": 1, "US": 1}

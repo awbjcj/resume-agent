@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -13,6 +13,7 @@ from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.taxonomy.company_size import snap as snap_size
 from resume_agent.taxonomy.industries import normalize_company
+from resume_agent.taxonomy.location import location_instances_from_criteria
 from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_skills
 from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import profile_skill_tokens
@@ -63,6 +64,7 @@ class ShortlistRow:
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTag]
+    locations: list[dict[str, Any]] = field(default_factory=list)
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
@@ -113,6 +115,7 @@ class TriageRow:
     reject_category: str | None = None
     url: str | None = None
     h1b_sponsorship_status: str | None = None
+    locations: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -139,6 +142,7 @@ class PipelineRow:
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTag]
+    locations: list[dict[str, Any]]
     location_country: str | None
     location_region: str | None
     location_city: str | None
@@ -193,6 +197,10 @@ def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> li
     return tags
 
 
+def _location_payload(criteria: dict[str, Any]) -> list[dict[str, Any]]:
+    return [location.as_dict() for location in location_instances_from_criteria(criteria)]
+
+
 def _shortlist_row(
     job: Job,
     tokens: set[str],
@@ -208,7 +216,8 @@ def _shortlist_row(
     job_id = _require_job_id(job)
     criteria = job.criteria_json or {}
     salary = criteria.get("salary_range") or {}
-    loc = criteria.get("location_parts") or {}
+    locations = _location_payload(criteria)
+    loc = locations[0] if locations else {}
     return ShortlistRow(
         job_id=job_id,
         company=job.company,
@@ -228,6 +237,7 @@ def _shortlist_row(
         company_size=snap_size(criteria.get("company_size")),
         posted_at=job.posted_at,
         skills=_skill_tags(criteria, tokens, aliases),
+        locations=locations,
         location_country=loc.get("country"),
         location_region=loc.get("region"),
         location_city=loc.get("city"),
@@ -363,7 +373,8 @@ def project_pipeline_jobs(
         job_id = _require_job_id(job)
         criteria = job.criteria_json or {}
         salary = criteria.get("salary_range") or {}
-        location = criteria.get("location_parts") or {}
+        locations = _location_payload(criteria)
+        location = locations[0] if locations else {}
         best = pick_best(versions.get(job_id, []))
         version = best.version
         application = applications.get(job_id)
@@ -396,6 +407,7 @@ def project_pipeline_jobs(
                 company_size=snap_size(criteria.get("company_size")),
                 posted_at=job.posted_at,
                 skills=_skill_tags(criteria, set(), aliases),
+                locations=locations,
                 location_country=location.get("country"),
                 location_region=location.get("region"),
                 location_city=location.get("city"),
@@ -438,6 +450,7 @@ def _triage_row(
     evidence_by_company: Mapping[str, H1BSponsorshipEvidence],
 ) -> TriageRow:
     job_id = _require_job_id(job)
+    locations = _location_payload(job.criteria_json or {})
     return TriageRow(
         job_id=job_id,
         company=job.company,
@@ -453,6 +466,7 @@ def _triage_row(
         reject_category=job.reject_category,
         url=job.url,
         h1b_sponsorship_status=_h1b_sponsorship_status(job, evidence_by_company),
+        locations=locations,
     )
 
 

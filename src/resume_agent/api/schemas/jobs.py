@@ -23,6 +23,16 @@ class SkillTagOut(CamelModel):
     required: bool
 
 
+class LocationInstanceOut(CamelModel):
+    """One canonical work-location alternative for a job posting."""
+
+    city: str | None = None
+    region: str | None = None
+    country: str | None = None
+    is_us: bool = False
+    raw: str | None = None
+
+
 class ShortlistItem(CamelModel):
     job_id: int
     company: str | None
@@ -42,6 +52,7 @@ class ShortlistItem(CamelModel):
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTagOut]
+    locations: list[LocationInstanceOut] = Field(default_factory=list)
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
@@ -71,6 +82,7 @@ class PipelineItem(CamelModel):
     industry: str | None = None
     company_size: str | None = None
     posted_at: datetime | None = None
+    locations: list[LocationInstanceOut] = Field(default_factory=list)
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
@@ -94,6 +106,7 @@ class TriageItem(CamelModel):
     posted_at: datetime | None
     archived_at: datetime | None
     has_progress: bool
+    locations: list[LocationInstanceOut] = Field(default_factory=list)
     reject_reason: str | None = None
     reject_category: str | None = None
     url: str | None = None
@@ -251,6 +264,7 @@ class JobDetail(CamelModel):
     # Skill + meta facets (parsed from criteria_json server-side so the detail
     # modal renders the same covered/required channels as the board card).
     skills: list[SkillTagOut]
+    locations: list[LocationInstanceOut] = Field(default_factory=list)
     sponsorship_signal: str | None = None
     salary_min: float | None = None
     salary_max: float | None = None

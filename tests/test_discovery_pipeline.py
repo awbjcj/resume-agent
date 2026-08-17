@@ -679,6 +679,30 @@ def test_run_score_preserves_canonical_industry_and_writes_location(tmp_path):
         assert job.criteria_json["location_parts"]["raw"] == "Austin, TX, USA"
 
 
+def test_run_score_writes_every_location_instance(tmp_path):
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="ashby",
+                jd_text="jd",
+                title="Eng",
+                location="Austin, TX, US | Toronto, Ontario, Canada",
+                status=JobStatus.filtered.value,
+            ),
+        )
+        run_score(s, facts, _LocationFitAgent(), aliases_path=tmp_path / "a.json")
+        job = jobs_by_status(s, JobStatus.shortlisted.value)[0]
+        assert job.criteria_json is not None
+        assert [item["city"] for item in job.criteria_json["locations"]] == [
+            "Austin",
+            "Toronto",
+        ]
+        assert job.criteria_json["locations"][1]["country"] == "CA"
+        assert job.criteria_json["location_parts"] == job.criteria_json["locations"][0]
+
+
 def test_run_score_refreshes_aliases_when_canonicalizer_given(tmp_path):
     facts = ProfileFacts(contact=Contact(name="Ada"))
     path = tmp_path / "aliases.json"

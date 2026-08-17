@@ -48,6 +48,28 @@ describe("location display formatting", () => {
         locationRegion: region,
         locationCountry: country,
       }),
-    ).toBe(raw);
+    ).toBe(raw.replaceAll("; ", " | "));
+  });
+
+  it("renders canonical location instances consistently across providers", () => {
+    expect(
+      locationLabel({
+        location: "provider-specific ignored value",
+        locations: [
+          { city: "AUSTIN", region: "tx", country: "us", raw: "Austin TX" },
+          { city: "TORONTO", region: "Ontario", country: "ca", raw: "Toronto" },
+        ],
+      }),
+    ).toBe("Austin, TX, US | Toronto, Ontario, CA");
+  });
+
+  it("keeps the remote qualifier on a structured country-only instance", () => {
+    expect(
+      locationLabel({
+        locations: [
+          { city: null, region: null, country: "us", raw: "Remote - US" },
+        ],
+      }),
+    ).toBe("Remote - US");
   });
 });

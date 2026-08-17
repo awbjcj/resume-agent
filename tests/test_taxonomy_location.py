@@ -181,3 +181,52 @@ def test_format_free_location_passes_through_unparseable():
 def test_format_free_location_collapses_whitespace_and_empties():
     assert location.format_free_location("  Boston   ") == "Boston"
     assert location.format_free_location("   ") == ""
+
+
+def test_build_locations_preserves_order_dedupes_and_structures_each_instance():
+    locations = location.build_locations(
+        "Austin, TX, US | Toronto, Ontario, Canada | Austin, TX, US"
+    )
+
+    assert [item.raw for item in locations] == [
+        "Austin, TX, US",
+        "Toronto, Ontario, Canada",
+    ]
+    assert locations[0].as_dict() == {
+        "city": "Austin",
+        "region": "TX",
+        "country": "US",
+        "is_us": True,
+        "raw": "Austin, TX, US",
+    }
+    assert locations[1].city == "Toronto"
+    assert locations[1].region == "Ontario"
+    assert locations[1].country == "CA"
+
+
+def test_build_locations_uses_primary_hint_without_losing_other_locations():
+    locations = location.build_locations(
+        "Toronto, ON | Remote - US",
+        primary=location.StructuredLocation(
+            city="Toronto", region="Ontario", country="CA", is_us=False
+        ),
+    )
+
+    assert [(item.city, item.region, item.country, item.raw) for item in locations] == [
+        ("Toronto", "Ontario", "CA", "Toronto, ON"),
+        (None, None, "US", "Remote - US"),
+    ]
+
+
+def test_location_instances_from_criteria_falls_back_to_legacy_shape():
+    legacy = {
+        "location_parts": {
+            "city": "Boston",
+            "region": "MA",
+            "country": "US",
+            "is_us": True,
+            "raw": "Boston, MA",
+        }
+    }
+
+    assert location.location_instances_from_criteria(legacy)[0].city == "Boston"

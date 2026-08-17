@@ -4368,6 +4368,13 @@
             ],
             "title": "Locationregion"
           },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationInstanceOut"
+            },
+            "title": "Locations",
+            "type": "array"
+          },
           "needsAttention": {
             "default": false,
             "title": "Needsattention",
@@ -5137,6 +5144,62 @@
           "pagination"
         ],
         "title": "LlmRatePage",
+        "type": "object"
+      },
+      "LocationInstanceOut": {
+        "description": "One canonical work-location alternative for a job posting.",
+        "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "isUs": {
+            "default": false,
+            "title": "Isus",
+            "type": "boolean"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          }
+        },
+        "title": "LocationInstanceOut",
         "type": "object"
       },
       "LoginRequest": {
@@ -5997,6 +6060,13 @@
               }
             ],
             "title": "Locationregion"
+          },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationInstanceOut"
+            },
+            "title": "Locations",
+            "type": "array"
           },
           "needsAttention": {
             "default": false,
@@ -9534,6 +9604,13 @@
             ],
             "title": "Locationregion"
           },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationInstanceOut"
+            },
+            "title": "Locations",
+            "type": "array"
+          },
           "postedAt": {
             "anyOf": [
               {
@@ -10773,6 +10850,13 @@
               }
             ],
             "title": "Location"
+          },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationInstanceOut"
+            },
+            "title": "Locations",
+            "type": "array"
           },
           "postedAt": {
             "anyOf": [

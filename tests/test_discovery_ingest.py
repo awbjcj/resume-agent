@@ -43,6 +43,19 @@ def test_add_job_inserts_raw_and_strips_fields():
         assert job.title == "Eng"
 
 
+def test_add_job_normalizes_provider_location_separators():
+    with _session() as s:
+        job = add_job(
+            s,
+            source="personio",
+            jd_text="hello",
+            location="Berlin // Remote; Berlin",
+        )
+
+        assert job is not None
+        assert job.location == "Berlin | Remote"
+
+
 def test_add_job_dedupes_identical_jd():
     with _session() as s:
         first = add_job(s, source="manual", jd_text="same text")

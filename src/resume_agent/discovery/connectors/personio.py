@@ -5,7 +5,7 @@ from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen, provenance_for
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_markdown
+from resume_agent.discovery.connectors.text import html_to_markdown, join_locations
 from resume_agent.discovery.search_config import SearchConfig
 
 
@@ -34,7 +34,7 @@ def parse_personio(payload: str, token: str, country: str = "com") -> list[RawJo
                 else None,
                 company=provider_company or token,
                 title=position.get("name"),
-                location=position.get("office") or None,
+                location=join_locations([position.get("office")]),
                 jd_text=html_to_markdown(position.get("description") or ""),
                 posted_at=None,
                 company_provenance=provenance_for(provider_company),

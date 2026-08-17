@@ -4774,6 +4774,8 @@ export interface components {
             locationCountry?: string | null;
             /** Locationregion */
             locationRegion?: string | null;
+            /** Locations */
+            locations?: components["schemas"]["LocationInstanceOut"][];
             /**
              * Needsattention
              * @default false
@@ -5039,6 +5041,25 @@ export interface components {
             /** Data */
             data: components["schemas"]["LlmRateOut"][];
             pagination: components["schemas"]["Pagination"];
+        };
+        /**
+         * LocationInstanceOut
+         * @description One canonical work-location alternative for a job posting.
+         */
+        LocationInstanceOut: {
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+            /**
+             * Isus
+             * @default false
+             */
+            isUs: boolean;
+            /** Raw */
+            raw?: string | null;
+            /** Region */
+            region?: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -5332,6 +5353,8 @@ export interface components {
             locationCountry?: string | null;
             /** Locationregion */
             locationRegion?: string | null;
+            /** Locations */
+            locations?: components["schemas"]["LocationInstanceOut"][];
             /**
              * Needsattention
              * @default false
@@ -6672,6 +6695,8 @@ export interface components {
             locationCountry?: string | null;
             /** Locationregion */
             locationRegion?: string | null;
+            /** Locations */
+            locations?: components["schemas"]["LocationInstanceOut"][];
             /** Postedat */
             postedAt: string | null;
             /** Remotepolicy */
@@ -7093,6 +7118,8 @@ export interface components {
             jobId: number;
             /** Location */
             location: string | null;
+            /** Locations */
+            locations?: components["schemas"]["LocationInstanceOut"][];
             /** Postedat */
             postedAt: string | null;
             /** Rejectcategory */

@@ -45,7 +45,7 @@ from resume_agent.taxonomy.industries import (
     normalize_industry,
     save_industry_taxonomy,
 )
-from resume_agent.taxonomy.location import build_location
+from resume_agent.taxonomy.location import StructuredLocation, build_locations
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
 from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
@@ -370,11 +370,23 @@ def _job_location_text(job: Job) -> str | None:
 
 def _write_taxonomy_fields(job: Job, fit: FitScore, raw_location: str | None) -> None:
     criteria = dict(job.criteria_json or {})
-    if fit.location is not None:
-        loc = build_location(
-            fit.location.city, fit.location.region, fit.location.country, raw=raw_location
+    primary = (
+        StructuredLocation(
+            city=fit.location.city,
+            region=fit.location.region,
+            country=fit.location.country,
+            is_us=False,
         )
-        criteria["location_parts"] = loc.as_dict()
+        if fit.location is not None
+        and any((fit.location.city, fit.location.region, fit.location.country))
+        else None
+    )
+    locations = build_locations(raw_location, primary=primary)
+    if locations:
+        serialized = [location.as_dict() for location in locations]
+        criteria["locations"] = serialized
+        # Compatibility projection for older API/read paths and persisted jobs.
+        criteria["location_parts"] = serialized[0]
     job.criteria_json = criteria
 
 

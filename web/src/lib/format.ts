@@ -46,8 +46,8 @@ const LOWERCASE_LOCATION_WORDS = new Set(["of", "the", "and", "de", "la", "van",
 
 function titleCaseWord(word: string): string {
   return word
-    .split(/([-'])/)
-    .map((part) => (part === "-" || part === "'" || !part ? part : part[0].toUpperCase() + part.slice(1).toLowerCase()))
+    .split(/([-()[\]'])/)
+    .map((part) => (/^[-()[\]']$/.test(part) || !part ? part : part[0].toUpperCase() + part.slice(1).toLowerCase()))
     .join("");
 }
 
@@ -92,18 +92,57 @@ export function formatLocationText(raw: string | null | undefined): string | nul
   return formatted || null;
 }
 
+type LocationInstance = {
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  raw?: string | null;
+};
+
+function instanceLabel(location: LocationInstance): string | null {
+  if (location.raw && /\bremote\b/i.test(location.raw)) {
+    return formatLocationText(location.raw);
+  }
+  const structured = [location.city, location.region, location.country]
+    .filter(Boolean)
+    .map((part) => formatLocationSegment(part!))
+    .join(", ");
+  return structured || formatLocationText(location.raw);
+}
+
+function joinLocationLabels(labels: Array<string | null>): string | null {
+  const seen = new Set<string>();
+  const values = labels.filter((label): label is string => {
+    if (!label) return false;
+    const key = label.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return values.length ? values.join(" | ") : null;
+}
+
+function compositeLocationLabel(raw: string): string | null {
+  return joinLocationLabels(
+    raw.split(/\s*(?:\||;)\s*/).map((value) => formatLocationText(value)),
+  );
+}
+
 /** The single source of truth for how a job's location renders anywhere in the
  * UI. A normalized city/region/country tuple cannot represent multiple
  * alternatives, so preserve a provider's composite value; otherwise prefer
  * the normalized facets and fall back to the raw scraped string. */
 export function locationLabel(job: {
   location?: string | null;
+  locations?: LocationInstance[] | null;
   locationCity?: string | null;
   locationRegion?: string | null;
   locationCountry?: string | null;
 }): string | null {
+  const canonical = joinLocationLabels((job.locations ?? []).map(instanceLabel));
+  if (canonical) return canonical;
   const raw = job.location?.trim();
-  if (raw && /[|;]/.test(raw)) return raw;
+  if (raw && /[|;]/.test(raw)) return compositeLocationLabel(raw);
   const structured = [job.locationCity, job.locationRegion, job.locationCountry]
     .filter(Boolean)
     .map((part) => formatLocationSegment(part!))

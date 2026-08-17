@@ -25,6 +25,7 @@ from resume_agent.tracking.repository import (
     has_progress,
 )
 from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.taxonomy.location import join_locations
 
 
 class IngestOutcome(str, Enum):
@@ -76,7 +77,7 @@ def save_or_upgrade(
         url=url,
         company=company,
         title=title,
-        location=location,
+        location=join_locations([location]),
         posted_at=posted_at,
         stale_company=stale_company,
     )

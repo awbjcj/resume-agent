@@ -1,4 +1,3 @@
-import re
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from typing import Literal
@@ -17,7 +16,7 @@ from resume_agent.discovery.connectors.base import (
 from resume_agent.discovery.connectors.config import GreenhouseBoard
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import harvest
-from resume_agent.discovery.connectors.text import html_to_markdown
+from resume_agent.discovery.connectors.text import html_to_markdown, join_locations
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.discovery.url_ingest import fetch as url_fetch
 
@@ -50,17 +49,7 @@ def _normalize_location(value) -> str | None:
     location = value.strip()
     if not location or location.lower() in _PLACEHOLDER_LOCATIONS:
         return None
-    parts = [part.strip() for part in re.split(r"\s*[;|]\s*", location) if part.strip()]
-    unique: list[str] = []
-    seen: set[str] = set()
-    for part in parts:
-        key = part.casefold()
-        if key not in seen:
-            seen.add(key)
-            unique.append(part)
-    if len(unique) == len(parts):
-        return location
-    return " | ".join(unique)
+    return join_locations([location])
 
 
 def _names(items) -> str | None:

@@ -36,6 +36,7 @@ from resume_agent.services.errors import (
     record_job_failure,
     resolve_job_failures,
 )
+from resume_agent.taxonomy.location import join_locations
 from resume_agent.services.rendering import render_resume_version
 from resume_agent.services.tailoring import tailor
 from resume_agent.tenancy.limits import enforce_active_budget
@@ -111,7 +112,7 @@ def repull_job(
     job.jd_text = raw.jd_text
     job.content_fingerprint = compute_content_fingerprint(raw.jd_text)
     if raw.location:
-        job.location = raw.location
+        job.location = join_locations([raw.location])
 
     company = raw.company or job.company
     title = raw.title or job.title

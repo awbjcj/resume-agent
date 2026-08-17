@@ -18,6 +18,7 @@ from resume_agent.tracking.migrate import (
     ensure_dedup_key_column,
     ensure_gate_override_column,
     ensure_industry_pending_column,
+    ensure_job_location_instances,
     ensure_posted_at_column,
     ensure_reject_category_column,
     ensure_resume_version_attempt_columns,
@@ -90,6 +91,7 @@ def init_db(engine: Engine) -> None:
     ensure_gate_override_column(engine)
     ensure_content_fingerprint_column(engine)
     ensure_industry_pending_column(engine)
+    ensure_job_location_instances(engine)
     ensure_resume_version_revision_columns(engine)
     ensure_resume_version_attempt_columns(engine)
     ensure_resume_version_gate_reviewers_column(engine)

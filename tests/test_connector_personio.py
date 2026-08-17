@@ -19,7 +19,7 @@ def test_personio_maps_search_json_and_converts_html():
     assert search_url("pitch", "de") == "https://pitch.jobs.personio.de/search.json?language=en"
     assert jobs[0].company == "Pitch Software GmbH"
     assert jobs[0].title == "Frontend Performance Engineer"
-    assert jobs[0].location == "Berlin // Remote"
+    assert jobs[0].location == "Berlin | Remote"
     assert jobs[0].url == "https://pitch.jobs.personio.de/job/160959"
     assert "- Five years building frontend systems" in jobs[0].jd_text
 

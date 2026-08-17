@@ -118,6 +118,12 @@ Only these read-only MCP tools are exposed: `h1b_get_company_stats`,
 never treated as confirmation of current sponsorship or current employer
 policy, never flip the posting signal, and never hard-reject a job.
 
+For local development, `make dev` starts the API, Vite frontend, and the sibling
+`h1b-job-search-mcp` server together. The launcher uses
+`http://127.0.0.1:8001/mcp` for the API's Streamable HTTP connection, so no
+manual MCP command or URL is needed. Run `make stack-health` after startup to
+check both HTTP health endpoints and the MCP handshake/tool allowlist.
+
 ### Multi-user server
 
 Every file-backed API server uses isolated per-user workspaces. Seed the first
@@ -441,10 +447,10 @@ Copied from `.env.example`. Loaded automatically.
 
 | Key                                                     | Purpose                                                                                                                                                                                                                       |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                                     | Shared Claude credential (the default provider); set it as a Railway environment variable in hosted deployments.                                                                                                             |
-| `OPENAI_API_KEY`                                        | Shared OpenAI credential for tiers prefixed `openai:`; set it as a Railway environment variable.                                                                                                                             |
-| `GEMINI_API_KEY`                                        | Shared Gemini credential for tiers prefixed `gemini:`; set it as a Railway environment variable.                                                                                                                             |
-| `DEEPSEEK_API_KEY`                                      | Shared DeepSeek credential for tiers prefixed `deepseek:`; set it as a Railway environment variable.                                                                                                                         |
+| `ANTHROPIC_API_KEY`                                     | Shared Claude credential (the default provider); set it as a Railway environment variable in hosted deployments.                                                                                                              |
+| `OPENAI_API_KEY`                                        | Shared OpenAI credential for tiers prefixed `openai:`; set it as a Railway environment variable.                                                                                                                              |
+| `GEMINI_API_KEY`                                        | Shared Gemini credential for tiers prefixed `gemini:`; set it as a Railway environment variable.                                                                                                                              |
+| `DEEPSEEK_API_KEY`                                      | Shared DeepSeek credential for tiers prefixed `deepseek:`; set it as a Railway environment variable.                                                                                                                          |
 | `GITHUB_TOKEN`                                          | Optional; enriches `profile build`.                                                                                                                                                                                           |
 | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`                      | Optional; enable the Adzuna connector for `pull`.                                                                                                                                                                             |
 | `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD`                  | Burner credentials for `scrape`.                                                                                                                                                                                              |

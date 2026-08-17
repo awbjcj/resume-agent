@@ -8,6 +8,7 @@ from markdownify import markdownify as _markdownify
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.taxonomy.location import join_locations as _join_locations
 
 _MATERIAL_ICON_TOKENS = frozenset(
     {
@@ -72,18 +73,8 @@ def html_to_markdown(raw: str) -> str:
 
 
 def join_locations(values: Iterable[object]) -> str | None:
-    """Join provider-owned location alternatives without repeats."""
-    locations: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not isinstance(value, str) or not (location := value.strip()):
-            continue
-        key = location.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        locations.append(location)
-    return " | ".join(locations) or None
+    """Join provider alternatives through the canonical location formatter."""
+    return _join_locations(values)
 
 
 def jobposting_location(posting: dict) -> str | None:

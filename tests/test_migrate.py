@@ -1,8 +1,14 @@
+import json
+
 from sqlalchemy import text
 from sqlmodel import create_engine
 
 from resume_agent.db import init_db
-from resume_agent.tracking.migrate import ensure_dedup_key_column, ensure_posted_at_column
+from resume_agent.tracking.migrate import (
+    ensure_dedup_key_column,
+    ensure_job_location_instances,
+    ensure_posted_at_column,
+)
 
 
 def test_ensure_adds_column_and_backfills_old_jobs_table():
@@ -92,3 +98,53 @@ def test_url_index_created(tmp_path):
     with engine.begin() as conn:
         names = [row[1] for row in conn.execute(text("PRAGMA index_list(jobs)"))]
     assert "ix_jobs_url" in names
+
+
+def test_location_instance_migration_backfills_legacy_multi_location_jobs():
+    engine = create_engine("sqlite://")
+    init_db(engine)
+    criteria = {
+        "location_parts": {
+            "city": "Austin",
+            "region": "TX",
+            "country": "US",
+            "is_us": True,
+            "raw": "Austin, TX",
+        }
+    }
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO jobs (source, location, jd_text, status, criteria_json, "
+                "gate_override, industry_pending, schema_version, created_at) "
+                "VALUES ('ashby', :location, 'jd', 'shortlisted', :criteria, "
+                "0, 0, 1, CURRENT_TIMESTAMP)"
+            ),
+            {
+                "location": "Austin, TX | Toronto, Ontario, Canada",
+                "criteria": json.dumps(criteria),
+            },
+        )
+        conn.execute(
+            text(
+                "INSERT INTO jobs (source, location, jd_text, status, "
+                "gate_override, industry_pending, schema_version, created_at) "
+                "VALUES ('personio', 'Berlin // Remote', 'jd', 'raw', "
+                "0, 0, 1, CURRENT_TIMESTAMP)"
+            )
+        )
+
+    ensure_job_location_instances(engine)
+    ensure_job_location_instances(engine)
+
+    with engine.connect() as conn:
+        stored = conn.execute(
+            text("SELECT criteria_json FROM jobs ORDER BY id")
+        ).scalars().all()
+    migrated = json.loads(stored[0])
+    assert [item["city"] for item in migrated["locations"]] == ["Austin", "Toronto"]
+    assert migrated["locations"][1]["country"] == "CA"
+    assert [item["raw"] for item in json.loads(stored[1])["locations"]] == [
+        "Berlin",
+        "Remote",
+    ]

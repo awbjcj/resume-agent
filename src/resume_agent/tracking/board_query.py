@@ -47,6 +47,7 @@ TRIAGE_STATUSES = (
     JobStatus.rejected.value,
 )
 SKILL_KEYS = ("must_have_skills", "nice_to_have_skills", "tech_stack")
+LOCATION_FACET_KEYS = ("country", "region", "city")
 
 
 def _json_text(*path: str) -> ColumnElement[str]:
@@ -173,7 +174,9 @@ def _selected(values: Sequence[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(value for value in values if value))
 
 
-def _base_clauses(board: BoardName, board_filter: BoardFilter) -> list[ColumnElement[bool]]:
+def _base_clauses(
+    board: BoardName, board_filter: BoardFilter
+) -> list[ColumnElement[bool]]:
     archived = cast(Any, Job.archived_at)
     status = cast(Any, Job.status)
     if board == "shortlist":
@@ -233,7 +236,9 @@ def derive_filter_values(
 
     skill_values: tuple[str, ...] | None = None
     selected_skills = {
-        normalize_skill(value) for value in board_filter.skills if normalize_skill(value)
+        normalize_skill(value)
+        for value in board_filter.skills
+        if normalize_skill(value)
     }
     if selected_skills:
         aliases = load_aliases(aliases_path)
@@ -266,6 +271,51 @@ def _skill_exists(raw_values: tuple[str, ...]) -> ColumnElement[bool]:
             .exists()
         )
     return or_(*clauses)
+
+
+def _location_filter_clause(
+    board_filter: BoardFilter,
+    *,
+    exclude: str | None,
+) -> ColumnElement[bool] | None:
+    """Match all selected location dimensions against the same instance."""
+    selected = {
+        key: _selected(getattr(board_filter, key))
+        for key in LOCATION_FACET_KEYS
+        if key != exclude
+    }
+    selected = {key: values for key, values in selected.items() if values}
+    if not selected:
+        return None
+
+    entries = func.json_each(cast(Any, Job.criteria_json), "$.locations").table_valued(
+        "key", "value", joins_implicitly=True
+    )
+    instance_matches = and_(
+        *(
+            func.json_extract(entries.c.value, f"$.{key}").in_(values)
+            for key, values in selected.items()
+        )
+    )
+    array_match = (
+        select(1).select_from(entries).where(instance_matches).correlate(Job).exists()
+    )
+    has_instances = (
+        func.coalesce(
+            func.json_array_length(
+                func.json_extract(cast(Any, Job.criteria_json), "$.locations")
+            ),
+            0,
+        )
+        > 0
+    )
+    legacy_match = and_(
+        *(
+            _json_text("location_parts", key).in_(values)
+            for key, values in selected.items()
+        )
+    )
+    return or_(array_match, and_(~has_instances, legacy_match))
 
 
 def _search_columns(board: BoardName) -> tuple[ColumnElement[Any], ...]:
@@ -330,13 +380,9 @@ def _filter_clauses(
 
     fit_score = cast(Any, Job.fit_score)
     if board_filter.min_fit is not None:
-        clauses.append(
-            or_(fit_score.is_(None), fit_score >= board_filter.min_fit)
-        )
+        clauses.append(or_(fit_score.is_(None), fit_score >= board_filter.min_fit))
     if board_filter.max_fit is not None:
-        clauses.append(
-            or_(fit_score.is_(None), fit_score <= board_filter.max_fit)
-        )
+        clauses.append(or_(fit_score.is_(None), fit_score <= board_filter.max_fit))
 
     if board_filter.min_salary is not None and board != "triage":
         salary = _salary_value(board)
@@ -361,7 +407,12 @@ def _filter_clauses(
 
     derived = derived or derive_filter_values(session, board_filter, aliases_path)
     visible_facets = _VISIBLE_FACETS[board]
+    location_clause = _location_filter_clause(board_filter, exclude=exclude)
+    if location_clause is not None:
+        clauses.append(location_clause)
     for spec in FACET_SPECS:
+        if spec.key in LOCATION_FACET_KEYS:
+            continue
         if spec.key == exclude:
             continue
         selected = _selected(getattr(board_filter, spec.filter_attr))
@@ -458,17 +509,21 @@ def board_statement(
     omitted the values are derived here.
     """
     query_time = now or datetime.now(timezone.utc)
-    return select(Job).where(
-        *_filter_clauses(
-            session,
-            board,
-            board_filter,
-            exclude=None,
-            now=query_time,
-            aliases_path=aliases_path,
-            derived=derived,
+    return (
+        select(Job)
+        .where(
+            *_filter_clauses(
+                session,
+                board,
+                board_filter,
+                exclude=None,
+                now=query_time,
+                aliases_path=aliases_path,
+                derived=derived,
+            )
         )
-    ).order_by(*_ordering(board, board_filter, query_time))
+        .order_by(*_ordering(board, board_filter, query_time))
+    )
 
 
 def board_page(
@@ -499,9 +554,7 @@ def board_page(
     )
     total = session.exec(count_statement).one()
     page_ids = list(
-        session.exec(
-            id_statement.offset((page - 1) * page_size).limit(page_size)
-        ).all()
+        session.exec(id_statement.offset((page - 1) * page_size).limit(page_size)).all()
     )
     if not page_ids:
         return [], total
@@ -590,9 +643,7 @@ def _shared_facet_counts(
     derived: DerivedFilterValues,
 ) -> Facets:
     """Count facets from one narrow projection when leave-one-out sets coincide."""
-    visible_specs = [
-        spec for spec in FACET_SPECS if spec.key in _VISIBLE_FACETS[board]
-    ]
+    visible_specs = [spec for spec in FACET_SPECS if spec.key in _VISIBLE_FACETS[board]]
     clauses = _filter_clauses(
         session,
         board,
@@ -619,7 +670,8 @@ def _shared_facet_counts(
         # Attribute access, not row[n]: `columns` is built conditionally, so
         # positional reads would silently shift if a column were ever added.
         criteria = getattr(row, "criteria_json", None) or {}
-        location = criteria.get("location_parts") or {}
+        locations = _criteria_locations(criteria)
+        location = locations[0] if locations else {}
         values = {
             "source": row.source,
             "status": row.status,
@@ -634,6 +686,14 @@ def _shared_facet_counts(
             "companySize": criteria.get("company_size"),
         }
         for spec in visible_specs:
+            if spec.key in LOCATION_FACET_KEYS:
+                tokens = {
+                    str(instance.get(spec.key))
+                    for instance in locations
+                    if instance.get(spec.key)
+                }
+                value_counts[spec.key].update(tokens)
+                continue
             value = values[spec.key]
             if not value:
                 continue
@@ -662,13 +722,71 @@ def _shared_facet_counts(
             skill_counts.update(job_skills)
 
     facets = {
-        key: _sorted_counts(counts)
-        for key, counts in value_counts.items()
-        if counts
+        key: _sorted_counts(counts) for key, counts in value_counts.items() if counts
     }
     if skill_counts:
         facets["skills"] = _sorted_counts(skill_counts)
     return facets
+
+
+def _criteria_locations(criteria: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = criteria.get("locations")
+    if isinstance(raw, list):
+        locations = [item for item in raw if isinstance(item, dict)]
+        if locations:
+            return locations
+    legacy = criteria.get("location_parts")
+    return [legacy] if isinstance(legacy, dict) else []
+
+
+def _location_instance_matches(
+    instance: dict[str, Any],
+    board_filter: BoardFilter,
+    *,
+    exclude: str,
+) -> bool:
+    for key in LOCATION_FACET_KEYS:
+        if key == exclude:
+            continue
+        selected = _selected(getattr(board_filter, key))
+        if selected and instance.get(key) not in selected:
+            return False
+    return True
+
+
+def _location_facet_counts(
+    session: Session,
+    board: BoardName,
+    board_filter: BoardFilter,
+    spec: FacetSpec,
+    *,
+    now: datetime,
+    aliases_path: str | Path,
+    derived: DerivedFilterValues,
+) -> dict[str, int]:
+    clauses = _filter_clauses(
+        session,
+        board,
+        board_filter,
+        exclude=spec.key,
+        now=now,
+        aliases_path=aliases_path,
+        derived=derived,
+    )
+    rows = session.exec(
+        select(cast(Any, Job.id), cast(Any, Job.criteria_json)).where(*clauses)
+    ).all()
+    counts: Counter[str] = Counter()
+    for _job_id, criteria_json in rows:
+        criteria = criteria_json or {}
+        tokens = {
+            str(instance[spec.key])
+            for instance in _criteria_locations(criteria)
+            if instance.get(spec.key)
+            and _location_instance_matches(instance, board_filter, exclude=spec.key)
+        }
+        counts.update(tokens)
+    return _sorted_counts(counts)
 
 
 def board_facet_counts(
@@ -696,6 +814,19 @@ def board_facet_counts(
     facets: Facets = {}
     for spec in FACET_SPECS:
         if spec.key not in _VISIBLE_FACETS[board]:
+            continue
+        if spec.key in LOCATION_FACET_KEYS:
+            counts = _location_facet_counts(
+                session,
+                board,
+                board_filter,
+                spec,
+                now=query_time,
+                aliases_path=aliases_path,
+                derived=derived,
+            )
+            if counts:
+                facets[spec.key] = counts
             continue
         expression = spec.sql()
         clauses = _filter_clauses(
