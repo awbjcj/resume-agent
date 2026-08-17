@@ -18,10 +18,13 @@ const setupStatus = {
 test.beforeEach(async ({ page }) => {
   let pythonGroup = "languages";
   let pythonGroupSource = "taxonomy";
+  let addedSkill: string | null = null;
   await page.route("**/api/notifications", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/setup/status", (route) => route.fulfill({ json: setupStatus }));
   await mockEmptyRuns(page);
   await page.route("**/api/profile/skeleton", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/profile/suppressed-skills", (route) =>
+    route.fulfill({ json: [] }));
   await page.route("**/api/profile/coach/sessions", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/profile/sources", (route) =>
     route.fulfill({
@@ -76,9 +79,39 @@ test.beforeEach(async ({ page }) => {
             strength: 1,
             lastUsed: null,
           },
+          ...(addedSkill
+            ? [{
+                key: addedSkill.toLowerCase(),
+                display: addedSkill,
+                category: "hard",
+                group: "languages",
+                groupSource: "correction",
+                inferred: false,
+                strength: 0,
+                lastUsed: null,
+              }]
+            : []),
         ],
       },
     }));
+  await page.route("**/api/profile/skills", async (route) => {
+    if (route.request().method() === "POST") {
+      const payload = route.request().postDataJSON();
+      addedSkill = payload.name;
+      await route.fulfill({
+        status: 201,
+        json: {
+          id: "manual-skill",
+          kind: "new_skill",
+          addedAt: "2026-07-10T00:00:00Z",
+          name: addedSkill,
+          category: payload.category,
+        },
+      });
+      return;
+    }
+    await route.fulfill({ json: [] });
+  });
   await page.route("**/api/profile/skills/*/group", async (route) => {
     if (route.request().method() === "PUT") {
       pythonGroup = route.request().postDataJSON().group;
@@ -172,6 +205,14 @@ test("profile depth controls and grouped skills form one working story", async (
   await expect(page.getByText("Python", { exact: true })).toBeVisible();
   await expect(page.getByText("vFlash", { exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: "Add skill" }).first().click();
+  await page.getByLabel("Skill name").fill("TypeScript");
+  const addRequest = page.waitForRequest(
+    (request) => request.url().endsWith("/api/profile/skills") && request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Add to category" }).click();
+  expect((await addRequest).postDataJSON()).toEqual({ name: "TypeScript", category: null });
+
   const moveRequest = page.waitForRequest(
     (request) =>
       request.url().endsWith("/api/profile/skills/python/group") &&
@@ -211,6 +252,7 @@ test("profile settings stay contained at a narrow viewport", async ({ page }) =>
   }));
   expect(layout.document).toBeLessThanOrEqual(layout.viewport);
 
+  await page.getByRole("tab", { name: "Documents" }).click();
   await page.getByRole("button", { name: "Add URL", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add a public page" });
   await expect(dialog).toBeVisible();

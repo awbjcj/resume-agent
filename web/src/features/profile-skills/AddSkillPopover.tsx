@@ -25,21 +25,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import {
+  SKILL_CATEGORY_LABELS,
+  SKILL_CATEGORY_OPTIONS,
+  type SkillCategory,
+} from "./skill-categories";
 import { useAddSkill, useAddSkillAlias, useProfileSkills } from "./use-profile-skills";
-
-type Category = "unspecified" | "hard" | "soft" | "domain";
-
-const CATEGORY_LABEL: Record<Category, string> = {
-  unspecified: "Not sure",
-  hard: "Hard skill",
-  soft: "Soft skill",
-  domain: "Domain",
-};
 
 export function AddSkillPopover({ skillName }: { skillName: string }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"new" | "alias">("new");
-  const [category, setCategory] = useState<Category>("unspecified");
+  const [category, setCategory] = useState<SkillCategory>("unspecified");
   const [query, setQuery] = useState("");
   const { data: skills } = useProfileSkills(open && mode === "alias");
   const addSkill = useAddSkill();
@@ -112,20 +108,19 @@ export function AddSkillPopover({ skillName }: { skillName: string }) {
         {mode === "new" ? (
           <div className="mt-3 space-y-3">
             <Select
-              items={(Object.keys(CATEGORY_LABEL) as Category[]).map((value) => ({
-                value,
-                label: CATEGORY_LABEL[value],
-              }))}
+              items={SKILL_CATEGORY_OPTIONS}
               value={category}
-              onValueChange={(value) => setCategory((value as Category) ?? "unspecified")}
+              onValueChange={(value) =>
+                setCategory((value as SkillCategory | null) ?? "unspecified")
+              }
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(CATEGORY_LABEL) as Category[]).map((value) => (
+                {SKILL_CATEGORY_OPTIONS.map(({ value }) => (
                   <SelectItem key={value} value={value}>
-                    {CATEGORY_LABEL[value]}
+                    {SKILL_CATEGORY_LABELS[value]}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -8,8 +8,13 @@ const state = vi.hoisted(() => ({
   refetch: vi.fn(),
   setGroup: vi.fn(),
   clearGroup: vi.fn(),
+  addSkill: vi.fn(),
   deleteSkill: vi.fn(),
   restoreSkill: vi.fn(),
+}));
+
+vi.mock("@/features/profile-skills/use-profile-skills", () => ({
+  useAddSkill: () => ({ mutate: state.addSkill, isPending: false }),
 }));
 
 vi.mock("./use-matrix", () => ({
@@ -33,6 +38,7 @@ describe("SkillGroupsPanel", () => {
     state.refetch.mockReset();
     state.setGroup.mockReset();
     state.clearGroup.mockReset();
+    state.addSkill.mockReset();
     state.deleteSkill.mockReset();
     state.restoreSkill.mockReset();
     state.suppressed = [];
@@ -57,7 +63,8 @@ describe("SkillGroupsPanel", () => {
       data: { generatedAt: "", groups, rows: [] },
     };
     render(<SkillGroupsPanel />);
-    expect(screen.getByText(/run a profile build/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /languages/i })).toHaveTextContent("0");
+    expect(screen.getByRole("button", { name: /other/i })).toHaveTextContent("0");
   });
 
   it("uses server vocabulary order, buckets nulls into Other, and shows counts", () => {
@@ -121,6 +128,7 @@ describe("SkillGroupsPanel", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /change group for python/i }),
     );
+    expect(await screen.findByRole("menu")).toHaveClass("max-h-80", "w-72", "min-w-72");
     await userEvent.click(await screen.findByRole("menuitem", { name: /^other$/i }));
     expect(state.setGroup).toHaveBeenCalledWith({ key: "python", group: "other" });
 
@@ -194,6 +202,45 @@ describe("SkillGroupsPanel", () => {
     );
     await userEvent.click(await screen.findByRole("menuitem", { name: /delete skill/i }));
     expect(state.deleteSkill).toHaveBeenCalledWith("kubernetes");
+  });
+
+  it("adds a new skill directly to a category", async () => {
+    state.value = {
+      isPending: false,
+      isError: false,
+      data: {
+        generatedAt: "2026-07-20T00:00:00Z",
+        groups,
+        rows: [
+          {
+            key: "python",
+            display: "Python",
+            category: "hard",
+            group: "languages",
+            groupSource: "taxonomy",
+            inferred: false,
+            strength: 2,
+            lastUsed: null,
+          },
+        ],
+      },
+    };
+    state.addSkill.mockImplementation((_variables, options) => options?.onSuccess());
+    const user = userEvent.setup();
+    render(<SkillGroupsPanel />);
+
+    await user.click(screen.getByRole("button", { name: /add skill/i }));
+    await user.type(screen.getByLabelText(/skill name/i), "TypeScript");
+    await user.click(screen.getByRole("button", { name: /add to category/i }));
+
+    expect(state.addSkill).toHaveBeenCalledWith(
+      { name: "TypeScript", category: null },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(state.setGroup).toHaveBeenCalledWith(
+      { key: "TypeScript", group: "languages" },
+    );
+    expect(screen.queryByText(/add to languages/i)).not.toBeInTheDocument();
   });
 
   it("restores a suppressed skill", async () => {

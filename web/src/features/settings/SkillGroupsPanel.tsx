@@ -1,10 +1,9 @@
-import { Check, CircleAlert, Layers3, Pin, Trash2, Undo2 } from "lucide-react";
+import { Check, CircleAlert, Pin, Trash2, Undo2 } from "lucide-react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { AddSkillToGroupPopover } from "./AddSkillToGroupPopover";
 import type { ProfileMatrix } from "./use-matrix";
 import {
   useClearSkillGroup,
@@ -55,21 +55,6 @@ export function SkillGroupsPanel() {
   }
 
   const rows = matrix.data.rows ?? [];
-  if (rows.length === 0) {
-    return (
-      <section aria-labelledby="skill-groups-heading">
-        <h2 id="skill-groups-heading" className="mb-3 text-base font-semibold">Skill groups</h2>
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon"><Layers3 aria-hidden="true" /></EmptyMedia>
-            <EmptyTitle>No grouped skills yet</EmptyTitle>
-            <EmptyDescription>Run a profile build to classify your skill matrix.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </section>
-    );
-  }
-
   const groups = matrix.data.groups ?? [];
   const known = new Set(groups.map((group) => group.slug));
   const byGroup = new Map<string, MatrixRow[]>();
@@ -83,15 +68,18 @@ export function SkillGroupsPanel() {
     ...groups.filter((group) => group.slug !== "other"),
     groups.find((group) => group.slug === "other") ?? { slug: "other", label: "Other" },
   ];
+  const populatedGroups = orderedGroups
+    .filter((group) => (byGroup.get(group.slug)?.length ?? 0) > 0)
+    .map((group) => group.slug);
 
   return (
     <section aria-labelledby="skill-groups-heading">
       <h2 id="skill-groups-heading" className="text-base font-semibold">Skill groups</h2>
       <p className="mb-2 text-sm text-muted-foreground">
         Profile skills grouped by their primary professional use. Click a skill to move it;
-        corrections are pinned and survive profile rebuilds.
+        open any category to add a new one. Corrections are pinned and survive profile rebuilds.
       </p>
-      <Accordion multiple defaultValue={orderedGroups.map((group) => group.slug)}>
+      <Accordion multiple defaultValue={populatedGroups}>
         {orderedGroups.map((group) => {
           const members = byGroup.get(group.slug) ?? [];
           return (
@@ -103,8 +91,17 @@ export function SkillGroupsPanel() {
                 </span>
               </AccordionTrigger>
               <AccordionContent>
-                <div className="flex flex-wrap gap-2">
-                  {members.length > 0 ? members.map((row) => {
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">
+                    {members.length === 0
+                      ? "No skills in this category yet."
+                      : `${members.length} skill${members.length === 1 ? "" : "s"}`}
+                  </span>
+                  <AddSkillToGroupPopover group={group} />
+                </div>
+                {members.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {members.map((row) => {
                     const current = row.group && known.has(row.group) ? row.group : "other";
                     return (
                       <DropdownMenu key={row.key}>
@@ -123,12 +120,16 @@ export function SkillGroupsPanel() {
                           ) : null}
                           {row.display}
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
+                        <DropdownMenuContent
+                          align="start"
+                          className="max-h-80 w-72 min-w-72"
+                        >
                           <DropdownMenuGroup>
                             <DropdownMenuLabel>Move to…</DropdownMenuLabel>
                             {orderedGroups.map((target) => (
                               <DropdownMenuItem
                                 key={target.slug}
+                                className="whitespace-nowrap"
                                 disabled={setGroup.isPending || target.slug === current}
                                 onClick={() =>
                                   setGroup.mutate({ key: row.key, group: target.slug })
@@ -167,10 +168,9 @@ export function SkillGroupsPanel() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     );
-                  }) : (
-                    <span className="text-xs text-muted-foreground">No skills in this group.</span>
-                  )}
-                </div>
+                    })}
+                  </div>
+                ) : null}
               </AccordionContent>
             </AccordionItem>
           );
