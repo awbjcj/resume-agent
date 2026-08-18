@@ -369,6 +369,8 @@ def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):
     evidence = report.by_company["acme"]
     assert evidence.status == "unavailable"
     assert evidence.unavailable_reason == H1B_MCP_UNAVAILABLE_REASON
+    assert evidence.expires_at is not None
+    assert evidence.retrieved_at is not None
     assert evidence.expires_at <= evidence.retrieved_at + timedelta(minutes=5)
 
 
