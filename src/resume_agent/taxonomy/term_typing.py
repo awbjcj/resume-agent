@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from asyncio import Semaphore
 from collections.abc import Mapping, Sequence
 from typing import Literal, Protocol, runtime_checkable
 
@@ -151,6 +152,13 @@ class TermTypeSuggestion(ExtensibleModel):
 @runtime_checkable
 class TermTypeAssistant(Protocol):
     def classify(self, source: TermSource) -> object: ...
+
+
+@runtime_checkable
+class AsyncTermTypeAssistant(TermTypeAssistant, Protocol):
+    async def aclassify(
+        self, source: TermSource, *, sem: Semaphore
+    ) -> TermTypeSuggestion: ...
 
 
 class TermTypingDecision(ExtensibleModel):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from asyncio import Semaphore
 
 from agno.agent import Agent
 
@@ -10,6 +11,8 @@ from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
+    acall,
+    aclose_runner,
     build_model,
     expect_schema,
     prompt_cache_for,
@@ -37,6 +40,28 @@ class ModelTermTypeAssistant:
         self._runner = runner
 
     def classify(self, source: TermSource) -> TermTypeSuggestion:
+        result = self._runner.run(self._payload(source))
+        return expect_schema(
+            result,
+            TermTypeSuggestion,
+            source="term-type-assistant",
+        )
+
+    async def aclassify(
+        self, source: TermSource, *, sem: Semaphore
+    ) -> TermTypeSuggestion:
+        result = await acall(self._runner, self._payload(source), sem=sem)
+        return expect_schema(
+            result,
+            TermTypeSuggestion,
+            source="term-type-assistant",
+        )
+
+    async def aclose(self) -> None:
+        await aclose_runner(self._runner)
+
+    @staticmethod
+    def _payload(source: TermSource) -> str:
         payload = json.dumps(
             {
                 "term": source.original_text,
@@ -45,12 +70,7 @@ class ModelTermTypeAssistant:
             },
             sort_keys=True,
         )
-        result = self._runner.run(payload)
-        return expect_schema(
-            result,
-            TermTypeSuggestion,
-            source="term-type-assistant",
-        )
+        return payload
 
 
 def build_term_type_assistant(model_id: str | None = None) -> ModelTermTypeAssistant:

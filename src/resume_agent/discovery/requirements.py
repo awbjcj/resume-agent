@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -25,8 +26,10 @@ from resume_agent.taxonomy.term_corrections import (
     apply_term_type_corrections,
 )
 from resume_agent.taxonomy.term_typing import (
+    AsyncTermTypeAssistant,
     TermSource,
     TermTypeAssistant,
+    TermTypeSuggestion,
     TermTypingDecision,
     type_term,
 )
@@ -82,6 +85,40 @@ def _locate(text: str, jd_text: str | None) -> tuple[int, int] | None:
     return match.span() if match is not None else None
 
 
+def _source_for(
+    raw: _RawRequirement,
+    *,
+    job_id: str,
+    jd_text: str | None,
+    legacy: bool,
+    explicit_span: tuple[int, int] | None = None,
+) -> tuple[TermSource, RequirementProvenance]:
+    span = explicit_span or _locate(raw.text, jd_text)
+    if legacy:
+        provenance: RequirementProvenance = "legacy_list_item"
+        span = None
+    elif span is None:
+        provenance = "unlocated_extraction"
+    else:
+        provenance = "exact_span"
+    source = (
+        TermSource.from_text(
+            source_kind="job_description",
+            source_id=f"job:{job_id}:{raw.legacy_source}:{raw.legacy_order}",
+            source_text=jd_text or "",
+            original_text=(jd_text or "")[span[0] : span[1]],
+            start=span[0],
+        )
+        if span is not None
+        else TermSource.without_offsets(
+            source_kind="job_criteria",
+            source_id=f"job:{job_id}:{raw.legacy_source}:{raw.legacy_order}",
+            original_text=raw.text,
+        )
+    )
+    return source, provenance
+
+
 def _experience_phrase(years: int, jd_text: str) -> tuple[str, int, int] | None:
     word = _NUMBER_WORDS.get(years)
     choices = [str(years), *([word] if word else [])]
@@ -93,9 +130,7 @@ def _experience_phrase(years: int, jd_text: str) -> tuple[str, int, int] | None:
     return match.group(), match.start(), match.end()
 
 
-def _kind(
-    raw: _RawRequirement, decision: TermTypingDecision
-) -> RequirementKind:
+def _kind(raw: _RawRequirement, decision: TermTypingDecision) -> RequirementKind:
     if raw.kind_override is not None:
         return raw.kind_override
     if _EDUCATION_TERMS.search(raw.text):
@@ -190,28 +225,12 @@ def _bind_one(
     aliases: Mapping[str, str] | None = None,
     term_corrections: list[TermTypeCorrection] | None = None,
 ) -> JobRequirement:
-    span = explicit_span or _locate(raw.text, jd_text)
-    if legacy:
-        provenance: RequirementProvenance = "legacy_list_item"
-        span = None
-    elif span is None:
-        provenance = "unlocated_extraction"
-    else:
-        provenance = "exact_span"
-    source = (
-        TermSource.from_text(
-            source_kind="job_description",
-            source_id=f"job:{job_id}:{raw.legacy_source}:{raw.legacy_order}",
-            source_text=jd_text or "",
-            original_text=(jd_text or "")[span[0] : span[1]],
-            start=span[0],
-        )
-        if span is not None
-        else TermSource.without_offsets(
-            source_kind="job_criteria",
-            source_id=f"job:{job_id}:{raw.legacy_source}:{raw.legacy_order}",
-            original_text=raw.text,
-        )
+    source, provenance = _source_for(
+        raw,
+        job_id=job_id,
+        jd_text=jd_text,
+        legacy=legacy,
+        explicit_span=explicit_span,
     )
     normalized = normalize_skill(source.original_text)
     canonical = (aliases or {}).get(normalized, normalized)
@@ -279,7 +298,9 @@ def _bind_one(
         legacy_source=raw.legacy_source,
         legacy_order=raw.legacy_order,
         exact_non_substitutable=strictness in {"credential", "exact_product"},
-        failure_reason=(decision.reason_code if decision.concept_type == "unknown" else None),
+        failure_reason=(
+            decision.reason_code if decision.concept_type == "unknown" else None
+        ),
     )
 
 
@@ -351,16 +372,11 @@ def project_legacy_criteria(
     return result
 
 
-def bind_job_requirements(
+def _explicit_requirements(
     criteria: JobCriteria,
     *,
-    job_id: int | str,
     jd_text: str,
-    taxonomy_revision: str,
-    assistant: TermTypeAssistant | None = None,
-    aliases: Mapping[str, str] | None = None,
-    term_corrections: list[TermTypeCorrection] | None = None,
-) -> JobCriteria:
+) -> list[tuple[_RawRequirement, tuple[int, int] | None]]:
     raw = _legacy_raw(criteria)
     explicit: list[tuple[_RawRequirement, tuple[int, int] | None]] = [
         (item, None) for item in raw
@@ -415,6 +431,20 @@ def bind_job_requirements(
                 )
             )
             derived_order += 1
+    return explicit
+
+
+def bind_job_requirements(
+    criteria: JobCriteria,
+    *,
+    job_id: int | str,
+    jd_text: str,
+    taxonomy_revision: str,
+    assistant: TermTypeAssistant | None = None,
+    aliases: Mapping[str, str] | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
+) -> JobCriteria:
+    explicit = _explicit_requirements(criteria, jd_text=jd_text)
     requirements = [
         _bind_one(
             item,
@@ -465,4 +495,72 @@ def bind_job_requirements(
             "job_extraction_revision": revision,
             "requirement_reconciliation_issues": issues,
         }
+    )
+
+
+class _SuggestionAssistant:
+    def __init__(self, suggestions: Mapping[str, TermTypeSuggestion]):
+        self._suggestions = suggestions
+
+    def classify(self, source: TermSource) -> object:
+        return self._suggestions[source.source_id]
+
+
+async def abind_job_requirements(
+    criteria: JobCriteria,
+    *,
+    job_id: int | str,
+    jd_text: str,
+    taxonomy_revision: str,
+    assistant: AsyncTermTypeAssistant | None,
+    sem: asyncio.Semaphore,
+    aliases: Mapping[str, str] | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
+) -> JobCriteria:
+    """Bind requirements while keeping optional model calls in the async leaf."""
+    if assistant is None:
+        return bind_job_requirements(
+            criteria,
+            job_id=job_id,
+            jd_text=jd_text,
+            taxonomy_revision=taxonomy_revision,
+            aliases=aliases,
+            term_corrections=term_corrections,
+        )
+
+    pending: list[TermSource] = []
+    for raw, span in _explicit_requirements(criteria, jd_text=jd_text):
+        source, _ = _source_for(
+            raw,
+            job_id=str(job_id),
+            jd_text=jd_text,
+            legacy=False,
+            explicit_span=span,
+        )
+        normalized = normalize_skill(source.original_text)
+        canonical = (aliases or {}).get(normalized, normalized)
+        decision = apply_term_type_corrections(
+            [type_term(source, canonical_text=canonical)],
+            term_corrections or [],
+        )[0]
+        if (
+            decision.concept_type == "unknown"
+            and decision.decision_source != "correction"
+        ):
+            pending.append(source)
+
+    suggestions = await asyncio.gather(
+        *(assistant.aclassify(source, sem=sem) for source in pending)
+    )
+    cached = _SuggestionAssistant(
+        dict(zip((item.source_id for item in pending), suggestions))
+    )
+    return bind_job_requirements(
+        criteria,
+        job_id=job_id,
+        jd_text=jd_text,
+        taxonomy_revision=taxonomy_revision,
+        assistant=cached,
+        aliases=aliases,
+        term_corrections=term_corrections,
     )

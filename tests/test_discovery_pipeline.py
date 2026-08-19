@@ -830,6 +830,73 @@ def test_run_extract_skips_failed_job_and_persists_the_rest():
         assert list(failures) == [bad.id]
 
 
+def test_run_extract_term_typing_uses_async_leaf_and_leaves_failures_raw(
+    tmp_path,
+):
+    from resume_agent.taxonomy.term_assistant import ModelTermTypeAssistant
+    from resume_agent.taxonomy.term_typing import TermTypeSuggestion
+
+    class _AmbiguousExtractAgent:
+        def run(self, prompt):
+            raise AssertionError("discovery extraction must use the async runner")
+
+        async def arun(self, prompt):
+            return _Result(_extract(must_have_skills=[prompt]))
+
+    class _TermRunner:
+        def __init__(self):
+            self.async_calls = 0
+
+        def run(self, prompt):
+            raise AssertionError("term typing must stay inside the async leaf")
+
+        async def arun(self, prompt):
+            self.async_calls += 1
+            if "boom orchestration" in prompt:
+                raise RuntimeError("term classifier unavailable")
+            return _Result(
+                TermTypeSuggestion(concept_type="capability", confidence=0.93)
+            )
+
+    term_runner = _TermRunner()
+    with _session() as session:
+        save_job(
+            session,
+            Job(
+                source="x",
+                jd_text="good orchestration",
+                title="A",
+                status=JobStatus.raw.value,
+            ),
+        )
+        bad = save_job(
+            session,
+            Job(
+                source="x",
+                jd_text="boom orchestration",
+                title="B",
+                status=JobStatus.raw.value,
+            ),
+        )
+
+        failures = run_extract(
+            session,
+            _AmbiguousExtractAgent(),
+            industry_taxonomy_path=tmp_path / "industries.json",
+            term_type_assistant=ModelTermTypeAssistant(term_runner),
+        )
+
+        extracted = jobs_by_status(session, JobStatus.extracted.value)
+        assert [job.title for job in extracted] == ["A"]
+        requirement = _criteria(extracted[0])["typed_requirements"][0]
+        assert requirement["concept_type"] == "capability"
+        assert [job.title for job in jobs_by_status(session, JobStatus.raw.value)] == [
+            "B"
+        ]
+        assert list(failures) == [bad.id]
+    assert term_runner.async_calls == 2
+
+
 def test_run_extract_skips_job_when_agent_returns_wrong_type():
     """A raw-str fallback (isinstance guard -> TypeError) is also isolated."""
     with _session() as s:

@@ -28,7 +28,7 @@ from resume_agent.discovery.fit import (  # noqa: F401
     score_fit,
 )
 from resume_agent.discovery.industry import IndustryCandidate, classify_industries
-from resume_agent.discovery.requirements import bind_job_requirements
+from resume_agent.discovery.requirements import abind_job_requirements
 from resume_agent.discovery.relevance import (  # noqa: F401
     ajudge_relevance,
     judge_relevance,
@@ -53,7 +53,7 @@ from resume_agent.taxonomy.industries import (
 )
 from resume_agent.taxonomy.location import StructuredLocation, build_locations
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
-from resume_agent.taxonomy.term_typing import TermTypeAssistant
+from resume_agent.taxonomy.term_typing import AsyncTermTypeAssistant
 from resume_agent.taxonomy.term_corrections import TermTypeCorrection
 from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
@@ -110,6 +110,29 @@ def _record_job_agent_meta(job: Job, field: str, runner: Runner) -> None:
     job.analysis_meta_json = existing.model_dump(mode="json")
 
 
+async def _extract_and_bind_requirements(
+    job: Job,
+    agent: Runner,
+    *,
+    sem: asyncio.Semaphore,
+    taxonomy_revision: str,
+    term_type_assistant: AsyncTermTypeAssistant | None,
+    term_aliases: Mapping[str, str] | None,
+    term_corrections: list[TermTypeCorrection] | None,
+) -> JobCriteria:
+    criteria = await aextract_job_criteria(job.jd_text, agent, sem=sem)
+    return await abind_job_requirements(
+        criteria,
+        job_id=job.id or "unpersisted",
+        jd_text=job.jd_text,
+        taxonomy_revision=taxonomy_revision,
+        assistant=term_type_assistant,
+        sem=sem,
+        aliases=term_aliases,
+        term_corrections=term_corrections,
+    )
+
+
 def run_extract(
     session: Session,
     agent: Runner,
@@ -118,7 +141,7 @@ def run_extract(
     industry_classifier: Runner | None = None,
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
     taxonomy_revision: str = "",
-    term_type_assistant: TermTypeAssistant | None = None,
+    term_type_assistant: AsyncTermTypeAssistant | None = None,
     term_aliases: Mapping[str, str] | None = None,
     term_corrections: list[TermTypeCorrection] | None = None,
 ) -> dict[int, StageFailure]:
@@ -138,10 +161,19 @@ def run_extract(
             run_with_cleanup(
                 gather_isolated(
                     jobs,
-                    lambda job: aextract_job_criteria(job.jd_text, agent, sem=sem),
+                    lambda job: _extract_and_bind_requirements(
+                        job,
+                        agent,
+                        sem=sem,
+                        taxonomy_revision=taxonomy_revision,
+                        term_type_assistant=term_type_assistant,
+                        term_aliases=term_aliases,
+                        term_corrections=term_corrections,
+                    ),
                     on_complete=on_complete,
                 ),
                 agent,
+                term_type_assistant,
             )
         )
         for job, res in zip(jobs, results):
@@ -152,16 +184,7 @@ def run_extract(
                     error = res.error or RuntimeError("extraction produced no criteria")
                     failures[job.id] = StageFailure.from_exception(error)
                 continue
-            criteria = bind_job_requirements(
-                res.value,
-                job_id=job.id or "unpersisted",
-                jd_text=job.jd_text,
-                taxonomy_revision=taxonomy_revision,
-                assistant=term_type_assistant,
-                aliases=term_aliases,
-                term_corrections=term_corrections,
-            )
-            job.criteria_json = criteria.model_dump(mode="json")
+            job.criteria_json = res.value.model_dump(mode="json")
             _record_job_agent_meta(job, "criteria", agent)
             advance(job, JobStatus.extracted.value, never_regress=scope.never_regress)
             session.add(job)
@@ -516,7 +539,7 @@ def discover(
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
     h1b_enricher=None,
-    term_type_assistant: TermTypeAssistant | None = None,
+    term_type_assistant: AsyncTermTypeAssistant | None = None,
     term_corrections: list[TermTypeCorrection] | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows (optionally scoped)."""
@@ -606,7 +629,7 @@ def reprocess(
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
     h1b_enricher=None,
-    term_type_assistant: TermTypeAssistant | None = None,
+    term_type_assistant: AsyncTermTypeAssistant | None = None,
     term_corrections: list[TermTypeCorrection] | None = None,
 ) -> dict[str, int]:
     """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
