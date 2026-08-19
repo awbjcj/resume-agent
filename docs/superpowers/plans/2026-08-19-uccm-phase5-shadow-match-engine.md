@@ -76,4 +76,3 @@
 - [ ] Add JSONL schema and a reviewed-fixture manifest field. Do not claim the full 12-family gate passes without reviewed labels.
 - [ ] Implement ablation flags and reports for current adjacency, exact-only, hierarchy, task/knowledge, approved transfer, proficiency/context, retrieval type, classifier type, and overlays.
 - [ ] Remove strict xfail; run all matching/eval tests, Ruff, targeted Pyright, and commit Phase 5 with a migration/rollback note.
-

@@ -67,4 +67,3 @@
 - [ ] Add additive schema fields and regenerate contracts if the profile API exposes them in this phase.
 - [ ] Remove strict xfail; run profile/assertion/matrix/service tests, old-artifact fixtures, Ruff, and targeted Pyright.
 - [ ] Add migration/rollback note and commit Phase 3.
-

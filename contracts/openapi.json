@@ -10841,6 +10841,421 @@
         "title": "TemplateListItem",
         "type": "object"
       },
+      "TermSourceIn": {
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "originalText": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Originaltext",
+            "type": "string"
+          },
+          "sourceId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Sourceid",
+            "type": "string"
+          },
+          "sourceKind": {
+            "enum": [
+              "profile_skill",
+              "profile_fact",
+              "job_description",
+              "job_criteria",
+              "manual"
+            ],
+            "title": "Sourcekind",
+            "type": "string"
+          },
+          "sourceText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcetext"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          }
+        },
+        "required": [
+          "sourceKind",
+          "sourceId",
+          "originalText"
+        ],
+        "title": "TermSourceIn",
+        "type": "object"
+      },
+      "TermSourceOut": {
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "originalText": {
+            "title": "Originaltext",
+            "type": "string"
+          },
+          "sourceId": {
+            "title": "Sourceid",
+            "type": "string"
+          },
+          "sourceKind": {
+            "enum": [
+              "profile_skill",
+              "profile_fact",
+              "job_description",
+              "job_criteria",
+              "manual"
+            ],
+            "title": "Sourcekind",
+            "type": "string"
+          },
+          "sourceText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcetext"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          }
+        },
+        "required": [
+          "sourceKind",
+          "sourceId",
+          "originalText"
+        ],
+        "title": "TermSourceOut",
+        "type": "object"
+      },
+      "TermTypeCorrectionIn": {
+        "properties": {
+          "evidenceRefs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencerefs",
+            "type": "array"
+          },
+          "newType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "competency_family",
+                  "capability",
+                  "skill",
+                  "knowledge",
+                  "work_activity",
+                  "task",
+                  "method",
+                  "standard",
+                  "tool_technology",
+                  "artifact",
+                  "work_style",
+                  "language",
+                  "occupation_role",
+                  "industry_domain",
+                  "knowledge_domain",
+                  "credential",
+                  "requirement",
+                  "work_context",
+                  "learning_outcome"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Newtype"
+          },
+          "rationale": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TermSourceIn"
+          }
+        },
+        "required": [
+          "source",
+          "newType",
+          "rationale"
+        ],
+        "title": "TermTypeCorrectionIn",
+        "type": "object"
+      },
+      "TermTypeCorrectionOut": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actorId": {
+            "title": "Actorid",
+            "type": "string"
+          },
+          "evidenceRefs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencerefs",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "newType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "competency_family",
+                  "capability",
+                  "skill",
+                  "knowledge",
+                  "work_activity",
+                  "task",
+                  "method",
+                  "standard",
+                  "tool_technology",
+                  "artifact",
+                  "work_style",
+                  "language",
+                  "occupation_role",
+                  "industry_domain",
+                  "knowledge_domain",
+                  "credential",
+                  "requirement",
+                  "work_context",
+                  "learning_outcome"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Newtype"
+          },
+          "priorType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "competency_family",
+                  "capability",
+                  "skill",
+                  "knowledge",
+                  "work_activity",
+                  "task",
+                  "method",
+                  "standard",
+                  "tool_technology",
+                  "artifact",
+                  "work_style",
+                  "language",
+                  "occupation_role",
+                  "industry_domain",
+                  "knowledge_domain",
+                  "credential",
+                  "requirement",
+                  "work_context",
+                  "learning_outcome"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Priortype"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "subjectDecisionId": {
+            "title": "Subjectdecisionid",
+            "type": "string"
+          },
+          "targetRevision": {
+            "title": "Targetrevision",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actorId",
+          "scope",
+          "action",
+          "subjectDecisionId",
+          "priorType",
+          "newType",
+          "rationale",
+          "evidenceRefs",
+          "targetRevision",
+          "timestamp"
+        ],
+        "title": "TermTypeCorrectionOut",
+        "type": "object"
+      },
+      "TermTypingDecisionOut": {
+        "properties": {
+          "conceptId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conceptid"
+          },
+          "conceptType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "competency_family",
+                  "capability",
+                  "skill",
+                  "knowledge",
+                  "work_activity",
+                  "task",
+                  "method",
+                  "standard",
+                  "tool_technology",
+                  "artifact",
+                  "work_style",
+                  "language",
+                  "occupation_role",
+                  "industry_domain",
+                  "knowledge_domain",
+                  "credential",
+                  "requirement",
+                  "work_context",
+                  "learning_outcome"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Concepttype"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "decisionSource": {
+            "enum": [
+              "rule",
+              "governed",
+              "model",
+              "correction",
+              "unknown"
+            ],
+            "title": "Decisionsource",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "normalizedText": {
+            "title": "Normalizedtext",
+            "type": "string"
+          },
+          "originalText": {
+            "title": "Originaltext",
+            "type": "string"
+          },
+          "policyRevision": {
+            "title": "Policyrevision",
+            "type": "string"
+          },
+          "reasonCode": {
+            "title": "Reasoncode",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TermSourceOut"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "originalText",
+          "normalizedText",
+          "conceptType",
+          "confidence",
+          "decisionSource",
+          "reasonCode",
+          "policyRevision"
+        ],
+        "title": "TermTypingDecisionOut",
+        "type": "object"
+      },
       "TokenCreateRequest": {
         "properties": {
           "name": {
@@ -24663,6 +25078,177 @@
           }
         },
         "summary": "Move Skill"
+      }
+    },
+    "/api/taxonomy/term-type-corrections": {
+      "get": {
+        "operationId": "list_term_type_corrections_api_taxonomy_term_type_corrections_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TermTypeCorrectionOut"
+                  },
+                  "title": "Response List Term Type Corrections Api Taxonomy Term Type Corrections Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Term Type Corrections"
+      }
+    },
+    "/api/taxonomy/term-types/{decision_id}": {
+      "patch": {
+        "operationId": "correct_term_api_taxonomy_term_types__decision_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "title": "Decision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermTypeCorrectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermTypingDecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Term"
+      }
+    },
+    "/api/taxonomy/term-types:classify": {
+      "post": {
+        "operationId": "classify_term_api_taxonomy_term_types_classify_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermSourceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermTypingDecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Classify Term"
       }
     },
     "/api/transcribe": {

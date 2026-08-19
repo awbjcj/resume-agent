@@ -69,4 +69,3 @@
 - [ ] Run the cross-seam profile-building/gap-matching/tailoring test in each effective mode and old-artifact compatibility fixtures.
 - [ ] Document exact passing evidence and any honest external/reviewed-gold limitation. Never label UCCM production-ready if the reviewed gold gate is unavailable.
 - [ ] Use superpowers:finishing-a-development-branch and present the branch completion options without auto-merging or pushing.
-

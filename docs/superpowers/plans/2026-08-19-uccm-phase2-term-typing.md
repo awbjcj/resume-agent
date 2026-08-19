@@ -68,4 +68,3 @@
 - [ ] Regenerate OpenAPI/TypeScript contracts; run drift tests.
 - [ ] Remove strict xfail and run `pytest tests/test_term_typing.py tests/test_term_corrections.py tests/api/test_taxonomy_term_typing.py tests/test_agent_prompt_contracts.py -v` plus Ruff on changed files.
 - [ ] Add a migration/rollback note and commit Phase 2.
-

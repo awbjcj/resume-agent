@@ -79,7 +79,7 @@ class TermTypeCorrection(ExtensibleModel):
 
 
 class TermTypeCorrectionLedger(ExtensibleModel):
-    schema_version: Literal[1] = 1
+    schema_version: int = Field(default=1, ge=1, le=1)
     events: list[TermTypeCorrection] = Field(default_factory=list)
 
 

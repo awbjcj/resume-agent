@@ -66,4 +66,3 @@
 - [ ] Test must/preferred, product family, capability, credential, experience, authorization, location, schedule, physical/environmental, and unknown cases.
 - [ ] Run focused tests, OpenAPI drift if schemas changed, Ruff, and targeted Pyright.
 - [ ] Add migration/rollback note and commit Phase 4.
-

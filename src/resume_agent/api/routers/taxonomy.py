@@ -18,20 +18,44 @@ from resume_agent.api.schemas.taxonomy import (
     DomainPatchIn,
     MoveSkillIn,
     NewDomainIn,
+    TermSourceIn,
+    TermTypeCorrectionIn,
+    TermTypeCorrectionOut,
+    TermTypingDecisionOut,
 )
 from resume_agent.services import taxonomy as service
+from resume_agent.services import term_typing as term_typing_service
 from resume_agent.taxonomy.corrections import corrections_file_path
+from resume_agent.taxonomy.term_corrections import load_term_type_corrections
+from resume_agent.taxonomy.term_typing import TermSource, TermTypingDecision
+from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.paths import resolve_tenant_path
 from resume_agent.tracking.match_gap import collect_target_skill_tokens
 
 router = APIRouter()
 _CLUSTER_PATH = "data/profile/cluster_map.json"
+_TERM_CORRECTIONS_PATH = "data/taxonomy/term_type_corrections.json"
 
 
 def _paths() -> tuple[str, str]:
     return (
         str(resolve_tenant_path(corrections_file_path())),
         str(resolve_tenant_path(_CLUSTER_PATH)),
+    )
+
+
+def _term_correction_path():
+    return resolve_tenant_path(_TERM_CORRECTIONS_PATH)
+
+
+def _term_source(value: TermSourceIn) -> TermSource:
+    return TermSource.model_validate(value.model_dump())
+
+
+def _decision_out(decision: TermTypingDecision) -> TermTypingDecisionOut:
+    return TermTypingDecisionOut(
+        **decision.model_dump(mode="json"),
+        original_text=decision.original_text,
     )
 
 
@@ -146,3 +170,48 @@ def add_alias(body: AliasIn, session: Session = Depends(get_session)):
             known_tokens=collect_target_skill_tokens(session),
         )
     return build_match_gap_payload(session)
+
+
+@router.post(
+    "/taxonomy/term-types:classify",
+    response_model=TermTypingDecisionOut,
+)
+def classify_term(body: TermSourceIn):
+    decision = term_typing_service.classify_term(
+        _term_source(body),
+        corrections_path=_term_correction_path(),
+    )
+    return _decision_out(decision)
+
+
+@router.patch(
+    "/taxonomy/term-types/{decision_id}",
+    response_model=TermTypingDecisionOut,
+)
+def correct_term(decision_id: str, body: TermTypeCorrectionIn):
+    context = current_context()
+    actor_id = context.user_id if context is not None else "local-user"
+    try:
+        decision = term_typing_service.correct_term(
+            _term_source(body.source),
+            decision_id=decision_id,
+            new_type=body.new_type,
+            rationale=body.rationale,
+            evidence_refs=body.evidence_refs,
+            actor_id=actor_id,
+            corrections_path=_term_correction_path(),
+        )
+    except term_typing_service.TermDecisionMismatchError as exc:
+        raise ApiException(409, "TERM_DECISION_MISMATCH", str(exc)) from exc
+    return _decision_out(decision)
+
+
+@router.get(
+    "/taxonomy/term-type-corrections",
+    response_model=list[TermTypeCorrectionOut],
+)
+def list_term_type_corrections():
+    return [
+        TermTypeCorrectionOut.model_validate(event.model_dump(mode="json"))
+        for event in load_term_type_corrections(_term_correction_path())
+    ]

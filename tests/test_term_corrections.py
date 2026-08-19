@@ -131,4 +131,3 @@ def test_correction_store_is_atomic_json_and_missing_file_is_empty(tmp_path):
         "events": [],
     }
     assert list(path.parent.glob("*.tmp")) == []
-

@@ -42,4 +42,3 @@
 - [ ] Run backend pytest, Ruff, targeted/full Pyright as configured, frontend Vitest, ESLint, build, OpenAPI drift, and contract-generation gates.
 - [ ] Verify profile build -> stored assertions -> typed job requirements -> shadow/v2 match -> match-gap API -> tailoring compatibility in one cross-seam test.
 - [ ] Document any release gate that remains honestly unproven; the guarded UCCM selector must reject activation rather than inventing success.
-

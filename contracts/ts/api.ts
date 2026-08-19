@@ -3117,6 +3117,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/taxonomy/term-type-corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Term Type Corrections */
+        get: operations["list_term_type_corrections_api_taxonomy_term_type_corrections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/taxonomy/term-types/{decision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Correct Term */
+        patch: operations["correct_term_api_taxonomy_term_types__decision_id__patch"];
+        trace?: never;
+    };
+    "/api/taxonomy/term-types:classify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Classify Term */
+        post: operations["classify_term_api_taxonomy_term_types_classify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/transcribe": {
         parameters: {
             query?: never;
@@ -7154,6 +7205,102 @@ export interface components {
             kind: "bundled" | "custom";
             /** Title */
             title: string;
+        };
+        /** TermSourceIn */
+        TermSourceIn: {
+            /** End */
+            end?: number | null;
+            /** Originaltext */
+            originalText: string;
+            /** Sourceid */
+            sourceId: string;
+            /**
+             * Sourcekind
+             * @enum {string}
+             */
+            sourceKind: "profile_skill" | "profile_fact" | "job_description" | "job_criteria" | "manual";
+            /** Sourcetext */
+            sourceText?: string | null;
+            /** Start */
+            start?: number | null;
+        };
+        /** TermSourceOut */
+        TermSourceOut: {
+            /** End */
+            end?: number | null;
+            /** Originaltext */
+            originalText: string;
+            /** Sourceid */
+            sourceId: string;
+            /**
+             * Sourcekind
+             * @enum {string}
+             */
+            sourceKind: "profile_skill" | "profile_fact" | "job_description" | "job_criteria" | "manual";
+            /** Sourcetext */
+            sourceText?: string | null;
+            /** Start */
+            start?: number | null;
+        };
+        /** TermTypeCorrectionIn */
+        TermTypeCorrectionIn: {
+            /** Evidencerefs */
+            evidenceRefs?: string[];
+            /** Newtype */
+            newType: ("competency_family" | "capability" | "skill" | "knowledge" | "work_activity" | "task" | "method" | "standard" | "tool_technology" | "artifact" | "work_style" | "language" | "occupation_role" | "industry_domain" | "knowledge_domain" | "credential" | "requirement" | "work_context" | "learning_outcome") | "unknown";
+            /** Rationale */
+            rationale: string;
+            source: components["schemas"]["TermSourceIn"];
+        };
+        /** TermTypeCorrectionOut */
+        TermTypeCorrectionOut: {
+            /** Action */
+            action: string;
+            /** Actorid */
+            actorId: string;
+            /** Evidencerefs */
+            evidenceRefs: string[];
+            /** Id */
+            id: string;
+            /** Newtype */
+            newType: ("competency_family" | "capability" | "skill" | "knowledge" | "work_activity" | "task" | "method" | "standard" | "tool_technology" | "artifact" | "work_style" | "language" | "occupation_role" | "industry_domain" | "knowledge_domain" | "credential" | "requirement" | "work_context" | "learning_outcome") | "unknown";
+            /** Priortype */
+            priorType: ("competency_family" | "capability" | "skill" | "knowledge" | "work_activity" | "task" | "method" | "standard" | "tool_technology" | "artifact" | "work_style" | "language" | "occupation_role" | "industry_domain" | "knowledge_domain" | "credential" | "requirement" | "work_context" | "learning_outcome") | "unknown";
+            /** Rationale */
+            rationale: string;
+            /** Scope */
+            scope: string;
+            /** Subjectdecisionid */
+            subjectDecisionId: string;
+            /** Targetrevision */
+            targetRevision: string;
+            /** Timestamp */
+            timestamp: string;
+        };
+        /** TermTypingDecisionOut */
+        TermTypingDecisionOut: {
+            /** Conceptid */
+            conceptId?: string | null;
+            /** Concepttype */
+            conceptType: ("competency_family" | "capability" | "skill" | "knowledge" | "work_activity" | "task" | "method" | "standard" | "tool_technology" | "artifact" | "work_style" | "language" | "occupation_role" | "industry_domain" | "knowledge_domain" | "credential" | "requirement" | "work_context" | "learning_outcome") | "unknown";
+            /** Confidence */
+            confidence: number;
+            /**
+             * Decisionsource
+             * @enum {string}
+             */
+            decisionSource: "rule" | "governed" | "model" | "correction" | "unknown";
+            /** Id */
+            id: string;
+            /** Normalizedtext */
+            normalizedText: string;
+            /** Originaltext */
+            originalText: string;
+            /** Policyrevision */
+            policyRevision: string;
+            /** Reasoncode */
+            reasonCode: string;
+            source: components["schemas"]["TermSourceOut"];
         };
         /** TokenCreateRequest */
         TokenCreateRequest: {
@@ -14871,6 +15018,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_term_type_corrections_api_taxonomy_term_type_corrections_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermTypeCorrectionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_term_api_taxonomy_term_types__decision_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                decision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TermTypeCorrectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermTypingDecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    classify_term_api_taxonomy_term_types_classify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TermSourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermTypingDecisionOut"];
                 };
             };
             /** @description Validation Error */

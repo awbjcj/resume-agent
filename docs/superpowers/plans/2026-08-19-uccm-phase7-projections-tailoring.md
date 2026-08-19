@@ -69,4 +69,3 @@
 - [ ] Remove strict xfail and run the cross-path test plus match-gap, API, tailoring, OpenAPI, TypeScript, and frontend suites.
 - [ ] Verify rollback to `shadow` and `legacy` keeps all old artifacts readable and legacy displays unchanged.
 - [ ] Add migration/rollback note and commit Phase 7.
-
