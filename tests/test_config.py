@@ -29,6 +29,23 @@ def test_settings_have_safe_defaults():
     assert settings.career_skill_manifest == Path("skills-lock.json")
 
 
+def test_career_capability_mode_defaults_to_legacy(monkeypatch):
+    monkeypatch.delenv("CAREER_CAPABILITY_MODE", raising=False)
+
+    assert _settings(env_file=None).career_capability_mode == "legacy"
+
+
+def test_career_capability_mode_accepts_only_three_states(monkeypatch):
+    from pydantic import ValidationError
+
+    monkeypatch.setenv("CAREER_CAPABILITY_MODE", "shadow")
+    assert _settings(env_file=None).career_capability_mode == "shadow"
+
+    monkeypatch.setenv("CAREER_CAPABILITY_MODE", "enabled")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
+
+
 def test_settings_have_provider_key_defaults(monkeypatch):
     # Provider keys may be present in the ambient OS env; clear them so we test
     # the Settings class defaults, not the developer's shell.

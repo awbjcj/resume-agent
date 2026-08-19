@@ -18,6 +18,11 @@ from resume_agent.taxonomy.corrections import (
     apply_taxonomy_corrections,
     sanitize_taxonomy_corrections,
 )
+from resume_agent.taxonomy.graph_models import (
+    CareerCapabilityMode,
+    EffectiveCapabilitySnapshot,
+    TaxonomyRevision,
+)
 from resume_agent.taxonomy.state import TaxonomyState
 from resume_agent.tracking.match_gap import normalize_skill
 
@@ -46,6 +51,12 @@ class TaxonomyManifest:
     state: str = ""
     overrides: str = ""
     semantic: str = ""
+    capability_mode: CareerCapabilityMode = "legacy"
+    capability_status: Literal["disabled", "shadow", "active", "fallback"] = (
+        "disabled"
+    )
+    capability_error_code: str | None = None
+    capability: TaxonomyRevision | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +121,7 @@ def _semantic_digest(
 @dataclass(frozen=True)
 class EffectiveTaxonomy:
     cluster_map: ClusterMap
+    capability_snapshot: EffectiveCapabilitySnapshot | None = None
     corrections: TaxonomyCorrections = field(default_factory=TaxonomyCorrections)
     banned_keys: frozenset[str] = frozenset()
     retired_keys: frozenset[str] = frozenset()

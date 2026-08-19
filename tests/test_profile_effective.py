@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from resume_agent.profile.effective import build_effective_taxonomy
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.taxonomy.corrections import (
@@ -68,3 +70,88 @@ def test_repeated_builds_are_deterministic(tmp_path):
 
     assert first.semantic_revision == second.semantic_revision
     assert first.manifest == second.manifest
+
+
+def test_modes_keep_the_legacy_projection_stable(tmp_path):
+    profile_dir, corrections_path = _write(
+        tmp_path,
+        aliases={"py": "python"},
+        corrections=TaxonomyCorrections(aliases={"js": "javascript"}),
+    )
+
+    legacy = build_effective_taxonomy(
+        profile_dir, corrections_path=corrections_path, mode="legacy"
+    )
+    shadow = build_effective_taxonomy(
+        profile_dir, corrections_path=corrections_path, mode="shadow"
+    )
+    uccm = build_effective_taxonomy(
+        profile_dir, corrections_path=corrections_path, mode="uccm"
+    )
+
+    assert legacy.cluster_map == shadow.cluster_map == uccm.cluster_map
+    assert legacy.capability_snapshot is None
+    assert shadow.capability_snapshot is not None
+    assert uccm.capability_snapshot is not None
+    assert legacy.manifest.capability_status == "disabled"
+    assert shadow.manifest.capability_status == "shadow"
+    assert uccm.manifest.capability_status == "active"
+
+
+def test_uccm_validation_failure_falls_back_without_changing_the_map(
+    monkeypatch, tmp_path
+):
+    from resume_agent.profile import effective as effective_module
+    from resume_agent.taxonomy.graph_validation import GraphValidationError
+
+    profile_dir, corrections_path = _write(tmp_path, aliases={"py": "python"})
+    legacy = build_effective_taxonomy(
+        profile_dir, corrections_path=corrections_path, mode="legacy"
+    )
+
+    def reject(*args, **kwargs):
+        raise GraphValidationError.single("invalid_graph", "test rejection")
+
+    monkeypatch.setattr(effective_module, "build_capability_snapshot", reject)
+    fallback = build_effective_taxonomy(
+        profile_dir, corrections_path=corrections_path, mode="uccm"
+    )
+
+    assert fallback.cluster_map == legacy.cluster_map
+    assert fallback.semantic_revision == legacy.semantic_revision
+    assert fallback.capability_snapshot is None
+    assert fallback.manifest.capability_status == "fallback"
+    assert fallback.manifest.capability_error_code == "invalid_graph"
+
+
+def test_legacy_mode_skips_graph_construction(monkeypatch, tmp_path):
+    from resume_agent.profile import effective as effective_module
+
+    profile_dir, corrections_path = _write(tmp_path, aliases={"py": "python"})
+
+    def reject(*args, **kwargs):
+        raise AssertionError("legacy mode must not build the capability graph")
+
+    monkeypatch.setattr(effective_module, "build_capability_snapshot", reject)
+    taxonomy = build_effective_taxonomy(
+        profile_dir, corrections_path=corrections_path, mode="legacy"
+    )
+
+    assert taxonomy.capability_snapshot is None
+    assert taxonomy.manifest.capability is not None
+    assert taxonomy.manifest.capability.internal_graph_version == ""
+
+
+def test_uccm_mode_does_not_hide_programming_errors(monkeypatch, tmp_path):
+    from resume_agent.profile import effective as effective_module
+
+    profile_dir, corrections_path = _write(tmp_path, aliases={"py": "python"})
+
+    def reject(*args, **kwargs):
+        raise RuntimeError("unexpected defect")
+
+    monkeypatch.setattr(effective_module, "build_capability_snapshot", reject)
+    with pytest.raises(RuntimeError, match="unexpected defect"):
+        build_effective_taxonomy(
+            profile_dir, corrections_path=corrections_path, mode="uccm"
+        )

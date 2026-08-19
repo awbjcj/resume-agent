@@ -103,6 +103,7 @@ class Settings(BaseSettings):
     # Every demanded skill ends a refresh with a home.  Disable only to restore
     # the historical behaviour where an uncertain skill stays unassigned.
     taxonomy_placement_floor: bool = True
+    career_capability_mode: Literal["legacy", "shadow", "uccm"] = "legacy"
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
     career_skill_root: Path = Path("skills")
