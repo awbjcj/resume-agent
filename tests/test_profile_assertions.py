@@ -102,7 +102,10 @@ def test_title_alone_does_not_create_an_assertion_or_level():
 
 
 def test_missing_evidence_reference_is_rejected():
-    from resume_agent.profile.assertion_builder import build_capability_assertions
+    from resume_agent.profile.assertion_builder import (
+        InvalidEvidenceReferencesError,
+        build_capability_assertions,
+    )
 
     facts = ProfileFacts(
         contact=Contact(name="Ada"),
@@ -119,7 +122,9 @@ def test_missing_evidence_reference_is_rejected():
         },
     )
 
-    with pytest.raises(ValueError, match="missing evidence fact IDs"):
+    with pytest.raises(
+        InvalidEvidenceReferencesError, match="missing evidence fact IDs"
+    ):
         build_capability_assertions(facts, _taxonomy())
 
 

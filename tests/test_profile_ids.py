@@ -84,6 +84,44 @@ def test_assign_fact_ids_returns_deep_copy():
     assert original.experience[0].source_ref is None
 
 
+def test_assign_fact_ids_remaps_evidence_references_to_deterministic_ids():
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        projects=[
+            Project(
+                id="project:tool",
+                name="Tool",
+                highlights=[
+                    Bullet(id="project:tool:highlight:1", text="Automated deploys")
+                ],
+            )
+        ],
+        skills={
+            "hard": [
+                Skill(
+                    id="skill:python",
+                    name="Python",
+                    evidence_fact_ids=[
+                        "project:tool:highlight:1",
+                        "missing-external-id",
+                    ],
+                )
+            ]
+        },
+    )
+
+    assigned = assign_fact_ids(facts, "project-source")
+
+    assert assigned.skills["hard"][0].evidence_fact_ids == [
+        assigned.projects[0].highlights[0].id,
+        "missing-external-id",
+    ]
+    assert facts.skills["hard"][0].evidence_fact_ids == [
+        "project:tool:highlight:1",
+        "missing-external-id",
+    ]
+
+
 def test_deterministic_id_shape():
     assert deterministic_id("a", "b") == deterministic_id("a", "b")
     assert len(deterministic_id("a", "b")) == 12

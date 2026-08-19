@@ -123,6 +123,59 @@ def test_match_gap_shadow_exposes_typed_results_from_one_profile_snapshot(
     assert len(body["profileProjection"]["layers"]) == 6
 
 
+def test_match_gap_keeps_legacy_payload_available_for_invalid_evidence(
+    monkeypatch,
+    tmp_path,
+):
+    profile_dir = tmp_path / "profile"
+    facts_path = profile_dir / "facts.json"
+    cluster_path = profile_dir / "cluster_map.json"
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_cluster_map(ClusterMap(), cluster_path)
+    save_taxonomy_corrections(TaxonomyCorrections(), corrections_path)
+    save_facts(
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            skills={
+                "soft": [
+                    Skill(
+                        id="skill-mentorship",
+                        name="Mentorship",
+                        inferred=True,
+                        category="soft",
+                        evidence_fact_ids=["missing-bullet"],
+                    )
+                ]
+            },
+        ),
+        facts_path,
+    )
+    monkeypatch.setattr(router_mod, "_FACTS_PATH", str(facts_path))
+    monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))
+    monkeypatch.setattr(
+        effective_module,
+        "corrections_file_path",
+        lambda: str(corrections_path),
+    )
+    monkeypatch.setattr(
+        effective_module,
+        "get_settings",
+        lambda: SimpleNamespace(career_capability_mode="shadow"),
+    )
+
+    with _client() as client:
+        response = client.get("/api/match-gap")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["targetTotal"] == 0
+    assert body["uccmState"] == "unavailable"
+    assert body["uccmErrorCode"] == "invalid_profile_evidence"
+    assert body["typedRequirements"] == []
+    assert body["matchResults"] == []
+    assert body["profileProjection"] is None
+
+
 def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
     monkeypatch, tmp_path
 ):

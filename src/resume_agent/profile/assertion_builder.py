@@ -30,6 +30,14 @@ from resume_agent.tracking.match_gap import normalize_skill
 _YEAR_IN_DATE = re.compile(r"(?:19|20)\d{2}")
 
 
+class InvalidEvidenceReferencesError(ValueError):
+    """A profile skill points to fact IDs absent from the same snapshot."""
+
+    def __init__(self, missing_ids: set[str]) -> None:
+        self.missing_ids = tuple(sorted(missing_ids))
+        super().__init__("missing evidence fact IDs: " + ", ".join(self.missing_ids))
+
+
 @dataclass
 class _Candidate:
     key: str
@@ -196,9 +204,7 @@ def build_capability_assertions(
                     candidate.evidence_ids.append(evidence_id)
 
     if missing_ids:
-        raise ValueError(
-            "missing evidence fact IDs: " + ", ".join(sorted(missing_ids))
-        )
+        raise InvalidEvidenceReferencesError(missing_ids)
 
     owners = [*facts.experience, *facts.projects]
     owner_by_fact_id = {

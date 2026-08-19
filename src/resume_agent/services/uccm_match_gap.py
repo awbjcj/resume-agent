@@ -16,6 +16,7 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.requirements import JobRequirement
 from resume_agent.profile.assertions import ASSERTION_POLICY_REVISION
+from resume_agent.profile.assertion_builder import InvalidEvidenceReferencesError
 from resume_agent.profile.matrix import (
     SkillMatrix,
     build_matrix,
@@ -107,7 +108,19 @@ def build_uccm_match_gap_projection(
         )
         _record_observation(result, taxonomy)
         return result
-    matrix = _coherent_matrix(facts, taxonomy, profile_dir)
+    try:
+        matrix = _coherent_matrix(facts, taxonomy, profile_dir)
+    except InvalidEvidenceReferencesError as exc:
+        logger.warning(
+            "UCCM match-gap unavailable because profile evidence is invalid",
+            extra={"missing_evidence_fact_ids": exc.missing_ids},
+        )
+        result = UccmMatchGapProjection(
+            state="unavailable",
+            error_code="invalid_profile_evidence",
+        )
+        _record_observation(result, taxonomy)
+        return result
     projection = UccmMatchGapProjection(
         state="ready",
         matching_policy_revision=MATCHING_POLICY_REVISION,

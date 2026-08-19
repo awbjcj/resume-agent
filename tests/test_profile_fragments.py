@@ -385,3 +385,26 @@ def test_project_walk_is_source_aware_cached_and_skipped_by_literal_walk(tmp_pat
     second = extract_project_fragments(profile_dir, load_manifest(profile_dir), agent)
     assert second.status[project_doc.id] == "cached"
     assert agent.calls == 1
+
+
+def test_project_prompt_version_bump_invalidates_project_cache(
+    tmp_path, monkeypatch
+):
+    from resume_agent.profile.project_extractor import ProjectDocFacts
+
+    profile_dir = _setup(tmp_path)
+    repo = tmp_path / "github--repo.md"
+    repo.write_text("# Repository: repo", encoding="utf-8")
+    project_doc = add_source(profile_dir, repo, mode="project", origin="github")
+    agent = _FakeAgent(ProjectDocFacts(project=Project(name="repo")))
+
+    extract_project_fragments(profile_dir, load_manifest(profile_dir), agent)
+    assert agent.calls == 1
+
+    monkeypatch.setattr("resume_agent.profile.fragments.PROJECT_PROMPT_VERSION", 99)
+    result = extract_project_fragments(
+        profile_dir, load_manifest(profile_dir), agent
+    )
+
+    assert agent.calls == 2
+    assert result.status[project_doc.id] == "extracted"
