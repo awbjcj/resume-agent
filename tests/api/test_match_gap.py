@@ -194,7 +194,12 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
         if key not in {"taxonomyRevision", "taxonomyManifest", *uccm_fields}
     }
     assert uccm_business_payload == legacy_business_payload
-    assert uccm_body["taxonomyManifest"]["capabilityStatus"] == "active"
+    assert uccm_body["taxonomyManifest"]["capabilityStatus"] == "fallback"
+    assert uccm_body["taxonomyManifest"]["capabilityEffectiveMode"] == "shadow"
+    assert (
+        uccm_body["taxonomyManifest"]["capabilityErrorCode"]
+        == "activation_report_missing"
+    )
     assert (
         len(
             uccm_body["taxonomyManifest"]["capability"][

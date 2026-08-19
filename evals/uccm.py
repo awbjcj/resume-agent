@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 
 from resume_agent.matching.models import MatchStatus
+from resume_agent.matching.activation import (
+    UccmActivationMetrics,
+    UccmActivationReport,
+    seal_activation_report,
+)
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.taxonomy.term_typing import TermConceptType
 
@@ -329,3 +335,40 @@ def load_gold_jsonl(path: str | Path) -> list[UccmEvalRecord]:
         except ValueError as exc:
             raise ValueError(f"invalid UCCM gold record on line {line_number}") from exc
     return records
+
+
+def build_activation_report(
+    evaluation: UccmEvaluationReport,
+    manifest: GoldSetManifest,
+    *,
+    report_revision: str,
+    taxonomy_revision: str,
+    assertion_policy_revision: str,
+    extraction_policy_revision: str,
+    matching_policy_revision: str,
+    generated_at: datetime,
+    expires_at: datetime,
+) -> UccmActivationReport:
+    """Seal an offline evaluation for the runtime's fail-closed release policy."""
+    report = UccmActivationReport(
+        report_revision=report_revision,
+        evaluation_revision=evaluation.evaluation_revision,
+        gold_set_revision=evaluation.gold_set_revision,
+        reviewed=manifest.reviewed,
+        reviewer_ids=manifest.reviewer_ids,
+        generated_at=generated_at,
+        expires_at=expires_at,
+        taxonomy_revision=taxonomy_revision,
+        assertion_policy_revision=assertion_policy_revision,
+        extraction_policy_revision=extraction_policy_revision,
+        matching_policy_revision=matching_policy_revision,
+        reviewed_record_count=evaluation.reviewed_record_count,
+        career_families=evaluation.career_families,
+        career_levels=evaluation.career_levels,
+        metrics=UccmActivationMetrics.model_validate(
+            evaluation.metrics.model_dump(mode="json")
+        ),
+        failed_gates=evaluation.failed_gates,
+        eligible=evaluation.eligible,
+    )
+    return seal_activation_report(report)

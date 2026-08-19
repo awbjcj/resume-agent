@@ -152,10 +152,12 @@ class TaxonomyManifestOut(CamelModel):
     overrides: str = ""
     semantic: str = ""
     capability_mode: Literal["legacy", "shadow", "uccm"] = "legacy"
+    capability_effective_mode: Literal["legacy", "shadow", "uccm"] = "legacy"
     capability_status: Literal["disabled", "shadow", "active", "fallback"] = (
         "disabled"
     )
     capability_error_code: str | None = None
+    capability_activation_report_revision: str | None = None
     capability: TaxonomyRevisionOut | None = None
 
 

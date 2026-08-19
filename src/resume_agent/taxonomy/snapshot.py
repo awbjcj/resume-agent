@@ -52,10 +52,12 @@ class TaxonomyManifest:
     overrides: str = ""
     semantic: str = ""
     capability_mode: CareerCapabilityMode = "legacy"
+    capability_effective_mode: CareerCapabilityMode = "legacy"
     capability_status: Literal["disabled", "shadow", "active", "fallback"] = (
         "disabled"
     )
     capability_error_code: str | None = None
+    capability_activation_report_revision: str | None = None
     capability: TaxonomyRevision | None = None
 
 

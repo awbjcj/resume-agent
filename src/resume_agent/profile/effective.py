@@ -14,6 +14,13 @@ from dataclasses import replace
 from pathlib import Path
 
 from resume_agent.config import get_settings
+from resume_agent.discovery.requirements import JOB_EXTRACTION_POLICY_REVISION
+from resume_agent.matching.activation import (
+    decide_uccm_activation,
+    load_activation_report,
+)
+from resume_agent.matching.models import MATCHING_POLICY_REVISION
+from resume_agent.profile.assertions import ASSERTION_POLICY_REVISION
 from resume_agent.profile.matrix import load_overrides
 from resume_agent.taxonomy.corrections import corrections_file_path
 from resume_agent.taxonomy.custody import TaxonomyCustody
@@ -29,6 +36,9 @@ from resume_agent.taxonomy.snapshot import EffectiveTaxonomy, TaxonomyManifest
 from resume_agent.tenancy.paths import resolve_tenant_path
 
 logger = logging.getLogger(__name__)
+DEFAULT_UCCM_ACTIVATION_REPORT_PATH = Path(
+    "data/evals/uccm_activation_report.json"
+)
 
 
 def build_effective_taxonomy(
@@ -36,6 +46,7 @@ def build_effective_taxonomy(
     *,
     corrections_path: str | Path | None = None,
     mode: CareerCapabilityMode | None = None,
+    activation_report_path: str | Path | None = None,
 ) -> EffectiveTaxonomy:
     """Read and resolve every taxonomy input for a profile exactly once."""
     profile_dir = Path(profile_dir)
@@ -76,6 +87,7 @@ def build_effective_taxonomy(
         overrides=override_revision,
         semantic=resolved.semantic_revision,
         capability_mode=requested_mode,
+        capability_effective_mode=requested_mode,
         capability_status="disabled",
         capability=legacy_revision,
     )
@@ -112,12 +124,40 @@ def build_effective_taxonomy(
             ),
         )
 
+    effective_mode = requested_mode
+    activation_error: str | None = None
+    activation_report_revision: str | None = None
+    if requested_mode == "uccm":
+        report_path = activation_report_path
+        if report_path is None:
+            report_path = getattr(
+                get_settings(),
+                "uccm_evaluation_report_path",
+                DEFAULT_UCCM_ACTIVATION_REPORT_PATH,
+            )
+        report = load_activation_report(resolve_tenant_path(report_path))
+        decision = decide_uccm_activation(
+            requested_mode,
+            report,
+            taxonomy_revision=capability.revision.effective_hash,
+            assertion_policy_revision=ASSERTION_POLICY_REVISION,
+            extraction_policy_revision=JOB_EXTRACTION_POLICY_REVISION,
+            matching_policy_revision=MATCHING_POLICY_REVISION,
+        )
+        effective_mode = decision.effective_mode
+        activation_report_revision = decision.report_revision
+        if not decision.eligible:
+            activation_error = decision.reason_code
     active_map = (
         capability.legacy_projection
-        if requested_mode == "uccm"
+        if effective_mode == "uccm"
         else resolved.cluster_map
     )
-    status = "active" if requested_mode == "uccm" else "shadow"
+    status = (
+        "active"
+        if effective_mode == "uccm"
+        else "fallback" if requested_mode == "uccm" else "shadow"
+    )
     return replace(
         resolved,
         cluster_map=active_map,
@@ -130,7 +170,10 @@ def build_effective_taxonomy(
         manifest=replace(
             base_manifest,
             semantic=capability.revision.effective_hash,
+            capability_effective_mode=effective_mode,
             capability_status=status,
+            capability_error_code=activation_error,
+            capability_activation_report_revision=activation_report_revision,
             capability=capability.revision,
         ),
     )

@@ -11332,6 +11332,27 @@
               }
             ]
           },
+          "capabilityActivationReportRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilityactivationreportrevision"
+          },
+          "capabilityEffectiveMode": {
+            "default": "legacy",
+            "enum": [
+              "legacy",
+              "shadow",
+              "uccm"
+            ],
+            "title": "Capabilityeffectivemode",
+            "type": "string"
+          },
           "capabilityErrorCode": {
             "anyOf": [
               {

@@ -95,7 +95,37 @@ def test_modes_keep_the_legacy_projection_stable(tmp_path):
     assert uccm.capability_snapshot is not None
     assert legacy.manifest.capability_status == "disabled"
     assert shadow.manifest.capability_status == "shadow"
-    assert uccm.manifest.capability_status == "active"
+    assert uccm.manifest.capability_status == "fallback"
+    assert uccm.manifest.capability_error_code == "activation_report_missing"
+
+
+def test_uccm_mode_becomes_active_only_after_the_release_policy_approves(
+    monkeypatch, tmp_path
+):
+    from resume_agent.matching.activation import UccmActivationDecision
+    from resume_agent.profile import effective as effective_module
+
+    profile_dir, corrections_path = _write(tmp_path, aliases={"py": "python"})
+    monkeypatch.setattr(effective_module, "load_activation_report", lambda path: object())
+
+    def approve(requested_mode, report, **expected):
+        return UccmActivationDecision(
+            requested_mode=requested_mode,
+            effective_mode="uccm",
+            eligible=True,
+            reason_code="activation_eligible",
+            report_revision="release-report-v1",
+            **expected,
+        )
+
+    monkeypatch.setattr(effective_module, "decide_uccm_activation", approve)
+    taxonomy = build_effective_taxonomy(
+        profile_dir, corrections_path=corrections_path, mode="uccm"
+    )
+
+    assert taxonomy.manifest.capability_status == "active"
+    assert taxonomy.manifest.capability_error_code is None
+    assert taxonomy.manifest.capability_activation_report_revision == "release-report-v1"
 
 
 def test_uccm_validation_failure_falls_back_without_changing_the_map(

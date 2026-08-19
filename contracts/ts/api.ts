@@ -7284,6 +7284,14 @@ export interface components {
         /** TaxonomyManifestOut */
         TaxonomyManifestOut: {
             capability?: components["schemas"]["TaxonomyRevisionOut"] | null;
+            /** Capabilityactivationreportrevision */
+            capabilityActivationReportRevision?: string | null;
+            /**
+             * Capabilityeffectivemode
+             * @default legacy
+             * @enum {string}
+             */
+            capabilityEffectiveMode: "legacy" | "shadow" | "uccm";
             /** Capabilityerrorcode */
             capabilityErrorCode?: string | null;
             /**

@@ -132,7 +132,9 @@ def test_taxonomy_manifest_serializes_nested_capability_revision():
 
     manifest = TaxonomyManifestOut(
         capability_mode="uccm",
+        capability_effective_mode="uccm",
         capability_status="active",
+        capability_activation_report_revision="release-v1",
         capability={
             "internal_graph_version": "a" * 64,
             "effective_hash": "b" * 64,
@@ -141,7 +143,9 @@ def test_taxonomy_manifest_serializes_nested_capability_revision():
 
     dumped = manifest.model_dump(by_alias=True)
     assert dumped["capabilityMode"] == "uccm"
+    assert dumped["capabilityEffectiveMode"] == "uccm"
     assert dumped["capabilityStatus"] == "active"
+    assert dumped["capabilityActivationReportRevision"] == "release-v1"
     assert dumped["capability"]["internalGraphVersion"] == "a" * 64
 
 

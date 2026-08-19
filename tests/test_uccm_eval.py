@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from itertools import product
+from datetime import datetime, timedelta, timezone
 
 
 FAMILIES = [
@@ -125,3 +126,37 @@ def test_report_is_deterministic_under_record_reordering():
         list(reversed(records)), manifest
     ).checksum
 
+
+def test_reviewed_eval_can_be_sealed_as_the_runtime_activation_report():
+    from evals.uccm import GoldSetManifest, build_activation_report, evaluate_uccm
+    from resume_agent.matching.activation import decide_uccm_activation
+
+    manifest = GoldSetManifest(
+        revision="gold-v1", reviewed=True, reviewer_ids=["reviewer:1"]
+    )
+    evaluated = evaluate_uccm(_perfect_records(), manifest)
+    now = datetime(2026, 8, 19, tzinfo=timezone.utc)
+    report = build_activation_report(
+        evaluated,
+        manifest,
+        report_revision="release-v1",
+        taxonomy_revision="taxonomy-v1",
+        assertion_policy_revision="profile-assertions-v1",
+        extraction_policy_revision="job-requirements-v1",
+        matching_policy_revision="uccm-match-v1",
+        generated_at=now,
+        expires_at=now + timedelta(days=30),
+    )
+
+    decision = decide_uccm_activation(
+        "uccm",
+        report,
+        now=now,
+        taxonomy_revision="taxonomy-v1",
+        assertion_policy_revision="profile-assertions-v1",
+        extraction_policy_revision="job-requirements-v1",
+        matching_policy_revision="uccm-match-v1",
+    )
+    assert decision.effective_mode == "uccm"
+    assert report.checksum
+    assert report.approval_signature

@@ -104,6 +104,9 @@ class Settings(BaseSettings):
     # the historical behaviour where an uncertain skill stays unassigned.
     taxonomy_placement_floor: bool = True
     career_capability_mode: Literal["legacy", "shadow", "uccm"] = "legacy"
+    uccm_evaluation_report_path: Path = Path(
+        "data/evals/uccm_activation_report.json"
+    )
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
     career_skill_root: Path = Path("skills")
