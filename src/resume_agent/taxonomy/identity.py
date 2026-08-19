@@ -13,3 +13,11 @@ def legacy_concept_id(token: str) -> str:
     if not normalized:
         raise ValueError("legacy concept token must normalize to a non-empty value")
     return f"legacy:skill:{quote(normalized, safe='')}"
+
+
+def typed_concept_id(concept_type: str, label: str) -> str:
+    """Return a stable provisional ID for a typed source phrase."""
+    normalized = normalize_skill(label)
+    if not normalized:
+        raise ValueError("typed concept label must normalize to a non-empty value")
+    return f"observed:{quote(concept_type, safe='')}:{quote(normalized, safe='')}"

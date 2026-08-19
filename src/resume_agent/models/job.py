@@ -4,6 +4,10 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.models.requirements import (
+    JobRequirement,
+    RequirementReconciliationIssue,
+)
 
 
 class SponsorshipSignal(str, Enum):
@@ -51,6 +55,12 @@ class JobCriteria(ExtensibleModel):
     location: str | None = None
     must_have_skills: list[str] = Field(default_factory=list)
     nice_to_have_skills: list[str] = Field(default_factory=list)
+    typed_requirements: list[JobRequirement] = Field(default_factory=list)
+    extraction_policy_revision: str = ""
+    job_extraction_revision: str = ""
+    requirement_reconciliation_issues: list[RequirementReconciliationIssue] = Field(
+        default_factory=list
+    )
 
 class SalaryRangeExtract(BaseModel):
     """LLM-facing salary schema: every field required, nullable for unknown.
