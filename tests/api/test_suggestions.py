@@ -3,12 +3,17 @@ import time
 from fastapi.testclient import TestClient
 
 import resume_agent.api.routers.suggestions as router_module
+import resume_agent.profile.effective as effective_module
 import resume_agent.services.suggestion_runs as run_module
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
 from resume_agent.github.repos import RepoMeta
 from resume_agent.suggestions.agents import RepoRef, SuggestionDraft
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.corrections import (
+    TaxonomyCorrections,
+    save_taxonomy_corrections,
+)
 from resume_agent.tracking.repository import save_job
 from resume_agent.tracking.tables import Job, JobStatus
 
@@ -52,6 +57,32 @@ def _configure(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(router_module, "_CLUSTER_PATH", str(cluster_path))
     monkeypatch.setattr(router_module, "_FACTS_PATH", str(tmp_path / "missing-facts.json"))
+
+
+def test_suggestion_graph_uses_effective_taxonomy_corrections(tmp_path, monkeypatch):
+    cluster_path = tmp_path / "cluster_map.json"
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_cluster_map(
+        ClusterMap(domain_of={"javascript": "web"}),
+        cluster_path,
+    )
+    save_taxonomy_corrections(
+        TaxonomyCorrections(aliases={"js": "javascript"}), corrections_path
+    )
+    monkeypatch.setattr(
+        effective_module, "corrections_file_path", lambda: str(corrections_path)
+    )
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
+    with TestClient(app):
+        _seed_job(app.state.engine, skills=["JS"])
+        with get_session(app.state.engine) as session:
+            _facts, graph = run_module.load_suggestion_graph(
+                session,
+                facts_path=str(tmp_path / "missing-facts.json"),
+                cluster_path=str(cluster_path),
+            )
+
+    assert [node.key for node in graph.skills] == ["javascript"]
 
 
 def _wait_for_run(client, run_id):

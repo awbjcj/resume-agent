@@ -6,12 +6,18 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.matrix import Overrides, build_matrix, save_matrix
+import resume_agent.profile.effective as effective_module
+from resume_agent.profile.effective import build_effective_taxonomy
+from resume_agent.profile.matrix import build_matrix, save_matrix
 from resume_agent.profile.store import save_facts
 from resume_agent.services import rendering, tailoring
 from resume_agent.services.errors import StageFailure
 from resume_agent.tailor.service import TailorOutcome
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.corrections import (
+    TaxonomyCorrections,
+    save_taxonomy_corrections,
+)
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 
 
@@ -143,18 +149,27 @@ def test_tailor_does_not_raise_when_only_some_targets_fail(monkeypatch):
         assert list(outcome.failures) == [jobs[1].id]
 
 
-def test_tailor_loads_bound_skill_artifacts_once(tmp_path, monkeypatch):
+def test_tailoring_sees_a_taxonomy_correction(tmp_path, monkeypatch):
+    """Tailoring's matrix and cluster map must share the correction ledger."""
     profile_dir = tmp_path / "profile"
     facts_path = profile_dir / "facts.json"
     facts = ProfileFacts(
         contact=Contact(name="Ada"),
-        skills={"Platforms": [Skill(name="Kubernetes")]},
+        skills={"Languages": [Skill(name="JS")]},
     )
-    cluster_map = ClusterMap(aliases={"k8s": "kubernetes"})
+    cluster_map = ClusterMap(domain_of={"javascript": "web"})
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_taxonomy_corrections(
+        TaxonomyCorrections(aliases={"js": "javascript"}), corrections_path
+    )
+    monkeypatch.setattr(
+        effective_module, "corrections_file_path", lambda: str(corrections_path)
+    )
     save_facts(facts, facts_path)
     save_cluster_map(cluster_map, profile_dir / "cluster_map.json")
+    taxonomy = build_effective_taxonomy(profile_dir)
     save_matrix(
-        build_matrix(facts, cluster_map, Overrides()), profile_dir / "matrix.json"
+        build_matrix(facts, taxonomy), profile_dir / "matrix.json"
     )
     captured = {}
 
@@ -196,7 +211,8 @@ def test_tailor_loads_bound_skill_artifacts_once(tmp_path, monkeypatch):
         tailoring.tailor(session, job_ids=[job.id], facts_path=str(facts_path))
 
     assert captured["skill_matrix"] is not None
-    assert captured["cluster_map"].aliases["k8s"] == "kubernetes"
+    assert captured["cluster_map"].aliases["js"] == "javascript"
+    assert [row.key for row in captured["skill_matrix"].rows] == ["javascript"]
 
 
 def test_render_resume_version_returns_path(monkeypatch, tmp_path):
