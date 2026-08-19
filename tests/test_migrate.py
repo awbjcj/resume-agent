@@ -6,6 +6,7 @@ from sqlmodel import create_engine
 from resume_agent.db import init_db
 from resume_agent.tracking.migrate import (
     ensure_dedup_key_column,
+    ensure_industry_labels_capitalized,
     ensure_job_location_instances,
     ensure_posted_at_column,
 )
@@ -148,3 +149,69 @@ def test_location_instance_migration_backfills_legacy_multi_location_jobs():
         "Berlin",
         "Remote",
     ]
+
+
+def test_location_instance_migration_repairs_existing_city_state_country():
+    engine = create_engine("sqlite://")
+    init_db(engine)
+    criteria = {
+        "locations": [
+            {
+                "city": "Singapore",
+                "region": None,
+                "country": None,
+                "is_us": False,
+                "raw": "Singapore",
+            }
+        ],
+        "location_parts": {
+            "city": "Singapore",
+            "region": None,
+            "country": None,
+            "is_us": False,
+            "raw": "Singapore",
+        },
+    }
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO jobs (source, location, jd_text, status, criteria_json, "
+                "gate_override, industry_pending, schema_version, created_at) "
+                "VALUES ('manual', 'Singapore', 'jd', 'shortlisted', :criteria, "
+                "0, 0, 1, CURRENT_TIMESTAMP)"
+            ),
+            {"criteria": json.dumps(criteria)},
+        )
+
+    ensure_job_location_instances(engine)
+
+    with engine.connect() as conn:
+        raw = conn.execute(text("SELECT criteria_json FROM jobs")).scalar()
+    assert isinstance(raw, (str, bytes, bytearray))
+    stored = json.loads(raw)
+    assert stored["locations"][0]["country"] == "SG"
+    assert stored["location_parts"] == stored["locations"][0]
+
+
+def test_industry_label_migration_capitalizes_existing_jobs_idempotently():
+    engine = create_engine("sqlite://")
+    init_db(engine)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO jobs (source, jd_text, status, criteria_json, "
+                "gate_override, industry_pending, schema_version, created_at) "
+                "VALUES ('manual', 'jd', 'shortlisted', :criteria, "
+                "0, 0, 1, CURRENT_TIMESTAMP)"
+            ),
+            {"criteria": json.dumps({"industry": "financial technology"})},
+        )
+
+    ensure_industry_labels_capitalized(engine)
+    ensure_industry_labels_capitalized(engine)
+
+    with engine.connect() as conn:
+        raw = conn.execute(text("SELECT criteria_json FROM jobs")).scalar()
+    assert isinstance(raw, (str, bytes, bytearray))
+    stored = json.loads(raw)
+    assert stored["industry"] == "Financial Technology"

@@ -7,11 +7,13 @@ from resume_agent.tracking.dedup import compute_content_fingerprint, compute_ded
 from resume_agent.taxonomy.location import (
     StructuredLocation,
     build_locations,
+    location_instances_from_criteria,
 )
+from resume_agent.taxonomy.industries import clean_industry_label
 
 
 def ensure_job_location_instances(engine: Engine) -> None:
-    """Backfill canonical location arrays for pre-multi-location job rows."""
+    """Backfill and renormalize canonical location arrays for persisted jobs."""
     with engine.begin() as conn:
         cols = {row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))}
         if not {"id", "location", "criteria_json"}.issubset(cols):
@@ -19,8 +21,7 @@ def ensure_job_location_instances(engine: Engine) -> None:
         rows = conn.execute(
             text(
                 "SELECT id, location, criteria_json FROM jobs "
-                "WHERE location IS NOT NULL AND "
-                "COALESCE(json_array_length(json_extract(criteria_json, '$.locations')), 0) = 0"
+                "WHERE location IS NOT NULL"
             )
         ).fetchall()
         for row_id, raw_location, raw_criteria in rows:
@@ -32,25 +33,62 @@ def ensure_job_location_instances(engine: Engine) -> None:
                     criteria = {}
             else:
                 criteria = dict(raw_criteria or {})
-            legacy = criteria.get("location_parts")
-            primary = None
-            if isinstance(legacy, dict):
-                primary = StructuredLocation(
-                    city=legacy.get("city"),
-                    region=legacy.get("region"),
-                    country=legacy.get("country"),
-                    is_us=bool(legacy.get("is_us")),
-                    raw=legacy.get("raw"),
-                )
-            locations = build_locations(str(raw_location), primary=primary)
+            raw_instances = criteria.get("locations")
+            if isinstance(raw_instances, list) and any(
+                isinstance(item, dict) for item in raw_instances
+            ):
+                locations = location_instances_from_criteria(criteria)
+            else:
+                legacy = criteria.get("location_parts")
+                primary = None
+                if isinstance(legacy, dict):
+                    primary = StructuredLocation(
+                        city=legacy.get("city"),
+                        region=legacy.get("region"),
+                        country=legacy.get("country"),
+                        is_us=bool(legacy.get("is_us")),
+                        raw=legacy.get("raw"),
+                    )
+                locations = build_locations(str(raw_location), primary=primary)
             if not locations:
                 continue
             serialized = [location.as_dict() for location in locations]
             criteria["locations"] = serialized
             criteria["location_parts"] = serialized[0]
+            normalized = json.dumps(criteria)
+            if normalized != raw_criteria:
+                conn.execute(
+                    text("UPDATE jobs SET criteria_json = :criteria WHERE id = :id"),
+                    {"criteria": normalized, "id": row_id},
+                )
+
+
+def ensure_industry_labels_capitalized(engine: Engine) -> None:
+    """Idempotently capitalize persisted job-industry display labels."""
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))}
+        if not {"id", "criteria_json"}.issubset(cols):
+            return
+        rows = conn.execute(
+            text("SELECT id, criteria_json FROM jobs WHERE criteria_json IS NOT NULL")
+        ).fetchall()
+        for row_id, raw_criteria in rows:
+            if isinstance(raw_criteria, str):
+                try:
+                    parsed = json.loads(raw_criteria)
+                except json.JSONDecodeError:
+                    continue
+            else:
+                parsed = raw_criteria
+            if not isinstance(parsed, dict):
+                continue
+            label = clean_industry_label(parsed.get("industry"))
+            if label is None or label == parsed.get("industry"):
+                continue
+            parsed["industry"] = label
             conn.execute(
                 text("UPDATE jobs SET criteria_json = :criteria WHERE id = :id"),
-                {"criteria": json.dumps(criteria), "id": row_id},
+                {"criteria": json.dumps(parsed), "id": row_id},
             )
 
 
