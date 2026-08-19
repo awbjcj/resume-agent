@@ -1,0 +1,224 @@
+model:
+  name: Universal Career Capability Matrix
+  acronym: UCCM
+  canonical_representation: Career Capability Graph
+  version: 0.1.0-design
+  status: research_recommendation
+
+career_layers:
+  - id: career_core
+    label: Career Core Capabilities
+  - id: foundational
+    label: Foundational Literacies and Work Methods
+  - id: transferable_function
+    label: Transferable Work Functions
+  - id: domain_industry
+    label: Domain and Industry Knowledge
+  - id: occupation_role
+    label: Occupation and Role Capabilities
+  - id: enabler
+    label: Tools, Technologies, Standards, and Artifacts
+
+separate_requirement_lane:
+  - credential
+  - license
+  - degree
+  - experience_duration
+  - work_authorization
+  - location
+  - schedule
+  - security_clearance
+  - physical_or_environmental_requirement
+
+core_capability_families:
+  - id: career_navigation_continuous_learning
+    label: Career Navigation and Continuous Learning
+  - id: reasoning_judgment_problem_solving
+    label: Reasoning, Judgment, and Problem Solving
+  - id: communication_sensemaking
+    label: Communication and Sensemaking
+  - id: collaboration_relationship_management
+    label: Collaboration and Relationship Management
+  - id: professional_responsibility_execution
+    label: Professional Responsibility and Execution
+  - id: leadership_influence_mobilization
+    label: Leadership, Influence, and Mobilization
+  - id: inclusive_intercultural_practice
+    label: Inclusive and Intercultural Practice
+  - id: digital_data_ai_fluency
+    label: Digital, Data, and AI Fluency
+
+concept_types:
+  - competency_family
+  - capability
+  - skill
+  - knowledge
+  - work_activity
+  - task
+  - method
+  - standard
+  - tool_technology
+  - artifact
+  - work_style
+  - language
+  - occupation_role
+  - industry_domain
+  - knowledge_domain
+  - credential
+  - requirement
+  - work_context
+  - learning_outcome
+
+edge_types:
+  identity:
+    - lexical_alias_of
+    - same_as
+  scoped_equivalence:
+    - equivalent_in_context
+  hierarchy:
+    - broader_than
+    - narrower_than
+  lineage_and_family:
+    - version_of
+    - member_of_family
+  dependency:
+    - requires_knowledge
+    - requires_capability
+    - prerequisite_for
+  work_relationship:
+    - uses_tool
+    - produces_artifact
+    - supports_task
+    - applies_in_domain
+  role_relationship:
+    - essential_for_role
+    - optional_for_role
+  transfer_and_validation:
+    - transferable_to
+    - validated_by
+    - aligned_to
+
+facets:
+  concept_type: required
+  career_layer: multi_value
+  granularity:
+    - family
+    - cluster
+    - demonstrable_capability
+    - atomic_skill
+    - technique_action
+  reusability:
+    - transversal
+    - cross_sectoral
+    - sector_specific
+    - occupation_specific
+    - employer_specific
+  domain: multi_value
+  occupation: multi_value
+  locale: multi_value
+  jurisdiction: multi_value
+  claim_policy:
+    - evidence_required
+    - assessment_or_evidence_required
+    - private_profile_only
+    - never_candidate_claim
+
+profile_assertion:
+  required_fields:
+    - assertion_id
+    - subject_profile_id
+    - concept_id
+    - assertion_status
+    - evidence_fact_ids
+    - taxonomy_revision
+    - policy_revision
+  assertion_status:
+    - evidenced
+    - self_reported
+    - inferred
+    - assessed
+    - disputed
+  proficiency_levels:
+    1: Exposure
+    2: Developing practitioner
+    3: Independent practitioner
+    4: Advanced or lead practitioner
+    5: Expert or strategic authority
+  separate_dimensions:
+    autonomy:
+      - supervised
+      - guided
+      - independent
+      - sets_direction
+    complexity:
+      - routine
+      - varied_nonroutine
+      - complex
+      - novel_systemic
+    responsibility_scope:
+      - individual
+      - team
+      - multi_team
+      - organization
+      - ecosystem
+    influence_scope:
+      - local
+      - team
+      - cross_functional
+      - executive_external
+    evidence_confidence: 0_to_1
+
+job_requirement:
+  kinds:
+    - must_have
+    - preferred
+    - responsibility
+    - context
+    - credential_required
+    - credential_preferred
+    - experience_required
+    - education_required
+    - availability_or_location
+    - physical_or_environmental
+  strictness:
+    - exact_product
+    - product_family
+    - capability
+    - method_or_standard
+    - credential
+    - contextual
+
+match_statuses:
+  covered:
+    - verified_exact
+    - verified_equivalent
+    - covered_broader
+    - covered_narrower
+  developmental_or_partial:
+    - transferable
+    - partial
+    - level_gap
+    - context_gap
+    - recency_gap
+    - evidence_gap
+    - tool_gap
+    - credential_gap
+  unresolved:
+    - unknown
+    - absent
+
+revision_components:
+  - internal_graph_version
+  - external_source_snapshots
+  - crosswalk_revision
+  - tenant_overlay_revision
+  - correction_policy_version
+  - matching_policy_version
+
+invariants:
+  - Taxonomy relationships never establish candidate facts.
+  - Transferable capabilities are never renamed as the target requirement.
+  - Same category or domain alone never counts as semantic coverage.
+  - Credentials and legal requirements are verified separately from skills.
+  - All derived artifacts carry a complete effective revision.
+  - Corrections are scoped, durable, replayable, and idempotent.
