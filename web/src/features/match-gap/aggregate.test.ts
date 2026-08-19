@@ -29,6 +29,7 @@ const payload: Payload = {
   clustersStale: false,
   taxonomyAlgorithmVersion: "embedding-taxonomy-v1",
   taxonomyMaintenanceDue: true,
+  taxonomyRevision: "a".repeat(64),
   unassignedCount: 0,
   taxonomyUndoAvailable: false,
   categories: [
