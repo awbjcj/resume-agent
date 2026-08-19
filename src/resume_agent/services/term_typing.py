@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-import re
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from resume_agent.taxonomy.term_corrections import (
     TermTypeCorrection,
+    append_term_type_correction,
     apply_term_type_corrections,
     load_term_type_corrections,
-    save_term_type_corrections,
+    term_type_corrections_lock,
 )
 from resume_agent.taxonomy.term_typing import (
     TermConceptType,
@@ -60,26 +60,26 @@ def correct_term(
     corrections_path: str | Path,
     timestamp: str | None = None,
 ) -> TermTypingDecision:
-    current = classify_term(source, corrections_path=corrections_path)
-    if current.id != decision_id:
-        raise TermDecisionMismatchError(
-            "path decision ID does not match the supplied source"
+    with term_type_corrections_lock(corrections_path):
+        current = classify_term(source, corrections_path=corrections_path)
+        if current.id != decision_id:
+            raise TermDecisionMismatchError(
+                "path decision ID does not match the supplied source"
+            )
+        event = TermTypeCorrection.create(
+            actor_id=actor_id,
+            scope="profile",
+            action="set_type",
+            subject_decision_id=current.id,
+            prior_type=current.concept_type,
+            new_type=new_type,
+            rationale=rationale,
+            evidence_refs=evidence_refs,
+            target_revision=current.policy_revision,
+            timestamp=timestamp
+            or datetime.now(timezone.utc).isoformat(timespec="microseconds"),
         )
-    event = TermTypeCorrection.create(
-        actor_id=actor_id,
-        scope="profile",
-        action="set_type",
-        subject_decision_id=current.id,
-        prior_type=current.concept_type,
-        new_type=new_type,
-        rationale=rationale,
-        evidence_refs=evidence_refs,
-        target_revision=current.policy_revision,
-        timestamp=timestamp
-        or datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    )
-    events = load_term_type_corrections(corrections_path)
-    save_term_type_corrections([*events, event], corrections_path)
+        event = append_term_type_correction(event, corrections_path)
     return apply_term_type_corrections([current], [event])[0]
 
 
@@ -95,6 +95,7 @@ def correct_term_and_rebuild_profile(
     profile_dir: str | Path,
     facts_path: str | Path,
     session: Session | None = None,
+    job_id: int | None = None,
 ) -> TermTypingDecision:
     """Persist one correction, then refresh the affected derived projections."""
     decision = correct_term(
@@ -117,15 +118,26 @@ def correct_term_and_rebuild_profile(
         facts = None
     if isinstance(facts, ProfileFacts):
         rebuild_saved_matrix(profile_dir, facts, taxonomy=taxonomy)
-    job_match = re.fullmatch(r"job:(\d+):(?:must|nice|tech|derived):\d+", source.source_id)
-    if session is not None and job_match is not None:
-        job_id = int(job_match.group(1))
-        job = session.get(Job, job_id)
-        if job is not None:
+    if session is not None:
+        jobs = (
+            [job]
+            if job_id is not None and (job := session.get(Job, job_id)) is not None
+            else list(session.exec(select(Job)))
+            if job_id is None
+            else []
+        )
+        for job in jobs:
             criteria = JobCriteria.model_validate(job.criteria_json or {})
+            if job_id is None and not any(
+                item.term_decision_id == decision_id
+                for item in criteria.typed_requirements
+            ):
+                continue
+            if job.id is None:
+                continue
             rebound = bind_job_requirements(
                 criteria,
-                job_id=job_id,
+                job_id=job.id,
                 jd_text=job.jd_text,
                 taxonomy_revision=taxonomy.semantic_revision,
                 aliases=taxonomy.cluster_map.aliases,
@@ -189,4 +201,5 @@ def correct_job_requirement(
         profile_dir=profile_dir,
         facts_path=facts_path,
         session=session,
+        job_id=job_id,
     )

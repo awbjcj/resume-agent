@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -160,3 +161,76 @@ def test_correction_store_is_atomic_json_and_missing_file_is_empty(tmp_path):
         "events": [],
     }
     assert list(path.parent.glob("*.tmp")) == []
+
+
+def test_append_assigns_event_order_when_audit_timestamps_tie(tmp_path):
+    from resume_agent.services.term_typing import correct_term
+    from resume_agent.taxonomy.term_corrections import load_term_type_corrections
+
+    source = TermSource.without_offsets(
+        source_kind="profile_skill",
+        source_id="skill:leadership",
+        original_text="Leadership",
+    )
+    decision = type_term(source)
+    path = tmp_path / "term_type_corrections.json"
+    timestamp = "2026-08-19T12:00:00+00:00"
+
+    correct_term(
+        source,
+        decision_id=decision.id,
+        new_type="skill",
+        rationale="First review",
+        evidence_refs=[],
+        actor_id="user:7",
+        corrections_path=path,
+        timestamp=timestamp,
+    )
+    final = correct_term(
+        source,
+        decision_id=decision.id,
+        new_type="capability",
+        rationale="Second review",
+        evidence_refs=[],
+        actor_id="user:7",
+        corrections_path=path,
+        timestamp=timestamp,
+    )
+
+    assert final.concept_type == "capability"
+    assert [event.sequence for event in load_term_type_corrections(path)] == [1, 2]
+
+
+def test_concurrent_appends_do_not_discard_correction_events(tmp_path):
+    from resume_agent.taxonomy.term_corrections import (
+        TermTypeCorrection,
+        append_term_type_correction,
+        load_term_type_corrections,
+    )
+
+    decision = _decision()
+    path = tmp_path / "term_type_corrections.json"
+
+    def append(index: int) -> None:
+        append_term_type_correction(
+            TermTypeCorrection.create(
+                actor_id=f"user:{index}",
+                scope="profile",
+                action="set_type",
+                subject_decision_id=f"{decision.id}:{index}",
+                prior_type="unknown",
+                new_type="capability",
+                rationale=f"Review {index}",
+                evidence_refs=[],
+                target_revision=decision.policy_revision,
+                timestamp="2026-08-19T12:00:00+00:00",
+            ),
+            path,
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(append, range(24)))
+
+    loaded = load_term_type_corrections(path)
+    assert len(loaded) == 24
+    assert [event.sequence for event in loaded] == list(range(1, 25))

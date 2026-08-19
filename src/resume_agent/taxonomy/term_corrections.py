@@ -7,11 +7,13 @@ import json
 import os
 import tempfile
 from pathlib import Path
+import threading
 from typing import Literal
 
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.taxonomy.custody import workspace_taxonomy_lock
 from resume_agent.taxonomy.term_typing import TermConceptType, TermTypingDecision
 
 CorrectionScope = Literal["global", "tenant", "profile", "proposed_shared"]
@@ -31,6 +33,7 @@ class TermTypeCorrection(ExtensibleModel):
     evidence_refs: list[str] = Field(default_factory=list)
     target_revision: str = Field(min_length=1)
     timestamp: str = Field(min_length=1)
+    sequence: int = Field(default=0, ge=0)
 
     @classmethod
     def create(
@@ -105,46 +108,69 @@ def term_type_corrections_revision(events: list[TermTypeCorrection]) -> str:
 
 def load_term_type_corrections(path: str | Path) -> list[TermTypeCorrection]:
     source = Path(path)
-    try:
-        payload = json.loads(source.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return []
-    return TermTypeCorrectionLedger.model_validate(payload).events
+    with term_type_corrections_lock(source):
+        try:
+            payload = json.loads(source.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return []
+        return TermTypeCorrectionLedger.model_validate(payload).events
+
+
+def term_type_corrections_lock(path: str | Path) -> threading.RLock:
+    return workspace_taxonomy_lock(path)
+
+
+def _event_order(event: TermTypeCorrection) -> tuple[int, int, str, str]:
+    if event.sequence:
+        return (1, event.sequence, event.timestamp, event.id)
+    return (0, 0, event.timestamp, event.id)
 
 
 def save_term_type_corrections(
     events: list[TermTypeCorrection], path: str | Path
 ) -> None:
     destination = Path(path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    ledger = TermTypeCorrectionLedger(
-        events=sorted(events, key=lambda event: (event.timestamp, event.id))
-    )
-    payload = json.dumps(
-        ledger.model_dump(mode="json"),
-        indent=2,
-        sort_keys=True,
-    )
-    temporary_path: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="\n",
-            prefix=f".{destination.name}.",
-            suffix=".tmp",
-            dir=destination.parent,
-            delete=False,
-        ) as handle:
-            handle.write(payload)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-            temporary_path = handle.name
-        os.replace(temporary_path, destination)
-    finally:
-        if temporary_path is not None and os.path.exists(temporary_path):
-            os.unlink(temporary_path)
+    with term_type_corrections_lock(destination):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        ledger = TermTypeCorrectionLedger(events=sorted(events, key=_event_order))
+        payload = json.dumps(
+            ledger.model_dump(mode="json"),
+            indent=2,
+            sort_keys=True,
+        )
+        temporary_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="\n",
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                dir=destination.parent,
+                delete=False,
+            ) as handle:
+                handle.write(payload)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+                temporary_path = handle.name
+            os.replace(temporary_path, destination)
+        finally:
+            if temporary_path is not None and os.path.exists(temporary_path):
+                os.unlink(temporary_path)
+
+
+def append_term_type_correction(
+    event: TermTypeCorrection,
+    path: str | Path,
+) -> TermTypeCorrection:
+    with term_type_corrections_lock(path):
+        events = load_term_type_corrections(path)
+        persisted = event.model_copy(
+            update={"sequence": max((item.sequence for item in events), default=0) + 1}
+        )
+        save_term_type_corrections([*events, persisted], path)
+        return persisted
 
 
 def apply_term_type_corrections(
@@ -152,7 +178,7 @@ def apply_term_type_corrections(
     corrections: list[TermTypeCorrection],
 ) -> list[TermTypingDecision]:
     by_id = {decision.id: decision for decision in decisions}
-    for event in sorted(corrections, key=lambda item: (item.timestamp, item.id)):
+    for event in sorted(corrections, key=_event_order):
         decision = by_id.get(event.subject_decision_id)
         if decision is None:
             continue
