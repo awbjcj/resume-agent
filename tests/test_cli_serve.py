@@ -1,3 +1,4 @@
+from click import unstyle
 from typer.testing import CliRunner
 
 from resume_agent import cli
@@ -24,7 +25,7 @@ def test_serve_refuses_to_expose_auth_free_local_mode(monkeypatch):
     result = CliRunner().invoke(cli.app, ["serve", "--host", "0.0.0.0"])
 
     assert result.exit_code != 0
-    assert "--mode hosted" in result.output
+    assert "--mode hosted" in unstyle(result.output)
 
 
 def test_serve_allows_hosted_mode_on_all_interfaces(monkeypatch):
