@@ -1,10 +1,15 @@
 from typer.testing import CliRunner
 
 from resume_agent import cli
+import resume_agent.profile.effective as effective_module
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.profile.store import save_facts
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.corrections import (
+    TaxonomyCorrections,
+    save_taxonomy_corrections,
+)
 from resume_agent.tracking.tables import Job
 
 runner = CliRunner()
@@ -107,3 +112,38 @@ def test_match_gap_uses_effective_persisted_map_before_llm_fallback(tmp_path, mo
     assert result.exit_code == 0, result.output
     assert "FastAPI" in result.output
     assert "adjacent" in result.output
+
+
+def test_match_gap_honours_a_taxonomy_correction(tmp_path, monkeypatch):
+    """The CLI must canonicalize profile and demand tokens through one ledger."""
+    db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
+    _seed_job(db_url, "shortlisted", ["JavaScript"])
+    profile_dir = tmp_path / "profile"
+    facts_path = profile_dir / "facts.json"
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_facts(
+        ProfileFacts(
+            contact=Contact(name="A"),
+            skills={"Languages": [Skill(name="JS")]},
+        ),
+        facts_path,
+    )
+    save_cluster_map(
+        ClusterMap(domain_of={"javascript": "web"}),
+        profile_dir / "cluster_map.json",
+    )
+    save_taxonomy_corrections(
+        TaxonomyCorrections(aliases={"js": "javascript"}), corrections_path
+    )
+    monkeypatch.setattr(
+        effective_module, "corrections_file_path", lambda: str(corrections_path)
+    )
+
+    result = runner.invoke(
+        cli.app,
+        ["match-gap", "--facts", str(facts_path), "--db-url", db_url],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "No gaps" in result.output
+    assert "JavaScript" not in result.output

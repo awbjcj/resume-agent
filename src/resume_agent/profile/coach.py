@@ -264,23 +264,17 @@ def normalize_recap(turn: CoachTurn, session: dict, strict: bool = True) -> str:
 
 
 def _market_gaps_report(profile_dir: Path, session):
-    from resume_agent.profile.matrix import effective_cluster_map, load_overrides
-    from resume_agent.taxonomy.clusters import load_cluster_map
+    from resume_agent.profile.effective import build_effective_taxonomy
     from resume_agent.tracking.match_gap import match_gap
 
     facts_path = profile_dir / "facts.json"
     if not facts_path.exists():
         return None
-    cluster_path = profile_dir / "cluster_map.json"
-    overrides = load_overrides(profile_dir / "overrides.yaml")
-    cluster_map = effective_cluster_map(load_cluster_map(cluster_path), overrides)
-    use_map = (
-        cluster_path.exists() and bool(cluster_map.aliases or cluster_map.domain_of)
-    ) or bool(overrides.alias or overrides.forbid_alias)
+    taxonomy = build_effective_taxonomy(profile_dir)
     return match_gap(
         session,
         load_facts(facts_path),
-        cluster_map=cluster_map if use_map else None,
+        cluster_map=taxonomy.cluster_map if taxonomy.is_populated else None,
     )
 
 
