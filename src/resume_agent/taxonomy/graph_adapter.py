@@ -15,11 +15,16 @@ from resume_agent.taxonomy.graph_models import (
     ConceptEdge,
     ConceptNode,
     CorrectionEvent,
+    EffectiveCapabilitySnapshot,
     LegacyProjectionMetadata,
     SourceManifest,
     SourceMapping,
+    TaxonomyRevision,
 )
-from resume_agent.taxonomy.graph_validation import validate_capability_graph
+from resume_agent.taxonomy.graph_validation import (
+    GraphValidationError,
+    validate_capability_graph,
+)
 from resume_agent.taxonomy.uccm_seeds import (
     UCCM_MODEL_VERSION,
     UCCM_SOURCE,
@@ -31,6 +36,9 @@ _LEGACY_CLUSTER_MAP_URI = "repo://data/profile/cluster_map.json"
 _TAXONOMY_CORRECTIONS_URI = "repo://data/taxonomy/taxonomy_corrections.json"
 _PROFILE_OVERRIDES_URI = "repo://data/profile/overrides.yaml"
 _LEGACY_NODE_SOURCE_URI = "workspace://profile/cluster_map.json"
+
+CORRECTION_POLICY_VERSION = "taxonomy-corrections-v1"
+LEGACY_MATCHING_POLICY_VERSION = "legacy-exact-adjacent-gap-v1"
 
 
 def legacy_concept_id(token: str) -> str:
@@ -428,4 +436,104 @@ def graph_to_cluster_map(graph: CareerCapabilityGraph) -> ClusterMap:
         domain_of=dict(sorted(domain_of.items())),
         domain_label=dict(sorted(projection.domain_label.items())),
         category_of=dict(sorted(projection.category_of.items())),
+    )
+
+
+def canonical_graph_json(graph: CareerCapabilityGraph) -> str:
+    """Serialize graph semantics canonically for deterministic identity."""
+    payload = graph.model_dump(mode="json", exclude_none=True)
+    payload["nodes"] = sorted(payload["nodes"], key=lambda item: item["id"])
+    payload["edges"] = sorted(payload["edges"], key=lambda item: item["id"])
+    payload["sources"] = sorted(payload["sources"], key=lambda item: item["id"])
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _digest(payload: object) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def graph_revision(graph: CareerCapabilityGraph) -> str:
+    """Return the content hash of one canonical capability graph."""
+    return hashlib.sha256(canonical_graph_json(graph).encode()).hexdigest()
+
+
+def combine_projection_revision(
+    base_projection_revision: str, effective_hash: str
+) -> str:
+    """Bind the compatibility projection revision to graph semantics."""
+    return _digest(
+        {
+            "base_projection_revision": base_projection_revision,
+            "effective_hash": effective_hash,
+        }
+    )
+
+
+def _crosswalk_revision(graph: CareerCapabilityGraph) -> str:
+    crosswalk_edges = [
+        edge.model_dump(mode="json", exclude_none=True)
+        for edge in sorted(graph.edges, key=lambda edge: edge.id)
+        if edge.status == "approved"
+        and edge.predicate in {"same_as", "equivalent_in_context", "aligned_to"}
+    ]
+    return _digest(crosswalk_edges)
+
+
+def build_capability_snapshot(
+    cmap: ClusterMap,
+    *,
+    generated_revision: str,
+    correction_revision: str,
+    lifecycle_revision: str,
+    override_revision: str,
+    base_effective_hash: str,
+    corrections: TaxonomyCorrections | None = None,
+    overrides: Overrides | None = None,
+) -> EffectiveCapabilitySnapshot:
+    """Build and validate an immutable graph snapshot of an effective map."""
+    graph, correction_events = cluster_map_to_graph(
+        cmap,
+        generated_revision=generated_revision,
+        correction_revision=correction_revision,
+        override_revision=override_revision,
+        corrections=corrections,
+        overrides=overrides,
+    )
+    validate_capability_graph(graph)
+    legacy_projection = graph_to_cluster_map(graph)
+    if legacy_projection != cmap:
+        raise GraphValidationError.single(
+            "legacy_projection_mismatch", "legacy projection"
+        )
+
+    internal_graph_version = graph_revision(graph)
+    crosswalk_revision = _crosswalk_revision(graph)
+    effective_hash = _digest(
+        {
+            "base_effective_hash": base_effective_hash,
+            "internal_graph_version": internal_graph_version,
+            "crosswalk_revision": crosswalk_revision,
+            "correction_policy_version": CORRECTION_POLICY_VERSION,
+            "matching_policy_version": LEGACY_MATCHING_POLICY_VERSION,
+        }
+    )
+    revision = TaxonomyRevision(
+        internal_graph_version=internal_graph_version,
+        external_source_snapshots=(),
+        crosswalk_revision=crosswalk_revision,
+        tenant_overlay_revision=correction_revision,
+        generated_legacy_map_revision=generated_revision,
+        correction_ledger_revision=correction_revision,
+        lifecycle_state_revision=lifecycle_revision,
+        canonicalization_override_revision=override_revision,
+        correction_policy_version=CORRECTION_POLICY_VERSION,
+        matching_policy_version=LEGACY_MATCHING_POLICY_VERSION,
+        effective_hash=effective_hash,
+    )
+    return EffectiveCapabilitySnapshot(
+        graph=graph,
+        legacy_projection=legacy_projection,
+        correction_events=correction_events,
+        revision=revision,
     )

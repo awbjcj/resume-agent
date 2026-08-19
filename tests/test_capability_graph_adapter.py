@@ -3,15 +3,21 @@ from __future__ import annotations
 import pytest
 
 from resume_agent.profile.matrix import Overrides
+from resume_agent.taxonomy import graph_adapter as graph_adapter_module
 from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.corrections import TaxonomyCorrections
 from resume_agent.taxonomy.graph_models import ConceptEdge
 from resume_agent.taxonomy.graph_adapter import (
+    build_capability_snapshot,
+    canonical_graph_json,
     cluster_map_to_graph,
+    combine_projection_revision,
+    graph_revision,
     graph_to_cluster_map,
     legacy_concept_id,
 )
 from resume_agent.taxonomy.uccm_seeds import UCCM_SOURCE
+from resume_agent.taxonomy.graph_validation import GraphValidationError
 
 GENERATED_REVISION = "1" * 64
 CORRECTION_REVISION = "2" * 64
@@ -207,3 +213,85 @@ def test_reverse_projection_rejects_multinode_cycles_and_ignores_nonlexical_edge
     cyclic_graph = graph.model_copy(update={"edges": cyclic_edges})
     with pytest.raises(ValueError, match="alias cycle"):
         graph_to_cluster_map(cyclic_graph)
+
+
+def test_graph_json_and_revision_ignore_input_dictionary_order():
+    first = ClusterMap(
+        aliases={"py": "python", "js": "javascript"},
+        domain_of={"python": "backend", "javascript": "web"},
+        domain_label={"backend": "Backend", "web": "Web"},
+        category_of={"backend": "backend-apis", "web": "frontend-web"},
+    )
+    second = ClusterMap(
+        aliases={"js": "javascript", "py": "python"},
+        domain_of={"javascript": "web", "python": "backend"},
+        domain_label={"web": "Web", "backend": "Backend"},
+        category_of={"web": "frontend-web", "backend": "backend-apis"},
+    )
+    first_graph, _ = cluster_map_to_graph(
+        first,
+        generated_revision=GENERATED_REVISION,
+        correction_revision=CORRECTION_REVISION,
+        override_revision=OVERRIDE_REVISION,
+    )
+    second_graph, _ = cluster_map_to_graph(
+        second,
+        generated_revision=GENERATED_REVISION,
+        correction_revision=CORRECTION_REVISION,
+        override_revision=OVERRIDE_REVISION,
+    )
+
+    assert canonical_graph_json(first_graph) == canonical_graph_json(second_graph)
+    assert graph_revision(first_graph) == graph_revision(second_graph)
+
+
+def test_complete_revision_records_components_without_treating_timestamps_as_identity():
+    snapshot = build_capability_snapshot(
+        _map(),
+        generated_revision="1" * 64,
+        correction_revision="2" * 64,
+        lifecycle_revision="3" * 64,
+        override_revision="4" * 64,
+        base_effective_hash="5" * 64,
+    )
+
+    revision = snapshot.revision
+    assert len(revision.internal_graph_version) == 64
+    assert revision.external_source_snapshots == ()
+    assert len(revision.crosswalk_revision) == 64
+    assert revision.tenant_overlay_revision == "2" * 64
+    assert revision.generated_legacy_map_revision == "1" * 64
+    assert revision.correction_ledger_revision == "2" * 64
+    assert revision.lifecycle_state_revision == "3" * 64
+    assert revision.canonicalization_override_revision == "4" * 64
+    assert revision.correction_policy_version == "taxonomy-corrections-v1"
+    assert revision.matching_policy_version == "legacy-exact-adjacent-gap-v1"
+    assert len(revision.effective_hash) == 64
+
+
+def test_capability_semantics_participate_in_the_profile_projection_revision():
+    first = combine_projection_revision("a" * 64, "b" * 64)
+
+    assert len(first) == 64
+    assert first == combine_projection_revision("a" * 64, "b" * 64)
+    assert first != combine_projection_revision("a" * 64, "c" * 64)
+
+
+def test_snapshot_rejects_a_legacy_projection_mismatch(monkeypatch):
+    monkeypatch.setattr(
+        graph_adapter_module,
+        "graph_to_cluster_map",
+        lambda graph: ClusterMap(),
+    )
+
+    with pytest.raises(GraphValidationError) as error:
+        build_capability_snapshot(
+            _map(),
+            generated_revision="1" * 64,
+            correction_revision="2" * 64,
+            lifecycle_revision="3" * 64,
+            override_revision="4" * 64,
+            base_effective_hash="5" * 64,
+        )
+
+    assert error.value.issues[0].code == "legacy_projection_mismatch"

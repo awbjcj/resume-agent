@@ -3,6 +3,7 @@ import json
 from resume_agent.taxonomy.industries import (
     IndustryTaxonomy,
     canonical_industry,
+    clean_industry_label,
     load_industry_taxonomy,
     merge_industry_taxonomy,
     normalize_company,
@@ -17,6 +18,12 @@ def test_industry_normalization_collapses_human_readable_variants():
     )
     assert normalize_industry("7372") is None
     assert normalize_industry("Web3") == "web3"
+
+
+def test_industry_display_labels_capitalize_each_word_without_corrupting_acronyms():
+    assert clean_industry_label("financial technology") == "Financial Technology"
+    assert clean_industry_label("AI & machine learning") == "AI & Machine Learning"
+    assert clean_industry_label("e-commerce") == "E-Commerce"
 
 
 def test_company_normalization_removes_only_identity_noise():
@@ -42,6 +49,18 @@ def test_company_mapping_wins_before_alias_lookup():
 
     assert canonical_industry("Acme, Inc.", "Financial Technology", taxonomy) == "Healthcare"
     assert canonical_industry("Other", "Financial Technology", taxonomy) == "Fintech"
+
+
+def test_taxonomy_normalizes_existing_lowercase_canonical_labels():
+    taxonomy = merge_industry_taxonomy(
+        IndustryTaxonomy(
+            aliases={"financial technology": "financial technology"},
+            companies={"acme": "health care"},
+        )
+    )
+
+    assert taxonomy.aliases == {"financial technology": "Financial Technology"}
+    assert taxonomy.companies == {"acme": "Health Care"}
 
 
 def test_taxonomy_merge_is_monotonic_and_persistence_is_idempotent(tmp_path):

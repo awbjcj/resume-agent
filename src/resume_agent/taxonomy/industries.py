@@ -14,6 +14,7 @@ INDUSTRY_TAXONOMY_PATH = Path("data/industry_taxonomy.json")
 
 _NON_ALNUM = re.compile(r"[^\w]+", flags=re.UNICODE)
 _WHITESPACE = re.compile(r"\s+")
+_WORD_INITIAL = re.compile(r"(?<!\w)([^\W\d_])", flags=re.UNICODE)
 _LEGAL_SUFFIXES = {
     "ag",
     "co",
@@ -128,14 +129,19 @@ def normalize_company(value: object | None) -> str | None:
 
 
 def clean_industry_label(value: object | None) -> str | None:
-    """Clean a display label while rejecting numeric-only or overly long values."""
+    """Return a capitalized display label, rejecting numeric or long values.
+
+    Only word initials are changed. That gives human-readable labels such as
+    ``Financial Technology`` without corrupting meaningful internal casing in
+    abbreviations such as ``AI`` or ``SaaS``.
+    """
     if value is None:
         return None
     label = _WHITESPACE.sub(" ", str(value)).strip(" \t\r\n.,;:!?-_/")
     key = normalize_industry(label)
     if key is None or len(key.split()) > 4:
         return None
-    return label
+    return _WORD_INITIAL.sub(lambda match: match.group(1).upper(), label)
 
 
 def canonical_industry(
@@ -145,9 +151,10 @@ def canonical_industry(
 ) -> str | None:
     company_key = normalize_company(company)
     if company_key and company_key in taxonomy.companies:
-        return taxonomy.companies[company_key]
+        return clean_industry_label(taxonomy.companies[company_key])
     industry_key = normalize_industry(candidate)
-    return taxonomy.aliases.get(industry_key) if industry_key else None
+    canonical = taxonomy.aliases.get(industry_key) if industry_key else None
+    return clean_industry_label(canonical)
 
 
 def merge_industry_taxonomy(
@@ -157,14 +164,24 @@ def merge_industry_taxonomy(
     companies: dict[str, str] | None = None,
 ) -> IndustryTaxonomy:
     """Add mappings without redirecting any established alias or company."""
-    merged_aliases = dict(existing.aliases)
+    merged_aliases: dict[str, str] = {}
+    for raw_alias, canonical in existing.aliases.items():
+        key = normalize_industry(raw_alias)
+        label = clean_industry_label(canonical)
+        if key and label:
+            merged_aliases.setdefault(key, label)
     for raw_alias, canonical in (aliases or {}).items():
         key = normalize_industry(raw_alias)
         label = clean_industry_label(canonical)
         if key and label:
             merged_aliases.setdefault(key, label)
 
-    merged_companies = dict(existing.companies)
+    merged_companies: dict[str, str] = {}
+    for raw_company, canonical in existing.companies.items():
+        key = normalize_company(raw_company)
+        label = clean_industry_label(canonical)
+        if key and label:
+            merged_companies.setdefault(key, label)
     for raw_company, canonical in (companies or {}).items():
         key = normalize_company(raw_company)
         label = clean_industry_label(canonical)

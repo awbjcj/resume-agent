@@ -100,6 +100,14 @@ def test_does_not_infer_us_from_bare_city():
     assert loc.is_us is False
 
 
+def test_infers_country_from_city_state_city():
+    loc = location.build_location("Singapore", None, None, raw="Singapore")
+    assert loc.city == "Singapore"
+    assert loc.region is None
+    assert loc.country == "SG"
+    assert loc.is_us is False
+
+
 def test_region_state_abbreviation_variants():
     assert location.normalize_region("Calif.", "US") == "CA"
     assert location.normalize_region("Mass.", "US") == "MA"
@@ -218,6 +226,22 @@ def test_build_locations_uses_primary_hint_without_losing_other_locations():
     ]
 
 
+def test_build_locations_treats_bare_singapore_as_city_and_country():
+    [loc] = location.build_locations("Singapore")
+
+    assert loc.city == "Singapore"
+    assert loc.region is None
+    assert loc.country == "SG"
+
+
+def test_build_locations_treats_bare_non_city_state_as_country_only():
+    [loc] = location.build_locations("Germany")
+
+    assert loc.city is None
+    assert loc.region is None
+    assert loc.country == "DE"
+
+
 def test_location_instances_from_criteria_falls_back_to_legacy_shape():
     legacy = {
         "location_parts": {
@@ -230,3 +254,18 @@ def test_location_instances_from_criteria_falls_back_to_legacy_shape():
     }
 
     assert location.location_instances_from_criteria(legacy)[0].city == "Boston"
+
+
+def test_location_instances_normalize_legacy_city_state_without_country():
+    legacy = {
+        "location_parts": {
+            "city": "Singapore",
+            "region": None,
+            "country": None,
+            "is_us": False,
+            "raw": "Singapore",
+        }
+    }
+
+    [loc] = location.location_instances_from_criteria(legacy)
+    assert (loc.city, loc.region, loc.country) == ("Singapore", None, "SG")

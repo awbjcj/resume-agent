@@ -72,6 +72,14 @@ _METRO_ALIASES: dict[str, tuple[str | None, str]] = {
     "silicon valley": (None, "CA"),
 }
 
+# Places whose commonly supplied city label also determines the country. This
+# is intentionally small and unambiguous: a bare city such as Boston still
+# cannot safely identify a country, while "Singapore" can.
+_CITY_COUNTRY_ALIASES: dict[str, tuple[str, str]] = {
+    "hong kong": ("Hong Kong", "HK"),
+    "singapore": ("Singapore", "SG"),
+}
+
 _ZIP_RE = re.compile(r"\s+\d{5}(?:-\d{4})?$")
 _LOCATION_SEPARATOR_RE = re.compile(r"\s*(?:\||;|//)\s*")
 _REMOTE_RE = re.compile(r"\bremote\b", re.IGNORECASE)
@@ -208,6 +216,11 @@ def join_locations(values: Iterable[object]) -> str | None:
 
 def _parse_location(raw: str) -> StructuredLocation:
     """Best-effort deterministic parsing for one provider location instance."""
+    city_country = _CITY_COUNTRY_ALIASES.get(_key(raw))
+    if city_country is not None:
+        city, country = city_country
+        return build_location(city, None, country, raw=raw)
+
     parts = [part.strip() for part in raw.split(",") if part.strip()]
     country: str | None = None
     region: str | None = None
@@ -225,7 +238,7 @@ def _parse_location(raw: str) -> StructuredLocation:
     if len(parts) >= 2:
         region = parts.pop()
     city = ", ".join(parts) if parts else None
-    if city is None and region is None:
+    if city is None and region is None and country is None:
         city = raw
     return build_location(city, region, country, raw=raw)
 
@@ -281,13 +294,11 @@ def location_instances_from_criteria(
     for candidate in candidates:
         if not isinstance(candidate, dict):
             continue
-        country = normalize_country(candidate.get("country"))
         locations.append(
-            StructuredLocation(
+            build_location(
                 city=candidate.get("city"),
                 region=candidate.get("region"),
-                country=country,
-                is_us=bool(candidate.get("is_us", country == "US")),
+                country=candidate.get("country"),
                 raw=candidate.get("raw"),
             )
         )
@@ -316,6 +327,13 @@ def build_location(
             region_usps = region_usps or metro_region
             if canonical_city is not None:
                 city_value = canonical_city
+
+        city_country = _CITY_COUNTRY_ALIASES.get(_key(city_value))
+        if city_country is not None:
+            canonical_city, city_country_iso2 = city_country
+            city_value = canonical_city
+            if iso2 is None:
+                iso2 = city_country_iso2
 
     # Infer US only when the country is unresolved AND a state/metro was found.
     # A resolved non-US country (GB, CA-Canada, …) is authoritative and blocks it.
