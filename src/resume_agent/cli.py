@@ -1178,19 +1178,12 @@ def match_gap_cmd(
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Report skills your target jobs demand that your profile does not show."""
-    from resume_agent.profile.matrix import effective_cluster_map, load_overrides
-    from resume_agent.taxonomy.clusters import load_cluster_map
+    from resume_agent.profile.effective import build_effective_taxonomy
 
     profile_facts = load_facts(facts)
     profile_dir = _tenant_cli_path(facts).parent
-    cluster_path = profile_dir / "cluster_map.json"
-    overrides = load_overrides(profile_dir / "overrides.yaml")
-    cluster_map = effective_cluster_map(load_cluster_map(cluster_path), overrides)
-    has_persisted_map = cluster_path.exists() and bool(
-        cluster_map.aliases or cluster_map.domain_of
-    )
-    has_overrides = bool(overrides.alias or overrides.forbid_alias)
-    use_cluster_map = has_persisted_map or has_overrides
+    taxonomy = build_effective_taxonomy(profile_dir)
+    use_cluster_map = taxonomy.is_populated
     canonicalizer = build_skill_canonicalizer() if llm and not use_cluster_map else None
     engine = _engine(db_url)
     with get_session(engine) as session:
@@ -1198,7 +1191,7 @@ def match_gap_cmd(
             session,
             profile_facts,
             canonicalizer=canonicalizer,
-            cluster_map=cluster_map if use_cluster_map else None,
+            cluster_map=taxonomy.cluster_map if use_cluster_map else None,
         )
 
     if report.target_total == 0:
