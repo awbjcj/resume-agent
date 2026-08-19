@@ -134,4 +134,3 @@ def test_assertion_ids_and_order_are_deterministic():
         "mentorship",
         "python",
     ]
-

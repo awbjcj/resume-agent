@@ -74,4 +74,3 @@ def test_shadow_batch_rejects_a_mixed_profile_taxonomy_revision():
             CareerCapabilityGraph(model_version="test"),
             expected_taxonomy_revision="different",
         )
-

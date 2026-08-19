@@ -52,4 +52,3 @@ def test_absent_requirement_lane_values_do_not_create_placeholder_facts():
     facts = ProfileFacts(contact=Contact(name="Ada"))
 
     assert build_requirement_facts(facts) == []
-
