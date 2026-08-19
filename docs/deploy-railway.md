@@ -40,6 +40,11 @@ auth-free, single-workspace default used by local `resume-agent serve`.
    | `GLOBAL_MONTHLY_COST_QUOTA_MICROS` | Shared-key UTC calendar-month cap in USD micro-units; defaults to `$500`                        |
    | `GLOBAL_WEEKLY_TOKEN_BUDGET`       | Deprecated stage-one token circuit breaker; used only while cost quotas are in `shadow` mode    |
 
+   This table highlights deployment-critical values and intentional Docker
+   overrides. The [complete environment reference](configuration.md) documents
+   every supported variable, default, accepted value, and bound; `.env.example`
+   contains the corresponding copy-ready local example.
+
    Add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and/or
    `DEEPSEEK_API_KEY` as Railway variables. Every admin, free member, and
    subscriber uses a matching shared key first. Users add fallback keys under

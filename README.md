@@ -456,24 +456,11 @@ Deferred (not yet exposed over HTTP): `profile build` and LinkedIn `scrape`.
 
 ### `.env` — secrets and models
 
-Copied from `.env.example`. Loaded automatically.
-
-| Key                                                     | Purpose                                                                                                                                                                                                                       |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                                     | Shared Claude credential (the default provider); set it as a Railway environment variable in hosted deployments.                                                                                                              |
-| `OPENAI_API_KEY`                                        | Shared OpenAI credential for tiers prefixed `openai:`; set it as a Railway environment variable.                                                                                                                              |
-| `GEMINI_API_KEY`                                        | Shared Gemini credential for tiers prefixed `gemini:`; set it as a Railway environment variable.                                                                                                                              |
-| `DEEPSEEK_API_KEY`                                      | Shared DeepSeek credential for tiers prefixed `deepseek:`; set it as a Railway environment variable.                                                                                                                          |
-| `GITHUB_TOKEN`                                          | Optional; enriches `profile build`.                                                                                                                                                                                           |
-| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`                      | Optional; enable the Adzuna connector for `pull`.                                                                                                                                                                             |
-| `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD`                  | Burner credentials for `scrape`.                                                                                                                                                                                              |
-| `LINKEDIN_USER_DATA_DIR`                                | Where the logged-in browser session is cached (default `.linkedin_profile`).                                                                                                                                                  |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Platform Gmail OAuth **Web application** client for the API/web app (CLI-only use skips these — see [Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts)).                                             |
-| `DB_URL`                                                | Database location (default `sqlite:///data/resume_agent.db`).                                                                                                                                                                 |
-| `APP_BASE_URL`                                          | Canonical public origin (e.g. `https://your-app.up.railway.app`), used to build OAuth callback URIs instead of trusting forwarded headers. Required for a public deploy — see [Deploying to Railway](docs/deploy-railway.md). |
-| `ALLOWED_HOSTS`                                         | Comma-separated `Host` header allowlist (`TrustedHostMiddleware`). Blank locally; set in production.                                                                                                                          |
-| `SECURE_COOKIES`                                        | Forces the session cookie's `Secure` flag regardless of request scheme. `false` locally; `true` in the shipped Docker image.                                                                                                  |
-| `DISABLE_API_DOCS`                                      | Hides `/docs`, `/redoc`, and `/openapi.json`. `false` locally; `true` in the shipped Docker image.                                                                                                                            |
+Copy `.env.example` to `.env`; it is loaded automatically. The example contains
+every environment-backed application setting with safe local defaults. See the
+[complete environment configuration reference](docs/configuration.md) for
+accepted values, bounds, hosted/Docker overrides, and integration-specific
+requirements.
 
 #### Choosing an LLM provider
 
@@ -484,9 +471,9 @@ model id is **provider-prefixed**: a bare id stays on Anthropic, while an
 Each tier uses its own provider's key, so you can mix providers freely:
 
 ```bash
-CHEAP_MODEL=gemini:gemini-2.0-flash     # cheap extract/fit/relevance on Gemini
+CHEAP_MODEL=gemini:gemini-3.5-flash-lite # cheap extract/fit/relevance on Gemini
 MID_MODEL=deepseek:deepseek-v4-flash    # reviewers / cover-letter reviser on DeepSeek
-PREMIUM_MODEL=claude-opus-4-8           # bare id → Anthropic for the tailor writer
+PREMIUM_MODEL=claude-opus-5             # bare id → Anthropic for the tailor writer
 ```
 
 Set only the keys for the providers you actually use; a provider's SDK is loaded
