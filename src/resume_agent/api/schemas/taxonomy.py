@@ -71,6 +71,12 @@ class TermTypeCorrectionIn(CamelModel):
     evidence_refs: list[str] = Field(default_factory=list)
 
 
+class RequirementTermTypeCorrectionIn(CamelModel):
+    new_type: TermConceptType
+    rationale: str = Field(min_length=1, max_length=1000)
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
 class TermSourceOut(CamelModel):
     source_kind: TermSourceKind
     source_id: str

@@ -107,7 +107,7 @@ def test_fit_location_requires_country_but_allows_city_and_region_to_be_omitted(
     assert location.region is None
 
     with pytest.raises(ValidationError):
-        FitLocation(city="Singapore")
+        FitLocation.model_validate({"city": "Singapore"})
 
 
 def test_score_fit_returns_location():

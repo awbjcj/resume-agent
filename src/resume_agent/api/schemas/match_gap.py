@@ -145,16 +145,31 @@ class TaxonomyRevisionOut(CamelModel):
     effective_hash: str = ""
 
 
+def _legacy_capability_mode() -> Literal["legacy", "shadow", "uccm"]:
+    return "legacy"
+
+
+def _disabled_capability_status() -> Literal[
+    "disabled", "shadow", "active", "fallback"
+]:
+    return "disabled"
+
+
 class TaxonomyManifestOut(CamelModel):
     generated: str = ""
     corrections: str = ""
+    term_type_corrections: str = Field(default_factory=str)
     state: str = ""
     overrides: str = ""
     semantic: str = ""
-    capability_mode: Literal["legacy", "shadow", "uccm"] = "legacy"
-    capability_effective_mode: Literal["legacy", "shadow", "uccm"] = "legacy"
+    capability_mode: Literal["legacy", "shadow", "uccm"] = Field(
+        default_factory=_legacy_capability_mode
+    )
+    capability_effective_mode: Literal["legacy", "shadow", "uccm"] = Field(
+        default_factory=_legacy_capability_mode
+    )
     capability_status: Literal["disabled", "shadow", "active", "fallback"] = (
-        "disabled"
+        Field(default_factory=_disabled_capability_status)
     )
     capability_error_code: str | None = None
     capability_activation_report_revision: str | None = None

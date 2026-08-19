@@ -9,10 +9,10 @@ from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 from resume_agent.profile.effective import build_effective_taxonomy
-from resume_agent.profile.matrix import build_matrix
+from resume_agent.profile.matrix import SkillMatchContext, build_matrix
 from resume_agent.discovery.requirements import bind_job_requirements
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.service import tailor_job, tailor_jobs
+from resume_agent.tailor.service import _select_skill_context, tailor_job, tailor_jobs
 from resume_agent.tailor.context import UccmTailoringContext
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.taxonomy.corrections import (
@@ -65,6 +65,24 @@ def _session() -> Session:
 def _require_id(value: int | None) -> int:
     assert value is not None
     return value
+
+
+def test_shadow_uccm_context_does_not_replace_primary_legacy_matching(tmp_path):
+    taxonomy = build_effective_taxonomy(tmp_path / "profile", mode="shadow")
+    legacy = SkillMatchContext()
+    context = UccmTailoringContext(
+        taxonomy_revision=taxonomy.semantic_revision,
+        facts_revision="facts-v1",
+        assertion_policy_revision="profile-assertions-v1",
+        extraction_policy_revision="job-requirements-v1",
+        matching_policy_revision="uccm-match-v1",
+    )
+
+    assert _select_skill_context(
+        taxonomy=taxonomy,
+        uccm_context=context,
+        legacy_context=legacy,
+    ) is legacy
 
 
 def test_tailor_job_persists_versions_and_marks_tailored(tmp_path):

@@ -42,6 +42,7 @@ from resume_agent.matching.models import VerifiedRequirementFact
 from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.taxonomy.skills import split_skills
 from resume_agent.taxonomy.term_typing import TERM_TYPING_POLICY_REVISION
+from resume_agent.taxonomy.term_corrections import TermTypeCorrection
 from resume_agent.tracking.match_gap import normalize_skill
 
 DEFAULT_MATRIX_PATH = "data/profile/matrix.json"
@@ -101,6 +102,7 @@ class TaxonomyRevisionModel(ExtensibleModel):
 class TaxonomyManifestModel(ExtensibleModel):
     generated: str = ""
     corrections: str = ""
+    term_type_corrections: str = ""
     state: str = ""
     overrides: str = ""
     semantic: str = ""
@@ -122,6 +124,7 @@ class SkillMatrix(ExtensibleModel):
     taxonomy_manifest: TaxonomyManifestModel | None = None
     assertion_policy_revision: str = ""
     term_typing_policy_revision: str = ""
+    term_type_corrections: list[TermTypeCorrection] = Field(default_factory=list)
     assertions: list[CapabilityAssertion] = Field(default_factory=list)
     uccm_profile: UccmProfileProjection | None = None
     verified_requirement_facts: list[VerifiedRequirementFact] = Field(
@@ -327,6 +330,7 @@ def build_matrix(
         taxonomy_manifest=TaxonomyManifestModel(**asdict(taxonomy.manifest)),
         assertion_policy_revision=ASSERTION_POLICY_REVISION,
         term_typing_policy_revision=TERM_TYPING_POLICY_REVISION,
+        term_type_corrections=list(taxonomy.term_type_corrections),
         assertions=assertions,
         uccm_profile=build_profile_projection(assertions, taxonomy),
         verified_requirement_facts=build_requirement_facts(facts),
@@ -400,10 +404,19 @@ def build_decorated_matrix(profile_dir: str | Path, facts: ProfileFacts) -> Skil
     return matrix
 
 
-def rebuild_saved_matrix(profile_dir: str | Path, facts: ProfileFacts) -> SkillMatrix:
+def rebuild_saved_matrix(
+    profile_dir: str | Path,
+    facts: ProfileFacts,
+    *,
+    taxonomy: EffectiveTaxonomy | None = None,
+) -> SkillMatrix:
     """Build, decorate, and persist matrix.json from current profile artifacts."""
     profile_dir = Path(profile_dir)
-    matrix = build_decorated_matrix(profile_dir, facts)
+    if taxonomy is None:
+        matrix = build_decorated_matrix(profile_dir, facts)
+    else:
+        matrix = build_matrix(facts, taxonomy)
+        decorate_matrix_groups(matrix, profile_dir, taxonomy)
     save_matrix(matrix, profile_dir / "matrix.json")
     return matrix
 

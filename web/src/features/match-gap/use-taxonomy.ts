@@ -7,6 +7,7 @@ import { MATCH_GAP_QUERY_KEY } from "./use-match-gap";
 
 type MatchGap = components["schemas"]["MatchGapOut"];
 export type NewDomainInput = { label: string; category: string };
+type RequirementCorrection = components["schemas"]["RequirementTermTypeCorrectionIn"];
 
 function useTaxonomyMutation<V>(
   run: (variables: V) => Promise<MatchGap>,
@@ -41,6 +42,33 @@ export function useRestoreSkills() {
           ? "Skill restored"
           : `${result.restored} skills restored`,
       );
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useCorrectRequirementTermType() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (variables: {
+      jobId: number;
+      requirementId: string;
+      body: RequirementCorrection;
+    }) =>
+      unwrap(
+        api.PATCH("/api/taxonomy/jobs/{job_id}/requirements/{requirement_id}/term-type", {
+          params: {
+            path: {
+              job_id: variables.jobId,
+              requirement_id: variables.requirementId,
+            },
+          },
+          body: variables.body,
+        }),
+      ) as Promise<components["schemas"]["TermTypingDecisionOut"]>,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: MATCH_GAP_QUERY_KEY });
+      toast.success("Requirement type corrected");
     },
     onError: (error: Error) => toast.error(error.message),
   });

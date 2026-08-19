@@ -334,6 +334,8 @@ def discover_jobs(
         discover_kwargs["h1b_enricher"] = h1b_enricher
     if bundle.term_type_assistant is not None:
         discover_kwargs["term_type_assistant"] = bundle.term_type_assistant
+    if matrix is not None and matrix.term_type_corrections:
+        discover_kwargs["term_corrections"] = matrix.term_type_corrections
     return discover(
         session,
         config,
@@ -449,6 +451,7 @@ def reprocess_jobs(
         cluster_map=cluster_map,
         h1b_enricher=h1b_enricher,
         term_type_assistant=bundle.term_type_assistant,
+        term_corrections=(matrix.term_type_corrections if matrix is not None else None),
     )
 
 

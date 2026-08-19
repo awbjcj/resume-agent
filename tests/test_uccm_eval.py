@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from itertools import product
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 
 FAMILIES = [
@@ -18,7 +19,12 @@ FAMILIES = [
     "logistics_skilled_operations",
     "public_nonprofit_administration",
 ]
-LEVELS = ["entry", "mid", "senior", "manager"]
+LEVELS: list[Literal["entry", "mid", "senior", "manager"]] = [
+    "entry",
+    "mid",
+    "senior",
+    "manager",
+]
 
 
 def _perfect_records():

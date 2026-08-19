@@ -49,6 +49,18 @@ def test_uccm_match_gap_metadata_is_additive_not_required():
     assert required.isdisjoint(additive_fields)
     assert all("default" not in schema["properties"][field] for field in additive_fields)
 
+    manifest = spec["components"]["schemas"]["TaxonomyManifestOut"]
+    manifest_fields = {
+        "termTypeCorrections",
+        "capabilityMode",
+        "capabilityEffectiveMode",
+        "capabilityStatus",
+    }
+    assert set(manifest.get("required", [])).isdisjoint(manifest_fields)
+    assert all(
+        "default" not in manifest["properties"][field] for field in manifest_fields
+    )
+
 
 def test_committed_openapi_is_current():
     """The committed contract must match the live app — regenerate if this fails."""

@@ -8475,6 +8475,62 @@
         "title": "ReprocessParams",
         "type": "object"
       },
+      "RequirementTermTypeCorrectionIn": {
+        "properties": {
+          "evidenceRefs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencerefs",
+            "type": "array"
+          },
+          "newType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "competency_family",
+                  "capability",
+                  "skill",
+                  "knowledge",
+                  "work_activity",
+                  "task",
+                  "method",
+                  "standard",
+                  "tool_technology",
+                  "artifact",
+                  "work_style",
+                  "language",
+                  "occupation_role",
+                  "industry_domain",
+                  "knowledge_domain",
+                  "credential",
+                  "requirement",
+                  "work_context",
+                  "learning_outcome"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Newtype"
+          },
+          "rationale": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "newType",
+          "rationale"
+        ],
+        "title": "RequirementTermTypeCorrectionIn",
+        "type": "object"
+      },
       "ResendCodeRequest": {
         "properties": {
           "email": {
@@ -11344,7 +11400,6 @@
             "title": "Capabilityactivationreportrevision"
           },
           "capabilityEffectiveMode": {
-            "default": "legacy",
             "enum": [
               "legacy",
               "shadow",
@@ -11365,7 +11420,6 @@
             "title": "Capabilityerrorcode"
           },
           "capabilityMode": {
-            "default": "legacy",
             "enum": [
               "legacy",
               "shadow",
@@ -11375,7 +11429,6 @@
             "type": "string"
           },
           "capabilityStatus": {
-            "default": "disabled",
             "enum": [
               "disabled",
               "shadow",
@@ -11408,6 +11461,10 @@
           "state": {
             "default": "",
             "title": "State",
+            "type": "string"
+          },
+          "termTypeCorrections": {
+            "title": "Termtypecorrections",
             "type": "string"
           }
         },
@@ -25832,6 +25889,80 @@
           }
         },
         "summary": "Merge Domain"
+      }
+    },
+    "/api/taxonomy/jobs/{job_id}/requirements/{requirement_id}/term-type": {
+      "patch": {
+        "operationId": "correct_job_requirement_api_taxonomy_jobs__job_id__requirements__requirement_id__term_type_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requirement_id",
+            "required": true,
+            "schema": {
+              "title": "Requirement Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementTermTypeCorrectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermTypingDecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Job Requirement"
       }
     },
     "/api/taxonomy/skills": {

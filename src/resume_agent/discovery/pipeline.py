@@ -54,6 +54,7 @@ from resume_agent.taxonomy.industries import (
 from resume_agent.taxonomy.location import StructuredLocation, build_locations
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
 from resume_agent.taxonomy.term_typing import TermTypeAssistant
+from resume_agent.taxonomy.term_corrections import TermTypeCorrection
 from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
 from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
@@ -119,6 +120,7 @@ def run_extract(
     taxonomy_revision: str = "",
     term_type_assistant: TermTypeAssistant | None = None,
     term_aliases: Mapping[str, str] | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
 ) -> dict[int, StageFailure]:
     jobs = _stage_jobs(session, JobStatus.raw.value, scope)
     failures: dict[int, StageFailure] = {}
@@ -157,6 +159,7 @@ def run_extract(
                 taxonomy_revision=taxonomy_revision,
                 assistant=term_type_assistant,
                 aliases=term_aliases,
+                term_corrections=term_corrections,
             )
             job.criteria_json = criteria.model_dump(mode="json")
             _record_job_agent_meta(job, "criteria", agent)
@@ -514,6 +517,7 @@ def discover(
     cluster_map: ClusterMap | None = None,
     h1b_enricher=None,
     term_type_assistant: TermTypeAssistant | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows (optionally scoped)."""
     run_relevance(session, config, relevance_agent, reporter=reporter, scope=scope)
@@ -527,6 +531,7 @@ def discover(
         taxonomy_revision=matrix.taxonomy_revision if matrix is not None else "",
         term_type_assistant=term_type_assistant,
         term_aliases=cluster_map.aliases if cluster_map is not None else None,
+        term_corrections=term_corrections,
     )
     run_filter(session, config, scope=scope)
     from resume_agent.services.discovery import run_h1b_enrichment
@@ -602,6 +607,7 @@ def reprocess(
     cluster_map: ClusterMap | None = None,
     h1b_enricher=None,
     term_type_assistant: TermTypeAssistant | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
 ) -> dict[str, int]:
     """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
     selected: dict[int, Job] = {}
@@ -637,4 +643,5 @@ def reprocess(
         cluster_map=cluster_map,
         h1b_enricher=h1b_enricher,
         term_type_assistant=term_type_assistant,
+        term_corrections=term_corrections,
     )

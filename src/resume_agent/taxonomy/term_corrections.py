@@ -16,6 +16,7 @@ from resume_agent.taxonomy.term_typing import TermConceptType, TermTypingDecisio
 
 CorrectionScope = Literal["global", "tenant", "profile", "proposed_shared"]
 CorrectionAction = Literal["set_type"]
+DEFAULT_TERM_TYPE_CORRECTIONS_PATH = "data/taxonomy/term_type_corrections.json"
 
 
 class TermTypeCorrection(ExtensibleModel):
@@ -81,6 +82,25 @@ class TermTypeCorrection(ExtensibleModel):
 class TermTypeCorrectionLedger(ExtensibleModel):
     schema_version: int = Field(default=1, ge=1, le=1)
     events: list[TermTypeCorrection] = Field(default_factory=list)
+
+
+def term_type_corrections_file_path() -> str:
+    return DEFAULT_TERM_TYPE_CORRECTIONS_PATH
+
+
+def term_type_corrections_revision(events: list[TermTypeCorrection]) -> str:
+    payload = sorted(
+        (
+            event.model_dump(mode="json", exclude={"id", "timestamp"})
+            for event in events
+        ),
+        key=lambda value: json.dumps(
+            value, sort_keys=True, separators=(",", ":")
+        ),
+    )
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def load_term_type_corrections(path: str | Path) -> list[TermTypeCorrection]:

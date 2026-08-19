@@ -156,6 +156,23 @@ def _attempt_taxonomy_manifest(
     return manifest
 
 
+def _select_skill_context(
+    *,
+    taxonomy: EffectiveTaxonomy | None,
+    uccm_context: UccmTailoringContext | None,
+    legacy_context: SkillMatchContext | None,
+) -> SkillMatchContext | None:
+    """Keep shadow results observable without letting them change decisions."""
+    if uccm_context is None:
+        return legacy_context
+    if (
+        taxonomy is not None
+        and taxonomy.manifest.capability_effective_mode != "uccm"
+    ):
+        return legacy_context
+    return project_legacy_skill_context(uccm_context)
+
+
 def tailor_job(
     session: Session,
     job: Job,
@@ -179,8 +196,11 @@ def tailor_job(
     planner = evidence_portfolio_agent or match_plan_agent
     if planner is not None:
         runners = (*runners, planner)
-    if uccm_context is not None:
-        skill_context = project_legacy_skill_context(uccm_context)
+    skill_context = _select_skill_context(
+        taxonomy=taxonomy,
+        uccm_context=uccm_context,
+        legacy_context=skill_context,
+    )
     rounds = asyncio.run(
         run_with_cleanup(
             TailorWorkflow().arun(
@@ -262,6 +282,7 @@ def tailor_jobs(
                             job_id=job_id,
                             taxonomy_revision=taxonomy.semantic_revision,
                             aliases=taxonomy.cluster_map.aliases,
+                            term_corrections=list(taxonomy.term_type_corrections),
                         )
                     }
                 )
@@ -283,10 +304,10 @@ def tailor_jobs(
         ) -> tuple[list[TailorRound], UccmTailoringContext | None]:
             criteria = _criteria(job)
             uccm_context = _uccm_context(job, criteria)
-            skill_context = (
-                project_legacy_skill_context(uccm_context)
-                if uccm_context is not None
-                else _legacy_skill_context(criteria)
+            skill_context = _select_skill_context(
+                taxonomy=taxonomy,
+                uccm_context=uccm_context,
+                legacy_context=_legacy_skill_context(criteria),
             )
             rounds = await TailorWorkflow().arun(
                 TailorRequest(

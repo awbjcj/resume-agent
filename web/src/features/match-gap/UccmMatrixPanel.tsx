@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AlertTriangleIcon, CheckCircle2Icon, CircleHelpIcon, RouteIcon } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,6 +9,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -17,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { MatchGap } from "./use-match-gap";
+import { useCorrectRequirementTermType } from "./use-taxonomy";
 
 const LAYER_LABELS = {
   career_core: "Career core",
@@ -45,6 +48,29 @@ const STATUS_LABELS = {
 } as const;
 
 type MatchResult = NonNullable<MatchGap["matchResults"]>[number];
+type TypedRequirement = NonNullable<MatchGap["typedRequirements"]>[number];
+
+const CORRECTABLE_TERM_TYPES = [
+  "competency_family",
+  "capability",
+  "skill",
+  "knowledge",
+  "work_activity",
+  "task",
+  "method",
+  "standard",
+  "tool_technology",
+  "artifact",
+  "work_style",
+  "language",
+  "occupation_role",
+  "industry_domain",
+  "knowledge_domain",
+  "credential",
+  "requirement",
+  "work_context",
+  "learning_outcome",
+] as const;
 
 function statusTone(status: MatchResult["v2"]["status"]) {
   if (status.startsWith("verified_") || status.startsWith("covered_")) return "text-ready";
@@ -68,6 +94,56 @@ function revisionNote(data: MatchGap) {
     .join(" · ");
 }
 
+function RequirementTypeCorrection({ requirement }: { requirement: TypedRequirement }) {
+  const mutation = useCorrectRequirementTermType();
+  const [newType, setNewType] = useState<(typeof CORRECTABLE_TERM_TYPES)[number]>("capability");
+  const [rationale, setRationale] = useState("");
+  const jobId = Number(requirement.jobId);
+  const canSubmit = Number.isInteger(jobId) && rationale.trim().length > 0 && !mutation.isPending;
+
+  return (
+    <form
+      className="mt-3 space-y-2 rounded-md border bg-background p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSubmit) return;
+        mutation.mutate({
+          jobId,
+          requirementId: requirement.id,
+          body: { newType, rationale: rationale.trim(), evidenceRefs: [] },
+        });
+      }}
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resolve unknown type</p>
+      <label className="block text-sm font-medium" htmlFor={`requirement-type-${requirement.id}`}>
+        Correct requirement type
+      </label>
+      <select
+        id={`requirement-type-${requirement.id}`}
+        className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+        value={newType}
+        onChange={(event) => setNewType(event.target.value as typeof newType)}
+      >
+        {CORRECTABLE_TERM_TYPES.map((type) => (
+          <option key={type} value={type}>{type.replaceAll("_", " ")}</option>
+        ))}
+      </select>
+      <label className="block text-sm font-medium" htmlFor={`requirement-rationale-${requirement.id}`}>
+        Correction rationale
+      </label>
+      <textarea
+        id={`requirement-rationale-${requirement.id}`}
+        className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm"
+        maxLength={1000}
+        required
+        value={rationale}
+        onChange={(event) => setRationale(event.target.value)}
+      />
+      <Button type="submit" size="sm" disabled={!canSubmit}>Save type correction</Button>
+    </form>
+  );
+}
+
 export function UccmMatrixPanel({ data }: { data: MatchGap }) {
   const state = data.uccmState ?? "disabled";
   if (state !== "ready") {
@@ -86,6 +162,8 @@ export function UccmMatrixPanel({ data }: { data: MatchGap }) {
   }
 
   const requirements = new Map((data.typedRequirements ?? []).map((item) => [item.id, item]));
+  const jobs = new Map(data.jobs.map((job) => [String(job.id), job]));
+  const shadowMode = data.taxonomyManifest?.capabilityEffectiveMode === "shadow";
 
   return (
     <section aria-labelledby="uccm-heading" className="space-y-4">
@@ -99,6 +177,16 @@ export function UccmMatrixPanel({ data }: { data: MatchGap }) {
         </div>
         <span className="font-mono text-xs text-muted-foreground">{revisionNote(data)}</span>
       </div>
+
+      {shadowMode && (
+        <Alert role="status" aria-label="Shadow analysis">
+          <CircleHelpIcon aria-hidden="true" />
+          <AlertTitle>Shadow analysis</AlertTitle>
+          <AlertDescription>
+            UCCM results are shown for comparison; legacy matching remains primary until reviewed activation gates pass.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {(data.profileProjection?.layers ?? []).map((layer) => (
@@ -143,6 +231,7 @@ export function UccmMatrixPanel({ data }: { data: MatchGap }) {
             <Accordion>
               {(data.matchResults ?? []).map((result) => {
                 const requirement = requirements.get(result.v2.requirementId);
+                const job = requirement ? jobs.get(requirement.jobId) : undefined;
                 return (
                   <AccordionItem key={result.v2.id} value={result.v2.id}>
                     <AccordionTrigger className="gap-3 no-underline hover:no-underline">
@@ -168,6 +257,7 @@ export function UccmMatrixPanel({ data }: { data: MatchGap }) {
                       <div>
                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Job source</p>
                         <p className="mt-1">{requirement?.sourceText ?? "Source span unavailable"}</p>
+                        {job && <p className="mt-1 text-xs text-muted-foreground">{job.company} · {job.title}</p>}
                         <p className="mt-2 text-xs text-muted-foreground">
                           {requirement?.requirementKind.replaceAll("_", " ")} · {requirement?.strictness.replaceAll("_", " ")}
                         </p>
@@ -181,6 +271,9 @@ export function UccmMatrixPanel({ data }: { data: MatchGap }) {
                             : "Evidence: none located"}
                         </p>
                         <p className="mt-2">{result.v2.recommendedAction}</p>
+                        {requirement?.conceptType === "unknown" && (
+                          <RequirementTypeCorrection requirement={requirement} />
+                        )}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

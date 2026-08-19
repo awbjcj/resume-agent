@@ -23,7 +23,7 @@ from resume_agent.taxonomy.graph_models import CareerCapabilityGraph, EdgeType
 from resume_agent.tracking.match_gap import normalize_skill
 
 _YEAR = re.compile(r"(?:19|20)\d{2}")
-_RELATION_STATUS = {
+_RELATION_STATUS: dict[EdgeType, MatchStatus] = {
     "same_as": "verified_equivalent",
     "equivalent_in_context": "verified_equivalent",
     "broader_than": "covered_broader",
@@ -99,7 +99,7 @@ def _path_status(path: RelationshipPath) -> MatchStatus:
         "supports_task",
     ):
         if predicate in predicates:
-            return _RELATION_STATUS[predicate]  # type: ignore[return-value]
+            return _RELATION_STATUS[predicate]
     return "absent"
 
 

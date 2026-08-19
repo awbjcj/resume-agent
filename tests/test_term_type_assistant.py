@@ -19,6 +19,9 @@ class _Runner:
         self.prompts.append(prompt)
         return _Result(self.content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_model_adapter_uses_schema_boundary_for_an_ambiguous_phrase():
     from resume_agent.taxonomy.term_assistant import ModelTermTypeAssistant
@@ -59,4 +62,3 @@ def test_model_adapter_invalid_output_remains_observable_unknown():
 
     assert decision.concept_type == "unknown"
     assert decision.reason_code == "invalid_model_output"
-

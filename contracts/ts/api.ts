@@ -3066,6 +3066,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/taxonomy/jobs/{job_id}/requirements/{requirement_id}/term-type": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Correct Job Requirement */
+        patch: operations["correct_job_requirement_api_taxonomy_jobs__job_id__requirements__requirement_id__term_type_patch"];
+        trace?: never;
+    };
     "/api/taxonomy/skills": {
         parameters: {
             query?: never;
@@ -6248,6 +6265,15 @@ export interface components {
             /** Scopes */
             scopes?: string[];
         };
+        /** RequirementTermTypeCorrectionIn */
+        RequirementTermTypeCorrectionIn: {
+            /** Evidencerefs */
+            evidenceRefs?: string[];
+            /** Newtype */
+            newType: ("competency_family" | "capability" | "skill" | "knowledge" | "work_activity" | "task" | "method" | "standard" | "tool_technology" | "artifact" | "work_style" | "language" | "occupation_role" | "industry_domain" | "knowledge_domain" | "credential" | "requirement" | "work_context" | "learning_outcome") | "unknown";
+            /** Rationale */
+            rationale: string;
+        };
         /** ResendCodeRequest */
         ResendCodeRequest: {
             /**
@@ -7288,24 +7314,21 @@ export interface components {
             capabilityActivationReportRevision?: string | null;
             /**
              * Capabilityeffectivemode
-             * @default legacy
              * @enum {string}
              */
-            capabilityEffectiveMode: "legacy" | "shadow" | "uccm";
+            capabilityEffectiveMode?: "legacy" | "shadow" | "uccm";
             /** Capabilityerrorcode */
             capabilityErrorCode?: string | null;
             /**
              * Capabilitymode
-             * @default legacy
              * @enum {string}
              */
-            capabilityMode: "legacy" | "shadow" | "uccm";
+            capabilityMode?: "legacy" | "shadow" | "uccm";
             /**
              * Capabilitystatus
-             * @default disabled
              * @enum {string}
              */
-            capabilityStatus: "disabled" | "shadow" | "active" | "fallback";
+            capabilityStatus?: "disabled" | "shadow" | "active" | "fallback";
             /**
              * Corrections
              * @default
@@ -7331,6 +7354,8 @@ export interface components {
              * @default
              */
             state: string;
+            /** Termtypecorrections */
+            termTypeCorrections?: string;
         };
         /** TaxonomyRevisionOut */
         TaxonomyRevisionOut: {
@@ -15184,6 +15209,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_job_requirement_api_taxonomy_jobs__job_id__requirements__requirement_id__term_type_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+                requirement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementTermTypeCorrectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermTypingDecisionOut"];
                 };
             };
             /** @description Validation Error */

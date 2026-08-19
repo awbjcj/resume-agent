@@ -4,6 +4,7 @@ import pytest
 
 from resume_agent.taxonomy.graph_models import (
     CareerCapabilityGraph,
+    ConceptType,
     ConceptEdge,
     ConceptNode,
     LegacyProjectionMetadata,
@@ -31,7 +32,7 @@ def _source() -> SourceManifest:
     )
 
 
-def _node(node_id: str, type_: str = "skill") -> ConceptNode:
+def _node(node_id: str, type_: ConceptType = "skill") -> ConceptNode:
     return ConceptNode(
         id=node_id,
         type=type_,

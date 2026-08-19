@@ -91,6 +91,35 @@ def test_correction_replay_is_deterministic_and_last_event_wins():
     assert forward[0].concept_type == "capability"
 
 
+def test_correction_revision_excludes_audit_timestamps():
+    from resume_agent.taxonomy.term_corrections import (
+        TermTypeCorrection,
+        term_type_corrections_revision,
+    )
+
+    decision = _decision()
+
+    def correction(timestamp: str) -> TermTypeCorrection:
+        return TermTypeCorrection.create(
+            actor_id="user:7",
+            scope="profile",
+            action="set_type",
+            subject_decision_id=decision.id,
+            prior_type="unknown",
+            new_type="capability",
+            rationale="Reviewed classification",
+            evidence_refs=[],
+            target_revision=decision.policy_revision,
+            timestamp=timestamp,
+        )
+
+    assert term_type_corrections_revision(
+        [correction("2026-08-19T12:00:00Z")]
+    ) == term_type_corrections_revision(
+        [correction("2026-08-19T13:00:00Z")]
+    )
+
+
 def test_stale_or_mismatched_corrections_are_rejected():
     from resume_agent.taxonomy.term_corrections import (
         TermTypeCorrection,

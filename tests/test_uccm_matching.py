@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import pytest
 
-from resume_agent.models.requirements import JobRequirement
+from resume_agent.models.requirements import JobRequirement, RequirementStrictness
 from resume_agent.profile.assertions import (
     CapabilityAssertion,
     LegacyAssertionProjection,
 )
-from resume_agent.taxonomy.graph_models import CareerCapabilityGraph, ConceptEdge
+from resume_agent.taxonomy.graph_models import CareerCapabilityGraph, ConceptEdge, EdgeType
+from resume_agent.taxonomy.term_typing import TermConceptType
 
 
 def _requirement(
     concept_id: str | None,
     *,
-    concept_type="capability",
-    strictness="capability",
+    concept_type: TermConceptType = "capability",
+    strictness: RequirementStrictness = "capability",
     minimum_proficiency=None,
     context=None,
     recency_constraint=None,
@@ -50,7 +51,7 @@ def _requirement(
 def _assertion(
     concept_id: str,
     *,
-    concept_type="capability",
+    concept_type: TermConceptType = "capability",
     proficiency_level=None,
     context=None,
     last_used="current",
@@ -81,7 +82,7 @@ def _assertion(
     )
 
 
-def _edge(subject: str, predicate: str, object_: str, **overrides):
+def _edge(subject: str, predicate: EdgeType, object_: str, **overrides):
     return ConceptEdge(
         id=f"edge:{subject}:{predicate}:{object_}",
         subject_id=subject,

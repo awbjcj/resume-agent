@@ -12,31 +12,14 @@ from pydantic import Field
 
 from resume_agent.matching.models import MatchStatus
 from resume_agent.matching.activation import (
+    REQUIRED_CAREER_FAMILIES,
+    REQUIRED_CAREER_LEVELS,
     UccmActivationMetrics,
     UccmActivationReport,
     seal_activation_report,
 )
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.taxonomy.term_typing import TermConceptType
-
-REQUIRED_CAREER_FAMILIES = frozenset(
-    {
-        "software_data",
-        "engineering_manufacturing",
-        "finance_accounting",
-        "human_resources",
-        "education_research",
-        "consulting_operations",
-        "creative_media",
-        "sales_customer",
-        "healthcare_social_services",
-        "legal_policy",
-        "logistics_skilled_operations",
-        "public_nonprofit_administration",
-    }
-)
-REQUIRED_CAREER_LEVELS = frozenset({"entry", "mid", "senior", "manager"})
-
 
 class GoldSetManifest(ExtensibleModel):
     revision: str

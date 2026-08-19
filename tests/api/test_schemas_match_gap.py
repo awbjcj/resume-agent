@@ -128,17 +128,20 @@ def test_match_gap_out_shape():
 
 
 def test_taxonomy_manifest_serializes_nested_capability_revision():
-    from resume_agent.api.schemas.match_gap import TaxonomyManifestOut
+    from resume_agent.api.schemas.match_gap import (
+        TaxonomyManifestOut,
+        TaxonomyRevisionOut,
+    )
 
     manifest = TaxonomyManifestOut(
         capability_mode="uccm",
         capability_effective_mode="uccm",
         capability_status="active",
         capability_activation_report_revision="release-v1",
-        capability={
-            "internal_graph_version": "a" * 64,
-            "effective_hash": "b" * 64,
-        },
+        capability=TaxonomyRevisionOut(
+            internal_graph_version="a" * 64,
+            effective_hash="b" * 64,
+        ),
     )
 
     dumped = manifest.model_dump(by_alias=True)

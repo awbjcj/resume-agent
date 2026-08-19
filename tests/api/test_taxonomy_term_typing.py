@@ -5,6 +5,11 @@ from fastapi.testclient import TestClient
 
 import resume_agent.api.routers.taxonomy as taxonomy_router
 from resume_agent.api.app import create_app
+from resume_agent.db import get_session
+from resume_agent.discovery.requirements import bind_job_requirements
+from resume_agent.models.job import JobCriteria
+from resume_agent.tracking.repository import save_job
+from resume_agent.tracking.tables import Job
 
 
 @pytest.fixture()
@@ -88,3 +93,36 @@ def test_invalid_type_is_rejected_by_the_wire_schema(client):
 
     assert response.status_code == 422
 
+
+def test_corrects_a_typed_job_requirement_without_requiring_source_reconstruction_in_ui(client):
+    jd_text = "This role requires Stakeholder orchestration."
+    criteria = bind_job_requirements(
+        JobCriteria(must_have_skills=["Stakeholder orchestration"]),
+        job_id=1,
+        jd_text=jd_text,
+        taxonomy_revision="before",
+    )
+    requirement = criteria.typed_requirements[0]
+    with get_session(client.app.state.engine) as session:
+        job = save_job(
+            session,
+            Job(source="manual", jd_text=jd_text, criteria_json=criteria.model_dump(mode="json")),
+        )
+        assert job.id == 1
+
+    response = client.patch(
+        f"/api/taxonomy/jobs/1/requirements/{requirement.id}/term-type",
+        json={
+            "newType": "capability",
+            "rationale": "Reviewed requirement semantics",
+            "evidenceRefs": ["review:job:1"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["conceptType"] == "capability"
+    with get_session(client.app.state.engine) as session:
+        stored = session.get(Job, 1)
+        assert stored is not None
+        rebound = JobCriteria.model_validate(stored.criteria_json)
+        assert rebound.typed_requirements[0].concept_type == "capability"

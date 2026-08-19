@@ -18,6 +18,7 @@ from resume_agent.api.schemas.taxonomy import (
     DomainPatchIn,
     MoveSkillIn,
     NewDomainIn,
+    RequirementTermTypeCorrectionIn,
     TermSourceIn,
     TermTypeCorrectionIn,
     TermTypeCorrectionOut,
@@ -34,6 +35,7 @@ from resume_agent.tracking.match_gap import collect_target_skill_tokens
 
 router = APIRouter()
 _CLUSTER_PATH = "data/profile/cluster_map.json"
+_FACTS_PATH = "data/profile/facts.json"
 _TERM_CORRECTIONS_PATH = "data/taxonomy/term_type_corrections.json"
 
 
@@ -188,11 +190,16 @@ def classify_term(body: TermSourceIn):
     "/taxonomy/term-types/{decision_id}",
     response_model=TermTypingDecisionOut,
 )
-def correct_term(decision_id: str, body: TermTypeCorrectionIn):
+def correct_term(
+    decision_id: str,
+    body: TermTypeCorrectionIn,
+    session: Session = Depends(get_session),
+):
     context = current_context()
     actor_id = context.user_id if context is not None else "local-user"
     try:
-        decision = term_typing_service.correct_term(
+        facts_path = resolve_tenant_path(_FACTS_PATH)
+        decision = term_typing_service.correct_term_and_rebuild_profile(
             _term_source(body.source),
             decision_id=decision_id,
             new_type=body.new_type,
@@ -200,7 +207,43 @@ def correct_term(decision_id: str, body: TermTypeCorrectionIn):
             evidence_refs=body.evidence_refs,
             actor_id=actor_id,
             corrections_path=_term_correction_path(),
+            profile_dir=facts_path.parent,
+            facts_path=facts_path,
+            session=session,
         )
+    except term_typing_service.TermDecisionMismatchError as exc:
+        raise ApiException(409, "TERM_DECISION_MISMATCH", str(exc)) from exc
+    return _decision_out(decision)
+
+
+@router.patch(
+    "/taxonomy/jobs/{job_id}/requirements/{requirement_id}/term-type",
+    response_model=TermTypingDecisionOut,
+)
+def correct_job_requirement(
+    job_id: int,
+    requirement_id: str,
+    body: RequirementTermTypeCorrectionIn,
+    session: Session = Depends(get_session),
+):
+    context = current_context()
+    actor_id = context.user_id if context is not None else "local-user"
+    facts_path = resolve_tenant_path(_FACTS_PATH)
+    try:
+        decision = term_typing_service.correct_job_requirement(
+            session,
+            job_id=job_id,
+            requirement_id=requirement_id,
+            new_type=body.new_type,
+            rationale=body.rationale,
+            evidence_refs=body.evidence_refs,
+            actor_id=actor_id,
+            corrections_path=_term_correction_path(),
+            profile_dir=facts_path.parent,
+            facts_path=facts_path,
+        )
+    except term_typing_service.JobRequirementNotFoundError as exc:
+        raise ApiException(404, "JOB_REQUIREMENT_NOT_FOUND", str(exc)) from exc
     except term_typing_service.TermDecisionMismatchError as exc:
         raise ApiException(409, "TERM_DECISION_MISMATCH", str(exc)) from exc
     return _decision_out(decision)

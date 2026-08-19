@@ -20,6 +20,10 @@ from resume_agent.models.requirements import (
     RequirementStrictness,
 )
 from resume_agent.taxonomy.identity import legacy_concept_id, typed_concept_id
+from resume_agent.taxonomy.term_corrections import (
+    TermTypeCorrection,
+    apply_term_type_corrections,
+)
 from resume_agent.taxonomy.term_typing import (
     TermSource,
     TermTypeAssistant,
@@ -184,6 +188,7 @@ def _bind_one(
     explicit_span: tuple[int, int] | None = None,
     assistant: TermTypeAssistant | None = None,
     aliases: Mapping[str, str] | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
 ) -> JobRequirement:
     span = explicit_span or _locate(raw.text, jd_text)
     if legacy:
@@ -210,11 +215,16 @@ def _bind_one(
     )
     normalized = normalize_skill(source.original_text)
     canonical = (aliases or {}).get(normalized, normalized)
-    decision = type_term(
-        source,
-        canonical_text=canonical,
-        assistant=assistant,
-    )
+    decision = apply_term_type_corrections(
+        [
+            type_term(
+                source,
+                canonical_text=canonical,
+                assistant=assistant,
+            )
+        ],
+        term_corrections or [],
+    )[0]
     kind = _kind(raw, decision)
     strictness = _strictness(raw, decision)
     source_text = source.original_text
@@ -298,6 +308,7 @@ def adapt_legacy_requirements(
     job_id: int | str,
     taxonomy_revision: str,
     aliases: Mapping[str, str] | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
 ) -> list[JobRequirement]:
     return [
         _bind_one(
@@ -307,6 +318,7 @@ def adapt_legacy_requirements(
             taxonomy_revision=taxonomy_revision,
             legacy=True,
             aliases=aliases,
+            term_corrections=term_corrections,
         )
         for raw in _legacy_raw(criteria)
     ]
@@ -347,6 +359,7 @@ def bind_job_requirements(
     taxonomy_revision: str,
     assistant: TermTypeAssistant | None = None,
     aliases: Mapping[str, str] | None = None,
+    term_corrections: list[TermTypeCorrection] | None = None,
 ) -> JobCriteria:
     raw = _legacy_raw(criteria)
     explicit: list[tuple[_RawRequirement, tuple[int, int] | None]] = [
@@ -412,6 +425,7 @@ def bind_job_requirements(
             explicit_span=span,
             assistant=assistant,
             aliases=aliases,
+            term_corrections=term_corrections,
         )
         for item, span in explicit
     ]

@@ -24,6 +24,7 @@ from resume_agent.taxonomy.term_typing import (
     TermSource,
     type_term,
 )
+from resume_agent.taxonomy.term_corrections import apply_term_type_corrections
 from resume_agent.tracking.match_gap import normalize_skill
 
 _YEAR_IN_DATE = re.compile(r"(?:19|20)\d{2}")
@@ -255,6 +256,9 @@ def build_capability_assertions(
             canonical_text=candidate.key,
             governed_types=governed_types,
         )
+        decision = apply_term_type_corrections(
+            [decision], list(taxonomy.term_type_corrections)
+        )[0]
         supporting = set(candidate.evidence_ids) - set(candidate.source_skill_ids)
         inferred = not candidate.literal_ids
         if inferred:

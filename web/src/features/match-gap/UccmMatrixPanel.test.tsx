@@ -1,13 +1,25 @@
-import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
+import { server } from "@/test/server";
 import type { MatchGap } from "./use-match-gap";
 import { UccmMatrixPanel } from "./UccmMatrixPanel";
+
+function renderPanel(data: MatchGap) {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { mutations: { retry: false } } })}>
+      <UccmMatrixPanel data={data} />
+    </QueryClientProvider>,
+  );
+}
 
 const base = {
   uccmState: "ready",
   uccmErrorCode: null,
+  jobs: [{ id: 42, company: "Stripe", title: "Backend", seniority: "senior", status: "shortlisted" }],
   matchingPolicyRevision: "match-v2",
   profileFactsRevision: "facts-7",
   assertionPolicyRevision: "assert-v1",
@@ -111,7 +123,7 @@ const base = {
 
 describe("UccmMatrixPanel", () => {
   it("renders six profile layers and explains precise requirement matches", async () => {
-    render(<UccmMatrixPanel data={base} />);
+    renderPanel(base);
 
     expect(screen.getByRole("heading", { name: "Career capability matrix" })).toBeInTheDocument();
     for (const label of [
@@ -131,15 +143,71 @@ describe("UccmMatrixPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /kubernetes/i }));
     expect(screen.getByText("Lead Kubernetes platform migrations")).toBeInTheDocument();
+    expect(screen.getByText("Stripe · Backend")).toBeInTheDocument();
     expect(screen.getByText("Evidence: fact-2")).toBeInTheDocument();
     expect(screen.getByText("Validate Kubernetes-specific execution evidence.")).toBeInTheDocument();
   });
 
   it("keeps stale UCCM artifacts visibly separate from legacy results", () => {
-    render(<UccmMatrixPanel data={{ ...base, uccmState: "stale", uccmErrorCode: "revision_mismatch" }} />);
+    renderPanel({ ...base, uccmState: "stale", uccmErrorCode: "revision_mismatch" });
 
     expect(screen.getByRole("status")).toHaveTextContent(/capability analysis is stale/i);
     expect(screen.getByRole("status")).toHaveTextContent("revision_mismatch");
     expect(screen.queryByText("Transferable", { selector: "span" })).not.toBeInTheDocument();
+  });
+
+  it("labels shadow output and lets a user correct an unknown requirement type", async () => {
+    let correctionBody: unknown;
+    server.use(
+      http.patch("/api/taxonomy/jobs/:jobId/requirements/:requirementId/term-type", async ({ request }) => {
+        correctionBody = await request.json();
+        return HttpResponse.json({
+          id: "decision-1",
+          source: {
+            sourceKind: "job_description",
+            sourceId: "job:42:must:0",
+            sourceText: "Lead Kubernetes platform migrations",
+            originalText: "Kubernetes",
+            start: 5,
+            end: 15,
+          },
+          originalText: "Kubernetes",
+          normalizedText: "kubernetes",
+          conceptType: "tool_technology",
+          conceptId: null,
+          confidence: 1,
+          decisionSource: "correction",
+          reasonCode: "correction:correction-1",
+          policyRevision: "term-typing-v1",
+        });
+      }),
+    );
+    const unknown = {
+      ...base,
+      taxonomyManifest: {
+        capabilityMode: "uccm",
+        capabilityEffectiveMode: "shadow",
+        capabilityStatus: "fallback",
+      },
+      jobs: [{ id: 42, company: "Stripe", title: "Backend", seniority: "senior", status: "shortlisted" }],
+      typedRequirements: [{ ...base.typedRequirements![0], conceptType: "unknown" }],
+    } as MatchGap;
+
+    renderPanel(unknown);
+
+    expect(screen.getByRole("status", { name: /shadow analysis/i })).toHaveTextContent(/legacy matching remains primary/i);
+    await userEvent.click(screen.getByRole("button", { name: /kubernetes/i }));
+    await userEvent.selectOptions(screen.getByLabelText("Correct requirement type"), "tool_technology");
+    await userEvent.type(
+      screen.getByLabelText("Correction rationale"),
+      "The source names a specific platform technology.",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save type correction" }));
+
+    await waitFor(() => expect(correctionBody).toEqual({
+      newType: "tool_technology",
+      rationale: "The source names a specific platform technology.",
+      evidenceRefs: [],
+    }));
   });
 });

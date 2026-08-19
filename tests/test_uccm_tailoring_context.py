@@ -6,7 +6,7 @@ from resume_agent.matching.engine import shadow_match_requirement
 from resume_agent.models.requirements import JobRequirement
 from resume_agent.profile.assertions import CapabilityAssertion, LegacyAssertionProjection
 from resume_agent.profile.matrix import SkillMatrix
-from resume_agent.taxonomy.graph_models import CareerCapabilityGraph, ConceptEdge
+from resume_agent.taxonomy.graph_models import CareerCapabilityGraph, ConceptEdge, EdgeType
 
 
 def _assertion(concept_id: str, display: str) -> CapabilityAssertion:
@@ -55,7 +55,7 @@ def _requirement(concept_id: str, label: str, order: int = 0) -> JobRequirement:
     )
 
 
-def _edge(subject: str, predicate: str, object_: str) -> ConceptEdge:
+def _edge(subject: str, predicate: EdgeType, object_: str) -> ConceptEdge:
     return ConceptEdge(
         id=f"edge:{subject}:{predicate}:{object_}",
         subject_id=subject,

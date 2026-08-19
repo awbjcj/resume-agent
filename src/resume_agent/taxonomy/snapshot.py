@@ -24,6 +24,7 @@ from resume_agent.taxonomy.graph_models import (
     TaxonomyRevision,
 )
 from resume_agent.taxonomy.state import TaxonomyState
+from resume_agent.taxonomy.term_corrections import TermTypeCorrection
 from resume_agent.tracking.match_gap import normalize_skill
 
 
@@ -48,6 +49,7 @@ class TaxonomyManifest:
 
     generated: str = ""
     corrections: str = ""
+    term_type_corrections: str = ""
     state: str = ""
     overrides: str = ""
     semantic: str = ""
@@ -125,6 +127,7 @@ class EffectiveTaxonomy:
     cluster_map: ClusterMap
     capability_snapshot: EffectiveCapabilitySnapshot | None = None
     corrections: TaxonomyCorrections = field(default_factory=TaxonomyCorrections)
+    term_type_corrections: tuple[TermTypeCorrection, ...] = ()
     banned_keys: frozenset[str] = frozenset()
     retired_keys: frozenset[str] = frozenset()
     category_overrides: Mapping[str, str] = field(default_factory=dict)

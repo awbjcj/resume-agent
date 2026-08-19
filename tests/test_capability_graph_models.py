@@ -73,21 +73,25 @@ def test_source_mapping_retains_a_future_external_record_without_importing_it():
 
 def test_unknown_concept_and_edge_literals_are_rejected():
     with pytest.raises(ValidationError):
-        ConceptNode(
-            id="internal:bad:x",
-            type="mystery",
-            preferred_label="X",
-            normalized_label="x",
-            source_refs=["source:internal:test:1"],
+        ConceptNode.model_validate(
+            {
+                "id": "internal:bad:x",
+                "type": "mystery",
+                "preferred_label": "X",
+                "normalized_label": "x",
+                "source_refs": ["source:internal:test:1"],
+            }
         )
     with pytest.raises(ValidationError) as error_info:
-        ConceptEdge(
-            id="edge:bad",
-            subject_id="internal:skill:a",
-            predicate="looks_like",
-            object_id="internal:skill:b",
-            source_refs=["source:internal:test:1"],
-            revision_created="revision:test:1",
+        ConceptEdge.model_validate(
+            {
+                "id": "edge:bad",
+                "subject_id": "internal:skill:a",
+                "predicate": "looks_like",
+                "object_id": "internal:skill:b",
+                "source_refs": ["source:internal:test:1"],
+                "revision_created": "revision:test:1",
+            }
         )
     assert any(
         error["loc"] == ("predicate",) for error in error_info.value.errors()
