@@ -183,6 +183,7 @@ def _run_extract(session, jobs, run_id) -> list[StageOutcome]:
         industry_classifier=bundle.industry_classifier,
         taxonomy_revision=matrix.taxonomy_revision if matrix is not None else "",
         term_type_assistant=bundle.term_type_assistant,
+        term_aliases=cluster_map.aliases if cluster_map is not None else None,
     )
     run_filter(session, config, scope)
     score_failures = run_score(

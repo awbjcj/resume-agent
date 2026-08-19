@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -117,6 +118,7 @@ def run_extract(
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
     taxonomy_revision: str = "",
     term_type_assistant: TermTypeAssistant | None = None,
+    term_aliases: Mapping[str, str] | None = None,
 ) -> dict[int, StageFailure]:
     jobs = _stage_jobs(session, JobStatus.raw.value, scope)
     failures: dict[int, StageFailure] = {}
@@ -154,6 +156,7 @@ def run_extract(
                 jd_text=job.jd_text,
                 taxonomy_revision=taxonomy_revision,
                 assistant=term_type_assistant,
+                aliases=term_aliases,
             )
             job.criteria_json = criteria.model_dump(mode="json")
             _record_job_agent_meta(job, "criteria", agent)
@@ -523,6 +526,7 @@ def discover(
         industry_taxonomy_path=industry_taxonomy_path,
         taxonomy_revision=matrix.taxonomy_revision if matrix is not None else "",
         term_type_assistant=term_type_assistant,
+        term_aliases=cluster_map.aliases if cluster_map is not None else None,
     )
     run_filter(session, config, scope=scope)
     from resume_agent.services.discovery import run_h1b_enrichment

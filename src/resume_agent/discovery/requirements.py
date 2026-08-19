@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from resume_agent.models.job import JobCriteria
@@ -18,7 +19,7 @@ from resume_agent.models.requirements import (
     RequirementReconciliationIssue,
     RequirementStrictness,
 )
-from resume_agent.taxonomy.identity import typed_concept_id
+from resume_agent.taxonomy.identity import legacy_concept_id, typed_concept_id
 from resume_agent.taxonomy.term_typing import (
     TermSource,
     TermTypeAssistant,
@@ -182,6 +183,7 @@ def _bind_one(
     legacy: bool,
     explicit_span: tuple[int, int] | None = None,
     assistant: TermTypeAssistant | None = None,
+    aliases: Mapping[str, str] | None = None,
 ) -> JobRequirement:
     span = explicit_span or _locate(raw.text, jd_text)
     if legacy:
@@ -206,18 +208,37 @@ def _bind_one(
             original_text=raw.text,
         )
     )
-    decision = type_term(source, assistant=assistant)
+    normalized = normalize_skill(source.original_text)
+    canonical = (aliases or {}).get(normalized, normalized)
+    decision = type_term(
+        source,
+        canonical_text=canonical,
+        assistant=assistant,
+    )
     kind = _kind(raw, decision)
     strictness = _strictness(raw, decision)
     source_text = source.original_text
     context = dict(raw.context)
     if kind in {"availability_or_location", "physical_or_environmental"}:
         context.setdefault("constraint", source_text)
-    concept_id = (
-        None
-        if decision.concept_type == "unknown"
-        else typed_concept_id(decision.concept_type, source_text)
-    )
+    if decision.concept_type == "unknown":
+        concept_id = None
+    elif decision.concept_type in {
+        "capability",
+        "skill",
+        "knowledge",
+        "work_activity",
+        "task",
+        "method",
+        "standard",
+        "tool_technology",
+        "artifact",
+        "work_style",
+        "language",
+    }:
+        concept_id = legacy_concept_id(canonical)
+    else:
+        concept_id = typed_concept_id(decision.concept_type, source_text)
     return JobRequirement(
         id=_requirement_id(
             job_id=job_id,
@@ -235,7 +256,7 @@ def _bind_one(
         source_end=source.end,
         provenance=provenance,
         parsed_concept_id=concept_id,
-        parsed_concept_label=normalize_skill(source_text),
+        parsed_concept_label=canonical,
         concept_type=decision.concept_type,
         requirement_kind=kind,
         strictness=strictness,
@@ -276,6 +297,7 @@ def adapt_legacy_requirements(
     *,
     job_id: int | str,
     taxonomy_revision: str,
+    aliases: Mapping[str, str] | None = None,
 ) -> list[JobRequirement]:
     return [
         _bind_one(
@@ -284,6 +306,7 @@ def adapt_legacy_requirements(
             jd_text=None,
             taxonomy_revision=taxonomy_revision,
             legacy=True,
+            aliases=aliases,
         )
         for raw in _legacy_raw(criteria)
     ]
@@ -323,6 +346,7 @@ def bind_job_requirements(
     jd_text: str,
     taxonomy_revision: str,
     assistant: TermTypeAssistant | None = None,
+    aliases: Mapping[str, str] | None = None,
 ) -> JobCriteria:
     raw = _legacy_raw(criteria)
     explicit: list[tuple[_RawRequirement, tuple[int, int] | None]] = [
@@ -387,6 +411,7 @@ def bind_job_requirements(
             legacy=False,
             explicit_span=span,
             assistant=assistant,
+            aliases=aliases,
         )
         for item, span in explicit
     ]

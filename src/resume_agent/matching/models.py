@@ -27,7 +27,7 @@ MatchStatus = Literal[
     "unknown",
     "absent",
 ]
-LegacyCoverage = Literal["covered", "adjacent", "gap"]
+LegacyCoverage = Literal["covered", "adjacent", "gap", "not_evaluated"]
 
 
 class VerifiedRequirementFact(ExtensibleModel):
