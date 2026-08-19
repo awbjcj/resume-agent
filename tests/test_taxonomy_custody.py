@@ -35,6 +35,9 @@ def test_read_returns_one_correction_applied_snapshot(tmp_path):
     assert snapshot.effective.domain_of["python"] == "languages"
     assert snapshot.corrections.skill_domain == {"python": "backend"}
     assert len(snapshot.revision) == 64
+    assert len(snapshot.generated_sha256) == 64
+    assert len(snapshot.corrections_sha256) == 64
+    assert len(snapshot.state_sha256) == 64
 
     save_taxonomy_corrections(
         TaxonomyCorrections(skill_domain={"python": "languages"}),
