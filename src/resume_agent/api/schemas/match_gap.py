@@ -8,6 +8,16 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.matching.models import LegacyCoverage, MatchStatus
+from resume_agent.models.requirements import (
+    EvidenceExpectation,
+    LegacyRequirementSource,
+    RequirementKind,
+    RequirementProvenance,
+    RequirementStrictness,
+)
+from resume_agent.taxonomy.graph_models import CareerLayer, EdgeType
+from resume_agent.taxonomy.term_typing import TermConceptType
 from resume_agent.tracking.match_gap import normalize_skill
 
 
@@ -156,6 +166,135 @@ class OverrideConflictOut(CamelModel):
     resolution: Literal["override", "forbid_alias"]
 
 
+class TypedRequirementOut(CamelModel):
+    id: str
+    job_id: str
+    source_text: str
+    source_start: int | None = None
+    source_end: int | None = None
+    provenance: RequirementProvenance
+    parsed_concept_id: str | None = None
+    parsed_concept_label: str
+    concept_type: TermConceptType
+    requirement_kind: RequirementKind
+    strictness: RequirementStrictness
+    minimum_proficiency: int | None = None
+    context: dict[str, str]
+    importance: float
+    evidence_expectation: EvidenceExpectation
+    recency_constraint: str | None = None
+    extraction_confidence: float
+    taxonomy_revision: str
+    extraction_policy_revision: str
+    term_decision_id: str
+    legacy_source: LegacyRequirementSource
+    legacy_order: int
+    exact_non_substitutable: bool
+    failure_reason: str | None = None
+
+
+class RelationshipStepOut(CamelModel):
+    edge_id: str
+    from_id: str
+    predicate: EdgeType
+    to_id: str
+    confidence: float
+
+
+class RelationshipPathOut(CamelModel):
+    steps: list[RelationshipStepOut] = Field(default_factory=list)
+
+
+class MatchFeatureVectorOut(CamelModel):
+    canonical_identity: bool
+    approved_equivalence: bool
+    relationship_predicates: list[EdgeType]
+    relationship_direction: str | None = None
+    task_overlap: float
+    knowledge_overlap: float
+    subskill_coverage: float
+    tool_family_compatible: bool
+    industry_context_match: bool | None = None
+    occupation_context_match: bool | None = None
+    audience_or_scale_match: bool | None = None
+    proficiency_sufficient: bool | None = None
+    autonomy_sufficient: bool | None = None
+    complexity_sufficient: bool | None = None
+    recency_sufficient: bool | None = None
+    evidence_directness: float
+    evidence_confidence: float | None = None
+    requirement_importance: float
+    strictness: str
+    lexical_similarity: float
+    embedding_similarity: float
+    learned_domain_match: bool
+
+
+class MatchV2Out(CamelModel):
+    id: str
+    requirement_id: str
+    status: MatchStatus
+    confidence: float
+    requirement_concept_id: str | None = None
+    requirement_label: str
+    assertion_id: str | None = None
+    verified_requirement_fact_id: str | None = None
+    candidate_concept_id: str | None = None
+    candidate_label: str | None = None
+    relationship_path: RelationshipPathOut | None = None
+    features: MatchFeatureVectorOut
+    evidence_fact_ids: list[str]
+    explanation_code: str
+    recommended_action: str
+    matching_policy_revision: str
+    taxonomy_revision: str
+    facts_revision: str | None = None
+    assertion_policy_revision: str | None = None
+    extraction_policy_revision: str
+    strict_requirement_credit: bool
+
+
+class ShadowMatchOut(CamelModel):
+    legacy_coverage: LegacyCoverage
+    v2: MatchV2Out
+
+
+class ProfileProjectionItemOut(CamelModel):
+    concept_id: str
+    concept_type: str
+    display: str
+    assertion_ids: list[str]
+    evidence_fact_ids: list[str]
+
+
+class ProfileLayerProjectionOut(CamelModel):
+    layer: CareerLayer
+    items: list[ProfileProjectionItemOut]
+
+
+class EvidenceQualityProjectionOut(CamelModel):
+    counts: dict[str, int]
+    assertion_ids: list[str]
+
+
+class DevelopmentNeedOut(CamelModel):
+    assertion_id: str
+    concept_id: str
+    display: str
+    reason: Literal[
+        "unknown_type",
+        "evidence_needed",
+        "disputed",
+        "level_unknown",
+    ]
+
+
+class UccmProfileProjectionOut(CamelModel):
+    layers: list[ProfileLayerProjectionOut]
+    evidence_quality: EvidenceQualityProjectionOut
+    development_needs: list[DevelopmentNeedOut]
+
+
 class MatchGapOut(CamelModel):
     target_total: int
     clusters_stale: bool
@@ -173,6 +312,14 @@ class MatchGapOut(CamelModel):
     taxonomy_revision: str = ""
     taxonomy_manifest: TaxonomyManifestOut | None = None
     override_conflicts: list[OverrideConflictOut] = Field(default_factory=list)
+    uccm_state: Literal["disabled", "ready", "stale", "unavailable"] = "disabled"
+    uccm_error_code: str | None = None
+    matching_policy_revision: str = ""
+    profile_facts_revision: str = ""
+    assertion_policy_revision: str = ""
+    typed_requirements: list[TypedRequirementOut] = Field(default_factory=list)
+    match_results: list[ShadowMatchOut] = Field(default_factory=list)
+    profile_projection: UccmProfileProjectionOut | None = None
     # Tokens the classifier judged to name no skill.  They are excluded from the
     # backlog, so they must stay visible somewhere or a wrong call is invisible
     # and irreversible.

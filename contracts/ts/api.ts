@@ -4202,6 +4202,20 @@ export interface components {
              */
             source: "must" | "nice" | "tech";
         };
+        /** DevelopmentNeedOut */
+        DevelopmentNeedOut: {
+            /** Assertionid */
+            assertionId: string;
+            /** Conceptid */
+            conceptId: string;
+            /** Display */
+            display: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "unknown_type" | "evidence_needed" | "disputed" | "level_unknown";
+        };
         /** DiscoverParams */
         DiscoverParams: Record<string, never>;
         /** DismissAllOut */
@@ -4378,6 +4392,15 @@ export interface components {
             status: "planned" | "deterministic_fallback" | "inherited";
             /** Warning */
             warning?: string | null;
+        };
+        /** EvidenceQualityProjectionOut */
+        EvidenceQualityProjectionOut: {
+            /** Assertionids */
+            assertionIds: string[];
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
         };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
@@ -5139,8 +5162,60 @@ export interface components {
             /** Targetskilldisplay */
             targetSkillDisplay?: string | null;
         };
+        /** MatchFeatureVectorOut */
+        MatchFeatureVectorOut: {
+            /** Approvedequivalence */
+            approvedEquivalence: boolean;
+            /** Audienceorscalematch */
+            audienceOrScaleMatch?: boolean | null;
+            /** Autonomysufficient */
+            autonomySufficient?: boolean | null;
+            /** Canonicalidentity */
+            canonicalIdentity: boolean;
+            /** Complexitysufficient */
+            complexitySufficient?: boolean | null;
+            /** Embeddingsimilarity */
+            embeddingSimilarity: number;
+            /** Evidenceconfidence */
+            evidenceConfidence?: number | null;
+            /** Evidencedirectness */
+            evidenceDirectness: number;
+            /** Industrycontextmatch */
+            industryContextMatch?: boolean | null;
+            /** Knowledgeoverlap */
+            knowledgeOverlap: number;
+            /** Learneddomainmatch */
+            learnedDomainMatch: boolean;
+            /** Lexicalsimilarity */
+            lexicalSimilarity: number;
+            /** Occupationcontextmatch */
+            occupationContextMatch?: boolean | null;
+            /** Proficiencysufficient */
+            proficiencySufficient?: boolean | null;
+            /** Recencysufficient */
+            recencySufficient?: boolean | null;
+            /** Relationshipdirection */
+            relationshipDirection?: string | null;
+            /** Relationshippredicates */
+            relationshipPredicates: ("lexical_alias_of" | "same_as" | "equivalent_in_context" | "broader_than" | "narrower_than" | "version_of" | "member_of_family" | "requires_knowledge" | "requires_capability" | "uses_tool" | "produces_artifact" | "supports_task" | "essential_for_role" | "optional_for_role" | "applies_in_domain" | "transferable_to" | "prerequisite_for" | "validated_by" | "aligned_to")[];
+            /** Requirementimportance */
+            requirementImportance: number;
+            /** Strictness */
+            strictness: string;
+            /** Subskillcoverage */
+            subskillCoverage: number;
+            /** Taskoverlap */
+            taskOverlap: number;
+            /** Toolfamilycompatible */
+            toolFamilyCompatible: boolean;
+        };
         /** MatchGapOut */
         MatchGapOut: {
+            /**
+             * Assertionpolicyrevision
+             * @default
+             */
+            assertionPolicyRevision: string;
             /** Categories */
             categories: components["schemas"]["CategoryOut"][];
             /** Clustersstale */
@@ -5151,8 +5226,21 @@ export interface components {
             edges: components["schemas"]["DemandEdgeOut"][];
             /** Jobs */
             jobs: components["schemas"]["JobLiteOut"][];
+            /** Matchresults */
+            matchResults?: components["schemas"]["ShadowMatchOut"][];
+            /**
+             * Matchingpolicyrevision
+             * @default
+             */
+            matchingPolicyRevision: string;
             /** Overrideconflicts */
             overrideConflicts?: components["schemas"]["OverrideConflictOut"][];
+            /**
+             * Profilefactsrevision
+             * @default
+             */
+            profileFactsRevision: string;
+            profileProjection?: components["schemas"]["UccmProfileProjectionOut"] | null;
             /** Retiredskills */
             retiredSkills?: components["schemas"]["RetiredSkillOut"][];
             /** Skills */
@@ -5184,11 +5272,67 @@ export interface components {
              * @default false
              */
             taxonomyUndoAvailable: boolean;
+            /** Typedrequirements */
+            typedRequirements?: components["schemas"]["TypedRequirementOut"][];
+            /** Uccmerrorcode */
+            uccmErrorCode?: string | null;
+            /**
+             * Uccmstate
+             * @default disabled
+             * @enum {string}
+             */
+            uccmState: "disabled" | "ready" | "stale" | "unavailable";
             /**
              * Unassignedcount
              * @default 0
              */
             unassignedCount: number;
+        };
+        /** MatchV2Out */
+        MatchV2Out: {
+            /** Assertionid */
+            assertionId?: string | null;
+            /** Assertionpolicyrevision */
+            assertionPolicyRevision?: string | null;
+            /** Candidateconceptid */
+            candidateConceptId?: string | null;
+            /** Candidatelabel */
+            candidateLabel?: string | null;
+            /** Confidence */
+            confidence: number;
+            /** Evidencefactids */
+            evidenceFactIds: string[];
+            /** Explanationcode */
+            explanationCode: string;
+            /** Extractionpolicyrevision */
+            extractionPolicyRevision: string;
+            /** Factsrevision */
+            factsRevision?: string | null;
+            features: components["schemas"]["MatchFeatureVectorOut"];
+            /** Id */
+            id: string;
+            /** Matchingpolicyrevision */
+            matchingPolicyRevision: string;
+            /** Recommendedaction */
+            recommendedAction: string;
+            relationshipPath?: components["schemas"]["RelationshipPathOut"] | null;
+            /** Requirementconceptid */
+            requirementConceptId?: string | null;
+            /** Requirementid */
+            requirementId: string;
+            /** Requirementlabel */
+            requirementLabel: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "verified_exact" | "verified_equivalent" | "covered_broader" | "covered_narrower" | "transferable" | "partial" | "level_gap" | "context_gap" | "recency_gap" | "evidence_gap" | "tool_gap" | "credential_gap" | "unknown" | "absent";
+            /** Strictrequirementcredit */
+            strictRequirementCredit: boolean;
+            /** Taxonomyrevision */
+            taxonomyRevision: string;
+            /** Verifiedrequirementfactid */
+            verifiedRequirementFactId?: string | null;
         };
         /** MatrixOut */
         MatrixOut: {
@@ -5571,6 +5715,29 @@ export interface components {
             githubRepoLimit: number;
             /** Githubusername */
             githubUsername?: string | null;
+        };
+        /** ProfileLayerProjectionOut */
+        ProfileLayerProjectionOut: {
+            /** Items */
+            items: components["schemas"]["ProfileProjectionItemOut"][];
+            /**
+             * Layer
+             * @enum {string}
+             */
+            layer: "career_core" | "foundational" | "transferable_function" | "domain_industry" | "occupation_role" | "enabler";
+        };
+        /** ProfileProjectionItemOut */
+        ProfileProjectionItemOut: {
+            /** Assertionids */
+            assertionIds: string[];
+            /** Conceptid */
+            conceptId: string;
+            /** Concepttype */
+            conceptType: string;
+            /** Display */
+            display: string;
+            /** Evidencefactids */
+            evidenceFactIds: string[];
         };
         /** ProfileStatus */
         ProfileStatus: {
@@ -6035,6 +6202,27 @@ export interface components {
             inviteCode: string;
             /** Password */
             password: string;
+        };
+        /** RelationshipPathOut */
+        RelationshipPathOut: {
+            /** Steps */
+            steps?: components["schemas"]["RelationshipStepOut"][];
+        };
+        /** RelationshipStepOut */
+        RelationshipStepOut: {
+            /** Confidence */
+            confidence: number;
+            /** Edgeid */
+            edgeId: string;
+            /** Fromid */
+            fromId: string;
+            /**
+             * Predicate
+             * @enum {string}
+             */
+            predicate: "lexical_alias_of" | "same_as" | "equivalent_in_context" | "broader_than" | "narrower_than" | "version_of" | "member_of_family" | "requires_knowledge" | "requires_capability" | "uses_tool" | "produces_artifact" | "supports_task" | "essential_for_role" | "optional_for_role" | "applies_in_domain" | "transferable_to" | "prerequisite_for" | "validated_by" | "aligned_to";
+            /** Toid */
+            toId: string;
         };
         /** RenderConfigDoc */
         RenderConfigDoc: {
@@ -6747,6 +6935,15 @@ export interface components {
             secrets: components["schemas"]["SecretsStatus"];
             sources: components["schemas"]["SourcesStatus"];
         };
+        /** ShadowMatchOut */
+        ShadowMatchOut: {
+            /**
+             * Legacycoverage
+             * @enum {string}
+             */
+            legacyCoverage: "covered" | "adjacent" | "gap" | "not_evaluated";
+            v2: components["schemas"]["MatchV2Out"];
+        };
         /** ShortlistItem */
         ShortlistItem: {
             /** Company */
@@ -7415,6 +7612,82 @@ export interface components {
             title: string | null;
             /** Url */
             url?: string | null;
+        };
+        /** TypedRequirementOut */
+        TypedRequirementOut: {
+            /** Concepttype */
+            conceptType: ("competency_family" | "capability" | "skill" | "knowledge" | "work_activity" | "task" | "method" | "standard" | "tool_technology" | "artifact" | "work_style" | "language" | "occupation_role" | "industry_domain" | "knowledge_domain" | "credential" | "requirement" | "work_context" | "learning_outcome") | "unknown";
+            /** Context */
+            context: {
+                [key: string]: string;
+            };
+            /**
+             * Evidenceexpectation
+             * @enum {string}
+             */
+            evidenceExpectation: "candidate_evidence" | "verified_fact" | "assessment_or_evidence" | "unknown";
+            /** Exactnonsubstitutable */
+            exactNonSubstitutable: boolean;
+            /** Extractionconfidence */
+            extractionConfidence: number;
+            /** Extractionpolicyrevision */
+            extractionPolicyRevision: string;
+            /** Failurereason */
+            failureReason?: string | null;
+            /** Id */
+            id: string;
+            /** Importance */
+            importance: number;
+            /** Jobid */
+            jobId: string;
+            /** Legacyorder */
+            legacyOrder: number;
+            /**
+             * Legacysource
+             * @enum {string}
+             */
+            legacySource: "must" | "nice" | "tech" | "derived";
+            /** Minimumproficiency */
+            minimumProficiency?: number | null;
+            /** Parsedconceptid */
+            parsedConceptId?: string | null;
+            /** Parsedconceptlabel */
+            parsedConceptLabel: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "exact_span" | "legacy_list_item" | "derived_field" | "unlocated_extraction";
+            /** Recencyconstraint */
+            recencyConstraint?: string | null;
+            /**
+             * Requirementkind
+             * @enum {string}
+             */
+            requirementKind: "must_have" | "preferred" | "responsibility" | "context" | "credential_required" | "credential_preferred" | "experience_required" | "education_required" | "availability_or_location" | "physical_or_environmental";
+            /** Sourceend */
+            sourceEnd?: number | null;
+            /** Sourcestart */
+            sourceStart?: number | null;
+            /** Sourcetext */
+            sourceText: string;
+            /**
+             * Strictness
+             * @enum {string}
+             */
+            strictness: "exact_product" | "product_family" | "capability" | "method_or_standard" | "credential" | "contextual";
+            /** Taxonomyrevision */
+            taxonomyRevision: string;
+            /** Termdecisionid */
+            termDecisionId: string;
+        };
+        /** UccmProfileProjectionOut */
+        UccmProfileProjectionOut: {
+            /** Developmentneeds */
+            developmentNeeds: components["schemas"]["DevelopmentNeedOut"][];
+            evidenceQuality: components["schemas"]["EvidenceQualityProjectionOut"];
+            /** Layers */
+            layers: components["schemas"]["ProfileLayerProjectionOut"][];
         };
         /** UrlIn */
         UrlIn: {

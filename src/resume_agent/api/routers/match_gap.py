@@ -19,6 +19,9 @@ from resume_agent.api.schemas.match_gap import (
     RestoreSkillsIn,
     RestoreSkillsOut,
     TaxonomyManifestOut,
+    ShadowMatchOut,
+    TypedRequirementOut,
+    UccmProfileProjectionOut,
 )
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
@@ -33,6 +36,7 @@ from resume_agent.profile.matrix import (
 )
 from resume_agent.profile.store import load_facts
 from resume_agent.services.suggestions import suggestion_statuses
+from resume_agent.services.uccm_match_gap import build_uccm_match_gap_projection
 from resume_agent.taxonomy.corrections import corrections_file_path
 from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
 from resume_agent.tenancy.paths import FACTS_PATH as _FACTS_PATH, resolve_tenant_path
@@ -64,6 +68,13 @@ def build_match_gap_payload(session: Session) -> MatchGapOut:
     graph.taxonomy_algorithm_version = taxonomy.state.algorithm_version
     graph.taxonomy_maintenance_due = taxonomy.state.maintenance_due
     graph.taxonomy_undo_available = taxonomy.state.can_undo
+    uccm = build_uccm_match_gap_projection(
+        session,
+        facts=facts,
+        taxonomy=taxonomy,
+        profile_dir=profile_dir,
+        job_ids=[job.id for job in graph.jobs],
+    )
     return MatchGapOut.model_validate(
         {
             **graph.__dict__,
@@ -86,6 +97,26 @@ def build_match_gap_payload(session: Session) -> MatchGapOut:
                 OverrideConflictOut(**asdict(conflict))
                 for conflict in taxonomy.conflicts
             ],
+            "uccm_state": uccm.state,
+            "uccm_error_code": uccm.error_code,
+            "matching_policy_revision": uccm.matching_policy_revision,
+            "profile_facts_revision": uccm.profile_facts_revision,
+            "assertion_policy_revision": uccm.assertion_policy_revision,
+            "typed_requirements": [
+                TypedRequirementOut.model_validate(item.model_dump(mode="json"))
+                for item in uccm.typed_requirements
+            ],
+            "match_results": [
+                ShadowMatchOut.model_validate(item.model_dump(mode="json"))
+                for item in uccm.match_results
+            ],
+            "profile_projection": (
+                UccmProfileProjectionOut.model_validate(
+                    uccm.profile_projection.model_dump(mode="json")
+                )
+                if uccm.profile_projection is not None
+                else None
+            ),
         }
     )
 

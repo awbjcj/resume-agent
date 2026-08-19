@@ -2771,6 +2771,40 @@
         "title": "DemandEdgeOut",
         "type": "object"
       },
+      "DevelopmentNeedOut": {
+        "properties": {
+          "assertionId": {
+            "title": "Assertionid",
+            "type": "string"
+          },
+          "conceptId": {
+            "title": "Conceptid",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "unknown_type",
+              "evidence_needed",
+              "disputed",
+              "level_unknown"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assertionId",
+          "conceptId",
+          "display",
+          "reason"
+        ],
+        "title": "DevelopmentNeedOut",
+        "type": "object"
+      },
       "DiscoverParams": {
         "properties": {},
         "title": "DiscoverParams",
@@ -3227,6 +3261,30 @@
           "status"
         ],
         "title": "EvidencePortfolioOut",
+        "type": "object"
+      },
+      "EvidenceQualityProjectionOut": {
+        "properties": {
+          "assertionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assertionids",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "counts",
+          "assertionIds"
+        ],
+        "title": "EvidenceQualityProjectionOut",
         "type": "object"
       },
       "ForgotPasswordRequest": {
@@ -5300,8 +5358,209 @@
         "title": "ManualEntryOut",
         "type": "object"
       },
+      "MatchFeatureVectorOut": {
+        "properties": {
+          "approvedEquivalence": {
+            "title": "Approvedequivalence",
+            "type": "boolean"
+          },
+          "audienceOrScaleMatch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audienceorscalematch"
+          },
+          "autonomySufficient": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autonomysufficient"
+          },
+          "canonicalIdentity": {
+            "title": "Canonicalidentity",
+            "type": "boolean"
+          },
+          "complexitySufficient": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complexitysufficient"
+          },
+          "embeddingSimilarity": {
+            "title": "Embeddingsimilarity",
+            "type": "number"
+          },
+          "evidenceConfidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidenceconfidence"
+          },
+          "evidenceDirectness": {
+            "title": "Evidencedirectness",
+            "type": "number"
+          },
+          "industryContextMatch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industrycontextmatch"
+          },
+          "knowledgeOverlap": {
+            "title": "Knowledgeoverlap",
+            "type": "number"
+          },
+          "learnedDomainMatch": {
+            "title": "Learneddomainmatch",
+            "type": "boolean"
+          },
+          "lexicalSimilarity": {
+            "title": "Lexicalsimilarity",
+            "type": "number"
+          },
+          "occupationContextMatch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occupationcontextmatch"
+          },
+          "proficiencySufficient": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proficiencysufficient"
+          },
+          "recencySufficient": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recencysufficient"
+          },
+          "relationshipDirection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationshipdirection"
+          },
+          "relationshipPredicates": {
+            "items": {
+              "enum": [
+                "lexical_alias_of",
+                "same_as",
+                "equivalent_in_context",
+                "broader_than",
+                "narrower_than",
+                "version_of",
+                "member_of_family",
+                "requires_knowledge",
+                "requires_capability",
+                "uses_tool",
+                "produces_artifact",
+                "supports_task",
+                "essential_for_role",
+                "optional_for_role",
+                "applies_in_domain",
+                "transferable_to",
+                "prerequisite_for",
+                "validated_by",
+                "aligned_to"
+              ],
+              "type": "string"
+            },
+            "title": "Relationshippredicates",
+            "type": "array"
+          },
+          "requirementImportance": {
+            "title": "Requirementimportance",
+            "type": "number"
+          },
+          "strictness": {
+            "title": "Strictness",
+            "type": "string"
+          },
+          "subskillCoverage": {
+            "title": "Subskillcoverage",
+            "type": "number"
+          },
+          "taskOverlap": {
+            "title": "Taskoverlap",
+            "type": "number"
+          },
+          "toolFamilyCompatible": {
+            "title": "Toolfamilycompatible",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canonicalIdentity",
+          "approvedEquivalence",
+          "relationshipPredicates",
+          "taskOverlap",
+          "knowledgeOverlap",
+          "subskillCoverage",
+          "toolFamilyCompatible",
+          "evidenceDirectness",
+          "requirementImportance",
+          "strictness",
+          "lexicalSimilarity",
+          "embeddingSimilarity",
+          "learnedDomainMatch"
+        ],
+        "title": "MatchFeatureVectorOut",
+        "type": "object"
+      },
       "MatchGapOut": {
         "properties": {
+          "assertionPolicyRevision": {
+            "default": "",
+            "title": "Assertionpolicyrevision",
+            "type": "string"
+          },
           "categories": {
             "items": {
               "$ref": "#/components/schemas/CategoryOut"
@@ -5334,12 +5593,39 @@
             "title": "Jobs",
             "type": "array"
           },
+          "matchResults": {
+            "items": {
+              "$ref": "#/components/schemas/ShadowMatchOut"
+            },
+            "title": "Matchresults",
+            "type": "array"
+          },
+          "matchingPolicyRevision": {
+            "default": "",
+            "title": "Matchingpolicyrevision",
+            "type": "string"
+          },
           "overrideConflicts": {
             "items": {
               "$ref": "#/components/schemas/OverrideConflictOut"
             },
             "title": "Overrideconflicts",
             "type": "array"
+          },
+          "profileFactsRevision": {
+            "default": "",
+            "title": "Profilefactsrevision",
+            "type": "string"
+          },
+          "profileProjection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UccmProfileProjectionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "retiredSkills": {
             "items": {
@@ -5407,6 +5693,35 @@
             "title": "Taxonomyundoavailable",
             "type": "boolean"
           },
+          "typedRequirements": {
+            "items": {
+              "$ref": "#/components/schemas/TypedRequirementOut"
+            },
+            "title": "Typedrequirements",
+            "type": "array"
+          },
+          "uccmErrorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uccmerrorcode"
+          },
+          "uccmState": {
+            "default": "disabled",
+            "enum": [
+              "disabled",
+              "ready",
+              "stale",
+              "unavailable"
+            ],
+            "title": "Uccmstate",
+            "type": "string"
+          },
           "unassignedCount": {
             "default": 0,
             "title": "Unassignedcount",
@@ -5423,6 +5738,184 @@
           "categories"
         ],
         "title": "MatchGapOut",
+        "type": "object"
+      },
+      "MatchV2Out": {
+        "properties": {
+          "assertionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assertionid"
+          },
+          "assertionPolicyRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assertionpolicyrevision"
+          },
+          "candidateConceptId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidateconceptid"
+          },
+          "candidateLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidatelabel"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "evidenceFactIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencefactids",
+            "type": "array"
+          },
+          "explanationCode": {
+            "title": "Explanationcode",
+            "type": "string"
+          },
+          "extractionPolicyRevision": {
+            "title": "Extractionpolicyrevision",
+            "type": "string"
+          },
+          "factsRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factsrevision"
+          },
+          "features": {
+            "$ref": "#/components/schemas/MatchFeatureVectorOut"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "matchingPolicyRevision": {
+            "title": "Matchingpolicyrevision",
+            "type": "string"
+          },
+          "recommendedAction": {
+            "title": "Recommendedaction",
+            "type": "string"
+          },
+          "relationshipPath": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelationshipPathOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requirementConceptId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirementconceptid"
+          },
+          "requirementId": {
+            "title": "Requirementid",
+            "type": "string"
+          },
+          "requirementLabel": {
+            "title": "Requirementlabel",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "verified_exact",
+              "verified_equivalent",
+              "covered_broader",
+              "covered_narrower",
+              "transferable",
+              "partial",
+              "level_gap",
+              "context_gap",
+              "recency_gap",
+              "evidence_gap",
+              "tool_gap",
+              "credential_gap",
+              "unknown",
+              "absent"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strictRequirementCredit": {
+            "title": "Strictrequirementcredit",
+            "type": "boolean"
+          },
+          "taxonomyRevision": {
+            "title": "Taxonomyrevision",
+            "type": "string"
+          },
+          "verifiedRequirementFactId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifiedrequirementfactid"
+          }
+        },
+        "required": [
+          "id",
+          "requirementId",
+          "status",
+          "confidence",
+          "requirementLabel",
+          "features",
+          "evidenceFactIds",
+          "explanationCode",
+          "recommendedAction",
+          "matchingPolicyRevision",
+          "taxonomyRevision",
+          "extractionPolicyRevision",
+          "strictRequirementCredit"
+        ],
+        "title": "MatchV2Out",
         "type": "object"
       },
       "MatrixOut": {
@@ -6504,6 +6997,74 @@
           }
         },
         "title": "ProfileConfigDoc",
+        "type": "object"
+      },
+      "ProfileLayerProjectionOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileProjectionItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "layer": {
+            "enum": [
+              "career_core",
+              "foundational",
+              "transferable_function",
+              "domain_industry",
+              "occupation_role",
+              "enabler"
+            ],
+            "title": "Layer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer",
+          "items"
+        ],
+        "title": "ProfileLayerProjectionOut",
+        "type": "object"
+      },
+      "ProfileProjectionItemOut": {
+        "properties": {
+          "assertionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assertionids",
+            "type": "array"
+          },
+          "conceptId": {
+            "title": "Conceptid",
+            "type": "string"
+          },
+          "conceptType": {
+            "title": "Concepttype",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "evidenceFactIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencefactids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conceptId",
+          "conceptType",
+          "display",
+          "assertionIds",
+          "evidenceFactIds"
+        ],
+        "title": "ProfileProjectionItemOut",
         "type": "object"
       },
       "ProfileStatus": {
@@ -7773,6 +8334,73 @@
           "password"
         ],
         "title": "RegisterRequest",
+        "type": "object"
+      },
+      "RelationshipPathOut": {
+        "properties": {
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "title": "RelationshipPathOut",
+        "type": "object"
+      },
+      "RelationshipStepOut": {
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "edgeId": {
+            "title": "Edgeid",
+            "type": "string"
+          },
+          "fromId": {
+            "title": "Fromid",
+            "type": "string"
+          },
+          "predicate": {
+            "enum": [
+              "lexical_alias_of",
+              "same_as",
+              "equivalent_in_context",
+              "broader_than",
+              "narrower_than",
+              "version_of",
+              "member_of_family",
+              "requires_knowledge",
+              "requires_capability",
+              "uses_tool",
+              "produces_artifact",
+              "supports_task",
+              "essential_for_role",
+              "optional_for_role",
+              "applies_in_domain",
+              "transferable_to",
+              "prerequisite_for",
+              "validated_by",
+              "aligned_to"
+            ],
+            "title": "Predicate",
+            "type": "string"
+          },
+          "toId": {
+            "title": "Toid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "edgeId",
+          "fromId",
+          "predicate",
+          "toId",
+          "confidence"
+        ],
+        "title": "RelationshipStepOut",
         "type": "object"
       },
       "RenderConfigDoc": {
@@ -9529,6 +10157,29 @@
           "complete"
         ],
         "title": "SetupStatusOut",
+        "type": "object"
+      },
+      "ShadowMatchOut": {
+        "properties": {
+          "legacyCoverage": {
+            "enum": [
+              "covered",
+              "adjacent",
+              "gap",
+              "not_evaluated"
+            ],
+            "title": "Legacycoverage",
+            "type": "string"
+          },
+          "v2": {
+            "$ref": "#/components/schemas/MatchV2Out"
+          }
+        },
+        "required": [
+          "legacyCoverage",
+          "v2"
+        ],
+        "title": "ShadowMatchOut",
         "type": "object"
       },
       "ShortlistItem": {
@@ -11569,6 +12220,268 @@
           "hasProgress"
         ],
         "title": "TriageItem",
+        "type": "object"
+      },
+      "TypedRequirementOut": {
+        "properties": {
+          "conceptType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "competency_family",
+                  "capability",
+                  "skill",
+                  "knowledge",
+                  "work_activity",
+                  "task",
+                  "method",
+                  "standard",
+                  "tool_technology",
+                  "artifact",
+                  "work_style",
+                  "language",
+                  "occupation_role",
+                  "industry_domain",
+                  "knowledge_domain",
+                  "credential",
+                  "requirement",
+                  "work_context",
+                  "learning_outcome"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Concepttype"
+          },
+          "context": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Context",
+            "type": "object"
+          },
+          "evidenceExpectation": {
+            "enum": [
+              "candidate_evidence",
+              "verified_fact",
+              "assessment_or_evidence",
+              "unknown"
+            ],
+            "title": "Evidenceexpectation",
+            "type": "string"
+          },
+          "exactNonSubstitutable": {
+            "title": "Exactnonsubstitutable",
+            "type": "boolean"
+          },
+          "extractionConfidence": {
+            "title": "Extractionconfidence",
+            "type": "number"
+          },
+          "extractionPolicyRevision": {
+            "title": "Extractionpolicyrevision",
+            "type": "string"
+          },
+          "failureReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failurereason"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "importance": {
+            "title": "Importance",
+            "type": "number"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "string"
+          },
+          "legacyOrder": {
+            "title": "Legacyorder",
+            "type": "integer"
+          },
+          "legacySource": {
+            "enum": [
+              "must",
+              "nice",
+              "tech",
+              "derived"
+            ],
+            "title": "Legacysource",
+            "type": "string"
+          },
+          "minimumProficiency": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimumproficiency"
+          },
+          "parsedConceptId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parsedconceptid"
+          },
+          "parsedConceptLabel": {
+            "title": "Parsedconceptlabel",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "exact_span",
+              "legacy_list_item",
+              "derived_field",
+              "unlocated_extraction"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "recencyConstraint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recencyconstraint"
+          },
+          "requirementKind": {
+            "enum": [
+              "must_have",
+              "preferred",
+              "responsibility",
+              "context",
+              "credential_required",
+              "credential_preferred",
+              "experience_required",
+              "education_required",
+              "availability_or_location",
+              "physical_or_environmental"
+            ],
+            "title": "Requirementkind",
+            "type": "string"
+          },
+          "sourceEnd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceend"
+          },
+          "sourceStart": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcestart"
+          },
+          "sourceText": {
+            "title": "Sourcetext",
+            "type": "string"
+          },
+          "strictness": {
+            "enum": [
+              "exact_product",
+              "product_family",
+              "capability",
+              "method_or_standard",
+              "credential",
+              "contextual"
+            ],
+            "title": "Strictness",
+            "type": "string"
+          },
+          "taxonomyRevision": {
+            "title": "Taxonomyrevision",
+            "type": "string"
+          },
+          "termDecisionId": {
+            "title": "Termdecisionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "jobId",
+          "sourceText",
+          "provenance",
+          "parsedConceptLabel",
+          "conceptType",
+          "requirementKind",
+          "strictness",
+          "context",
+          "importance",
+          "evidenceExpectation",
+          "extractionConfidence",
+          "taxonomyRevision",
+          "extractionPolicyRevision",
+          "termDecisionId",
+          "legacySource",
+          "legacyOrder",
+          "exactNonSubstitutable"
+        ],
+        "title": "TypedRequirementOut",
+        "type": "object"
+      },
+      "UccmProfileProjectionOut": {
+        "properties": {
+          "developmentNeeds": {
+            "items": {
+              "$ref": "#/components/schemas/DevelopmentNeedOut"
+            },
+            "title": "Developmentneeds",
+            "type": "array"
+          },
+          "evidenceQuality": {
+            "$ref": "#/components/schemas/EvidenceQualityProjectionOut"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileLayerProjectionOut"
+            },
+            "title": "Layers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layers",
+          "evidenceQuality",
+          "developmentNeeds"
+        ],
+        "title": "UccmProfileProjectionOut",
         "type": "object"
       },
       "UrlIn": {

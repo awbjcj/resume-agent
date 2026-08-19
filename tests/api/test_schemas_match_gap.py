@@ -111,6 +111,14 @@ def test_match_gap_out_shape():
         "taxonomyManifest",
         "overrideConflicts",
         "retiredSkills",
+        "uccmState",
+        "uccmErrorCode",
+        "matchingPolicyRevision",
+        "profileFactsRevision",
+        "assertionPolicyRevision",
+        "typedRequirements",
+        "matchResults",
+        "profileProjection",
     }
     assert dumped["suggestionStatuses"] == []
     assert dumped["taxonomyAlgorithmVersion"] == "legacy"

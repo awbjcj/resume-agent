@@ -6,7 +6,13 @@ import resume_agent.api.routers.match_gap as router_mod
 from resume_agent.profile import effective as effective_module
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.models.profile import (
+    Bullet,
+    Contact,
+    Experience,
+    ProfileFacts,
+    Skill,
+)
 from resume_agent.profile.store import save_facts
 from resume_agent.services.suggestions import (
     resolve_suggestion_context,
@@ -41,6 +47,80 @@ def test_match_gap_empty_db_returns_empty_graph():
     assert len(body["categories"]) == 20
     assert body["suggestionStatuses"] == []
     assert body["clustersStale"] is False
+
+
+def test_match_gap_shadow_exposes_typed_results_from_one_profile_snapshot(
+    monkeypatch,
+    tmp_path,
+):
+    profile_dir = tmp_path / "profile"
+    facts_path = profile_dir / "facts.json"
+    cluster_path = profile_dir / "cluster_map.json"
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_cluster_map(
+        ClusterMap(aliases={"py": "python", "python": "python"}),
+        cluster_path,
+    )
+    save_taxonomy_corrections(TaxonomyCorrections(), corrections_path)
+    save_facts(
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[
+                Experience(
+                    id="experience-1",
+                    company="Acme",
+                    title="Engineer",
+                    current=True,
+                    bullets=[
+                        Bullet(id="bullet-python", text="Built Python services")
+                    ],
+                )
+            ],
+            skills={"hard": [Skill(id="skill-python", name="Py")]},
+        ),
+        facts_path,
+    )
+    monkeypatch.setattr(router_mod, "_FACTS_PATH", str(facts_path))
+    monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))
+    monkeypatch.setattr(
+        effective_module,
+        "corrections_file_path",
+        lambda: str(corrections_path),
+    )
+    monkeypatch.setattr(
+        effective_module,
+        "get_settings",
+        lambda: SimpleNamespace(career_capability_mode="shadow"),
+    )
+
+    app = create_app(db_url="sqlite://")
+    with TestClient(app) as client:
+        with get_session(app.state.engine) as session:
+            save_job(
+                session,
+                Job(
+                    source="manual",
+                    company="Acme",
+                    title="Engineer",
+                    jd_text="Python is required.",
+                    status=JobStatus.shortlisted.value,
+                    criteria_json={"tech_stack": ["Python"]},
+                ),
+            )
+        response = client.get("/api/match-gap")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["uccmState"] == "ready"
+    assert body["matchingPolicyRevision"] == "uccm-match-v1"
+    assert len(body["typedRequirements"]) == 1
+    assert body["typedRequirements"][0]["sourceText"] == "Python"
+    assert body["matchResults"][0]["legacyCoverage"] == "covered"
+    assert body["matchResults"][0]["v2"]["status"] == "verified_exact"
+    assert body["profileFactsRevision"] == body["matchResults"][0]["v2"][
+        "factsRevision"
+    ]
+    assert len(body["profileProjection"]["layers"]) == 6
 
 
 def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
@@ -93,15 +173,25 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
     assert uccm_resp.status_code == 200
     body = resp.json()
     uccm_body = uccm_resp.json()
+    uccm_fields = {
+        "uccmState",
+        "uccmErrorCode",
+        "matchingPolicyRevision",
+        "profileFactsRevision",
+        "assertionPolicyRevision",
+        "typedRequirements",
+        "matchResults",
+        "profileProjection",
+    }
     legacy_business_payload = {
         key: value
         for key, value in body.items()
-        if key not in {"taxonomyRevision", "taxonomyManifest"}
+        if key not in {"taxonomyRevision", "taxonomyManifest", *uccm_fields}
     }
     uccm_business_payload = {
         key: value
         for key, value in uccm_body.items()
-        if key not in {"taxonomyRevision", "taxonomyManifest"}
+        if key not in {"taxonomyRevision", "taxonomyManifest", *uccm_fields}
     }
     assert uccm_business_payload == legacy_business_payload
     assert uccm_body["taxonomyManifest"]["capabilityStatus"] == "active"
@@ -116,6 +206,8 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
     taxonomy_revision = body.pop("taxonomyRevision")
     taxonomy_manifest = body.pop("taxonomyManifest")
     override_conflicts = body.pop("overrideConflicts")
+    for key in uccm_fields:
+        body.pop(key)
     assert len(taxonomy_revision) == 64
     assert taxonomy_manifest["semantic"] == taxonomy_revision
     assert override_conflicts == []
