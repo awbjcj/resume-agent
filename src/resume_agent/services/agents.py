@@ -39,6 +39,10 @@ from resume_agent.tailor.portfolio_planner import build_evidence_portfolio_agent
 from resume_agent.tailor.panel import MERGED_ADVISORY
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import Canonicalizer
+from resume_agent.taxonomy.term_assistant import (
+    ModelTermTypeAssistant,
+    build_term_type_assistant,
+)
 
 
 @dataclass
@@ -48,6 +52,7 @@ class DiscoveryBundle:
     relevance: Runner | None
     canonicalizer: Canonicalizer | None
     industry_classifier: Runner
+    term_type_assistant: ModelTermTypeAssistant | None = None
 
 
 @dataclass
@@ -92,6 +97,11 @@ def build_discovery_bundle(
         relevance=build_relevance_agent(),
         canonicalizer=build_skill_canonicalizer(),
         industry_classifier=build_industry_classifier(),
+        term_type_assistant=(
+            build_term_type_assistant()
+            if get_settings().career_capability_mode != "legacy"
+            else None
+        ),
     )
 
 

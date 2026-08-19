@@ -157,6 +157,48 @@ class _IndustryExtractAgent:
         return self.run(prompt)
 
 
+def test_run_extract_persists_typed_requirements_with_policy_revisions(tmp_path):
+    jd = "Python and five years of experience are required. Leadership is preferred."
+    agent = _ReextractAgent(
+        _extract(
+            tech_stack=["Python"],
+            yoe_min=5,
+            nice_to_have_skills=["Leadership"],
+        )
+    )
+    with _session() as session:
+        save_job(
+            session,
+            Job(
+                source="manual",
+                jd_text=jd,
+                title="Engineer",
+                status=JobStatus.raw.value,
+            ),
+        )
+
+        run_extract(
+            session,
+            agent,
+            industry_taxonomy_path=tmp_path / "industries.json",
+            taxonomy_revision="b" * 64,
+        )
+
+        job = jobs_by_status(session, JobStatus.extracted.value)[0]
+        criteria = _criteria(job)
+        assert criteria["extraction_policy_revision"] == "job-requirements-v1"
+        assert criteria["job_extraction_revision"]
+        assert {item["source_text"] for item in criteria["typed_requirements"]} == {
+            "Python",
+            "five years of experience",
+            "Leadership",
+        }
+        assert all(
+            item["taxonomy_revision"] == "b" * 64
+            for item in criteria["typed_requirements"]
+        )
+
+
 def test_run_extract_classifies_one_unseen_delta_and_persists_canonical_names(tmp_path):
     runner = _IndustryRunner(
         IndustryClassification(

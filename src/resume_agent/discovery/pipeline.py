@@ -27,6 +27,7 @@ from resume_agent.discovery.fit import (  # noqa: F401
     score_fit,
 )
 from resume_agent.discovery.industry import IndustryCandidate, classify_industries
+from resume_agent.discovery.requirements import bind_job_requirements
 from resume_agent.discovery.relevance import (  # noqa: F401
     ajudge_relevance,
     judge_relevance,
@@ -51,6 +52,7 @@ from resume_agent.taxonomy.industries import (
 )
 from resume_agent.taxonomy.location import StructuredLocation, build_locations
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
+from resume_agent.taxonomy.term_typing import TermTypeAssistant
 from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
 from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
@@ -113,6 +115,8 @@ def run_extract(
     scope: StageScope = _DEFAULT_SCOPE,
     industry_classifier: Runner | None = None,
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
+    taxonomy_revision: str = "",
+    term_type_assistant: TermTypeAssistant | None = None,
 ) -> dict[int, StageFailure]:
     jobs = _stage_jobs(session, JobStatus.raw.value, scope)
     failures: dict[int, StageFailure] = {}
@@ -144,7 +148,13 @@ def run_extract(
                     error = res.error or RuntimeError("extraction produced no criteria")
                     failures[job.id] = StageFailure.from_exception(error)
                 continue
-            criteria = res.value
+            criteria = bind_job_requirements(
+                res.value,
+                job_id=job.id or "unpersisted",
+                jd_text=job.jd_text,
+                taxonomy_revision=taxonomy_revision,
+                assistant=term_type_assistant,
+            )
             job.criteria_json = criteria.model_dump(mode="json")
             _record_job_agent_meta(job, "criteria", agent)
             advance(job, JobStatus.extracted.value, never_regress=scope.never_regress)
@@ -500,6 +510,7 @@ def discover(
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
     h1b_enricher=None,
+    term_type_assistant: TermTypeAssistant | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows (optionally scoped)."""
     run_relevance(session, config, relevance_agent, reporter=reporter, scope=scope)
@@ -510,6 +521,8 @@ def discover(
         scope=scope,
         industry_classifier=industry_classifier,
         industry_taxonomy_path=industry_taxonomy_path,
+        taxonomy_revision=matrix.taxonomy_revision if matrix is not None else "",
+        term_type_assistant=term_type_assistant,
     )
     run_filter(session, config, scope=scope)
     from resume_agent.services.discovery import run_h1b_enrichment
@@ -584,6 +597,7 @@ def reprocess(
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
     h1b_enricher=None,
+    term_type_assistant: TermTypeAssistant | None = None,
 ) -> dict[str, int]:
     """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
     selected: dict[int, Job] = {}
@@ -618,4 +632,5 @@ def reprocess(
         matrix=matrix,
         cluster_map=cluster_map,
         h1b_enricher=h1b_enricher,
+        term_type_assistant=term_type_assistant,
     )
