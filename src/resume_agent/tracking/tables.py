@@ -92,6 +92,13 @@ class ResumeVersion(SQLModel, table=True):
     # the current review config for it; [] is a known, empty roster (no
     # reviewer-configured gates ran this round, only the deterministic ones).
     gate_reviewers_json: list[str] | None = Field(default=None, sa_column=Column(JSON))
+    # None means "written before this column existed" - unknown, not empty.
+    # A resume version records one attempt and is never backfilled: the taxonomy
+    # that produced an older version cannot be reconstructed later.
+    taxonomy_revision: str | None = None
+    taxonomy_manifest_json: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
     attempt: int = Field(default=0, index=True)
     tailor_model: str | None = None
     origin: str = Field(default="tailor", index=True)

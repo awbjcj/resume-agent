@@ -56,6 +56,7 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
         skill_matrix=None,
         cluster_map=None,
         model=None,
+        taxonomy=None,
     ):
         captured["targets"] = [j.id for j in targets]
         captured["match_plan"] = match_plan_agent
@@ -213,6 +214,7 @@ def test_tailoring_sees_a_taxonomy_correction(tmp_path, monkeypatch):
     assert captured["skill_matrix"] is not None
     assert captured["cluster_map"].aliases["js"] == "javascript"
     assert [row.key for row in captured["skill_matrix"].rows] == ["javascript"]
+    assert captured["taxonomy"] == taxonomy
 
 
 def test_render_resume_version_returns_path(monkeypatch, tmp_path):
