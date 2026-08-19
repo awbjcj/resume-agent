@@ -101,6 +101,15 @@ def test_fitscore_defaults_keep_existing_construction():
     assert fit.location is None
 
 
+def test_fit_location_requires_country_but_allows_city_and_region_to_be_omitted():
+    location = FitLocation(country="Singapore")
+    assert location.city is None
+    assert location.region is None
+
+    with pytest.raises(ValidationError):
+        FitLocation(city="Singapore")
+
+
 def test_score_fit_returns_location():
     payload = FitScore(
         score=80, rationale="ok",

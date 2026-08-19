@@ -25,13 +25,13 @@ from resume_agent.prompts.guidance import with_guidance
 
 
 class FitLocation(BaseModel):
-    """LLM-facing parsed location (every field required, nullable for unknown)."""
+    """LLM-facing location with mandatory country and optional subdivisions."""
 
     model_config = ConfigDict(extra="forbid")
 
-    city: str | None
-    region: str | None
-    country: str | None
+    city: str | None = None
+    region: str | None = None
+    country: str
 
 
 class FitScore(ExtensibleModel):
@@ -52,11 +52,13 @@ _INSTRUCTIONS = [
     "Write a factual one- or two-sentence rationale naming the strongest evidence and the most "
     "important gap. Do not expose hidden reasoning or produce advice.",
     "Parse the job's work location, not the candidate's location. Prefer the JOB LOCATION section, "
-    "using the description only to clarify it. Return location=null when no meaningful work location "
-    "is supported; otherwise leave unsupported city, region, or country members null.",
+    "using the description only to clarify it. Return location=null when no country can be supported; "
+    "otherwise country is mandatory while unsupported city or region members may be omitted.",
     "Split a combined location into its parts: put the city in city, the state, province, or "
     'administrative region in region, and the nation in country. Set country to "US" whenever the '
     "location names a US state or a clearly US city, even when the country is not written.",
+    'Infer the country for unambiguous city-states: for example, city "Singapore" means country '
+    '"Singapore" even when the posting supplies only that city.',
     'For remote roles, capture any country qualifier (for example "Remote (US)" means country US) '
     "and leave city and region null unless the posting names a specific hub.",
     "When a SKILL MATCH CONTEXT section is present, use its deterministic tiers. Award full "
