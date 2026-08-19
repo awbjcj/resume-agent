@@ -168,4 +168,29 @@ describe("MatchGapContainer", () => {
 
     expect((await axe(container)).violations).toEqual([]);
   });
+
+  it("places the backend-driven capability matrix beside the legacy constellation", async () => {
+    server.use(
+      http.get("/api/match-gap", () =>
+        HttpResponse.json({
+          ...populated,
+          uccmState: "ready",
+          matchingPolicyRevision: "match-v2",
+          profileFactsRevision: "facts-1",
+          assertionPolicyRevision: "assert-v1",
+          typedRequirements: [],
+          matchResults: [],
+          profileProjection: {
+            layers: [],
+            evidenceQuality: { counts: {}, assertionIds: [] },
+            developmentNeeds: [],
+          },
+        }),
+      ),
+    );
+    wrap(<MatchGapContainer />);
+
+    expect(await screen.findByRole("heading", { name: "Career capability matrix" })).toBeInTheDocument();
+    expect(screen.getByText("Skill constellation")).toBeInTheDocument();
+  });
 });

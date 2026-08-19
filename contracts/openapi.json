@@ -5557,7 +5557,6 @@
       "MatchGapOut": {
         "properties": {
           "assertionPolicyRevision": {
-            "default": "",
             "title": "Assertionpolicyrevision",
             "type": "string"
           },
@@ -5601,7 +5600,6 @@
             "type": "array"
           },
           "matchingPolicyRevision": {
-            "default": "",
             "title": "Matchingpolicyrevision",
             "type": "string"
           },
@@ -5613,7 +5611,6 @@
             "type": "array"
           },
           "profileFactsRevision": {
-            "default": "",
             "title": "Profilefactsrevision",
             "type": "string"
           },
@@ -5712,7 +5709,6 @@
             "title": "Uccmerrorcode"
           },
           "uccmState": {
-            "default": "disabled",
             "enum": [
               "disabled",
               "ready",

@@ -5211,11 +5211,8 @@ export interface components {
         };
         /** MatchGapOut */
         MatchGapOut: {
-            /**
-             * Assertionpolicyrevision
-             * @default
-             */
-            assertionPolicyRevision: string;
+            /** Assertionpolicyrevision */
+            assertionPolicyRevision?: string;
             /** Categories */
             categories: components["schemas"]["CategoryOut"][];
             /** Clustersstale */
@@ -5228,18 +5225,12 @@ export interface components {
             jobs: components["schemas"]["JobLiteOut"][];
             /** Matchresults */
             matchResults?: components["schemas"]["ShadowMatchOut"][];
-            /**
-             * Matchingpolicyrevision
-             * @default
-             */
-            matchingPolicyRevision: string;
+            /** Matchingpolicyrevision */
+            matchingPolicyRevision?: string;
             /** Overrideconflicts */
             overrideConflicts?: components["schemas"]["OverrideConflictOut"][];
-            /**
-             * Profilefactsrevision
-             * @default
-             */
-            profileFactsRevision: string;
+            /** Profilefactsrevision */
+            profileFactsRevision?: string;
             profileProjection?: components["schemas"]["UccmProfileProjectionOut"] | null;
             /** Retiredskills */
             retiredSkills?: components["schemas"]["RetiredSkillOut"][];
@@ -5278,10 +5269,9 @@ export interface components {
             uccmErrorCode?: string | null;
             /**
              * Uccmstate
-             * @default disabled
              * @enum {string}
              */
-            uccmState: "disabled" | "ready" | "stale" | "unavailable";
+            uccmState?: "disabled" | "ready" | "stale" | "unavailable";
             /**
              * Unassignedcount
              * @default 0

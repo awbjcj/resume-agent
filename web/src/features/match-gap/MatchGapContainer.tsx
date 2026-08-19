@@ -30,6 +30,7 @@ import { RetiredSkills } from "./RetiredSkills";
 import { SelectionTray } from "./SelectionTray";
 import { SkillMap } from "./SkillMap";
 import { SkillModal } from "./SkillModal";
+import { UccmMatrixPanel } from "./UccmMatrixPanel";
 import {
   useMaintainTaxonomy,
   useMatchGap,
@@ -161,6 +162,8 @@ export function MatchGapContainer() {
               ["Adjacent", String(view.skills.filter((skill) => skill.coverage === "adjacent").length)],
             ]}
           />
+
+          <UccmMatrixPanel data={data} />
 
           {view.skills.length === 0 ? (
             <Empty className="min-h-72 border">

@@ -35,6 +35,21 @@ def test_openapi_exposes_scout_source_verification_contract():
     assert "conflict" in schemas["ScoutProposalOut"]["properties"]["check"]["enum"]
 
 
+def test_uccm_match_gap_metadata_is_additive_not_required():
+    spec = create_app(db_url="sqlite://").openapi()
+    schema = spec["components"]["schemas"]["MatchGapOut"]
+    required = set(schema.get("required", []))
+    additive_fields = {
+        "uccmState",
+        "matchingPolicyRevision",
+        "profileFactsRevision",
+        "assertionPolicyRevision",
+    }
+
+    assert required.isdisjoint(additive_fields)
+    assert all("default" not in schema["properties"][field] for field in additive_fields)
+
+
 def test_committed_openapi_is_current():
     """The committed contract must match the live app — regenerate if this fails."""
     assert CONTRACT.exists(), "run scripts/export_openapi.py and commit contracts/openapi.json"

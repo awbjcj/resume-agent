@@ -295,6 +295,13 @@ class UccmProfileProjectionOut(CamelModel):
     development_needs: list[DevelopmentNeedOut]
 
 
+UccmState = Literal["disabled", "ready", "stale", "unavailable"]
+
+
+def _disabled_uccm_state() -> UccmState:
+    return "disabled"
+
+
 class MatchGapOut(CamelModel):
     target_total: int
     clusters_stale: bool
@@ -312,11 +319,11 @@ class MatchGapOut(CamelModel):
     taxonomy_revision: str = ""
     taxonomy_manifest: TaxonomyManifestOut | None = None
     override_conflicts: list[OverrideConflictOut] = Field(default_factory=list)
-    uccm_state: Literal["disabled", "ready", "stale", "unavailable"] = "disabled"
+    uccm_state: UccmState = Field(default_factory=_disabled_uccm_state)
     uccm_error_code: str | None = None
-    matching_policy_revision: str = ""
-    profile_facts_revision: str = ""
-    assertion_policy_revision: str = ""
+    matching_policy_revision: str = Field(default_factory=str)
+    profile_facts_revision: str = Field(default_factory=str)
+    assertion_policy_revision: str = Field(default_factory=str)
     typed_requirements: list[TypedRequirementOut] = Field(default_factory=list)
     match_results: list[ShadowMatchOut] = Field(default_factory=list)
     profile_projection: UccmProfileProjectionOut | None = None
