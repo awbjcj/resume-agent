@@ -80,14 +80,18 @@ def test_unknown_concept_and_edge_literals_are_rejected():
             normalized_label="x",
             source_refs=["source:internal:test:1"],
         )
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as error_info:
         ConceptEdge(
             id="edge:bad",
             subject_id="internal:skill:a",
             predicate="looks_like",
             object_id="internal:skill:b",
             source_refs=["source:internal:test:1"],
+            revision_created="revision:test:1",
         )
+    assert any(
+        error["loc"] == ("predicate",) for error in error_info.value.errors()
+    )
 
 
 def test_graph_can_hold_projection_metadata_without_semantic_domain_edges():
