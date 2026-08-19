@@ -6,8 +6,10 @@ imports from ``profile``. Precedence lives here and nowhere else.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Literal, Protocol, runtime_checkable
 
 from resume_agent.taxonomy.clusters import ClusterMap
@@ -83,6 +85,27 @@ def _normalized_aliases(*sources: Mapping[str, str]) -> dict[str, str]:
     return normalized
 
 
+def _digest(payload: object) -> str:
+    """Return a deterministic SHA-256 over canonical JSON."""
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _semantic_digest(
+    effective: ClusterMap,
+    banned: frozenset[str],
+    retired: frozenset[str],
+) -> str:
+    """Hash the projections that change derived artifact content."""
+    return _digest(
+        {
+            "effective": asdict(effective),
+            "banned": sorted(banned),
+            "retired": sorted(retired),
+        }
+    )
+
+
 @dataclass(frozen=True)
 class EffectiveTaxonomy:
     cluster_map: ClusterMap
@@ -155,11 +178,23 @@ class EffectiveTaxonomy:
             for raw in (overrides.ban if overrides is not None else [])
             if (token := normalize_skill(raw))
         )
+        retired = frozenset(state.retired_skills)
+        semantic = _semantic_digest(effective, banned, retired)
+        projection = _digest(
+            {
+                "category": dict(overrides.category) if overrides else {},
+                "group": dict(overrides.group) if overrides else {},
+                "semantic": semantic,
+            }
+        )
         return cls(
             cluster_map=effective,
             banned_keys=banned,
-            retired_keys=frozenset(state.retired_skills),
+            retired_keys=retired,
             category_overrides=dict(overrides.category) if overrides else {},
             group_overrides=dict(overrides.group) if overrides else {},
             state=state,
+            semantic_revision=semantic,
+            projection_revision=projection,
+            manifest=TaxonomyManifest(semantic=semantic),
         )
