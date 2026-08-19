@@ -237,6 +237,7 @@ def _rule_type(normalized: str) -> tuple[ConceptType, str] | None:
 def type_term(
     source: TermSource,
     *,
+    canonical_text: str | None = None,
     governed_types: Mapping[str, tuple[str, ConceptType]] | None = None,
     assistant: TermTypeAssistant | None = None,
     minimum_model_confidence: float = 0.7,
@@ -256,6 +257,10 @@ def type_term(
             policy_revision=policy_revision,
         )
     rule = _rule_type(normalized)
+    if rule is None and canonical_text is not None:
+        rule = _rule_type(normalize_term(canonical_text))
+        if rule is not None:
+            rule = (rule[0], f"canonical_{rule[1]}")
     if rule is not None:
         concept_type, reason_code = rule
         return _result(
@@ -319,6 +324,7 @@ def type_terms(
     sources: Sequence[TermSource],
     *,
     governed_types: Mapping[str, tuple[str, ConceptType]] | None = None,
+    canonical_texts: Mapping[str, str] | None = None,
     assistant: TermTypeAssistant | None = None,
     minimum_model_confidence: float = 0.7,
     policy_revision: str = TERM_TYPING_POLICY_REVISION,
@@ -326,6 +332,7 @@ def type_terms(
     return [
         type_term(
             source,
+            canonical_text=(canonical_texts or {}).get(source.source_id),
             governed_types=governed_types,
             assistant=assistant,
             minimum_model_confidence=minimum_model_confidence,
