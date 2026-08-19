@@ -62,6 +62,12 @@ _SALARY_BUCKETS = [
     (200_000, "9"),
 ]
 
+# These values describe a workplace policy, not a geographic search area.
+# Sending ``Remote`` to LinkedIn's GEO typeahead currently resolves to
+# "Ita Nagar GSI Remote Observatory ... India", so select the first concrete
+# configured place instead and leave remote/onsite filtering to ``f_WT``.
+_NON_GEOGRAPHIC_LOCATIONS = {"anywhere", "remote", "worldwide"}
+
 
 class _LoginPageLike(Protocol):
     @property
@@ -164,6 +170,17 @@ def _linkedin_filter_params(config: SearchConfig) -> dict[str, str]:
     return params
 
 
+def _primary_geographic_location(config: SearchConfig) -> str | None:
+    return next(
+        (
+            location.strip()
+            for location in config.locations
+            if location.strip().casefold() not in _NON_GEOGRAPHIC_LOCATIONS
+        ),
+        None,
+    )
+
+
 def _search_url(
     config: SearchConfig,
     geo_resolver: Callable[[str], str | None] = resolve_geo_id,
@@ -172,8 +189,8 @@ def _search_url(
     terms = _source_query_terms(config)
     if terms:
         params["keywords"] = terms[0][1]
-    if config.locations:
-        location = config.locations[0]
+    location = _primary_geographic_location(config)
+    if location:
         geo_id = geo_resolver(location)
         if geo_id:
             params["geoId"] = geo_id

@@ -203,6 +203,47 @@ def test_search_url_emits_native_filters():
     assert params["sortBy"] == ["DD"]
 
 
+def test_search_url_skips_remote_as_a_geography():
+    resolved: list[str] = []
+
+    def _resolve(location: str) -> str:
+        resolved.append(location)
+        return "103624908"
+
+    cfg = SearchConfig(
+        titles=["AI Engineer"],
+        locations=["Remote", "Detroit, MI"],
+        remote_policy=["remote"],
+    )
+    params = parse_qs(urlsplit(_search_url(cfg, geo_resolver=_resolve)).query)
+
+    assert resolved == ["Detroit, MI"]
+    assert params["geoId"] == ["103624908"]
+    assert params["f_WT"] == ["2"]
+
+
+def test_search_url_omits_location_when_only_non_geographic_labels_exist():
+    cfg = SearchConfig(
+        titles=["AI Engineer"],
+        locations=["Remote", "Worldwide", "Anywhere"],
+        remote_policy=["remote"],
+    )
+    params = parse_qs(
+        urlsplit(
+            _search_url(
+                cfg,
+                geo_resolver=lambda location: (_ for _ in ()).throw(
+                    AssertionError(f"must not resolve non-geography {location}")
+                ),
+            )
+        ).query
+    )
+
+    assert "geoId" not in params
+    assert "location" not in params
+    assert params["f_WT"] == ["2"]
+
+
 def test_search_url_joins_multiple_remote_policies():
     cfg = SearchConfig(titles=["AI Engineer"], remote_policy=["remote", "hybrid", "remote"])
     url = _search_url(cfg, geo_resolver=lambda loc: None)
