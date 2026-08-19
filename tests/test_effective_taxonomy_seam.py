@@ -59,10 +59,6 @@ def test_matrix_and_match_gap_agree_on_one_correction(tmp_path):
     assert len(taxonomy.semantic_revision) == 64
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Phase 0 not yet adopted: timestamps still participate in the hash",
-)
 def test_regroup_timestamp_does_not_invalidate_the_matrix(tmp_path):
     from resume_agent.profile.effective import build_effective_taxonomy
     from resume_agent.taxonomy.state import (

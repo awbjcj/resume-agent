@@ -54,6 +54,15 @@ class TaxonomySnapshot:
     effective: ClusterMap
     state: TaxonomyState
     revision: str
+    generated_sha256: str = ""
+    corrections_sha256: str = ""
+    state_sha256: str = ""
+
+
+def _component(payload: object) -> str:
+    """Fingerprint one persisted component in stable key order."""
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _revision(
@@ -104,4 +113,7 @@ class TaxonomyCustody:
                 effective=apply_taxonomy_corrections(generated, corrections),
                 state=state,
                 revision=_revision(generated, corrections, state),
+                generated_sha256=_component(asdict(generated)),
+                corrections_sha256=_component(corrections.model_dump(mode="json")),
+                state_sha256=_component(state.model_dump(mode="json")),
             )
