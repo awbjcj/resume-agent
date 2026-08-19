@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
@@ -13,30 +14,26 @@ from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.match_gap import (
     MatchGapOut,
+    OverrideConflictOut,
     RefreshClustersIn,
     RestoreSkillsIn,
     RestoreSkillsOut,
+    TaxonomyManifestOut,
 )
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
 from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.profile.effective import build_effective_taxonomy
 from resume_agent.profile.matrix import (
     build_matrix,
     decorate_matrix_groups,
-    effective_cluster_map,
     load_overrides,
     override_tokens,
     save_matrix,
 )
 from resume_agent.profile.store import load_facts
 from resume_agent.services.suggestions import suggestion_statuses
-from resume_agent.taxonomy.clusters import load_cluster_map
-from resume_agent.taxonomy.corrections import (
-    apply_taxonomy_corrections,
-    corrections_file_path,
-    load_taxonomy_corrections,
-)
-from resume_agent.taxonomy.state import load_taxonomy_state
+from resume_agent.taxonomy.corrections import corrections_file_path
 from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
 from resume_agent.tenancy.paths import FACTS_PATH as _FACTS_PATH, resolve_tenant_path
 
@@ -55,28 +52,18 @@ def build_match_gap_payload(session: Session) -> MatchGapOut:
     facts = _facts_or_empty()
     facts_path = resolve_tenant_path(_FACTS_PATH)
     profile_dir = facts_path.parent
-    corrections = load_taxonomy_corrections(
-        resolve_tenant_path(corrections_file_path())
-    )
-    cluster_map = apply_taxonomy_corrections(
-        effective_cluster_map(
-            load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
-            load_overrides(profile_dir / "overrides.yaml"),
-        ),
-        corrections,
-    )
-    taxonomy_state = load_taxonomy_state(resolve_tenant_path(_CLUSTER_PATH))
+    taxonomy = build_effective_taxonomy(profile_dir)
     graph = build_demand_graph(
         session,
         facts,
-        cluster_map=cluster_map,
-        corrections=corrections,
-        grouping_statuses=taxonomy_state.grouping_status,
+        cluster_map=taxonomy.cluster_map,
+        corrections=taxonomy.corrections,
+        grouping_statuses=taxonomy.state.grouping_status,
     )
-    graph.taxonomy_generation = taxonomy_state.generation_id
-    graph.taxonomy_algorithm_version = taxonomy_state.algorithm_version
-    graph.taxonomy_maintenance_due = taxonomy_state.maintenance_due
-    graph.taxonomy_undo_available = taxonomy_state.can_undo
+    graph.taxonomy_generation = taxonomy.state.generation_id
+    graph.taxonomy_algorithm_version = taxonomy.state.algorithm_version
+    graph.taxonomy_maintenance_due = taxonomy.state.maintenance_due
+    graph.taxonomy_undo_available = taxonomy.state.can_undo
     return MatchGapOut.model_validate(
         {
             **graph.__dict__,
@@ -89,7 +76,15 @@ def build_match_gap_payload(session: Session) -> MatchGapOut:
                     "reason": retired.reason,
                     "retired_at": retired.retired_at,
                 }
-                for key, retired in sorted(taxonomy_state.retired_skills.items())
+                for key, retired in sorted(taxonomy.state.retired_skills.items())
+            ],
+            "taxonomy_revision": taxonomy.semantic_revision,
+            "taxonomy_manifest": TaxonomyManifestOut(
+                **asdict(taxonomy.manifest)
+            ),
+            "override_conflicts": [
+                OverrideConflictOut(**asdict(conflict))
+                for conflict in taxonomy.conflicts
             ],
         }
     )
@@ -104,13 +99,9 @@ def _regenerate_bound_matrix(facts: ProfileFacts | None, facts_path: Path) -> bo
     if facts is None:
         return False
     profile_dir = facts_path.parent
-    overrides = load_overrides(profile_dir / "overrides.yaml")
-    matrix = build_matrix(
-        facts,
-        load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
-        overrides,
-    )
-    decorate_matrix_groups(matrix, profile_dir, overrides)
+    taxonomy = build_effective_taxonomy(profile_dir)
+    matrix = build_matrix(facts, taxonomy)
+    decorate_matrix_groups(matrix, profile_dir, taxonomy)
     save_matrix(matrix, facts_path.with_name("matrix.json"))
     return True
 

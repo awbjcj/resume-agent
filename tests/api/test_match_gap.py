@@ -4,11 +4,16 @@ import resume_agent.api.routers.match_gap as router_mod
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
 from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.profile.store import save_facts
 from resume_agent.services.suggestions import (
     resolve_suggestion_context,
     suggestion_fingerprint,
 )
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.corrections import (
+    TaxonomyCorrections,
+    save_taxonomy_corrections,
+)
 from resume_agent.tracking.match_gap import build_demand_graph
 from resume_agent.tracking.repository import save_job
 from resume_agent.tracking.tables import Job, JobStatus, SkillSuggestion
@@ -72,6 +77,12 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
 
     assert resp.status_code == 200
     body = resp.json()
+    taxonomy_revision = body.pop("taxonomyRevision")
+    taxonomy_manifest = body.pop("taxonomyManifest")
+    override_conflicts = body.pop("overrideConflicts")
+    assert len(taxonomy_revision) == 64
+    assert taxonomy_manifest["semantic"] == taxonomy_revision
+    assert override_conflicts == []
     assert {**body, "categories": []} == {
         "targetTotal": 1,
         "clustersStale": False,
@@ -140,6 +151,41 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
         "label": "Cloud & Infrastructure",
         "kind": "hard",
     }
+
+
+def test_match_gap_reports_override_conflicts(monkeypatch, tmp_path):
+    from resume_agent.profile import effective as effective_module
+
+    profile_dir = tmp_path / "profile"
+    facts_path = profile_dir / "facts.json"
+    cluster_path = profile_dir / "cluster_map.json"
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_facts(ProfileFacts(contact=Contact(name="A")), facts_path)
+    save_cluster_map(ClusterMap(), cluster_path)
+    save_taxonomy_corrections(
+        TaxonomyCorrections(aliases={"js": "javascript"}), corrections_path
+    )
+    (profile_dir / "overrides.yaml").write_text(
+        "alias:\n  js: typescript\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(router_mod, "_FACTS_PATH", str(facts_path))
+    monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))
+    monkeypatch.setattr(
+        effective_module, "corrections_file_path", lambda: str(corrections_path)
+    )
+
+    app = create_app(db_url="sqlite://")
+    with TestClient(app) as client:
+        payload = client.get("/api/match-gap").json()
+
+    assert payload["overrideConflicts"] == [
+        {
+            "token": "js",
+            "correctionHead": "javascript",
+            "overrideHead": "typescript",
+            "resolution": "override",
+        }
+    ]
 
 
 def test_match_gap_includes_canonical_persisted_suggestion_status(

@@ -225,3 +225,15 @@ def test_conflicts_do_not_participate_in_the_semantic_revision():
 
     assert conflicted.semantic_revision == clean.semantic_revision
     assert conflicted.conflicts and not clean.conflicts
+
+
+def test_snapshot_preserves_corrections_for_read_consumers():
+    corrections = TaxonomyCorrections(
+        aliases={"js": "javascript"},
+        added_skills=["javascript"],
+        removed_skills=["legacy js"],
+    )
+
+    snap = EffectiveTaxonomy.from_parts(ClusterMap(), corrections=corrections)
+
+    assert snap.corrections == corrections
