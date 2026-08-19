@@ -107,10 +107,16 @@ def test_match_gap_out_shape():
         "taxonomyMaintenanceDue",
         "unassignedCount",
         "taxonomyUndoAvailable",
+        "taxonomyRevision",
+        "taxonomyManifest",
+        "overrideConflicts",
         "retiredSkills",
     }
     assert dumped["suggestionStatuses"] == []
     assert dumped["taxonomyAlgorithmVersion"] == "legacy"
+    assert dumped["taxonomyRevision"] == ""
+    assert dumped["taxonomyManifest"] is None
+    assert dumped["overrideConflicts"] == []
 
 
 def test_refresh_cluster_input_normalizes_deduplicates_and_bounds_keys():

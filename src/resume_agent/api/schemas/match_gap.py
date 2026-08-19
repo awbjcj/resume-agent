@@ -113,6 +113,21 @@ class CategoryOut(CamelModel):
     kind: Literal["hard", "soft"]
 
 
+class TaxonomyManifestOut(CamelModel):
+    generated: str = ""
+    corrections: str = ""
+    state: str = ""
+    overrides: str = ""
+    semantic: str = ""
+
+
+class OverrideConflictOut(CamelModel):
+    token: str
+    correction_head: str
+    override_head: str
+    resolution: Literal["override", "forbid_alias"]
+
+
 class MatchGapOut(CamelModel):
     target_total: int
     clusters_stale: bool
@@ -127,6 +142,9 @@ class MatchGapOut(CamelModel):
     taxonomy_maintenance_due: bool = True
     unassigned_count: int = 0
     taxonomy_undo_available: bool = False
+    taxonomy_revision: str = ""
+    taxonomy_manifest: TaxonomyManifestOut | None = None
+    override_conflicts: list[OverrideConflictOut] = Field(default_factory=list)
     # Tokens the classifier judged to name no skill.  They are excluded from the
     # backlog, so they must stay visible somewhere or a wrong call is invisible
     # and irreversible.

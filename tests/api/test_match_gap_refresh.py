@@ -180,11 +180,15 @@ def test_refresh_regenerates_matrix_from_bound_facts(monkeypatch, tmp_path):
         _seed_job(app)
         response = client.post("/api/match-gap/refresh-clusters")
         record = _wait_for_terminal(client, response.json()["runId"])
+        payload = client.get("/api/match-gap").json()
 
     assert record["state"] == "done"
     assert record["result"]["matrixRegenerated"] is True
     matrix = load_matrix(tmp_path / "matrix.json")
     assert matrix is not None
+    assert len(payload["taxonomyRevision"]) == 64
+    assert payload["taxonomyManifest"]["semantic"] == payload["taxonomyRevision"]
+    assert matrix.taxonomy_revision == payload["taxonomyRevision"]
     assert matrix.rows[0].group == "cloud-infra"
 
 

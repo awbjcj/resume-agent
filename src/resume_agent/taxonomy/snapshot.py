@@ -16,6 +16,7 @@ from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.corrections import (
     TaxonomyCorrections,
     apply_taxonomy_corrections,
+    sanitize_taxonomy_corrections,
 )
 from resume_agent.taxonomy.state import TaxonomyState
 from resume_agent.tracking.match_gap import normalize_skill
@@ -109,6 +110,7 @@ def _semantic_digest(
 @dataclass(frozen=True)
 class EffectiveTaxonomy:
     cluster_map: ClusterMap
+    corrections: TaxonomyCorrections = field(default_factory=TaxonomyCorrections)
     banned_keys: frozenset[str] = frozenset()
     retired_keys: frozenset[str] = frozenset()
     category_overrides: Mapping[str, str] = field(default_factory=dict)
@@ -144,6 +146,7 @@ class EffectiveTaxonomy:
         # ``apply_taxonomy_corrections`` sanitizes persisted input. The public
         # constructor must instead surface a direct corrupt cycle to callers.
         _flatten(_normalized_aliases(cluster_map.aliases, corrections.aliases))
+        corrections = sanitize_taxonomy_corrections(corrections)
 
         resolved = apply_taxonomy_corrections(cluster_map, corrections)
         aliases = dict(resolved.aliases)
@@ -216,6 +219,7 @@ class EffectiveTaxonomy:
         )
         return cls(
             cluster_map=effective,
+            corrections=corrections,
             banned_keys=banned,
             retired_keys=retired,
             category_overrides=dict(overrides.category) if overrides else {},
