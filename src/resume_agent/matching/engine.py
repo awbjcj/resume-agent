@@ -23,6 +23,21 @@ from resume_agent.taxonomy.graph_models import CareerCapabilityGraph, EdgeType
 from resume_agent.tracking.match_gap import normalize_skill
 
 _YEAR = re.compile(r"(?:19|20)\d{2}")
+_WORK_AUTHORIZATION = re.compile(
+    r"\b(work authori[sz]ation|visa|sponsorship|citizenship|citizen|"
+    r"permanent resident|green card)\b",
+    re.IGNORECASE,
+)
+_POSITIVE_WORK_AUTHORIZATION = re.compile(
+    r"\b(authorized to work|citizen|permanent resident|green card|"
+    r"no sponsorship|does not require sponsorship)\b",
+    re.IGNORECASE,
+)
+_SECURITY_CLEARANCE = re.compile(r"\bsecurity clearance\b", re.IGNORECASE)
+_LOCATION_CONTEXT = re.compile(
+    r"\b(remote|hybrid|on[ -]?site|location|relocat(?:e|ion))\b",
+    re.IGNORECASE,
+)
 _RELATION_STATUS: dict[EdgeType, MatchStatus] = {
     "same_as": "verified_equivalent",
     "equivalent_in_context": "verified_equivalent",
@@ -193,6 +208,63 @@ def _features(
     )
 
 
+def _required_fact_type(requirement: JobRequirement) -> str | None:
+    text = f"{requirement.source_text} {requirement.parsed_concept_label}"
+    if requirement.strictness == "credential":
+        return "credential"
+    if requirement.requirement_kind == "education_required":
+        return "education"
+    if requirement.concept_type == "language":
+        return "language"
+    if requirement.requirement_kind != "availability_or_location":
+        return None
+    if _SECURITY_CLEARANCE.search(text):
+        return "security_clearance"
+    if _WORK_AUTHORIZATION.search(text):
+        return "work_authorization"
+    if _LOCATION_CONTEXT.search(text) or "location" in requirement.context:
+        return "location"
+    return None
+
+
+def _fact_matches_requirement(
+    fact: VerifiedRequirementFact,
+    requirement: JobRequirement,
+    fact_type: str,
+) -> bool:
+    if fact.fact_type != fact_type:
+        return False
+    if fact_type in {"credential", "security_clearance"}:
+        if fact.verification_status != "verified":
+            return False
+    elif fact.verification_status not in {"verified", "asserted"}:
+        return False
+    required = normalize_skill(requirement.parsed_concept_label)
+    source = normalize_skill(requirement.source_text)
+    if fact_type == "work_authorization":
+        if not _POSITIVE_WORK_AUTHORIZATION.search(fact.normalized_value):
+            return False
+        return required in {"work authorization", "authorized to work"} or source in {
+            "work authorization",
+            "authorized to work",
+        } or required in fact.normalized_value
+    return fact.normalized_value in {required, source}
+
+
+def _exact_assertion(
+    requirement: JobRequirement,
+    assertions: list[CapabilityAssertion],
+) -> CapabilityAssertion | None:
+    return next(
+        (
+            assertion
+            for assertion in assertions
+            if assertion.concept_id == requirement.parsed_concept_id
+        ),
+        None,
+    )
+
+
 def match_requirement(
     requirement: JobRequirement,
     assertions: list[CapabilityAssertion],
@@ -204,30 +276,34 @@ def match_requirement(
     candidate: CapabilityAssertion | None = None
     verified_fact: VerifiedRequirementFact | None = None
     path: RelationshipPath | None = None
-    if requirement.concept_type == "unknown" or requirement.parsed_concept_id is None:
-        status: MatchStatus = "unknown"
-    elif requirement.strictness == "credential":
+    required_fact_type = _required_fact_type(requirement)
+    if required_fact_type is not None:
         verified_fact = next(
             (
                 fact
                 for fact in verified_requirement_facts or []
-                if fact.fact_type == "credential"
-                and fact.verification_status == "verified"
-                and fact.normalized_value
-                == normalize_skill(requirement.parsed_concept_label)
+                if _fact_matches_requirement(fact, requirement, required_fact_type)
             ),
             None,
         )
-        status = "verified_exact" if verified_fact is not None else "credential_gap"
+        if verified_fact is not None:
+            status: MatchStatus = "verified_exact"
+        elif required_fact_type == "credential":
+            status = "credential_gap"
+        else:
+            status = "context_gap"
+    elif requirement.requirement_kind == "physical_or_environmental":
+        status = "context_gap"
+    elif requirement.concept_type == "unknown" or requirement.parsed_concept_id is None:
+        status: MatchStatus = "unknown"
+    elif requirement.strictness == "exact_product" or requirement.concept_type == "standard":
+        candidate = _exact_assertion(requirement, assertions)
+        if candidate is None:
+            status = "tool_gap" if requirement.strictness == "exact_product" else "absent"
+        else:
+            status = _deficit_status(requirement, candidate) or "verified_exact"
     else:
-        candidate = next(
-            (
-                assertion
-                for assertion in assertions
-                if assertion.concept_id == requirement.parsed_concept_id
-            ),
-            None,
-        )
+        candidate = _exact_assertion(requirement, assertions)
         if candidate is not None:
             status = "verified_exact"
         else:
@@ -260,8 +336,6 @@ def match_requirement(
                         item[1].id,
                     ),
                 )
-            elif requirement.strictness == "exact_product":
-                status = "tool_gap"
             else:
                 status = "absent"
         if candidate is not None and status in {
@@ -277,7 +351,6 @@ def match_requirement(
     strict_credit = verified_fact is not None or status in {
         "verified_exact",
         "verified_equivalent",
-        "covered_broader",
         "covered_narrower",
     }
     evidence_fact_ids = (
@@ -334,6 +407,7 @@ def shadow_match_requirement(
     *,
     legacy_coverage: LegacyCoverage,
     traversal_policy: TraversalPolicy | None = None,
+    verified_requirement_facts: list[VerifiedRequirementFact] | None = None,
 ) -> ShadowMatchResult:
     return ShadowMatchResult(
         legacy_coverage=legacy_coverage,
@@ -342,5 +416,6 @@ def shadow_match_requirement(
             assertions,
             graph,
             traversal_policy=traversal_policy,
+            verified_requirement_facts=verified_requirement_facts,
         ),
     )

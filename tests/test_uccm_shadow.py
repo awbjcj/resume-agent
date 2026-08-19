@@ -4,7 +4,14 @@ import pytest
 
 from resume_agent.discovery.requirements import bind_job_requirements
 from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_agent.models.profile import (
+    Bullet,
+    Certification,
+    Contact,
+    Experience,
+    ProfileFacts,
+    Skill,
+)
 from resume_agent.profile.matrix import build_matrix
 from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.graph_models import CareerCapabilityGraph
@@ -74,3 +81,37 @@ def test_shadow_batch_rejects_a_mixed_profile_taxonomy_revision():
             CareerCapabilityGraph(model_version="test"),
             expected_taxonomy_revision="different",
         )
+
+
+def test_shadow_batch_threads_verified_requirement_facts_into_the_engine():
+    from resume_agent.matching.shadow import build_shadow_matches
+
+    taxonomy = EffectiveTaxonomy.from_parts(ClusterMap())
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        certifications=[
+            Certification(
+                id="certification:aws",
+                name="AWS Certified Solutions Architect",
+                credential_id="AWS-123",
+            )
+        ],
+    )
+    matrix = build_matrix(facts, taxonomy)
+    criteria = bind_job_requirements(
+        JobCriteria(must_have_skills=["AWS Certified Solutions Architect"]),
+        job_id=42,
+        jd_text="AWS Certified Solutions Architect is required.",
+        taxonomy_revision=taxonomy.semantic_revision,
+    )
+
+    results = build_shadow_matches(
+        criteria,
+        matrix,
+        taxonomy.cluster_map,
+        CareerCapabilityGraph(model_version="test"),
+        expected_taxonomy_revision=taxonomy.semantic_revision,
+    )
+
+    assert results[0].v2.status == "verified_exact"
+    assert results[0].v2.verified_requirement_fact_id is not None

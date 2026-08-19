@@ -63,6 +63,7 @@ def build_shadow_matches(
                 matrix.assertions,
                 graph,
                 legacy_coverage=legacy_coverage,
+                verified_requirement_facts=matrix.verified_requirement_facts,
             )
         )
     return results

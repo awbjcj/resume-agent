@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -12,6 +13,12 @@ from resume_agent.models.profile import (
     Skill,
 )
 from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.graph_models import (
+    CareerCapabilityGraph,
+    ConceptNode,
+    EffectiveCapabilitySnapshot,
+    TaxonomyRevision,
+)
 from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 
 
@@ -139,3 +146,52 @@ def test_assertion_ids_and_order_are_deterministic():
         "mentorship",
         "python",
     ]
+
+
+def test_never_candidate_claim_seed_is_not_bound_to_a_profile_assertion():
+    from resume_agent.profile.assertion_builder import build_capability_assertions
+
+    taxonomy = _taxonomy()
+    revision = TaxonomyRevision(
+        internal_graph_version="test",
+        external_source_snapshots=(),
+        crosswalk_revision="",
+        tenant_overlay_revision="",
+        generated_legacy_map_revision="",
+        correction_ledger_revision="",
+        lifecycle_state_revision="",
+        canonicalization_override_revision="",
+        correction_policy_version="",
+        matching_policy_version="",
+        effective_hash=taxonomy.semantic_revision,
+    )
+    taxonomy = replace(
+        taxonomy,
+        capability_snapshot=EffectiveCapabilitySnapshot(
+            graph=CareerCapabilityGraph(
+                model_version="test",
+                nodes=[
+                    ConceptNode(
+                        id="internal:competency-family:communication",
+                        type="competency_family",
+                        preferred_label="Communication",
+                        normalized_label="communication",
+                        claim_policy="never_candidate_claim",
+                        type_assignment_status="governed",
+                        source_refs=["source:test"],
+                    )
+                ],
+            ),
+            legacy_projection=taxonomy.cluster_map,
+            correction_events=(),
+            revision=revision,
+        ),
+    )
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"soft": [Skill(id="skill-communication", name="Communication")]},
+    )
+
+    [assertion] = build_capability_assertions(facts, taxonomy)
+
+    assert assertion.concept_id != "internal:competency-family:communication"

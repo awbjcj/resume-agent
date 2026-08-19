@@ -19,18 +19,21 @@ def _requirement(
     minimum_proficiency=None,
     context=None,
     recency_constraint=None,
+    requirement_kind=None,
+    source_text="Target Capability",
+    parsed_concept_label="target capability",
+    exact_non_substitutable=None,
 ):
     return JobRequirement(
         id=f"req:{concept_id or 'unknown'}:{strictness}",
         job_id="42",
-        source_text="Target Capability",
+        source_text=source_text,
         provenance="legacy_list_item",
         parsed_concept_id=concept_id,
-        parsed_concept_label="target capability",
+        parsed_concept_label=parsed_concept_label,
         concept_type=concept_type,
-        requirement_kind=(
-            "credential_required" if concept_type == "credential" else "must_have"
-        ),
+        requirement_kind=requirement_kind
+        or ("credential_required" if concept_type == "credential" else "must_have"),
         strictness=strictness,
         minimum_proficiency=minimum_proficiency,
         context=context or {},
@@ -44,7 +47,11 @@ def _requirement(
         term_decision_id="term:1",
         legacy_source="must",
         legacy_order=0,
-        exact_non_substitutable=strictness in {"credential", "exact_product"},
+        exact_non_substitutable=(
+            strictness in {"credential", "exact_product"}
+            if exact_non_substitutable is None
+            else exact_non_substitutable
+        ),
     )
 
 
@@ -284,3 +291,83 @@ def test_strict_credential_uses_verified_requirement_lane_facts_only():
     assert matched.status == "verified_exact"
     assert matched.verified_requirement_fact_id == verified.id
     assert matched.evidence_fact_ids == ["certification:1"]
+
+
+def test_strict_product_and_standard_gates_cannot_be_bypassed_by_graph_paths():
+    from resume_agent.matching.engine import match_requirement
+
+    product = match_requirement(
+        _requirement("target", concept_type="tool_technology", strictness="exact_product"),
+        [_assertion("candidate", concept_type="tool_technology")],
+        _graph(_edge("candidate", "same_as", "target")),
+    )
+    standard = match_requirement(
+        _requirement("target", concept_type="standard", strictness="method_or_standard"),
+        [_assertion("candidate", concept_type="standard")],
+        _graph(_edge("candidate", "same_as", "target")),
+    )
+
+    assert product.status == "tool_gap"
+    assert product.strict_requirement_credit is False
+    assert standard.status == "absent"
+    assert standard.strict_requirement_credit is False
+
+
+def test_work_authorization_and_clearance_use_requirement_facts_not_graph_paths():
+    from resume_agent.matching.engine import match_requirement
+    from resume_agent.matching.models import VerifiedRequirementFact
+
+    authorization = _requirement(
+        "requirement:work-authorization",
+        concept_type="work_context",
+        strictness="contextual",
+        requirement_kind="availability_or_location",
+        source_text="Work authorization",
+        parsed_concept_label="work authorization",
+    )
+    explicit_fact = VerifiedRequirementFact(
+        id="requirement-fact:authorization:1",
+        fact_type="work_authorization",
+        normalized_value="authorized to work in the united states",
+        display="Authorized to work in the United States",
+        evidence_fact_id="contact:work_authorization",
+        verification_status="asserted",
+    )
+    matched = match_requirement(
+        authorization,
+        [_assertion("requirement:work-authorization", concept_type="work_context")],
+        _graph(),
+        verified_requirement_facts=[explicit_fact],
+    )
+    assert matched.status == "verified_exact"
+    assert matched.verified_requirement_fact_id == explicit_fact.id
+    assert matched.strict_requirement_credit is True
+
+    clearance = _requirement(
+        "requirement:security-clearance",
+        concept_type="work_context",
+        strictness="contextual",
+        requirement_kind="availability_or_location",
+        source_text="Security clearance",
+        parsed_concept_label="security clearance",
+    )
+    blocked = match_requirement(
+        clearance,
+        [_assertion("candidate")],
+        _graph(_edge("candidate", "same_as", "requirement:security-clearance")),
+    )
+    assert blocked.status == "context_gap"
+    assert blocked.strict_requirement_credit is False
+
+
+def test_broader_candidate_never_receives_strict_credit_without_subskill_evidence():
+    from resume_agent.matching.engine import match_requirement
+
+    result = match_requirement(
+        _requirement("target"),
+        [_assertion("candidate")],
+        _graph(_edge("candidate", "broader_than", "target")),
+    )
+
+    assert result.status == "covered_broader"
+    assert result.strict_requirement_credit is False

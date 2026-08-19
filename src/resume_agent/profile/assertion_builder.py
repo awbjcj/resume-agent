@@ -122,6 +122,7 @@ def _governed_types(
         for node in snapshot.graph.nodes
         if node.status == "active"
         and node.type_assignment_status == "governed"
+        and node.claim_policy != "never_candidate_claim"
         and normalize_skill(node.preferred_label)
     }
 
