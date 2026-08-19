@@ -9,8 +9,11 @@ from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 from resume_agent.profile.effective import build_effective_taxonomy
+from resume_agent.profile.matrix import build_matrix
+from resume_agent.discovery.requirements import bind_job_requirements
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
 from resume_agent.tailor.service import tailor_job, tailor_jobs
+from resume_agent.tailor.context import UccmTailoringContext
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.taxonomy.corrections import (
     TaxonomyCorrections,
@@ -162,6 +165,97 @@ def test_tailor_job_persists_the_frozen_fallback_portfolio():
             .evidence_portfolio_json["warning"]
             .startswith("Evidence planner unavailable")
         )
+
+
+def test_tailor_job_persists_the_complete_uccm_context_in_the_attempt_manifest():
+    config = ReviewConfig(
+        max_rounds=1,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    taxonomy = build_effective_taxonomy("missing-profile", mode="uccm")
+    context = UccmTailoringContext(
+        taxonomy_revision=taxonomy.semantic_revision,
+        facts_revision="facts-v1",
+        assertion_policy_revision="profile-assertions-v1",
+        extraction_policy_revision="job-requirements-v1",
+        matching_policy_revision="uccm-match-v1",
+        requirement_ids=["requirement:1"],
+        result_ids=["match:1"],
+        assertion_ids=["assertion:1"],
+    )
+    with _session() as session:
+        job = save_job(
+            session,
+            Job(
+                source="manual",
+                jd_text="jd",
+                criteria_json=JobCriteria().model_dump(mode="json"),
+            ),
+        )
+        versions = tailor_job(
+            session,
+            job,
+            ProfileFacts(contact=Contact(name="Ada")),
+            config,
+            tailor_agent=_ContentAgent(),
+            reviewer_agents={"fact-check": _FactCheck()},
+            reviser_agent=_ContentAgent(),
+            taxonomy=taxonomy,
+            uccm_context=context,
+        )
+
+        manifest = versions[0].taxonomy_manifest_json
+        assert manifest is not None
+        assert manifest["uccm_tailoring_context"] == context.model_dump(mode="json")
+
+
+def test_tailor_jobs_builds_one_uccm_context_and_persists_its_pinned_revisions(tmp_path):
+    config = ReviewConfig(
+        max_rounds=1,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    taxonomy = build_effective_taxonomy(tmp_path / "profile", mode="uccm")
+    matrix = build_matrix(facts, taxonomy)
+    criteria = bind_job_requirements(
+        JobCriteria(tech_stack=["Python"]),
+        job_id=42,
+        jd_text="Python is required.",
+        taxonomy_revision=taxonomy.semantic_revision,
+        aliases=taxonomy.cluster_map.aliases,
+    )
+    with _session() as session:
+        job = save_job(
+            session,
+            Job(
+                source="manual",
+                jd_text="Python is required.",
+                criteria_json=criteria.model_dump(mode="json"),
+            ),
+        )
+        outcome = tailor_jobs(
+            session,
+            [job],
+            facts,
+            config,
+            tailor_agent=_ContentAgent(),
+            reviewer_agents={"fact-check": _FactCheck()},
+            reviser_agent=_ContentAgent(),
+            skill_matrix=matrix,
+            cluster_map=taxonomy.cluster_map,
+            taxonomy=taxonomy,
+        )
+
+        version = outcome.versions[_require_id(job.id)][0]
+        manifest = version.taxonomy_manifest_json
+        assert manifest is not None
+        context = manifest["uccm_tailoring_context"]
+        assert context["taxonomy_revision"] == taxonomy.semantic_revision
+        assert context["facts_revision"] == matrix.facts_sha256
+        assert context["assertion_policy_revision"] == matrix.assertion_policy_revision
+        assert context["matching_policy_revision"] == "uccm-match-v1"
+        assert context["requirements"][0]["id"] == criteria.typed_requirements[0].id
+        assert context["shadow_results"][0]["v2"]["requirement_id"] == criteria.typed_requirements[0].id
 
 
 def test_tailor_jobs_reports_progress_and_returns_per_job(tmp_path):

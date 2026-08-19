@@ -8,7 +8,9 @@ from sqlmodel import Session
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
 from resume_agent.career_skills.provenance import append_skill_use
+from resume_agent.discovery.requirements import adapt_legacy_requirements
 from resume_agent.llm_runner import Runner, run_with_cleanup
+from resume_agent.matching.shadow import build_shadow_matches
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import (
@@ -19,6 +21,11 @@ from resume_agent.profile.matrix import (
 from resume_agent.progress import ProgressReporter
 from resume_agent.services.errors import StageFailure
 from resume_agent.tailor.review_config import ReviewConfig
+from resume_agent.tailor.context import (
+    UccmTailoringContext,
+    build_uccm_tailoring_context,
+    project_legacy_skill_context,
+)
 from resume_agent.tailor.workflow import (
     TailorAgents,
     TailorRequest,
@@ -63,6 +70,7 @@ def _persist_rounds(
     reviser_agent: Runner | None = None,
     reviewer_agents: Mapping[str, Runner] | None = None,
     taxonomy: EffectiveTaxonomy | None = None,
+    uccm_context: UccmTailoringContext | None = None,
 ) -> list[ResumeVersion]:
     """Persist each review round as a ResumeVersion and mark the job tailored.
 
@@ -100,9 +108,7 @@ def _persist_rounds(
             ),
             gate_reviewers_json=gate_reviewers,
             taxonomy_revision=(taxonomy.semantic_revision if taxonomy is not None else None),
-            taxonomy_manifest_json=(
-                asdict(taxonomy.manifest) if taxonomy is not None else None
-            ),
+            taxonomy_manifest_json=_attempt_taxonomy_manifest(taxonomy, uccm_context),
         )
         raw_uses: object = None
         if (
@@ -136,6 +142,20 @@ def _persist_rounds(
     return versions
 
 
+def _attempt_taxonomy_manifest(
+    taxonomy: EffectiveTaxonomy | None,
+    uccm_context: UccmTailoringContext | None,
+) -> dict[str, object] | None:
+    if taxonomy is None and uccm_context is None:
+        return None
+    manifest: dict[str, object] = (
+        asdict(taxonomy.manifest) if taxonomy is not None else {}
+    )
+    if uccm_context is not None:
+        manifest["uccm_tailoring_context"] = uccm_context.model_dump(mode="json")
+    return manifest
+
+
 def tailor_job(
     session: Session,
     job: Job,
@@ -148,6 +168,7 @@ def tailor_job(
     skill_context: SkillMatchContext | None = None,
     evidence_portfolio_agent: Runner | None = None,
     taxonomy: EffectiveTaxonomy | None = None,
+    uccm_context: UccmTailoringContext | None = None,
 ) -> list[ResumeVersion]:
     """Run the loop for one job and persist each round. Marks the job tailored."""
     if job.id is None:
@@ -158,6 +179,8 @@ def tailor_job(
     planner = evidence_portfolio_agent or match_plan_agent
     if planner is not None:
         runners = (*runners, planner)
+    if uccm_context is not None:
+        skill_context = project_legacy_skill_context(uccm_context)
     rounds = asyncio.run(
         run_with_cleanup(
             TailorWorkflow().arun(
@@ -181,6 +204,7 @@ def tailor_job(
         reviser_agent=reviser_agent,
         reviewer_agents=reviewer_agents,
         taxonomy=taxonomy,
+        uccm_context=uccm_context,
     )
 
 
@@ -216,26 +240,68 @@ def tailor_jobs(
         def _criteria(job: Job) -> JobCriteria:
             return JobCriteria.model_validate(job.criteria_json or {})
 
-        def _skill_context(criteria: JobCriteria) -> SkillMatchContext | None:
+        def _legacy_skill_context(criteria: JobCriteria) -> SkillMatchContext | None:
             if skill_matrix is None or cluster_map is None:
                 return None
             return build_skill_match_context(criteria, skill_matrix, cluster_map)
 
-        async def _run_job(job: Job) -> list[TailorRound]:
+        def _uccm_context(
+            job: Job, criteria: JobCriteria
+        ) -> UccmTailoringContext | None:
+            snapshot = taxonomy.capability_snapshot if taxonomy is not None else None
+            if skill_matrix is None or taxonomy is None or snapshot is None:
+                return None
+            if not criteria.typed_requirements:
+                job_id = job.id
+                if job_id is None:
+                    raise ValueError("Cannot tailor a job that has not been persisted")
+                criteria = criteria.model_copy(
+                    update={
+                        "typed_requirements": adapt_legacy_requirements(
+                            criteria,
+                            job_id=job_id,
+                            taxonomy_revision=taxonomy.semantic_revision,
+                            aliases=taxonomy.cluster_map.aliases,
+                        )
+                    }
+                )
+            shadow_results = build_shadow_matches(
+                criteria,
+                skill_matrix,
+                taxonomy.cluster_map,
+                snapshot.graph,
+                expected_taxonomy_revision=taxonomy.semantic_revision,
+            )
+            return build_uccm_tailoring_context(
+                matrix=skill_matrix,
+                requirements=criteria.typed_requirements,
+                shadow_results=shadow_results,
+            )
+
+        async def _run_job(
+            job: Job,
+        ) -> tuple[list[TailorRound], UccmTailoringContext | None]:
             criteria = _criteria(job)
-            return await TailorWorkflow().arun(
+            uccm_context = _uccm_context(job, criteria)
+            skill_context = (
+                project_legacy_skill_context(uccm_context)
+                if uccm_context is not None
+                else _legacy_skill_context(criteria)
+            )
+            rounds = await TailorWorkflow().arun(
                 TailorRequest(
                     job.jd_text,
                     criteria,
                     profile_facts,
                     config,
-                    _skill_context(criteria),
+                    skill_context,
                 ),
                 TailorAgents(
                     tailor_agent, reviewer_agents, reviser_agent, planner
                 ),
                 sem=sem,
             )
+            return rounds, uccm_context
 
         runners = (tailor_agent, *reviewer_agents.values(), reviser_agent)
         if planner is not None:
@@ -263,16 +329,18 @@ def tailor_jobs(
                 logger.warning("tailor job=%s failed", job_id, exc_info=error)
                 failures[job_id] = StageFailure.from_exception(error)
                 continue
+            rounds, uccm_context = res.value
             results[job_id] = _persist_rounds(
                 session,
                 job,
-                res.value,
+                rounds,
                 config,
                 model=model,
                 tailor_agent=tailor_agent,
                 reviser_agent=reviser_agent,
                 reviewer_agents=reviewer_agents,
                 taxonomy=taxonomy,
+                uccm_context=uccm_context,
             )
     if reporter:
         reporter.done()
