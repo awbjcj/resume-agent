@@ -6,11 +6,13 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import get_args
 
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.taxonomy.graph_models import CareerCapabilityMode
+from resume_agent.matching.models import MatchStatus
+from resume_agent.taxonomy.graph_models import CareerCapabilityMode, ConceptType
 
 REQUIRED_CAREER_FAMILIES = frozenset(
     {
@@ -29,6 +31,22 @@ REQUIRED_CAREER_FAMILIES = frozenset(
     }
 )
 REQUIRED_CAREER_LEVELS = frozenset({"entry", "mid", "senior", "manager"})
+REQUIRED_CONCEPT_TYPES = frozenset({*get_args(ConceptType), "unknown"})
+REQUIRED_MATCH_STATUSES = frozenset(get_args(MatchStatus))
+MINIMUM_RECORDS_PER_STRATUM = 5
+MINIMUM_GATE_DENOMINATORS = {
+    "exact_synonym_precision": 50,
+    "strict_false_positive_rate": 200,
+    "resume_claim_precision": 200,
+    "transfer_precision": 25,
+    "transfer_must_have_credit_precision": 34,
+    "adversarial_false_transfer_rate": 34,
+    "concept_type_macro_f1": len(REQUIRED_CONCEPT_TYPES),
+    "match_status_macro_f1": len(REQUIRED_MATCH_STATUSES),
+    "match_status_min_f1": len(REQUIRED_MATCH_STATUSES),
+    "correction_propagation_rate": 1,
+    "deterministic_reproduction_rate": 1,
+}
 
 
 class UccmActivationMetrics(ExtensibleModel):
@@ -60,6 +78,10 @@ class UccmActivationReport(ExtensibleModel):
     reviewed_record_count: int = Field(ge=0)
     career_families: list[str] = Field(default_factory=list)
     career_levels: list[str] = Field(default_factory=list)
+    stratum_counts: dict[str, int] = Field(default_factory=dict)
+    concept_types: list[str] = Field(default_factory=list)
+    match_statuses: list[str] = Field(default_factory=list)
+    metric_denominators: dict[str, int] = Field(default_factory=dict)
     metrics: UccmActivationMetrics
     failed_gates: list[str] = Field(default_factory=list)
     eligible: bool = False
@@ -245,6 +267,18 @@ def decide_uccm_activation(
         report.reviewed_record_count > 0
         and REQUIRED_CAREER_FAMILIES.issubset(report.career_families)
         and REQUIRED_CAREER_LEVELS.issubset(report.career_levels)
+        and all(
+            report.stratum_counts.get(f"{family}:{level}", 0)
+            >= MINIMUM_RECORDS_PER_STRATUM
+            for family in REQUIRED_CAREER_FAMILIES
+            for level in REQUIRED_CAREER_LEVELS
+        )
+        and REQUIRED_CONCEPT_TYPES.issubset(report.concept_types)
+        and REQUIRED_MATCH_STATUSES.issubset(report.match_statuses)
+        and all(
+            report.metric_denominators.get(name, 0) >= minimum
+            for name, minimum in MINIMUM_GATE_DENOMINATORS.items()
+        )
         and all(value is not None for value in report.metrics.model_dump().values())
     )
     if not complete:

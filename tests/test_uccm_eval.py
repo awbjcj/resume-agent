@@ -29,17 +29,23 @@ LEVELS: list[Literal["entry", "mid", "senior", "manager"]] = [
 
 def _perfect_records():
     from evals.uccm import UccmEvalRecord
+    from resume_agent.matching.activation import (
+        REQUIRED_CONCEPT_TYPES,
+        REQUIRED_MATCH_STATUSES,
+    )
 
+    concept_types = sorted(REQUIRED_CONCEPT_TYPES)
+    match_statuses = sorted(REQUIRED_MATCH_STATUSES)
     return [
         UccmEvalRecord(
-            id=f"{family}:{level}",
+            id=f"{family}:{level}:{sample}",
             career_family=family,
             career_level=level,
             review_status="reviewed",
-            concept_type_gold="capability",
-            concept_type_predicted="capability",
-            match_status_gold="verified_exact",
-            match_status_predicted="verified_exact",
+            concept_type_gold=concept_types[index % len(concept_types)],
+            concept_type_predicted=concept_types[index % len(concept_types)],
+            match_status_gold=match_statuses[index % len(match_statuses)],
+            match_status_predicted=match_statuses[index % len(match_statuses)],
             exact_or_synonym_gold_positive=True,
             exact_or_synonym_predicted_positive=True,
             strict_requirement=True,
@@ -54,7 +60,9 @@ def _perfect_records():
             correction_propagated=True,
             reproduced=True,
         )
-        for family, level in product(FAMILIES, LEVELS)
+        for index, (family, level, sample) in enumerate(
+            product(FAMILIES, LEVELS, range(5))
+        )
     ]
 
 
@@ -100,11 +108,58 @@ def test_missing_review_coverage_or_denominator_fails_closed():
     assert "exact_synonym_precision_missing" in report.failed_gates
 
 
-def test_one_strict_false_positive_fails_the_threshold():
+def test_incomplete_label_strata_and_small_denominators_fail_closed():
+    from evals.uccm import GoldSetManifest, evaluate_uccm
+    from resume_agent.matching.activation import REQUIRED_CONCEPT_TYPES
+
+    records = _perfect_records()
+    missing_type = sorted(REQUIRED_CONCEPT_TYPES)[0]
+    records = [
+        record.model_copy(
+            update={
+                "concept_type_gold": "capability",
+                "concept_type_predicted": "capability",
+            }
+        )
+        if record.concept_type_gold == missing_type
+        else record
+        for record in records
+    ]
+    records = [
+        record
+        for record in records
+        if not (
+            record.career_family == FAMILIES[0]
+            and record.career_level == LEVELS[0]
+            and not record.id.endswith(":0")
+        )
+    ]
+    records = [
+        record.model_copy(update={"transfer_predicted": index < 10})
+        for index, record in enumerate(records)
+    ]
+
+    report = evaluate_uccm(
+        records,
+        GoldSetManifest(
+            revision="gold-incomplete",
+            reviewed=True,
+            reviewer_ids=["reviewer:1"],
+        ),
+    )
+
+    assert report.eligible is False
+    assert "insufficient_career_coverage" in report.failed_gates
+    assert "insufficient_concept_type_coverage" in report.failed_gates
+    assert "transfer_precision_insufficient_denominator" in report.failed_gates
+
+
+def test_strict_false_positives_above_the_published_rate_fail_the_threshold():
     from evals.uccm import GoldSetManifest, evaluate_uccm
 
     records = _perfect_records()
     records[0] = records[0].model_copy(update={"strict_false_positive": True})
+    records[1] = records[1].model_copy(update={"strict_false_positive": True})
     report = evaluate_uccm(
         records,
         GoldSetManifest(

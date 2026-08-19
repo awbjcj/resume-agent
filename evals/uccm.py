@@ -12,8 +12,12 @@ from pydantic import Field
 
 from resume_agent.matching.models import MatchStatus
 from resume_agent.matching.activation import (
+    MINIMUM_GATE_DENOMINATORS,
+    MINIMUM_RECORDS_PER_STRATUM,
     REQUIRED_CAREER_FAMILIES,
     REQUIRED_CAREER_LEVELS,
+    REQUIRED_CONCEPT_TYPES,
+    REQUIRED_MATCH_STATUSES,
     UccmActivationMetrics,
     UccmActivationReport,
     seal_activation_report,
@@ -72,6 +76,10 @@ class UccmEvaluationReport(ExtensibleModel):
     metrics: UccmMetrics
     career_families: list[str] = Field(default_factory=list)
     career_levels: list[str] = Field(default_factory=list)
+    stratum_counts: dict[str, int] = Field(default_factory=dict)
+    concept_types: list[str] = Field(default_factory=list)
+    match_statuses: list[str] = Field(default_factory=list)
+    metric_denominators: dict[str, int] = Field(default_factory=dict)
     failed_gates: list[str] = Field(default_factory=list)
     eligible: bool = False
     checksum: str
@@ -88,6 +96,10 @@ def _rate(values: list[bool]) -> float | None:
     if not values:
         return None
     return sum(values) / len(values)
+
+
+def _predicted_count(records: list[tuple[bool, bool]]) -> int:
+    return sum(prediction for _, prediction in records)
 
 
 def _macro_f1(pairs: list[tuple[str, str]]) -> tuple[float, float] | None:
@@ -146,73 +158,104 @@ def evaluate_uccm(
     ]
     type_f1 = _macro_f1(type_pairs)
     status_f1 = _macro_f1(status_pairs)
+    exact_pairs = [
+        (
+            bool(record.exact_or_synonym_gold_positive),
+            bool(record.exact_or_synonym_predicted_positive),
+        )
+        for record in reviewed
+        if record.exact_or_synonym_gold_positive is not None
+        and record.exact_or_synonym_predicted_positive is not None
+    ]
+    strict_values = [
+        record.strict_false_positive
+        for record in reviewed
+        if record.strict_requirement
+    ]
+    claim_pairs = [
+        (record.resume_claim_supported, record.resume_claim_predicted)
+        for record in reviewed
+    ]
+    transfer_pairs = [
+        (record.transfer_correct, record.transfer_predicted) for record in reviewed
+    ]
+    transfer_credit_pairs = [
+        (record.transfer_correct, record.must_have_positive_credit)
+        for record in reviewed
+    ]
+    adversarial_values = [
+        record.false_transfer
+        for record in reviewed
+        if record.adversarial_same_domain_negative
+    ]
+    correction_values = [
+        bool(record.correction_propagated)
+        for record in reviewed
+        if record.correction_propagated is not None
+    ]
+    reproduction_values = [
+        bool(record.reproduced)
+        for record in reviewed
+        if record.reproduced is not None
+    ]
     metrics = UccmMetrics(
-        exact_synonym_precision=_precision(
-            [
-                (
-                    bool(record.exact_or_synonym_gold_positive),
-                    bool(record.exact_or_synonym_predicted_positive),
-                )
-                for record in reviewed
-                if record.exact_or_synonym_gold_positive is not None
-                and record.exact_or_synonym_predicted_positive is not None
-            ]
-        ),
-        strict_false_positive_rate=_rate(
-            [record.strict_false_positive for record in reviewed if record.strict_requirement]
-        ),
-        resume_claim_precision=_precision(
-            [
-                (record.resume_claim_supported, record.resume_claim_predicted)
-                for record in reviewed
-            ]
-        ),
-        transfer_precision=_precision(
-            [
-                (record.transfer_correct, record.transfer_predicted)
-                for record in reviewed
-            ]
-        ),
-        transfer_must_have_credit_precision=_precision(
-            [
-                (record.transfer_correct, record.must_have_positive_credit)
-                for record in reviewed
-            ]
-        ),
-        adversarial_false_transfer_rate=_rate(
-            [
-                record.false_transfer
-                for record in reviewed
-                if record.adversarial_same_domain_negative
-            ]
-        ),
+        exact_synonym_precision=_precision(exact_pairs),
+        strict_false_positive_rate=_rate(strict_values),
+        resume_claim_precision=_precision(claim_pairs),
+        transfer_precision=_precision(transfer_pairs),
+        transfer_must_have_credit_precision=_precision(transfer_credit_pairs),
+        adversarial_false_transfer_rate=_rate(adversarial_values),
         concept_type_macro_f1=type_f1[0] if type_f1 is not None else None,
         match_status_macro_f1=status_f1[0] if status_f1 is not None else None,
         match_status_min_f1=status_f1[1] if status_f1 is not None else None,
-        correction_propagation_rate=_rate(
-            [
-                bool(record.correction_propagated)
-                for record in reviewed
-                if record.correction_propagated is not None
-            ]
-        ),
-        deterministic_reproduction_rate=_rate(
-            [
-                bool(record.reproduced)
-                for record in reviewed
-                if record.reproduced is not None
-            ]
-        ),
+        correction_propagation_rate=_rate(correction_values),
+        deterministic_reproduction_rate=_rate(reproduction_values),
     )
     families = sorted({record.career_family for record in reviewed})
     levels = sorted({record.career_level for record in reviewed})
+    stratum_counts = {
+        f"{family}:{level}": sum(
+            record.career_family == family and record.career_level == level
+            for record in reviewed
+        )
+        for family in REQUIRED_CAREER_FAMILIES
+        for level in REQUIRED_CAREER_LEVELS
+    }
+    concept_types = sorted(
+        {record.concept_type_gold for record in reviewed if record.concept_type_gold}
+    )
+    match_statuses = sorted(
+        {record.match_status_gold for record in reviewed if record.match_status_gold}
+    )
+    metric_denominators = {
+        "exact_synonym_precision": _predicted_count(exact_pairs),
+        "strict_false_positive_rate": len(strict_values),
+        "resume_claim_precision": _predicted_count(claim_pairs),
+        "transfer_precision": _predicted_count(transfer_pairs),
+        "transfer_must_have_credit_precision": _predicted_count(
+            transfer_credit_pairs
+        ),
+        "adversarial_false_transfer_rate": len(adversarial_values),
+        "concept_type_macro_f1": len(type_pairs),
+        "match_status_macro_f1": len(status_pairs),
+        "match_status_min_f1": len(status_pairs),
+        "correction_propagation_rate": len(correction_values),
+        "deterministic_reproduction_rate": len(reproduction_values),
+    }
     failed: list[str] = []
     if not manifest.reviewed or not manifest.reviewer_ids:
         failed.append("gold_set_not_reviewed")
-    if not REQUIRED_CAREER_FAMILIES.issubset(families) or not (
-        REQUIRED_CAREER_LEVELS.issubset(levels)
+    if any(
+        count < MINIMUM_RECORDS_PER_STRATUM for count in stratum_counts.values()
     ):
         failed.append("insufficient_career_coverage")
+    if not REQUIRED_CONCEPT_TYPES.issubset(concept_types):
+        failed.append("insufficient_concept_type_coverage")
+    if not REQUIRED_MATCH_STATUSES.issubset(match_statuses):
+        failed.append("insufficient_match_status_coverage")
+    for name, minimum in MINIMUM_GATE_DENOMINATORS.items():
+        if metric_denominators[name] < minimum:
+            failed.append(f"{name}_insufficient_denominator")
     _threshold(
         failed,
         name="exact_synonym_precision",
@@ -285,6 +328,10 @@ def evaluate_uccm(
         "manifest": manifest.model_dump(mode="json"),
         "records": [record.model_dump(mode="json") for record in reviewed],
         "metrics": metrics.model_dump(mode="json"),
+        "stratum_counts": stratum_counts,
+        "concept_types": concept_types,
+        "match_statuses": match_statuses,
+        "metric_denominators": metric_denominators,
         "failed_gates": failed,
     }
     checksum = hashlib.sha256(
@@ -300,6 +347,10 @@ def evaluate_uccm(
         metrics=metrics,
         career_families=families,
         career_levels=levels,
+        stratum_counts=stratum_counts,
+        concept_types=concept_types,
+        match_statuses=match_statuses,
+        metric_denominators=metric_denominators,
         failed_gates=failed,
         eligible=not failed,
         checksum=checksum,
@@ -348,6 +399,10 @@ def build_activation_report(
         reviewed_record_count=evaluation.reviewed_record_count,
         career_families=evaluation.career_families,
         career_levels=evaluation.career_levels,
+        stratum_counts=evaluation.stratum_counts,
+        concept_types=evaluation.concept_types,
+        match_statuses=evaluation.match_statuses,
+        metric_denominators=evaluation.metric_denominators,
         metrics=UccmActivationMetrics.model_validate(
             evaluation.metrics.model_dump(mode="json")
         ),

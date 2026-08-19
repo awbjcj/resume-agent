@@ -17,6 +17,10 @@ def _passing_report(**updates):
     from resume_agent.matching.activation import (
         REQUIRED_CAREER_FAMILIES,
         REQUIRED_CAREER_LEVELS,
+        REQUIRED_CONCEPT_TYPES,
+        REQUIRED_MATCH_STATUSES,
+        MINIMUM_GATE_DENOMINATORS,
+        MINIMUM_RECORDS_PER_STRATUM,
         UccmActivationReport,
         seal_activation_report,
     )
@@ -34,6 +38,17 @@ def _passing_report(**updates):
         "reviewed_record_count": 240,
         "career_families": sorted(REQUIRED_CAREER_FAMILIES),
         "career_levels": sorted(REQUIRED_CAREER_LEVELS),
+        "stratum_counts": {
+            f"{family}:{level}": MINIMUM_RECORDS_PER_STRATUM
+            for family in REQUIRED_CAREER_FAMILIES
+            for level in REQUIRED_CAREER_LEVELS
+        },
+        "concept_types": sorted(REQUIRED_CONCEPT_TYPES),
+        "match_statuses": sorted(REQUIRED_MATCH_STATUSES),
+        "metric_denominators": {
+            name: max(minimum, 240)
+            for name, minimum in MINIMUM_GATE_DENOMINATORS.items()
+        },
         "metrics": {
             "exact_synonym_precision": 0.99,
             "strict_false_positive_rate": 0.0,
@@ -157,9 +172,24 @@ def test_missing_metric_denominator_and_coverage_are_fail_closed():
         )
     )
     missing_coverage = seal_again(report.model_copy(update={"career_families": []}))
+    missing_strata = seal_again(report.model_copy(update={"stratum_counts": {}}))
+    missing_statuses = seal_again(report.model_copy(update={"match_statuses": []}))
+    small_denominator = seal_again(
+        report.model_copy(
+            update={
+                "metric_denominators": {
+                    **report.metric_denominators,
+                    "strict_false_positive_rate": 1,
+                }
+            }
+        )
+    )
 
     assert _decide(missing_metric).reason_code == "activation_report_incomplete"
     assert _decide(missing_coverage).reason_code == "activation_report_incomplete"
+    assert _decide(missing_strata).reason_code == "activation_report_incomplete"
+    assert _decide(missing_statuses).reason_code == "activation_report_incomplete"
+    assert _decide(small_denominator).reason_code == "activation_report_incomplete"
 
 
 def test_complete_reviewed_report_activates_uccm_primary():
