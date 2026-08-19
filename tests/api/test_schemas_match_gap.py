@@ -119,6 +119,24 @@ def test_match_gap_out_shape():
     assert dumped["overrideConflicts"] == []
 
 
+def test_taxonomy_manifest_serializes_nested_capability_revision():
+    from resume_agent.api.schemas.match_gap import TaxonomyManifestOut
+
+    manifest = TaxonomyManifestOut(
+        capability_mode="uccm",
+        capability_status="active",
+        capability={
+            "internal_graph_version": "a" * 64,
+            "effective_hash": "b" * 64,
+        },
+    )
+
+    dumped = manifest.model_dump(by_alias=True)
+    assert dumped["capabilityMode"] == "uccm"
+    assert dumped["capabilityStatus"] == "active"
+    assert dumped["capability"]["internalGraphVersion"] == "a" * 64
+
+
 def test_refresh_cluster_input_normalizes_deduplicates_and_bounds_keys():
     request = RefreshClustersIn(skill_keys=[" Python ", "python", "C++"])
 

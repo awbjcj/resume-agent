@@ -65,12 +65,40 @@ class MatrixRow(ExtensibleModel):
         )
 
 
+class SourceSnapshotRevisionModel(ExtensibleModel):
+    namespace: str
+    version: str
+    checksum: str
+
+
+class TaxonomyRevisionModel(ExtensibleModel):
+    internal_graph_version: str = ""
+    external_source_snapshots: list[SourceSnapshotRevisionModel] = Field(
+        default_factory=list
+    )
+    crosswalk_revision: str = ""
+    tenant_overlay_revision: str = ""
+    generated_legacy_map_revision: str = ""
+    correction_ledger_revision: str = ""
+    lifecycle_state_revision: str = ""
+    canonicalization_override_revision: str = ""
+    correction_policy_version: str = ""
+    matching_policy_version: str = ""
+    effective_hash: str = ""
+
+
 class TaxonomyManifestModel(ExtensibleModel):
     generated: str = ""
     corrections: str = ""
     state: str = ""
     overrides: str = ""
     semantic: str = ""
+    capability_mode: Literal["legacy", "shadow", "uccm"] = "legacy"
+    capability_status: Literal["disabled", "shadow", "active", "fallback"] = (
+        "disabled"
+    )
+    capability_error_code: str | None = None
+    capability: TaxonomyRevisionModel | None = None
 
 
 class SkillMatrix(ExtensibleModel):

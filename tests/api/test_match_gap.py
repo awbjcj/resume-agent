@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
 import resume_agent.api.routers.match_gap as router_mod
+from resume_agent.profile import effective as effective_module
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
 from resume_agent.models.profile import Contact, ProfileFacts
@@ -55,6 +58,11 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
     )
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "missing-facts.json"))
+    monkeypatch.setattr(
+        effective_module,
+        "get_settings",
+        lambda: SimpleNamespace(career_capability_mode="legacy"),
+    )
 
     app = create_app(db_url="sqlite://")
     with TestClient(app) as client:
@@ -74,9 +82,37 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
                 ),
             )
         resp = client.get("/api/match-gap")
+        monkeypatch.setattr(
+            effective_module,
+            "get_settings",
+            lambda: SimpleNamespace(career_capability_mode="uccm"),
+        )
+        uccm_resp = client.get("/api/match-gap")
 
     assert resp.status_code == 200
+    assert uccm_resp.status_code == 200
     body = resp.json()
+    uccm_body = uccm_resp.json()
+    legacy_business_payload = {
+        key: value
+        for key, value in body.items()
+        if key not in {"taxonomyRevision", "taxonomyManifest"}
+    }
+    uccm_business_payload = {
+        key: value
+        for key, value in uccm_body.items()
+        if key not in {"taxonomyRevision", "taxonomyManifest"}
+    }
+    assert uccm_business_payload == legacy_business_payload
+    assert uccm_body["taxonomyManifest"]["capabilityStatus"] == "active"
+    assert (
+        len(
+            uccm_body["taxonomyManifest"]["capability"][
+                "internalGraphVersion"
+            ]
+        )
+        == 64
+    )
     taxonomy_revision = body.pop("taxonomyRevision")
     taxonomy_manifest = body.pop("taxonomyManifest")
     override_conflicts = body.pop("overrideConflicts")

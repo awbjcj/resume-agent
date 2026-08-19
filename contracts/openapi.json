@@ -10243,6 +10243,29 @@
         "title": "SourcePreviewOut",
         "type": "object"
       },
+      "SourceSnapshotRevisionOut": {
+        "properties": {
+          "checksum": {
+            "title": "Checksum",
+            "type": "string"
+          },
+          "namespace": {
+            "title": "Namespace",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace",
+          "version",
+          "checksum"
+        ],
+        "title": "SourceSnapshotRevisionOut",
+        "type": "object"
+      },
       "SourcesStatus": {
         "properties": {
           "enabledCount": {
@@ -10652,6 +10675,48 @@
       },
       "TaxonomyManifestOut": {
         "properties": {
+          "capability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaxonomyRevisionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capabilityErrorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilityerrorcode"
+          },
+          "capabilityMode": {
+            "default": "legacy",
+            "enum": [
+              "legacy",
+              "shadow",
+              "uccm"
+            ],
+            "title": "Capabilitymode",
+            "type": "string"
+          },
+          "capabilityStatus": {
+            "default": "disabled",
+            "enum": [
+              "disabled",
+              "shadow",
+              "active",
+              "fallback"
+            ],
+            "title": "Capabilitystatus",
+            "type": "string"
+          },
           "corrections": {
             "default": "",
             "title": "Corrections",
@@ -10679,6 +10744,69 @@
           }
         },
         "title": "TaxonomyManifestOut",
+        "type": "object"
+      },
+      "TaxonomyRevisionOut": {
+        "properties": {
+          "canonicalizationOverrideRevision": {
+            "default": "",
+            "title": "Canonicalizationoverriderevision",
+            "type": "string"
+          },
+          "correctionLedgerRevision": {
+            "default": "",
+            "title": "Correctionledgerrevision",
+            "type": "string"
+          },
+          "correctionPolicyVersion": {
+            "default": "",
+            "title": "Correctionpolicyversion",
+            "type": "string"
+          },
+          "crosswalkRevision": {
+            "default": "",
+            "title": "Crosswalkrevision",
+            "type": "string"
+          },
+          "effectiveHash": {
+            "default": "",
+            "title": "Effectivehash",
+            "type": "string"
+          },
+          "externalSourceSnapshots": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSnapshotRevisionOut"
+            },
+            "title": "Externalsourcesnapshots",
+            "type": "array"
+          },
+          "generatedLegacyMapRevision": {
+            "default": "",
+            "title": "Generatedlegacymaprevision",
+            "type": "string"
+          },
+          "internalGraphVersion": {
+            "default": "",
+            "title": "Internalgraphversion",
+            "type": "string"
+          },
+          "lifecycleStateRevision": {
+            "default": "",
+            "title": "Lifecyclestaterevision",
+            "type": "string"
+          },
+          "matchingPolicyVersion": {
+            "default": "",
+            "title": "Matchingpolicyversion",
+            "type": "string"
+          },
+          "tenantOverlayRevision": {
+            "default": "",
+            "title": "Tenantoverlayrevision",
+            "type": "string"
+          }
+        },
+        "title": "TaxonomyRevisionOut",
         "type": "object"
       },
       "TemplateListItem": {

@@ -6873,6 +6873,15 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** SourceSnapshotRevisionOut */
+        SourceSnapshotRevisionOut: {
+            /** Checksum */
+            checksum: string;
+            /** Namespace */
+            namespace: string;
+            /** Version */
+            version: string;
+        };
         /** SourcesStatus */
         SourcesStatus: {
             /** Enabledcount */
@@ -7036,6 +7045,21 @@ export interface components {
         };
         /** TaxonomyManifestOut */
         TaxonomyManifestOut: {
+            capability?: components["schemas"]["TaxonomyRevisionOut"] | null;
+            /** Capabilityerrorcode */
+            capabilityErrorCode?: string | null;
+            /**
+             * Capabilitymode
+             * @default legacy
+             * @enum {string}
+             */
+            capabilityMode: "legacy" | "shadow" | "uccm";
+            /**
+             * Capabilitystatus
+             * @default disabled
+             * @enum {string}
+             */
+            capabilityStatus: "disabled" | "shadow" | "active" | "fallback";
             /**
              * Corrections
              * @default
@@ -7061,6 +7085,61 @@ export interface components {
              * @default
              */
             state: string;
+        };
+        /** TaxonomyRevisionOut */
+        TaxonomyRevisionOut: {
+            /**
+             * Canonicalizationoverriderevision
+             * @default
+             */
+            canonicalizationOverrideRevision: string;
+            /**
+             * Correctionledgerrevision
+             * @default
+             */
+            correctionLedgerRevision: string;
+            /**
+             * Correctionpolicyversion
+             * @default
+             */
+            correctionPolicyVersion: string;
+            /**
+             * Crosswalkrevision
+             * @default
+             */
+            crosswalkRevision: string;
+            /**
+             * Effectivehash
+             * @default
+             */
+            effectiveHash: string;
+            /** Externalsourcesnapshots */
+            externalSourceSnapshots?: components["schemas"]["SourceSnapshotRevisionOut"][];
+            /**
+             * Generatedlegacymaprevision
+             * @default
+             */
+            generatedLegacyMapRevision: string;
+            /**
+             * Internalgraphversion
+             * @default
+             */
+            internalGraphVersion: string;
+            /**
+             * Lifecyclestaterevision
+             * @default
+             */
+            lifecycleStateRevision: string;
+            /**
+             * Matchingpolicyversion
+             * @default
+             */
+            matchingPolicyVersion: string;
+            /**
+             * Tenantoverlayrevision
+             * @default
+             */
+            tenantOverlayRevision: string;
         };
         /** TemplateListItem */
         TemplateListItem: {

@@ -25,6 +25,7 @@ from resume_agent.profile.matrix import (
     rebuild_saved_matrix,
     save_matrix,
 )
+from resume_agent.profile.effective import build_effective_taxonomy
 from resume_agent.profile.group_corrections import (
     GroupCorrection,
     GroupCorrections,
@@ -32,6 +33,10 @@ from resume_agent.profile.group_corrections import (
     save_group_corrections,
 )
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.corrections import (
+    TaxonomyCorrections,
+    save_taxonomy_corrections,
+)
 from resume_agent.taxonomy.groups import group_map_path, save_group_map
 from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 
@@ -183,6 +188,32 @@ def test_build_matrix_pins_the_semantic_revision():
     assert matrix.taxonomy_revision == taxonomy.semantic_revision
     assert matrix.taxonomy_manifest is not None
     assert [row.key for row in matrix.rows] == ["python"]
+
+
+def test_build_matrix_persists_the_complete_capability_revision(tmp_path):
+    profile_dir = tmp_path / "profile"
+    profile_dir.mkdir()
+    save_cluster_map(
+        ClusterMap(aliases={"py": "python"}),
+        profile_dir / "cluster_map.json",
+    )
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_taxonomy_corrections(TaxonomyCorrections(), corrections_path)
+    taxonomy = build_effective_taxonomy(
+        profile_dir,
+        corrections_path=corrections_path,
+        mode="uccm",
+    )
+
+    matrix = build_matrix(_facts(), taxonomy)
+
+    assert matrix.taxonomy_manifest is not None
+    assert matrix.taxonomy_manifest.capability is not None
+    assert (
+        matrix.taxonomy_manifest.capability.effective_hash
+        == matrix.taxonomy_revision
+    )
+    assert matrix.taxonomy_manifest.capability.internal_graph_version
 
 
 def test_load_matrix_rebuilds_a_legacy_matrix_with_no_revision(tmp_path):

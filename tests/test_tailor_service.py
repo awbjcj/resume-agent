@@ -1,4 +1,5 @@
 from dataclasses import asdict
+import json
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -7,10 +8,14 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
+from resume_agent.profile.effective import build_effective_taxonomy
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
 from resume_agent.tailor.service import tailor_job, tailor_jobs
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
+from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.corrections import (
+    TaxonomyCorrections,
+    save_taxonomy_corrections,
+)
 from resume_agent.tracking.repository import resume_versions_for_job, save_job
 from resume_agent.tracking.tables import Job, JobStatus
 
@@ -59,7 +64,7 @@ def _require_id(value: int | None) -> int:
     return value
 
 
-def test_tailor_job_persists_versions_and_marks_tailored():
+def test_tailor_job_persists_versions_and_marks_tailored(tmp_path):
     config = ReviewConfig(
         max_rounds=1,
         score_threshold=50,
@@ -68,8 +73,18 @@ def test_tailor_job_persists_versions_and_marks_tailored():
     tailor_agent = _ContentAgent()
     reviewer = _FactCheck()
     reviser_agent = _ContentAgent()
-    taxonomy = EffectiveTaxonomy.from_parts(
-        ClusterMap(aliases={"js": "javascript"})
+    profile_dir = tmp_path / "profile"
+    profile_dir.mkdir()
+    save_cluster_map(
+        ClusterMap(aliases={"js": "javascript"}),
+        profile_dir / "cluster_map.json",
+    )
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_taxonomy_corrections(TaxonomyCorrections(), corrections_path)
+    taxonomy = build_effective_taxonomy(
+        profile_dir,
+        corrections_path=corrections_path,
+        mode="uccm",
     )
     with _session() as s:
         job = save_job(
@@ -101,7 +116,12 @@ def test_tailor_job_persists_versions_and_marks_tailored():
         # settings later - see test_apply_gate_names_does_not_relabel_*.
         assert versions[0].gate_reviewers_json == ["fact-check"]
         assert versions[0].taxonomy_revision == taxonomy.semantic_revision
-        assert versions[0].taxonomy_manifest_json == asdict(taxonomy.manifest)
+        expected_manifest = json.loads(json.dumps(asdict(taxonomy.manifest)))
+        assert versions[0].taxonomy_manifest_json == expected_manifest
+        manifest = versions[0].taxonomy_manifest_json
+        assert manifest is not None
+        assert manifest["capability"]["effective_hash"] == versions[0].taxonomy_revision
+        assert manifest["capability_mode"] == "uccm"
 
         stored = resume_versions_for_job(s, _require_id(job.id))
         assert len(stored) == 1
