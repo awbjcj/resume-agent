@@ -489,7 +489,11 @@ def validate_capability_graph(graph: CareerCapabilityGraph) -> None:
         if edge.predicate == "lexical_alias_of":
             if subject_node.type != object_node.type:
                 issues.add(GraphValidationIssue("alias_type_mismatch", edge_id))
-            _add_relation(alias_relations, edge.subject_id, edge.object_id)
+            # ClusterMap uses self-aliases as canonical anchors. They are
+            # semantically no-ops, not alias cycles, while multi-node loops
+            # remain forbidden.
+            if edge.subject_id != edge.object_id:
+                _add_relation(alias_relations, edge.subject_id, edge.object_id)
         elif edge.predicate == "broader_than":
             _add_relation(hierarchy_relations, edge.subject_id, edge.object_id)
         elif edge.predicate == "narrower_than":

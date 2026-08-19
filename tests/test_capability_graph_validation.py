@@ -96,6 +96,19 @@ def test_alias_and_hierarchy_cycles_are_rejected():
     assert "alias_cycle" in {issue.code for issue in exc.value.issues}
 
 
+def test_legacy_self_alias_is_a_valid_canonical_anchor():
+    node = _node("legacy:skill:a")
+    edge = ConceptEdge(
+        id="edge:self-alias",
+        subject_id=node.id,
+        predicate="lexical_alias_of",
+        object_id=node.id,
+        revision_created="r1",
+        source_refs=["source:internal:test:1"],
+    )
+    validate_capability_graph(_graph([node], [edge]))
+
+
 def test_tools_cannot_be_declared_essential_for_a_non_role_target():
     nodes = [
         _node("internal:tool:excel", "tool_technology"),
