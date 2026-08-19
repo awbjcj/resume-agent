@@ -5100,6 +5100,8 @@ export interface components {
             edges: components["schemas"]["DemandEdgeOut"][];
             /** Jobs */
             jobs: components["schemas"]["JobLiteOut"][];
+            /** Overrideconflicts */
+            overrideConflicts?: components["schemas"]["OverrideConflictOut"][];
             /** Retiredskills */
             retiredSkills?: components["schemas"]["RetiredSkillOut"][];
             /** Skills */
@@ -5120,6 +5122,12 @@ export interface components {
              * @default true
              */
             taxonomyMaintenanceDue: boolean;
+            taxonomyManifest?: components["schemas"]["TaxonomyManifestOut"] | null;
+            /**
+             * Taxonomyrevision
+             * @default
+             */
+            taxonomyRevision: string;
             /**
              * Taxonomyundoavailable
              * @default false
@@ -5294,6 +5302,20 @@ export interface components {
             state: string;
             /** Title */
             title?: string | null;
+        };
+        /** OverrideConflictOut */
+        OverrideConflictOut: {
+            /** Correctionhead */
+            correctionHead: string;
+            /** Overridehead */
+            overrideHead: string;
+            /**
+             * Resolution
+             * @enum {string}
+             */
+            resolution: "override" | "forbid_alias";
+            /** Token */
+            token: string;
         };
         /** Page[RunOut] */
         Page_RunOut_: {
@@ -6105,6 +6127,11 @@ export interface components {
             pdfPath: string | null;
             /** Reviewscore */
             reviewScore: number | null;
+            /**
+             * Revisionunknown
+             * @default true
+             */
+            revisionUnknown: boolean;
             /** Round */
             round: number;
         };
@@ -7006,6 +7033,34 @@ export interface components {
             deep: boolean;
             /** Jobids */
             jobIds?: number[] | null;
+        };
+        /** TaxonomyManifestOut */
+        TaxonomyManifestOut: {
+            /**
+             * Corrections
+             * @default
+             */
+            corrections: string;
+            /**
+             * Generated
+             * @default
+             */
+            generated: string;
+            /**
+             * Overrides
+             * @default
+             */
+            overrides: string;
+            /**
+             * Semantic
+             * @default
+             */
+            semantic: string;
+            /**
+             * State
+             * @default
+             */
+            state: string;
         };
         /** TemplateListItem */
         TemplateListItem: {

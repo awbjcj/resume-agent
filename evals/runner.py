@@ -21,12 +21,12 @@ from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 from resume_agent.models.review import Severity
 from resume_agent.profile.matrix import (
-    Overrides,
     build_matrix,
     build_skill_match_context,
 )
 from resume_agent.services.agents import TailorBundle
 from resume_agent.taxonomy.clusters import load_cluster_map
+from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.tailor.panel import compose_evidence_review_input, review_one
 from resume_agent.tailor.provenance import resolve_evidence
 from resume_agent.tailor.review_config import ReviewConfig
@@ -142,8 +142,11 @@ def run_case(
     skill_context = None
     if config.portfolio_enabled:
         cluster_map = load_cluster_map(Path("evals/portfolio_cluster_map.json"))
-        matrix = build_matrix(profile, cluster_map, Overrides())
-        skill_context = build_skill_match_context(criteria, matrix, cluster_map)
+        taxonomy = EffectiveTaxonomy.from_parts(cluster_map)
+        matrix = build_matrix(profile, taxonomy)
+        skill_context = build_skill_match_context(
+            criteria, matrix, taxonomy.cluster_map
+        )
 
     tailor_rounds = run_tailor_review(
         jd_text=case.jd_text,

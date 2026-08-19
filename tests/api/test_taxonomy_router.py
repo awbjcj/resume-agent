@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 import resume_agent.api.routers.match_gap as match_gap_router
 import resume_agent.api.routers.taxonomy as taxonomy_router
+import resume_agent.profile.effective as effective_module
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
@@ -31,6 +32,9 @@ def client(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(match_gap_router, "_CLUSTER_PATH", str(cluster_path))
     monkeypatch.setattr(match_gap_router, "_FACTS_PATH", str(facts_path))
+    monkeypatch.setattr(
+        effective_module, "corrections_file_path", lambda: str(corrections_path)
+    )
     monkeypatch.setattr(
         match_gap_router, "corrections_file_path", lambda: str(corrections_path)
     )

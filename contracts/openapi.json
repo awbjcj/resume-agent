@@ -5334,6 +5334,13 @@
             "title": "Jobs",
             "type": "array"
           },
+          "overrideConflicts": {
+            "items": {
+              "$ref": "#/components/schemas/OverrideConflictOut"
+            },
+            "title": "Overrideconflicts",
+            "type": "array"
+          },
           "retiredSkills": {
             "items": {
               "$ref": "#/components/schemas/RetiredSkillOut"
@@ -5379,6 +5386,21 @@
             "default": true,
             "title": "Taxonomymaintenancedue",
             "type": "boolean"
+          },
+          "taxonomyManifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaxonomyManifestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taxonomyRevision": {
+            "default": "",
+            "title": "Taxonomyrevision",
+            "type": "string"
           },
           "taxonomyUndoAvailable": {
             "default": false,
@@ -5834,6 +5856,38 @@
           "createdAt"
         ],
         "title": "NotificationOut",
+        "type": "object"
+      },
+      "OverrideConflictOut": {
+        "properties": {
+          "correctionHead": {
+            "title": "Correctionhead",
+            "type": "string"
+          },
+          "overrideHead": {
+            "title": "Overridehead",
+            "type": "string"
+          },
+          "resolution": {
+            "enum": [
+              "override",
+              "forbid_alias"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "correctionHead",
+          "overrideHead",
+          "resolution"
+        ],
+        "title": "OverrideConflictOut",
         "type": "object"
       },
       "Page_RunOut_": {
@@ -8064,6 +8118,11 @@
               }
             ],
             "title": "Reviewscore"
+          },
+          "revisionUnknown": {
+            "default": true,
+            "title": "Revisionunknown",
+            "type": "boolean"
           },
           "round": {
             "title": "Round",
@@ -10589,6 +10648,37 @@
           }
         },
         "title": "TailorParams",
+        "type": "object"
+      },
+      "TaxonomyManifestOut": {
+        "properties": {
+          "corrections": {
+            "default": "",
+            "title": "Corrections",
+            "type": "string"
+          },
+          "generated": {
+            "default": "",
+            "title": "Generated",
+            "type": "string"
+          },
+          "overrides": {
+            "default": "",
+            "title": "Overrides",
+            "type": "string"
+          },
+          "semantic": {
+            "default": "",
+            "title": "Semantic",
+            "type": "string"
+          },
+          "state": {
+            "default": "",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "TaxonomyManifestOut",
         "type": "object"
       },
       "TemplateListItem": {
