@@ -32,10 +32,10 @@ def run_corpus_build(
         load_manual_skills,
         manual_skills_lock,
     )
+    from resume_agent.profile.effective import build_effective_taxonomy
     from resume_agent.profile.matrix import (
         build_matrix,
         decorate_matrix_groups,
-        load_overrides,
         save_matrix,
     )
     from resume_agent.profile.merge import build_bullet_dedup_agent
@@ -44,12 +44,8 @@ def run_corpus_build(
         build_entailment_agent,
         build_synthesis_agent,
     )
-    from resume_agent.taxonomy.clusters import load_cluster_map
     from resume_agent.taxonomy import groups as skill_groups
-    from resume_agent.taxonomy.state import (
-        load_taxonomy_state,
-        mark_legacy_group_map_imported,
-    )
+    from resume_agent.taxonomy.state import mark_legacy_group_map_imported
     from resume_agent.services.match_gap import refresh_clusters
     from resume_agent.tracking.canonicalize import (
         build_incremental_canonicalizer_agent,
@@ -80,13 +76,10 @@ def run_corpus_build(
         save_facts(facts, str(facts_out))
         if reporter is not None:
             reporter.step(2, label="Classifying the shared skill taxonomy")
-        overrides = load_overrides(Path(profile_dir) / "overrides.yaml")
-        preliminary = build_matrix(
-            facts,
-            load_cluster_map(Path(profile_dir) / "cluster_map.json"),
-            overrides,
-        )
         cluster_path = Path(profile_dir) / "cluster_map.json"
+        # Everything before classification uses one coherent taxonomy read.
+        pre = build_effective_taxonomy(profile_dir)
+        preliminary = build_matrix(facts, pre)
         taxonomy_path = skill_groups.group_map_path(profile_dir)
         # ``skill_groups.json`` is a one-time migration hint only.  Once its
         # original content hash has been recorded, the growing cluster map is
@@ -94,14 +87,15 @@ def run_corpus_build(
         # not steer a rebuild.
         legacy_hints = (
             skill_groups.load_group_map(taxonomy_path)
-            if load_taxonomy_state(cluster_path).legacy_group_map_sha256 is None
+            if pre.state.legacy_group_map_sha256 is None
             else {}
         )
-        current_tree = load_cluster_map(cluster_path)
         missing = {
             row.key
             for row in preliminary.rows
-            if current_tree.domain_of.get(current_tree.aliases.get(row.key, row.key))
+            if pre.cluster_map.domain_of.get(
+                pre.cluster_map.aliases.get(row.key, row.key)
+            )
             is None
         }
         if missing:
@@ -114,8 +108,11 @@ def run_corpus_build(
                 category_hints=legacy_hints,
             )
         mark_legacy_group_map_imported(cluster_path, taxonomy_path)
-        matrix = build_matrix(facts, load_cluster_map(cluster_path), overrides)
-        decorate_matrix_groups(matrix, profile_dir, overrides)
+        # Classification and the legacy-import marker may both have mutated
+        # persisted taxonomy artifacts, so the final matrix must rebind.
+        post = build_effective_taxonomy(profile_dir)
+        matrix = build_matrix(facts, post)
+        decorate_matrix_groups(matrix, profile_dir, post)
         save_matrix(matrix, Path(facts_out).with_name("matrix.json"))
     if reporter is not None:
         reporter.step(3, label="Saved matrix.json")

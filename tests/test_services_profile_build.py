@@ -6,6 +6,7 @@ from resume_agent.profile.manual_skills import (
     save_manual_skills,
 )
 from resume_agent.profile.matrix import load_matrix
+from resume_agent.profile.effective import build_effective_taxonomy
 from resume_agent.profile.store import load_facts
 from resume_agent.services.profile_build import run_corpus_build
 from resume_agent.taxonomy.groups import group_map_path, load_group_map
@@ -79,6 +80,9 @@ def test_run_corpus_build_derives_groups_from_the_shared_taxonomy_tree(
     assert load_taxonomy_state(profile_dir / "cluster_map.json").legacy_group_map_sha256
     matrix = load_matrix(profile_dir / "matrix.json")
     assert matrix is not None
+    assert matrix.taxonomy_revision == build_effective_taxonomy(
+        profile_dir
+    ).semantic_revision
     assert {row.key: row.group for row in matrix.rows} == {
         "kubernetes": "cloud-infra",
         "python": "languages",
