@@ -13,6 +13,7 @@ from pydantic import Field
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.matching.models import MatchStatus
 from resume_agent.taxonomy.graph_models import CareerCapabilityMode, ConceptType
+from resume_agent.taxonomy.term_typing import TermConceptType
 
 REQUIRED_CAREER_FAMILIES = frozenset(
     {
@@ -31,8 +32,10 @@ REQUIRED_CAREER_FAMILIES = frozenset(
     }
 )
 REQUIRED_CAREER_LEVELS = frozenset({"entry", "mid", "senior", "manager"})
-REQUIRED_CONCEPT_TYPES = frozenset({*get_args(ConceptType), "unknown"})
-REQUIRED_MATCH_STATUSES = frozenset(get_args(MatchStatus))
+REQUIRED_CONCEPT_TYPES: frozenset[TermConceptType] = frozenset(
+    {*get_args(ConceptType), "unknown"}
+)
+REQUIRED_MATCH_STATUSES: frozenset[MatchStatus] = frozenset(get_args(MatchStatus))
 MINIMUM_RECORDS_PER_STRATUM = 5
 MINIMUM_GATE_DENOMINATORS = {
     "exact_synonym_precision": 50,
