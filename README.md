@@ -124,10 +124,17 @@ For local development, `make dev` starts the API, Vite frontend, and the sibling
 manual MCP command or URL is needed. Run `make stack-health` after startup to
 check both HTTP health endpoints and the MCP handshake/tool allowlist.
 
-### Multi-user server
+### Hosted multi-user server
 
-Every file-backed API server uses isolated per-user workspaces. Seed the first
+`resume-agent serve` is an auth-free local application by default: it binds to
+loopback, reuses the existing administrator workspace (or creates a `local`
+workspace on first boot), and does not require account credentials. To expose a
+server or enable multiple users, opt into hosted mode and seed the first
 administrator before its first boot:
+
+```bash
+uv run resume-agent serve --mode hosted --host 0.0.0.0
+```
 
 ```env
 AUTH_USERNAME=owner
@@ -419,8 +426,14 @@ client):
 
 ```bash
 uv run resume-agent serve                       # http://127.0.0.1:8000
-uv run resume-agent serve --host 0.0.0.0 --port 8080
+uv run resume-agent serve --mode hosted --host 0.0.0.0 --port 8080
 ```
+
+The default local mode skips account authentication and always activates the
+one default workspace. It refuses non-loopback binds. Hosted mode is the
+deployment boundary: it enables login, bearer/PAT checks, tenant selection,
+registration, and isolated user workspaces. The shipped container selects
+hosted mode explicitly.
 
 - Interactive docs at `/docs`; the OpenAPI schema at `/openapi.json`.
 - The committed contract the frontend consumes lives in `contracts/`
@@ -429,9 +442,9 @@ uv run resume-agent serve --host 0.0.0.0 --port 8080
 - Long operations (`POST /api/discover|pull|tailor|cover-letters|jobs/from-url`)
   return a **run** you watch via `GET /api/runs/{id}/events` (Server-Sent Events)
   or poll at `GET /api/runs/{id}`.
-- Set `API_TOKEN` in `.env` to require an `Authorization: Bearer <token>` on every
-  route except `/api/health`; set `CORS_ORIGINS` (comma-separated) for your
-  frontend dev server. Both are off-by-default-friendly for local single-user use.
+- In hosted mode, configure account credentials/PATs for API access and set
+  `CORS_ORIGINS` (comma-separated) for a separate frontend dev server. Local
+  mode intentionally ignores account and API authentication settings.
 
 Gmail sync (`POST /api/gmail/sync`), connect/status/disconnect
 (`/api/gmail/connect|status|token`), and email drafts are exposed over HTTP.

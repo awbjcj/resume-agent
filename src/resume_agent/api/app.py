@@ -60,11 +60,15 @@ from resume_agent.api.routers import taxonomy as taxonomy_router
 from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.public_url import validate_public_origin
-from resume_agent.config import Settings, get_settings
+from resume_agent.config import AppMode, Settings, get_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.services.config_store import YamlConfigStore
 from resume_agent.services.profile_documents import DocumentStore
-from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
+from resume_agent.tenancy.bootstrap import (
+    build_context,
+    ensure_bootstrapped,
+    ensure_local_user,
+)
 from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.engines import EngineRegistry
 from resume_agent.tenancy.system_db import init_system_db, make_system_engine
@@ -87,6 +91,7 @@ def _is_memory_db(db_url: str) -> bool:
 def create_app(
     *,
     db_url: str | None = None,
+    app_mode: AppMode = "local",
     api_token: str | None = None,
     run_executor: Executor | None = None,
     runs_root: Path | str | None = None,
@@ -129,12 +134,18 @@ def create_app(
             system_engine = make_system_engine(app.state.data_dir)
             try:
                 init_system_db(system_engine)
-                admin = ensure_bootstrapped(
-                    app.state.data_dir, system_engine, app.state.settings
+                default_user = (
+                    ensure_bootstrapped(
+                        app.state.data_dir, system_engine, app.state.settings
+                    )
+                    if app.state.app_mode == "hosted"
+                    else ensure_local_user(
+                        app.state.data_dir, system_engine, app.state.settings
+                    )
                 )
                 registry = EngineRegistry()
                 context = build_context(
-                    admin,
+                    default_user,
                     app.state.data_dir,
                     app.state.settings,
                     registry,
@@ -186,6 +197,7 @@ def create_app(
         redoc_url=redoc_url,
         openapi_url=openapi_url,
     )
+    app.state.app_mode = app_mode
     app.state.settings = resolved_settings
     if resolved_settings.disable_api_docs:
 
@@ -299,7 +311,8 @@ def create_app(
 
     install_error_handlers(app)
 
-    # Guard everything except /api/health behind the optional bearer token.
+    # Guard application routes through the selected runtime mode. Local mode
+    # activates the default workspace; hosted mode authenticates a tenant.
     guarded = [Depends(require_token), Depends(get_user_context)]
     app.include_router(health.router, prefix="/api")
     app.include_router(auth_router.router, prefix="/api")

@@ -27,6 +27,17 @@ link_router = APIRouter(prefix="/auth", tags=["auth"])
 FAILED_LOGIN_DELAY_SECONDS = 0.05
 
 
+def _local_me(request: Request) -> MeResponse:
+    context = getattr(request.app.state, "default_context", None)
+    if context is None:
+        return MeResponse(auth_required=False)
+    return MeResponse(
+        username=context.username,
+        role=cast(Literal["admin", "user"], context.role),
+        auth_required=False,
+    )
+
+
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
@@ -67,6 +78,8 @@ def login(
     response: Response,
     settings: Settings = Depends(get_settings_dep),
 ) -> MeResponse:
+    if request.app.state.app_mode == "local":
+        return _local_me(request)
     system_engine = getattr(request.app.state, "system_engine", None)
     if system_engine is None:
         return _legacy_login(body, request, response, settings)
@@ -152,6 +165,8 @@ def logout(response: Response) -> dict[str, str]:
 
 @router.get("/me")
 def me(request: Request, settings: Settings = Depends(get_settings_dep)) -> MeResponse:
+    if request.app.state.app_mode == "local":
+        return _local_me(request)
     system_engine = getattr(request.app.state, "system_engine", None)
     token = request.cookies.get(auth.SESSION_COOKIE, "")
     if system_engine is None:

@@ -5,6 +5,7 @@ NPM ?= npm
 NPX ?= npx
 HOST ?= 127.0.0.1
 PORT ?= 8000
+MODE ?= local
 WEB_HOST ?= localhost
 WEB_PORT ?= 5173
 H1B_DIR ?= ../h1b-job-search-mcp
@@ -60,6 +61,7 @@ help:
 	@echo ""
 	@echo "Overrides:"
 	@echo "  make api PORT=8080"
+	@echo "  make api MODE=hosted HOST=0.0.0.0"
 	@echo "  make web WEB_PORT=3000"
 	@echo "  make test-api PYTEST_ARGS=\"tests/api/test_app_health.py -v\""
 	@echo "  make seed RAILWAY_URL=https://your-app.up.railway.app API_TOKEN=..."
@@ -72,7 +74,7 @@ setup-browser:
 	$(UV) run playwright install chromium
 
 api:
-	$(UV) run resume-agent serve --host $(HOST) --port $(PORT)
+	$(UV) run resume-agent serve --mode $(MODE) --host $(HOST) --port $(PORT)
 
 kill-port:
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill_port.ps1 -Port $(PORT)

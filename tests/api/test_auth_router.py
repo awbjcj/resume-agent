@@ -31,7 +31,9 @@ def _no_login_delay(monkeypatch):
 
 
 def test_login_sets_cookie_and_unlocks_guarded_api(tmp_path):
-    app = create_app(db_url="sqlite://", env_path=_auth_env(tmp_path))
+    app = create_app(
+        db_url="sqlite://", app_mode="hosted", env_path=_auth_env(tmp_path)
+    )
     with _client(app) as client:
         assert client.get("/api/pipeline").status_code == 401
         response = client.post(
@@ -54,6 +56,7 @@ def test_login_sets_cookie_and_unlocks_guarded_api(tmp_path):
 def test_production_cookie_setting_forces_secure_over_proxy_http(tmp_path):
     app = create_app(
         db_url="sqlite://",
+        app_mode="hosted",
         env_path=_auth_env(
             tmp_path,
             "SECURE_COOKIES=true\nAPP_BASE_URL=https://public.example\n",
@@ -72,6 +75,7 @@ def test_secure_cookie_mode_requires_a_canonical_https_origin(tmp_path):
     with pytest.raises(RuntimeError, match="APP_BASE_URL is required"):
         create_app(
             db_url="sqlite://",
+            app_mode="hosted",
             env_path=_auth_env(tmp_path, "SECURE_COOKIES=true\n"),
         )
 
@@ -79,6 +83,7 @@ def test_secure_cookie_mode_requires_a_canonical_https_origin(tmp_path):
 def test_production_can_disable_api_docs_and_reject_unknown_hosts(tmp_path):
     app = create_app(
         db_url="sqlite://",
+        app_mode="hosted",
         env_path=_auth_env(
             tmp_path,
             "DISABLE_API_DOCS=true\nALLOWED_HOSTS=public.example\n",
@@ -106,7 +111,9 @@ def test_login_verifies_password_for_unknown_username(tmp_path, monkeypatch):
             calls.append(password) or real_verify(password, stored)
         ),
     )
-    app = create_app(db_url="sqlite://", env_path=_auth_env(tmp_path))
+    app = create_app(
+        db_url="sqlite://", app_mode="hosted", env_path=_auth_env(tmp_path)
+    )
     with _client(app) as client:
         response = client.post(
             "/api/auth/login",
@@ -117,7 +124,9 @@ def test_login_verifies_password_for_unknown_username(tmp_path, monkeypatch):
 
 
 def test_me_is_public_state_probe_and_logout_clears_cookie(tmp_path):
-    app = create_app(db_url="sqlite://", env_path=_auth_env(tmp_path))
+    app = create_app(
+        db_url="sqlite://", app_mode="hosted", env_path=_auth_env(tmp_path)
+    )
     with _client(app) as client:
         assert client.get("/api/auth/me").json() == {
             "username": None,
@@ -143,6 +152,7 @@ def test_open_mode_and_bearer_compatibility(tmp_path):
 
     guarded = create_app(
         db_url="sqlite://",
+        app_mode="hosted",
         env_path=_auth_env(tmp_path, "API_TOKEN=cli-token\n"),
     )
     with _client(guarded) as client:
@@ -156,7 +166,9 @@ def test_open_mode_and_bearer_compatibility(tmp_path):
 
 
 def test_login_rejects_bad_credentials_and_unconfigured_mode(tmp_path):
-    app = create_app(db_url="sqlite://", env_path=_auth_env(tmp_path))
+    app = create_app(
+        db_url="sqlite://", app_mode="hosted", env_path=_auth_env(tmp_path)
+    )
     with _client(app) as client:
         response = client.post(
             "/api/auth/login",
@@ -165,7 +177,7 @@ def test_login_rejects_bad_credentials_and_unconfigured_mode(tmp_path):
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
-    with _client(create_app(db_url="sqlite://")) as client:
+    with _client(create_app(db_url="sqlite://", app_mode="hosted")) as client:
         response = client.post(
             "/api/auth/login", json={"identifier": "x", "password": "y"}
         )
@@ -174,7 +186,9 @@ def test_login_rejects_bad_credentials_and_unconfigured_mode(tmp_path):
 
 
 def test_refresh_preserves_platform_auth_and_browser_fields(tmp_path):
-    app = create_app(db_url="sqlite://", env_path=_auth_env(tmp_path))
+    app = create_app(
+        db_url="sqlite://", app_mode="hosted", env_path=_auth_env(tmp_path)
+    )
     with _client(app):
         refresh_app_settings(app, Settings(_env_file=None))  # type: ignore[call-arg]
         settings = app.state.settings

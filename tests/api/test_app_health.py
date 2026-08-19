@@ -34,7 +34,7 @@ def test_api_tests_ignore_host_auth_environment(monkeypatch):
 
 
 def test_bearer_required_when_token_set():
-    client = _client(api_token="secret")
+    client = _client(api_token="secret", app_mode="hosted")
     with client:
         assert client.get("/api/health").status_code == 200  # health is unguarded
         assert client.get("/api/pipeline").status_code == 401

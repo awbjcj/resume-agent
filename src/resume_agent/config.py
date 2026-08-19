@@ -9,6 +9,8 @@ from pydantic import AliasChoices, Field, model_validator
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+AppMode = Literal["local", "hosted"]
+
 
 class Settings(BaseSettings):
     """Secrets and environment-level config, loaded from ``.env``."""

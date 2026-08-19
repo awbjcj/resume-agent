@@ -30,8 +30,10 @@ logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
   and `session_work()` owns the worker-opens-its-own-session rule.
 - **Errors** use one envelope `{ "error": { code, message, details? } }` via
   `ApiException` + handlers in `api/errors.py`.
-- **Auth/CORS:** optional static bearer via `Settings.api_token` (guards every
-  route except `/api/health`; off when unset); `Settings.cors_origins` allowlist.
+- **Runtime/auth boundary:** `create_app(..., app_mode="local")` auto-activates
+  one default workspace and bypasses account auth; the CLI confines that mode
+  to loopback. `app_mode="hosted"` enables session/PAT authentication and
+  per-request tenant context. `Settings.cors_origins` remains the CORS allowlist.
 - **In-memory sqlite tests** need a shared connection: `make_engine` gives
   `sqlite://` a `StaticPool` + `check_same_thread=False` so the request threadpool
   sees the schema the lifespan thread created.

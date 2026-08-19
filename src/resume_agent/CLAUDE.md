@@ -295,6 +295,10 @@ to `build_model` with a lazy import. Nothing else changes.
   browser-only sources return explicit degradation failures in cloud. Admin
   import validates and stages the archive, then uses rollback-safe child swaps
   because the mounted volume root itself cannot be renamed.
+- **Runtime mode is explicit.** `resume-agent serve` defaults to auth-free local
+  mode and one automatically activated workspace; non-loopback binds require
+  `--mode hosted`. The container entrypoint always selects hosted mode, where
+  login and per-request tenant selection remain mandatory.
 
 ---
 

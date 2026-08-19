@@ -64,6 +64,7 @@ def mu_app(tmp_path):
     )
     application = create_app(
         db_url=f"sqlite:///{(tmp_path / 'data' / 'ignored.db').as_posix()}",
+        app_mode="hosted",
         env_path=env,
         data_dir=tmp_path / "data",
         runs_root=tmp_path / "legacy-runs",

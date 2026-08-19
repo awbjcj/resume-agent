@@ -163,7 +163,9 @@ def test_triage_archived_query():
 
 
 def test_bearer_enforced_on_guarded_route():
-    client = TestClient(create_app(db_url="sqlite://", api_token="secret"))
+    client = TestClient(
+        create_app(db_url="sqlite://", app_mode="hosted", api_token="secret")
+    )
     with client:
         assert client.get("/api/pipeline").status_code == 401
         ok = client.get("/api/pipeline", headers={"Authorization": "Bearer secret"})

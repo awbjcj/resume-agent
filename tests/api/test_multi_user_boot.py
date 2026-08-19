@@ -28,10 +28,11 @@ def _env(tmp_path, *, include_seed=True):
     return path
 
 
-def test_file_backed_app_always_boots_multi_user(tmp_path):
+def test_hosted_file_backed_app_boots_multi_user(tmp_path):
     data_root = tmp_path / "data"
     app = create_app(
         db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        app_mode="hosted",
         data_dir=data_root,
         env_path=_env(tmp_path),
         config_dir=tmp_path / "templates",
@@ -43,10 +44,11 @@ def test_file_backed_app_always_boots_multi_user(tmp_path):
         assert app.state.engine is app.state.default_context.engine
 
 
-def test_file_backed_app_refuses_missing_seed_credentials(tmp_path):
+def test_hosted_file_backed_app_refuses_missing_seed_credentials(tmp_path):
     data_root = tmp_path / "data"
     app = create_app(
         db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        app_mode="hosted",
         data_dir=data_root,
         env_path=_env(tmp_path, include_seed=False),
     )
@@ -60,6 +62,58 @@ def test_in_memory_app_keeps_legacy_test_adapter():
     with TestClient(app) as client:
         assert client.get("/api/health").status_code == 200
         assert app.state.system_engine is None
+
+
+def test_local_file_backed_app_uses_default_user_without_auth(tmp_path):
+    data_root = tmp_path / "data"
+    app = create_app(
+        db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        data_dir=data_root,
+        env_path=tmp_path / "missing.env",
+        config_dir=tmp_path / "templates",
+    )
+
+    with TestClient(app) as client:
+        assert app.state.app_mode == "local"
+        assert app.state.default_context.username == "local"
+        assert client.get("/api/auth/me").json() == {
+            "username": "local",
+            "email": None,
+            "emailVerified": False,
+            "needsEmail": False,
+            "googleLinked": False,
+            "role": "admin",
+            "authRequired": False,
+        }
+        assert client.get("/api/pipeline").status_code == 200
+
+
+def test_local_restart_ignores_auth_and_stale_legacy_children(tmp_path):
+    data_root = tmp_path / "data"
+    env_path = _env(tmp_path)
+    hosted = create_app(
+        db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        app_mode="hosted",
+        data_dir=data_root,
+        env_path=env_path,
+        config_dir=tmp_path / "templates",
+    )
+    with TestClient(hosted, base_url="https://testserver"):
+        default_user_id = hosted.state.default_context.user_id
+
+    stale = data_root / "workday_facets"
+    stale.mkdir()
+    (stale / "legacy.json").write_text("{}", encoding="utf-8")
+    local = create_app(
+        db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        data_dir=data_root,
+        env_path=env_path,
+        config_dir=tmp_path / "templates",
+    )
+    with TestClient(local) as client:
+        assert local.state.default_context.user_id == default_user_id
+        assert client.get("/api/auth/me").json()["authRequired"] is False
+        assert client.get("/api/pipeline").status_code == 200
 
 
 def test_run_manager_propagates_context_and_uses_workspace_root(tmp_path):
@@ -105,6 +159,7 @@ def test_startup_recovery_records_error_in_the_owner_workspace(tmp_path):
     env_path = _env(tmp_path)
     first_app = create_app(
         db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        app_mode="hosted",
         data_dir=data_root,
         env_path=env_path,
         config_dir=tmp_path / "templates",
@@ -121,6 +176,7 @@ def test_startup_recovery_records_error_in_the_owner_workspace(tmp_path):
 
     recovered_app = create_app(
         db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        app_mode="hosted",
         data_dir=data_root,
         env_path=env_path,
         config_dir=tmp_path / "templates",

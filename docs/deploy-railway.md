@@ -4,6 +4,10 @@ This is a public multi-user deployment: one service, one persistent volume,
 one replica, an owner/admin account, and email-verified self-registration.
 SQLite plus a Railway volume still requires a single replica.
 
+The container entrypoint explicitly starts `resume-agent serve --mode hosted`.
+This keeps Railway authentication and tenant isolation independent from the
+auth-free, single-workspace default used by local `resume-agent serve`.
+
 ## One-time setup
 
 1. Create a Railway project from this GitHub repository. `railway.json` selects

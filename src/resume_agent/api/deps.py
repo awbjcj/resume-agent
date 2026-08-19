@@ -1,4 +1,4 @@
-"""FastAPI dependencies: per-request DB session, settings, optional bearer auth."""
+"""FastAPI dependencies: per-request workspace, DB, settings, and auth."""
 
 from __future__ import annotations
 
@@ -164,6 +164,14 @@ def _authenticated_user(
 async def _activate_user_context(
     request: Request, *, link_purpose: str | None = None
 ) -> AsyncGenerator[UserContext | None]:
+    if getattr(request.app.state, "app_mode", "hosted") == "local":
+        context = getattr(request.app.state, "default_context", None)
+        if context is None:
+            yield None
+        else:
+            with use_context(context):
+                yield context
+        return
     system_engine = getattr(request.app.state, "system_engine", None)
     if system_engine is None:
         yield None
@@ -216,7 +224,7 @@ def require_token(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings_dep),
 ) -> None:
-    """Accept a valid session cookie or the existing bearer/query token.
+    """Bypass auth locally; otherwise accept a session or bearer/query token.
 
     Accepts the token either in the ``Authorization: Bearer`` header or, as a
     fallback for clients that cannot set headers (``EventSource`` SSE, ``<a>``
@@ -225,6 +233,8 @@ def require_token(
     schema for every guarded route. Note: query-param tokens can appear in access
     logs — acceptable for a localhost single-user tool.
     """
+    if getattr(request.app.state, "app_mode", "hosted") == "local":
+        return
     if getattr(request.app.state, "system_engine", None) is not None:
         return
     from resume_agent.api.auth import (

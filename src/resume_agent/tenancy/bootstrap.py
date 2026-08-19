@@ -11,11 +11,62 @@ from resume_agent.tenancy.context import UserContext, new_user_id
 from resume_agent.tenancy.engines import EngineRegistry
 from resume_agent.tenancy.migrate import adopt_legacy_root, is_legacy_root
 from resume_agent.tenancy.system_db import User, utc_now
-from resume_agent.tenancy.workspace import effective_settings, provision_workspace
+from resume_agent.tenancy.workspace import (
+    effective_settings,
+    provision_workspace,
+    workspace_paths,
+)
 
 
 class BootstrapError(RuntimeError):
     pass
+
+
+def ensure_local_user(
+    data_root: Path | str, system_engine: Engine, settings: Settings
+) -> User:
+    """Return the one implicit local user without requiring login credentials.
+
+    Local mode keeps using the canonical workspace layout so a checkout can be
+    opened by the hosted server later, but it never performs tenant selection.
+    An existing administrator is the stable default. A fresh checkout receives
+    a local administrator whose empty password cannot be used for hosted login.
+    """
+
+    root = Path(data_root)
+    with Session(system_engine) as session:
+        admin = (
+            session.execute(
+                select(User).where(User.role == "admin").order_by(User.created_at)
+            )
+            .scalars()
+            .first()
+        )
+        if admin is None:
+            user_count = int(
+                session.execute(select(func.count()).select_from(User)).scalar_one()
+            )
+            if user_count:
+                raise BootstrapError("users table is non-empty but has no admin")
+            admin = User(
+                id=new_user_id(),
+                username=settings.auth_username.strip() or "local",
+                password_hash=settings.auth_password_hash,
+                email=settings.auth_email or None,
+                email_verified_at=utc_now() if settings.auth_email else None,
+                role="admin",
+            )
+            session.add(admin)
+            session.commit()
+            session.refresh(admin)
+        session.expunge(admin)
+
+    # A completed workspace wins over stale legacy children left at data/. This
+    # is what makes local restart tolerant of partially migrated old checkouts.
+    if is_legacy_root(root) and not workspace_paths(root, admin.id).db_file.is_file():
+        adopt_legacy_root(root, admin.id)
+    provision_workspace(root, admin.id)
+    return admin
 
 
 def ensure_bootstrapped(

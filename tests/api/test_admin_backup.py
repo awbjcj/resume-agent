@@ -22,7 +22,15 @@ def _app(tmp_path):
         "SESSION_SECRET=test-secret\n",
         encoding="utf-8",
     )
-    return create_app(db_url=db_url, data_dir=data_root, env_path=env), data_root
+    return (
+        create_app(
+            db_url=db_url,
+            app_mode="hosted",
+            data_dir=data_root,
+            env_path=env,
+        ),
+        data_root,
+    )
 
 
 def _login(client):
@@ -100,6 +108,7 @@ def test_admin_routes_are_guarded(tmp_path):
     )
     app = create_app(
         db_url=f"sqlite:///{(data_root / 'resume_agent.db').as_posix()}",
+        app_mode="hosted",
         data_dir=data_root,
         api_token="secret",
         env_path=env,

@@ -30,6 +30,10 @@ function wrap(ui: ReactNode, initialPath = "/") {
 describe("AuthGate", () => {
   it.each([
     { state: { username: null, authRequired: false }, label: "open mode" },
+    {
+      state: { username: "local", role: "admin", authRequired: false },
+      label: "local default-user mode",
+    },
     { state: { username: "owner", authRequired: true }, label: "signed in" },
   ])("renders children in $label", async ({ state }) => {
     server.use(http.get("/api/auth/me", () => HttpResponse.json(state)));

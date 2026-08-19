@@ -1,3 +1,5 @@
+from enum import Enum
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Literal, cast
 
@@ -56,6 +58,11 @@ app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline."
 profile_app = typer.Typer(help="Build and manage your fact-lock profile.")
 app.add_typer(profile_app, name="profile")
 app.add_typer(admin_app, name="admin")
+
+
+class ServeMode(str, Enum):
+    local = "local"
+    hosted = "hosted"
 
 
 _NO_LOCAL_CONTEXT_COMMANDS = {"serve", "admin"}
@@ -1603,13 +1610,29 @@ def serve_cmd(
     ),
     port: int = typer.Option(8000, help="Bind port."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
+    mode: ServeMode = typer.Option(
+        ServeMode.local,
+        help="Local bypasses account auth; hosted enables login and tenants.",
+    ),
 ) -> None:
     """Run the FastAPI backend (for the React frontend / API clients)."""
     import uvicorn
 
     from resume_agent.api.app import create_app
 
-    uvicorn.run(create_app(db_url=db_url), host=host, port=port)
+    normalized_host = host.strip().strip("[]")
+    try:
+        loopback = ip_address(normalized_host).is_loopback
+    except ValueError:
+        loopback = normalized_host.casefold() == "localhost"
+    if mode is ServeMode.local and not loopback:
+        raise typer.BadParameter(
+            "local mode has no authentication and must bind to a loopback host; "
+            "use --mode hosted to expose the server"
+        )
+    uvicorn.run(
+        create_app(db_url=db_url, app_mode=mode.value), host=host, port=port
+    )
 
 
 if __name__ == "__main__":
