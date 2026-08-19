@@ -92,6 +92,7 @@ def tailor(
         skill_matrix=skill_matrix,
         cluster_map=taxonomy.cluster_map,
         model=model,
+        taxonomy=taxonomy,
     )
     for job_id in outcome.versions:
         export_job_artifacts(session, job_id)

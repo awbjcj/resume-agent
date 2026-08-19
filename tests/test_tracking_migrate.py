@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import text
 
 from resume_agent.db import init_db, make_engine
+from resume_agent.api.schemas.jobs import ResumeVersionOut
 from resume_agent.tracking.migrate import (
     ensure_application_cover_letter_id_column,
     ensure_cover_letter_revision_columns,
@@ -9,6 +10,7 @@ from resume_agent.tracking.migrate import (
     ensure_resume_version_evidence_portfolio_columns,
     ensure_resume_version_gate_reviewers_column,
     ensure_resume_version_revision_columns,
+    ensure_resume_version_taxonomy_columns,
 )
 from resume_agent.career_skills.models import read_job_analysis_meta, read_skill_uses
 
@@ -194,6 +196,76 @@ def test_evidence_portfolio_migration_is_additive_null_and_idempotent():
 
     assert {"evidence_portfolio_json", "evidence_portfolio_status"}.issubset(cols)
     assert values == (None, None)
+
+
+def test_resume_version_taxonomy_migration_is_additive_and_idempotent():
+    engine = make_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE resume_versions ("
+                "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
+            )
+        )
+        conn.execute(
+            text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)")
+        )
+
+    ensure_resume_version_taxonomy_columns(engine)
+    ensure_resume_version_taxonomy_columns(engine)
+
+    with engine.begin() as conn:
+        cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
+        values = conn.execute(
+            text(
+                "SELECT taxonomy_revision, taxonomy_manifest_json "
+                "FROM resume_versions"
+            )
+        ).one()
+
+    assert {"taxonomy_revision", "taxonomy_manifest_json"}.issubset(cols)
+    assert values == (None, None)
+
+
+def test_init_db_upgrades_legacy_resume_versions_with_taxonomy_columns():
+    engine = make_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE resume_versions ("
+                "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
+            )
+        )
+
+    init_db(engine)
+
+    with engine.begin() as conn:
+        cols = [
+            row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))
+        ]
+
+    assert {"taxonomy_revision", "taxonomy_manifest_json"}.issubset(cols)
+
+
+def test_legacy_resume_version_reports_revision_unknown():
+    version = ResumeVersionOut.model_validate(
+        {
+            "id": 1,
+            "jobId": 1,
+            "round": 0,
+            "reviewScore": None,
+            "factCheckPassed": False,
+            "pdfPath": None,
+            "critiqueJson": None,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "taxonomyRevision": None,
+        }
+    )
+
+    assert version.revision_unknown is True
+    assert "taxonomyRevision" not in version.model_dump(by_alias=True)
 
 
 def test_agent_metadata_migration_is_additive_and_idempotent():

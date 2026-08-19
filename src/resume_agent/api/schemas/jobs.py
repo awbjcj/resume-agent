@@ -128,6 +128,10 @@ class ResumeVersionOut(CamelModel):
     failed_gates: list[str] = Field(default_factory=list)
     evidence_portfolio_status: str | None = None
     has_evidence_portfolio: bool = False
+    # Stored provenance is not exposed directly, but drives the public signal
+    # that a legacy version predates taxonomy revision recording.
+    taxonomy_revision: str | None = Field(default=None, exclude=True)
+    revision_unknown: bool = True
     # The round's OWN recorded gate roster (`ResumeVersion.gate_reviewers_json`).
     # None means a row written before this field existed - unknown, not empty -
     # and `apply_gate_names` treats that as the signal to fall back to a
@@ -151,6 +155,7 @@ class ResumeVersionOut(CamelModel):
             self.gate_reviewers_json,
         )
         self.has_evidence_portfolio = self.evidence_portfolio_status is not None
+        self.revision_unknown = self.taxonomy_revision is None
         return self
 
     def apply_gate_names(self, gate_names: Iterable[str]) -> None:

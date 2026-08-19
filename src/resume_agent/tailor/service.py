@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from sqlmodel import Session
 
@@ -26,6 +26,7 @@ from resume_agent.tailor.workflow import (
     TailorWorkflow,
 )
 from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.tracking.repository import (
     resume_versions_for_job,
     save_job,
@@ -61,6 +62,7 @@ def _persist_rounds(
     tailor_agent: Runner | None = None,
     reviser_agent: Runner | None = None,
     reviewer_agents: Mapping[str, Runner] | None = None,
+    taxonomy: EffectiveTaxonomy | None = None,
 ) -> list[ResumeVersion]:
     """Persist each review round as a ResumeVersion and mark the job tailored.
 
@@ -97,6 +99,10 @@ def _persist_rounds(
                 else None
             ),
             gate_reviewers_json=gate_reviewers,
+            taxonomy_revision=(taxonomy.semantic_revision if taxonomy is not None else None),
+            taxonomy_manifest_json=(
+                asdict(taxonomy.manifest) if taxonomy is not None else None
+            ),
         )
         raw_uses: object = None
         if (
@@ -141,6 +147,7 @@ def tailor_job(
     match_plan_agent: Runner | None = None,
     skill_context: SkillMatchContext | None = None,
     evidence_portfolio_agent: Runner | None = None,
+    taxonomy: EffectiveTaxonomy | None = None,
 ) -> list[ResumeVersion]:
     """Run the loop for one job and persist each round. Marks the job tailored."""
     if job.id is None:
@@ -173,6 +180,7 @@ def tailor_job(
         tailor_agent=tailor_agent,
         reviser_agent=reviser_agent,
         reviewer_agents=reviewer_agents,
+        taxonomy=taxonomy,
     )
 
 
@@ -190,6 +198,7 @@ def tailor_jobs(
     cluster_map: ClusterMap | None = None,
     model: str | None = None,
     evidence_portfolio_agent: Runner | None = None,
+    taxonomy: EffectiveTaxonomy | None = None,
 ) -> TailorOutcome:
     """Tailor targets concurrently, then persist successful jobs serially."""
     for job in targets:
@@ -263,6 +272,7 @@ def tailor_jobs(
                 tailor_agent=tailor_agent,
                 reviser_agent=reviser_agent,
                 reviewer_agents=reviewer_agents,
+                taxonomy=taxonomy,
             )
     if reporter:
         reporter.done()

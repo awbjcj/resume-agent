@@ -337,6 +337,30 @@ def ensure_resume_version_evidence_portfolio_columns(engine: Engine) -> None:
             )
 
 
+def ensure_resume_version_taxonomy_columns(engine: Engine) -> None:
+    """Idempotently add taxonomy provenance columns to ``resume_versions``.
+
+    This is distinct from ``ensure_resume_version_revision_columns``, which
+    adds resume-lineage fields rather than the taxonomy snapshot used to create
+    a version.
+    """
+    cols = _table_columns(engine, "resume_versions")
+    if not cols:
+        return
+    with engine.begin() as conn:
+        if "taxonomy_revision" not in cols:
+            conn.execute(
+                text("ALTER TABLE resume_versions ADD COLUMN taxonomy_revision VARCHAR")
+            )
+        if "taxonomy_manifest_json" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE resume_versions "
+                    "ADD COLUMN taxonomy_manifest_json JSON"
+                )
+            )
+
+
 def ensure_agent_metadata_columns(engine: Engine) -> None:
     """Idempotently add nullable skill and agent-run provenance columns."""
     jobs = _table_columns(engine, "jobs")

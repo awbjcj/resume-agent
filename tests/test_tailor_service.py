@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -7,6 +9,8 @@ from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
 from resume_agent.tailor.service import tailor_job, tailor_jobs
+from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.tracking.repository import resume_versions_for_job, save_job
 from resume_agent.tracking.tables import Job, JobStatus
 
@@ -64,6 +68,9 @@ def test_tailor_job_persists_versions_and_marks_tailored():
     tailor_agent = _ContentAgent()
     reviewer = _FactCheck()
     reviser_agent = _ContentAgent()
+    taxonomy = EffectiveTaxonomy.from_parts(
+        ClusterMap(aliases={"js": "javascript"})
+    )
     with _session() as s:
         job = save_job(
             s,
@@ -82,6 +89,7 @@ def test_tailor_job_persists_versions_and_marks_tailored():
             tailor_agent=tailor_agent,
             reviewer_agents={"fact-check": reviewer},
             reviser_agent=reviser_agent,
+            taxonomy=taxonomy,
         )
 
         assert len(versions) == 1
@@ -92,6 +100,8 @@ def test_tailor_job_persists_versions_and_marks_tailored():
         # Recorded from THIS round's config, not read back from current
         # settings later - see test_apply_gate_names_does_not_relabel_*.
         assert versions[0].gate_reviewers_json == ["fact-check"]
+        assert versions[0].taxonomy_revision == taxonomy.semantic_revision
+        assert versions[0].taxonomy_manifest_json == asdict(taxonomy.manifest)
 
         stored = resume_versions_for_job(s, _require_id(job.id))
         assert len(stored) == 1
