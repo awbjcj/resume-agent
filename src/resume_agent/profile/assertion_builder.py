@@ -7,15 +7,17 @@ import json
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+from typing import cast
 
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.assertions import (
     ASSERTION_POLICY_REVISION,
     CapabilityAssertion,
+    LegacySkillCategory,
     LegacyAssertionProjection,
 )
-from resume_agent.taxonomy.graph_adapter import legacy_concept_id
 from resume_agent.taxonomy.graph_models import ConceptType
+from resume_agent.taxonomy.identity import legacy_concept_id
 from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.taxonomy.term_typing import (
     TERM_TYPING_POLICY_REVISION,
@@ -32,7 +34,7 @@ class _Candidate:
     key: str
     display: str
     aliases: set[str] = field(default_factory=set)
-    category: str | None = None
+    category: LegacySkillCategory | None = None
     contexts: list[str] = field(default_factory=list)
     literal_ids: set[str] = field(default_factory=set)
     source_skill_ids: list[str] = field(default_factory=list)
@@ -147,6 +149,11 @@ def build_capability_assertions(
 ) -> list[CapabilityAssertion]:
     today = today or datetime.now(timezone.utc).date()
     aliases = taxonomy.cluster_map.aliases
+    category_overrides = {
+        aliases.get(token, token): category
+        for value, category in taxonomy.category_overrides.items()
+        if (token := normalize_skill(value))
+    }
     candidates: dict[str, _Candidate] = {}
     known_ids = _known_fact_ids(facts.model_dump(mode="json"))
     missing_ids: set[str] = set()
@@ -259,9 +266,9 @@ def build_capability_assertions(
         else:
             status = "self_reported"
             claimability = "self_reported_unverified"
-        category_override = taxonomy.category_overrides.get(candidate.key)
-        category = (
-            category_override
+        category_override = category_overrides.get(candidate.key)
+        category: LegacySkillCategory | None = (
+            cast(LegacySkillCategory, category_override)
             if category_override in ("hard", "soft", "domain")
             else candidate.category
         )

@@ -29,6 +29,7 @@ Claimability = Literal[
     "disputed",
 ]
 ProficiencyLevel = Literal[1, 2, 3, 4, 5]
+LegacySkillCategory = Literal["hard", "soft", "domain"]
 Autonomy = Literal["guided", "independent", "leading", "strategic"]
 Complexity = Literal["routine", "varied", "complex", "novel"]
 Scope = Literal["individual", "team", "organization", "ecosystem"]
@@ -40,7 +41,7 @@ class LegacyAssertionProjection(ExtensibleModel):
     key: str
     display: str
     aliases: list[str] = Field(default_factory=list)
-    category: Literal["hard", "soft", "domain"] | None = None
+    category: LegacySkillCategory | None = None
     inferred: bool = False
     strength: float = 0.0
 

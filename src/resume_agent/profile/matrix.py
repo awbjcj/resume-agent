@@ -3,7 +3,6 @@
 import hashlib
 import json
 import os
-import re
 import tempfile
 from collections.abc import Mapping
 from dataclasses import asdict
@@ -17,6 +16,11 @@ from pydantic import Field, field_validator
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
+from resume_agent.profile.assertion_builder import build_capability_assertions
+from resume_agent.profile.assertions import (
+    ASSERTION_POLICY_REVISION,
+    CapabilityAssertion,
+)
 from resume_agent.profile.group_corrections import (
     corrections_path,
     load_group_corrections,
@@ -29,8 +33,13 @@ from resume_agent.taxonomy.groups import (
     load_group_map,
     sanitize_group_map,
 )
+from resume_agent.profile.projections import (
+    UccmProfileProjection,
+    build_profile_projection,
+)
 from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.taxonomy.skills import split_skills
+from resume_agent.taxonomy.term_typing import TERM_TYPING_POLICY_REVISION
 from resume_agent.tracking.match_gap import normalize_skill
 
 DEFAULT_MATRIX_PATH = "data/profile/matrix.json"
@@ -107,6 +116,10 @@ class SkillMatrix(ExtensibleModel):
     canonical_map_sha256: str = ""
     taxonomy_revision: str = ""
     taxonomy_manifest: TaxonomyManifestModel | None = None
+    assertion_policy_revision: str = ""
+    term_typing_policy_revision: str = ""
+    assertions: list[CapabilityAssertion] = Field(default_factory=list)
+    uccm_profile: UccmProfileProjection | None = None
     rows: list[MatrixRow] = Field(default_factory=list)
 
 
@@ -276,41 +289,6 @@ def build_skill_match_context(
     return SkillMatchContext(matches=matches)
 
 
-_YEAR_IN_DATE = re.compile(r"(?:19|20)\d{2}")
-
-
-def _date_year(value: str | None) -> int | None:
-    match = _YEAR_IN_DATE.search(value or "")
-    return int(match.group()) if match else None
-
-
-def _recency(last_used: str | None, today: date) -> float:
-    if last_used in (None, "current"):
-        return 1.0
-    year = _date_year(last_used)
-    if year is None:
-        return 1.0
-    return max(0.25, 1.0 - 0.15 * max(0, today.year - year))
-
-
-def _owner_end(owner) -> str | None:
-    if getattr(owner, "current", False):
-        return "current"
-    end = getattr(owner, "end", None)
-    return str(end) if end is not None else None
-
-
-def _later(first: str | None, second: str | None) -> str | None:
-    if first == "current" or second == "current":
-        return "current"
-    values = [value for value in (first, second) if value is not None]
-    return max(
-        values,
-        key=lambda value: (_date_year(value) or -1, value),
-        default=None,
-    )
-
-
 def build_matrix(
     facts: ProfileFacts,
     taxonomy: EffectiveTaxonomy,
@@ -319,107 +297,20 @@ def build_matrix(
 ) -> SkillMatrix:
     today = today or datetime.now(timezone.utc).date()
     effective = taxonomy.cluster_map
-    aliases = effective.aliases
-    banned = taxonomy.banned_keys
-    category_overrides = {
-        aliases.get(token, token): category
-        for value, category in taxonomy.category_overrides.items()
-        if (token := normalize_skill(value))
-    }
-
-    rows: dict[str, MatrixRow] = {}
-    literal_keys: set[str] = set()
-    strength_ids: dict[str, set[str]] = {}
-    for skills in facts.skills.values():
-        for skill in skills:
-            token = normalize_skill(skill.name)
-            key = aliases.get(token, token)
-            if not key or key in banned:
-                continue
-            row = rows.setdefault(key, MatrixRow(key=key, display=skill.name))
-            evidence_strength = strength_ids.setdefault(key, set())
-            if skill.inferred:
-                evidence_strength.update(skill.evidence_fact_ids)
-            else:
-                literal_keys.add(key)
-                evidence_strength.add(skill.id)
-            row.aliases = sorted(
-                set(row.aliases)
-                | {alias for alias in skill.aliases if normalize_skill(alias) != key}
-                | {
-                    alias_token
-                    for alias_token, head in aliases.items()
-                    if head == key and alias_token != key
-                }
-            )
-            if skill.category is not None:
-                row.category = skill.category
-            row.evidence_fact_ids = list(
-                dict.fromkeys(
-                    [*row.evidence_fact_ids, skill.id, *skill.evidence_fact_ids]
-                )
-            )
-
-    owners = [*facts.experience, *facts.projects]
-    owner_by_fact_id = {
-        fact_id: owner
-        for owner in owners
-        for fact_id in (
-            owner.id,
-            *(bullet.id for bullet in getattr(owner, "bullets", [])),
+    assertions = build_capability_assertions(facts, taxonomy, today=today)
+    rows = [
+        MatrixRow(
+            key=(projection := assertion.legacy_projection).key,
+            display=projection.display,
+            aliases=projection.aliases,
+            category=projection.category,
+            inferred=projection.inferred,
+            evidence_fact_ids=assertion.evidence_fact_ids,
+            strength=projection.strength,
+            last_used=assertion.last_used,
         )
-    }
-    for row in rows.values():
-        row.inferred = row.key not in literal_keys
-        needles = {
-            row.key,
-            normalize_skill(row.display),
-            *map(normalize_skill, row.aliases),
-        }
-        needles.discard("")
-        for owner in owners:
-            technology = {normalize_skill(item) for item in getattr(owner, "tech", [])}
-            technology_hit = bool(needles & technology)
-            bullet_hits: list[str] = []
-            for bullet in getattr(owner, "bullets", []):
-                text = normalize_skill(bullet.text)
-                if any(f" {needle} " in f" {text} " for needle in needles):
-                    if bullet.id not in row.evidence_fact_ids:
-                        row.evidence_fact_ids.append(bullet.id)
-                    bullet_hits.append(bullet.id)
-            if bullet_hits:
-                strength_ids[row.key].update(bullet_hits)
-            elif technology_hit:
-                if owner.id not in row.evidence_fact_ids:
-                    row.evidence_fact_ids.append(owner.id)
-                strength_ids[row.key].add(owner.id)
-
-        for owner in owners:
-            bullet_ids = {bullet.id for bullet in getattr(owner, "bullets", [])}
-            if owner.id in strength_ids[row.key] and strength_ids[row.key] & bullet_ids:
-                strength_ids[row.key].discard(owner.id)
-
-        for fact_id in strength_ids[row.key]:
-            owner = owner_by_fact_id.get(fact_id)
-            if owner is not None:
-                row.last_used = _later(row.last_used, _owner_end(owner))
-
-    for row in rows.values():
-        override_category = category_overrides.get(row.key)
-        if override_category in ("hard", "soft", "domain"):
-            row.category = override_category
-        row.strength = round(
-            sum(
-                _recency(
-                    _owner_end(owner_by_fact_id[fact_id])
-                    if fact_id in owner_by_fact_id
-                    else None,
-                    today,
-                )
-                for fact_id in strength_ids[row.key]
-            ),
-            2,
-        )
+        for assertion in assertions
+    ]
 
     return SkillMatrix(
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -427,7 +318,11 @@ def build_matrix(
         canonical_map_sha256=canonical_map_sha256(effective),
         taxonomy_revision=taxonomy.semantic_revision,
         taxonomy_manifest=TaxonomyManifestModel(**asdict(taxonomy.manifest)),
-        rows=sorted(rows.values(), key=lambda row: (-row.strength, row.key)),
+        assertion_policy_revision=ASSERTION_POLICY_REVISION,
+        term_typing_policy_revision=TERM_TYPING_POLICY_REVISION,
+        assertions=assertions,
+        uccm_profile=build_profile_projection(assertions, taxonomy),
+        rows=sorted(rows, key=lambda row: (-row.strength, row.key)),
     )
 
 

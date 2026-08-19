@@ -6,7 +6,6 @@ import hashlib
 import json
 from collections.abc import Mapping
 from typing import Literal
-from urllib.parse import quote
 
 from resume_agent.profile.matrix import Overrides
 from resume_agent.taxonomy.clusters import ClusterMap
@@ -26,6 +25,7 @@ from resume_agent.taxonomy.graph_validation import (
     GraphValidationError,
     validate_capability_graph,
 )
+from resume_agent.taxonomy.identity import legacy_concept_id
 from resume_agent.taxonomy.uccm_seeds import (
     UCCM_MODEL_VERSION,
     UCCM_SOURCE,
@@ -58,14 +58,6 @@ CorrectionOperation = Literal[
     "set_profile_category",
     "set_profile_group",
 ]
-
-
-def legacy_concept_id(token: str) -> str:
-    """Return the stable graph ID for one normalized legacy skill token."""
-    normalized = normalize_skill(token)
-    if not normalized:
-        raise ValueError("legacy concept token must normalize to a non-empty value")
-    return f"legacy:skill:{quote(normalized, safe='')}"
 
 
 def _stable_id(namespace: str, payload: object) -> str:

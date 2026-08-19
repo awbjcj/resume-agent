@@ -190,6 +190,48 @@ def test_build_matrix_pins_the_semantic_revision():
     assert [row.key for row in matrix.rows] == ["python"]
 
 
+def test_matrix_persists_assertions_and_derives_legacy_rows_from_them():
+    facts = _facts()
+    matrix = build_matrix(
+        facts,
+        _taxonomy(ClusterMap.empty()),
+        today=date(2026, 7, 1),
+    )
+
+    assert matrix.assertion_policy_revision == "profile-assertions-v1"
+    assert matrix.term_typing_policy_revision == "term-typing-v1"
+    assert {item.legacy_projection.key for item in matrix.assertions} == {
+        row.key for row in matrix.rows
+    }
+    assertions_by_key = {
+        item.legacy_projection.key: item for item in matrix.assertions
+    }
+    for row in matrix.rows:
+        projection = assertions_by_key[row.key].legacy_projection
+        assert row.display == projection.display
+        assert row.aliases == projection.aliases
+        assert row.category == projection.category
+        assert row.inferred == projection.inferred
+        assert row.strength == projection.strength
+        assert row.evidence_fact_ids == assertions_by_key[row.key].evidence_fact_ids
+        assert row.last_used == assertions_by_key[row.key].last_used
+
+
+def test_old_matrix_without_assertions_remains_readable(tmp_path):
+    path = tmp_path / "legacy-matrix.json"
+    path.write_text(
+        '{"rows":[{"key":"python","display":"Python"}]}',
+        encoding="utf-8",
+    )
+
+    loaded = load_matrix(path)
+
+    assert loaded is not None
+    assert loaded.assertions == []
+    assert loaded.assertion_policy_revision == ""
+    assert loaded.term_typing_policy_revision == ""
+
+
 def test_build_matrix_persists_the_complete_capability_revision(tmp_path):
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()

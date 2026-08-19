@@ -83,6 +83,14 @@ def test_run_corpus_build_derives_groups_from_the_shared_taxonomy_tree(
     assert matrix.taxonomy_revision == build_effective_taxonomy(
         profile_dir
     ).semantic_revision
+    assert matrix.assertions
+    assert all(
+        assertion.facts_revision == matrix.facts_sha256
+        and assertion.taxonomy_revision == matrix.taxonomy_revision
+        for assertion in matrix.assertions
+    )
+    assert matrix.uccm_profile is not None
+    assert len(matrix.uccm_profile.layers) == 6
     assert {row.key: row.group for row in matrix.rows} == {
         "kubernetes": "cloud-infra",
         "python": "languages",
