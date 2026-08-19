@@ -33,6 +33,7 @@ from resume_agent.profile.group_corrections import (
 )
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.taxonomy.groups import group_map_path, save_group_map
+from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 
 
 def _facts():
@@ -62,10 +63,20 @@ def _facts():
     )
 
 
+def _taxonomy(
+    cluster_map: ClusterMap | None = None,
+    overrides: Overrides | None = None,
+) -> EffectiveTaxonomy:
+    return EffectiveTaxonomy.from_parts(
+        cluster_map if cluster_map is not None else ClusterMap.empty(),
+        overrides=overrides,
+    )
+
+
 def test_matrix_rows_are_canonical_with_deduplicated_evidence_and_recency():
     facts = _facts()
     matrix = build_matrix(
-        facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1)
+        facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1)
     )
     kubernetes = next(row for row in matrix.rows if row.key == "kubernetes")
     bullet = facts.experience[0].bullets[0]
@@ -82,7 +93,7 @@ def test_matrix_inferred_means_inferred_only():
     facts = _facts()
     facts.skills["soft"].append(Skill(name="K8s", aliases=["Mentorship"]))
     cluster_map = ClusterMap(aliases={"mentorship": "k8s", "k8s": "k8s"})
-    matrix = build_matrix(facts, cluster_map, Overrides(), today=date(2026, 7, 1))
+    matrix = build_matrix(facts, _taxonomy(cluster_map), today=date(2026, 7, 1))
     row = next(item for item in matrix.rows if item.key == "k8s")
     assert row.inferred is False
 
@@ -90,7 +101,7 @@ def test_matrix_inferred_means_inferred_only():
 def test_overrides_ban_and_category():
     overrides = Overrides(ban=["mentorship"], category={"kubernetes": "hard"})
     matrix = build_matrix(
-        _facts(), ClusterMap.empty(), overrides, today=date(2026, 7, 1)
+        _facts(), _taxonomy(ClusterMap.empty(), overrides), today=date(2026, 7, 1)
     )
     assert "mentorship" not in [row.key for row in matrix.rows]
     assert (
@@ -129,9 +140,11 @@ def test_override_tokens_covers_alias_forbid_and_category():
 
 def test_matrix_deterministic_and_round_trips(tmp_path):
     facts = _facts()
-    first = build_matrix(facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1))
+    first = build_matrix(
+        facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1)
+    )
     second = build_matrix(
-        facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1)
+        facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1)
     )
     assert [(row.key, row.strength) for row in first.rows] == [
         (row.key, row.strength) for row in second.rows
@@ -147,14 +160,97 @@ def test_matrix_deterministic_and_round_trips(tmp_path):
 
 def test_load_matrix_rejects_different_facts_or_effective_map(tmp_path):
     original = _facts()
-    effective = effective_cluster_map(ClusterMap.empty(), Overrides())
+    taxonomy = _taxonomy(ClusterMap.empty())
     path = tmp_path / "matrix.json"
-    save_matrix(build_matrix(original, effective, Overrides()), path)
+    save_matrix(build_matrix(original, taxonomy), path)
     changed = original.model_copy(deep=True)
     changed.skills["Platforms"][0].name = "Nomad"
     assert load_matrix(path, facts=changed) is None
     changed_map = ClusterMap(aliases={"k8s": "kubernetes"})
-    assert load_matrix(path, facts=original, cluster_map=changed_map) is None
+    assert load_matrix(path, facts=original, taxonomy=_taxonomy(changed_map)) is None
+
+
+def test_build_matrix_pins_the_semantic_revision():
+    facts = ProfileFacts(
+        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
+    )
+    taxonomy = EffectiveTaxonomy.from_parts(
+        ClusterMap(aliases={"py": "python"})
+    )
+
+    matrix = build_matrix(facts, taxonomy)
+
+    assert matrix.taxonomy_revision == taxonomy.semantic_revision
+    assert matrix.taxonomy_manifest is not None
+    assert [row.key for row in matrix.rows] == ["python"]
+
+
+def test_load_matrix_rebuilds_a_legacy_matrix_with_no_revision(tmp_path):
+    """A pre-contract cache is unknown even if its legacy hash looks fresh."""
+    path = tmp_path / "matrix.json"
+    save_matrix(SkillMatrix(rows=[MatrixRow(key="python", display="Python")]), path)
+    taxonomy = EffectiveTaxonomy.from_parts(
+        ClusterMap(aliases={"py": "python"})
+    )
+
+    assert load_matrix(path, taxonomy=taxonomy) is None
+
+
+def test_load_matrix_accepts_a_matching_revision(tmp_path):
+    facts = ProfileFacts(
+        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
+    )
+    taxonomy = EffectiveTaxonomy.from_parts(
+        ClusterMap(aliases={"py": "python"})
+    )
+    path = tmp_path / "matrix.json"
+    save_matrix(build_matrix(facts, taxonomy), path)
+
+    assert load_matrix(path, taxonomy=taxonomy) is not None
+
+
+def test_a_regroup_timestamp_does_not_invalidate_a_saved_matrix(tmp_path):
+    from resume_agent.taxonomy.state import GroupingStatus, TaxonomyState
+
+    facts = ProfileFacts(
+        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
+    )
+    cluster_map = ClusterMap(aliases={"py": "python"})
+    before = EffectiveTaxonomy.from_parts(cluster_map)
+    path = tmp_path / "matrix.json"
+    save_matrix(build_matrix(facts, before), path)
+    after = EffectiveTaxonomy.from_parts(
+        cluster_map,
+        state=TaxonomyState(
+            grouping_status={"rust": GroupingStatus(reason="uncertain")}
+        ),
+    )
+
+    assert load_matrix(path, taxonomy=after) is not None
+
+
+def test_a_ban_does_invalidate_a_saved_matrix(tmp_path):
+    facts = ProfileFacts(
+        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
+    )
+    cluster_map = ClusterMap(aliases={"py": "python"})
+    path = tmp_path / "matrix.json"
+    save_matrix(build_matrix(facts, EffectiveTaxonomy.from_parts(cluster_map)), path)
+    banned = EffectiveTaxonomy.from_parts(
+        cluster_map, overrides=Overrides(ban=["python"])
+    )
+
+    assert load_matrix(path, taxonomy=banned) is None
+
+
+def test_canonical_map_sha256_is_still_written_for_old_readers():
+    facts = ProfileFacts(
+        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
+    )
+
+    matrix = build_matrix(facts, EffectiveTaxonomy.from_parts(ClusterMap()))
+
+    assert matrix.canonical_map_sha256
 
 
 def test_undated_project_has_unknown_last_used():
@@ -164,7 +260,7 @@ def test_undated_project_has_unknown_last_used():
         projects=[project],
         skills={"Frameworks": [Skill(name="FastAPI")]},
     )
-    matrix = build_matrix(facts, ClusterMap.empty(), Overrides())
+    matrix = build_matrix(facts, _taxonomy(ClusterMap.empty()))
     assert matrix.rows[0].last_used is None
 
 
@@ -187,7 +283,7 @@ def test_explicit_bullet_and_owner_evidence_count_as_one_signal():
             ]
         },
     )
-    matrix = build_matrix(facts, ClusterMap.empty(), Overrides())
+    matrix = build_matrix(facts, _taxonomy(ClusterMap.empty()))
     assert matrix.rows[0].strength == 1.0
 
 
@@ -252,7 +348,7 @@ def test_apply_groups_uses_taxonomy_and_alias_aware_override_precedence():
     apply_skill_groups(
         matrix,
         {"python": "languages", "kubernetes": "cloud-infra"},
-        overrides,
+        overrides.group,
     )
     assert {row.key: row.group for row in matrix.rows} == {
         "python": "languages",
@@ -271,7 +367,7 @@ def test_group_validation_drops_unknown_values_without_expanding_override_tokens
     assert matrix.rows[0].group is None
     assert overrides.group == {"python": "ai-ml"}
     assert "python" not in override_tokens(overrides)
-    apply_skill_groups(matrix, {"python": "invented"}, Overrides())
+    apply_skill_groups(matrix, {"python": "invented"}, Overrides().group)
     assert matrix.rows[0].group is None
 
 
@@ -281,7 +377,7 @@ def test_apply_groups_correction_beats_override_and_taxonomy():
     apply_skill_groups(
         matrix,
         {"python": "languages"},
-        Overrides(group={"python": "frontend-web"}),
+        Overrides(group={"python": "frontend-web"}).group,
         corrections={"python": "ai-ml"},
     )
 
@@ -303,7 +399,7 @@ def test_apply_groups_records_override_taxonomy_and_none_sources():
     apply_skill_groups(
         matrix,
         {"python": "languages"},
-        Overrides(group={"sql": "databases-storage"}),
+        Overrides(group={"sql": "databases-storage"}).group,
     )
 
     by_key = {row.key: row for row in matrix.rows}
@@ -328,7 +424,7 @@ def test_apply_groups_uses_aliases_for_corrections_and_taxonomy():
     apply_skill_groups(
         matrix,
         {"k8s": "cloud-infra"},
-        Overrides(),
+        Overrides().group,
         corrections={"postgres": "databases-storage"},
     )
 
@@ -360,11 +456,11 @@ def test_decorated_matrix_uses_the_canonical_tree_then_overrides_and_corrections
     save_cluster_map(tree, profile_dir / "cluster_map.json")
     # A conflicting legacy map must not override a canonical tree that exists.
     save_group_map({"python": "ai-ml"}, group_map_path(profile_dir))
-    matrix = build_matrix(facts, tree, Overrides())
+    overrides = Overrides(group={"python": "frontend-web"})
+    taxonomy = _taxonomy(tree, overrides)
+    matrix = build_matrix(facts, taxonomy)
 
-    decorate_matrix_groups(
-        matrix, profile_dir, Overrides(group={"python": "frontend-web"})
-    )
+    decorate_matrix_groups(matrix, profile_dir, taxonomy)
     assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
         "frontend-web",
         "override",
@@ -376,9 +472,7 @@ def test_decorated_matrix_uses_the_canonical_tree_then_overrides_and_corrections
         ),
         corrections_path(profile_dir),
     )
-    decorate_matrix_groups(
-        matrix, profile_dir, Overrides(group={"python": "frontend-web"})
-    )
+    decorate_matrix_groups(matrix, profile_dir, taxonomy)
     assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
         "databases-storage",
         "correction",
