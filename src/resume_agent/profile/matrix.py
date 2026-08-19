@@ -37,6 +37,8 @@ from resume_agent.profile.projections import (
     UccmProfileProjection,
     build_profile_projection,
 )
+from resume_agent.profile.requirement_facts import build_requirement_facts
+from resume_agent.matching.models import VerifiedRequirementFact
 from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.taxonomy.skills import split_skills
 from resume_agent.taxonomy.term_typing import TERM_TYPING_POLICY_REVISION
@@ -120,6 +122,9 @@ class SkillMatrix(ExtensibleModel):
     term_typing_policy_revision: str = ""
     assertions: list[CapabilityAssertion] = Field(default_factory=list)
     uccm_profile: UccmProfileProjection | None = None
+    verified_requirement_facts: list[VerifiedRequirementFact] = Field(
+        default_factory=list
+    )
     rows: list[MatrixRow] = Field(default_factory=list)
 
 
@@ -322,6 +327,7 @@ def build_matrix(
         term_typing_policy_revision=TERM_TYPING_POLICY_REVISION,
         assertions=assertions,
         uccm_profile=build_profile_projection(assertions, taxonomy),
+        verified_requirement_facts=build_requirement_facts(facts),
         rows=sorted(rows, key=lambda row: (-row.strength, row.key)),
     )
 
