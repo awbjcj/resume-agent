@@ -16,6 +16,7 @@ from resume_agent.llm_runner import (
     retry_kwargs,
     use_json_mode_for,
 )
+from resume_agent.prompts.guidance import with_guidance
 from resume_agent.taxonomy.term_typing import (
     TERM_TYPING_POLICY_REVISION,
     TermSource,
@@ -63,7 +64,7 @@ def build_term_type_assistant(model_id: str | None = None) -> ModelTermTypeAssis
         Agent(
             model=model,
             description="Conservatively type one ambiguous career term.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("term-type-assistant", _INSTRUCTIONS),
             output_schema=TermTypeSuggestion,
             use_json_mode=use_json_mode_for(model, TermTypeSuggestion),
             **retry_kwargs(),
