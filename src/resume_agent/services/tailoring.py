@@ -8,11 +8,8 @@ from sqlmodel import Session
 from resume_agent.career_skills.models import ResumeAuthoringSkillName
 from resume_agent.career_skills.registry import CareerSkillRegistry
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.matrix import (
-    effective_cluster_map,
-    load_matrix,
-    load_overrides,
-)
+from resume_agent.profile.effective import build_effective_taxonomy
+from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
@@ -23,7 +20,6 @@ from resume_agent.tailor.service import TailorOutcome, tailor_jobs
 from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.tracking.repository import get_job, jobs_by_status
 from resume_agent.tracking.tables import Job, JobStatus
-from resume_agent.taxonomy.clusters import load_cluster_map
 from resume_agent.tenancy.limits import enforce_active_budget
 from resume_agent.tenancy.paths import (
     FACTS_PATH as DEFAULT_FACTS,
@@ -63,13 +59,10 @@ def tailor(
     enforce_active_budget()
     facts = load_facts(facts_path)
     profile_dir = resolve_tenant_path(facts_path).parent
-    overrides = load_overrides(profile_dir / "overrides.yaml")
-    cluster_map = effective_cluster_map(
-        load_cluster_map(profile_dir / "cluster_map.json"), overrides
-    )
+    taxonomy = build_effective_taxonomy(profile_dir)
     matrix_facts = facts if isinstance(facts, ProfileFacts) else None
     skill_matrix = load_matrix(
-        profile_dir / "matrix.json", facts=matrix_facts, cluster_map=cluster_map
+        profile_dir / "matrix.json", facts=matrix_facts, taxonomy=taxonomy
     )
     style_guide = load_style_guide(config.style_guide_path)
     if authoring_skill is None and registry is None:
@@ -97,7 +90,7 @@ def tailor(
         # evidence-portfolio rename. `tailor_jobs` resolves it as the planner.
         match_plan_agent=bundle.evidence_portfolio or bundle.match_plan,
         skill_matrix=skill_matrix,
-        cluster_map=cluster_map,
+        cluster_map=taxonomy.cluster_map,
         model=model,
     )
     for job_id in outcome.versions:

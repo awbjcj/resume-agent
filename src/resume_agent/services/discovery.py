@@ -36,12 +36,8 @@ from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.models import H1BEnrichmentReport, H1BSponsorshipEvidence
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.matrix import (
-    SkillMatrix,
-    effective_cluster_map,
-    load_matrix,
-    load_overrides,
-)
+from resume_agent.profile.effective import build_effective_taxonomy
+from resume_agent.profile.matrix import SkillMatrix, load_matrix
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
 from resume_agent.services.agents import (
@@ -49,7 +45,7 @@ from resume_agent.services.agents import (
     build_discovery_bundle,
     build_url_extract_agent,
 )
-from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
+from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tenancy.limits import (
     DEFAULT_MAX_ACTIVE_JOBS,
@@ -244,14 +240,11 @@ def _skill_artifacts(
     facts_path: str, facts: ProfileFacts
 ) -> tuple[SkillMatrix | None, ClusterMap]:
     profile_dir = resolve_tenant_path(facts_path).parent
-    overrides = load_overrides(profile_dir / "overrides.yaml")
-    cluster_map = effective_cluster_map(
-        load_cluster_map(profile_dir / "cluster_map.json"), overrides
-    )
+    taxonomy = build_effective_taxonomy(profile_dir)
     matrix = load_matrix(
-        profile_dir / "matrix.json", facts=facts, cluster_map=cluster_map
+        profile_dir / "matrix.json", facts=facts, taxonomy=taxonomy
     )
-    return matrix, cluster_map
+    return matrix, taxonomy.cluster_map
 
 
 def add_job_from_text(

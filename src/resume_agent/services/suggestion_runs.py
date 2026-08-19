@@ -10,6 +10,7 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.db import get_session as open_session
 from resume_agent.github.repos import verify_repo
 from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.profile.effective import build_effective_taxonomy
 from resume_agent.profile.store import load_facts
 from resume_agent.services.suggestions import (
     SuggestionContext,
@@ -17,12 +18,6 @@ from resume_agent.services.suggestions import (
     resolve_suggestion_context,
 )
 from resume_agent.suggestions.agents import build_formatter_agent, build_search_agent
-from resume_agent.taxonomy.clusters import load_cluster_map
-from resume_agent.taxonomy.corrections import (
-    apply_taxonomy_corrections,
-    corrections_file_path,
-    load_taxonomy_corrections,
-)
 from resume_agent.tracking.match_gap import DemandGraph, build_demand_graph
 from resume_agent.tenancy.paths import resolve_tenant_path
 
@@ -39,17 +34,12 @@ def load_suggestion_graph(
         if resolved_facts.exists()
         else ProfileFacts(contact=Contact(name=""))
     )
-    corrections = load_taxonomy_corrections(
-        resolve_tenant_path(corrections_file_path())
-    )
+    taxonomy = build_effective_taxonomy(resolve_tenant_path(cluster_path).parent)
     graph = build_demand_graph(
         session,
         facts,
-        cluster_map=apply_taxonomy_corrections(
-            load_cluster_map(cluster_path),
-            corrections,
-        ),
-        corrections=corrections,
+        cluster_map=taxonomy.cluster_map,
+        corrections=taxonomy.corrections,
     )
     return facts, graph
 

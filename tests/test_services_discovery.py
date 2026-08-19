@@ -3,9 +3,19 @@ import pytest
 
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.connectors.base import RawJob
+import resume_agent.profile.effective as effective_module
+from resume_agent.models.profile import Contact, ProfileFacts, Skill
+from resume_agent.profile.effective import build_effective_taxonomy
+from resume_agent.profile.matrix import build_matrix, save_matrix
+from resume_agent.profile.store import save_facts
 from resume_agent.services import discovery
 from resume_agent.services.agents import DiscoveryBundle
 from resume_agent.services.discovery import UrlFetchError
+from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.corrections import (
+    TaxonomyCorrections,
+    save_taxonomy_corrections,
+)
 
 
 def _session():
@@ -35,6 +45,35 @@ def test_add_job_from_text_inserts(tmp_path):
     assert job is not None
     assert job.source == "manual"
     assert job.company == "Acme"
+
+
+def test_skill_artifacts_uses_taxonomy_corrections(tmp_path, monkeypatch):
+    profile_dir = tmp_path / "profile"
+    facts_path = profile_dir / "facts.json"
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"Languages": [Skill(name="JS")]},
+    )
+    corrections_path = tmp_path / "taxonomy" / "taxonomy_corrections.json"
+    save_cluster_map(
+        ClusterMap(domain_of={"javascript": "web"}),
+        profile_dir / "cluster_map.json",
+    )
+    save_taxonomy_corrections(
+        TaxonomyCorrections(aliases={"js": "javascript"}), corrections_path
+    )
+    save_facts(facts, facts_path)
+    monkeypatch.setattr(
+        effective_module, "corrections_file_path", lambda: str(corrections_path)
+    )
+    taxonomy = build_effective_taxonomy(profile_dir)
+    save_matrix(build_matrix(facts, taxonomy), profile_dir / "matrix.json")
+
+    matrix, cluster_map = discovery._skill_artifacts(str(facts_path), facts)
+
+    assert matrix is not None
+    assert [row.key for row in matrix.rows] == ["javascript"]
+    assert cluster_map.aliases["js"] == "javascript"
 
 
 def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
