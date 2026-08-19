@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.profile.matrix import build_matrix
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
@@ -45,10 +43,6 @@ def _seed(tmp_path):
     return profile_dir, corrections_path, facts
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="UCCM Phase 1 graph adapter and deployment modes are not implemented",
-)
 def test_uccm_mode_round_trips_the_effective_taxonomy_without_row_drift(tmp_path):
     from resume_agent.profile.effective import build_effective_taxonomy
     from resume_agent.taxonomy.graph_adapter import graph_to_cluster_map
