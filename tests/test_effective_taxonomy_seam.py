@@ -8,8 +8,6 @@ join and not the other.
 
 from __future__ import annotations
 
-import pytest
-
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.taxonomy.corrections import (
@@ -40,10 +38,6 @@ def _seed(tmp_path):
     return profile_dir, corrections_path, facts
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Phase 0 not yet adopted: consumers still compose the taxonomy themselves",
-)
 def test_matrix_and_match_gap_agree_on_one_correction(tmp_path):
     from resume_agent.profile.effective import build_effective_taxonomy
     from resume_agent.profile.matrix import build_matrix

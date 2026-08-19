@@ -2,13 +2,14 @@ from pathlib import Path
 
 from evals.metrics import portfolio_forbidden_hits, portfolio_mandatory_hits
 from evals.schema import load_cases, load_profile
-from resume_agent.profile.matrix import Overrides, build_matrix, build_skill_match_context
+from resume_agent.profile.matrix import build_matrix, build_skill_match_context
 from resume_agent.tailor.evidence_portfolio import (
     build_evidence_catalog,
     build_fallback_portfolio,
 )
 from resume_agent.tailor.review_config import LengthBudget
 from resume_agent.taxonomy.clusters import load_cluster_map
+from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 
 
 def test_labeled_portfolio_cases_meet_deterministic_safety_floor():
@@ -36,13 +37,14 @@ def test_labeled_portfolio_cases_meet_deterministic_safety_floor():
     hits = 0
     total = 0
     forbidden: list[str] = []
+    taxonomy = EffectiveTaxonomy.from_parts(cluster_map)
     for case in cases:
         assert case.criteria is not None
         expectation = case.portfolio_expectation
         assert expectation is not None
         profile = load_profile(case, Path("evals/profiles"))
-        matrix = build_matrix(profile, cluster_map, Overrides())
-        context = build_skill_match_context(case.criteria, matrix, cluster_map)
+        matrix = build_matrix(profile, taxonomy)
+        context = build_skill_match_context(case.criteria, matrix, taxonomy.cluster_map)
         catalog = build_evidence_catalog(profile, case.criteria, context)
         portfolio = build_fallback_portfolio(
             catalog,

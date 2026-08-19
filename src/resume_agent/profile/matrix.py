@@ -5,6 +5,8 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Mapping
+from dataclasses import asdict
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -19,11 +21,7 @@ from resume_agent.profile.group_corrections import (
     corrections_path,
     load_group_corrections,
 )
-from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
-from resume_agent.taxonomy.corrections import (
-    apply_taxonomy_corrections,
-    load_taxonomy_corrections,
-)
+from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.groups import (
     SKILL_GROUPS,
     groups_from_cluster_map,
@@ -31,7 +29,7 @@ from resume_agent.taxonomy.groups import (
     load_group_map,
     sanitize_group_map,
 )
-from resume_agent.taxonomy.state import load_taxonomy_state
+from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
 from resume_agent.taxonomy.skills import split_skills
 from resume_agent.tracking.match_gap import normalize_skill
 
@@ -67,10 +65,20 @@ class MatrixRow(ExtensibleModel):
         )
 
 
+class TaxonomyManifestModel(ExtensibleModel):
+    generated: str = ""
+    corrections: str = ""
+    state: str = ""
+    overrides: str = ""
+    semantic: str = ""
+
+
 class SkillMatrix(ExtensibleModel):
     generated_at: str = ""
     facts_sha256: str = ""
     canonical_map_sha256: str = ""
+    taxonomy_revision: str = ""
+    taxonomy_manifest: TaxonomyManifestModel | None = None
     rows: list[MatrixRow] = Field(default_factory=list)
 
 
@@ -277,21 +285,17 @@ def _later(first: str | None, second: str | None) -> str | None:
 
 def build_matrix(
     facts: ProfileFacts,
-    cluster_map: ClusterMap,
-    overrides: Overrides,
+    taxonomy: EffectiveTaxonomy,
+    *,
     today: date | None = None,
 ) -> SkillMatrix:
     today = today or datetime.now(timezone.utc).date()
-    effective = effective_cluster_map(cluster_map, overrides)
+    effective = taxonomy.cluster_map
     aliases = effective.aliases
-    banned = {
-        aliases.get(token, token)
-        for value in overrides.ban
-        if (token := normalize_skill(value))
-    }
+    banned = taxonomy.banned_keys
     category_overrides = {
         aliases.get(token, token): category
-        for value, category in overrides.category.items()
+        for value, category in taxonomy.category_overrides.items()
         if (token := normalize_skill(value))
     }
 
@@ -393,6 +397,8 @@ def build_matrix(
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         facts_sha256=facts_sha256(facts),
         canonical_map_sha256=canonical_map_sha256(effective),
+        taxonomy_revision=taxonomy.semantic_revision,
+        taxonomy_manifest=TaxonomyManifestModel(**asdict(taxonomy.manifest)),
         rows=sorted(rows.values(), key=lambda row: (-row.strength, row.key)),
     )
 
@@ -404,12 +410,12 @@ def _lookup_group(mapping: dict[str, str], keys: list[str]) -> str | None:
 def apply_skill_groups(
     matrix: SkillMatrix,
     group_of: dict[str, str],
-    overrides: Overrides,
+    group_overrides: Mapping[str, str],
     corrections: dict[str, str] | None = None,
 ) -> None:
     """Decorate rows with validated groups; corrections beat overrides and taxonomy."""
     taxonomy = sanitize_group_map(group_of)
-    override_groups = sanitize_group_map(overrides.group)
+    override_groups = sanitize_group_map(group_overrides)
     correction_groups = sanitize_group_map(corrections or {})
     for row in matrix.rows:
         lookup_keys = [
@@ -431,41 +437,35 @@ def apply_skill_groups(
 
 
 def decorate_matrix_groups(
-    matrix: SkillMatrix, profile_dir: str | Path, overrides: Overrides
+    matrix: SkillMatrix,
+    profile_dir: str | Path,
+    taxonomy: EffectiveTaxonomy,
 ) -> None:
     """Apply every on-disk skill-group layer through one shared seam."""
     profile_dir = Path(profile_dir)
-    cluster_path = profile_dir / "cluster_map.json"
-    taxonomy_correction_path = (
-        profile_dir.parent / "taxonomy" / "taxonomy_corrections.json"
-    )
-    tree = apply_taxonomy_corrections(
-        load_cluster_map(cluster_path),
-        load_taxonomy_corrections(taxonomy_correction_path),
-    )
-    group_map = groups_from_cluster_map(tree)
+    group_map = groups_from_cluster_map(taxonomy.cluster_map)
     # One migration-only display fallback: a legacy map can guide the first
     # profile rebuild, but is never written or consulted once that rebuild has
     # recorded its import hash in taxonomy_state.json.
-    if (
-        not group_map
-        and load_taxonomy_state(cluster_path).legacy_group_map_sha256 is None
-    ):
+    if not group_map and taxonomy.state.legacy_group_map_sha256 is None:
         group_map = load_group_map(group_map_path(profile_dir))
     corrections = load_group_corrections(corrections_path(profile_dir)).as_map()
-    apply_skill_groups(matrix, group_map, overrides, corrections=corrections)
+    apply_skill_groups(
+        matrix,
+        group_map,
+        taxonomy.group_overrides,
+        corrections=corrections,
+    )
 
 
 def build_decorated_matrix(profile_dir: str | Path, facts: ProfileFacts) -> SkillMatrix:
     """Build and decorate a matrix without persisting it."""
+    from resume_agent.profile.effective import build_effective_taxonomy
+
     profile_dir = Path(profile_dir)
-    overrides = load_overrides(profile_dir / "overrides.yaml")
-    matrix = build_matrix(
-        facts,
-        load_cluster_map(profile_dir / "cluster_map.json"),
-        overrides,
-    )
-    decorate_matrix_groups(matrix, profile_dir, overrides)
+    taxonomy = build_effective_taxonomy(profile_dir)
+    matrix = build_matrix(facts, taxonomy)
+    decorate_matrix_groups(matrix, profile_dir, taxonomy)
     return matrix
 
 
@@ -504,7 +504,7 @@ def save_matrix(matrix: SkillMatrix, path: str | Path) -> None:
 def load_matrix(
     path: str | Path,
     facts: ProfileFacts | None = None,
-    cluster_map: ClusterMap | None = None,
+    taxonomy: EffectiveTaxonomy | None = None,
 ) -> SkillMatrix | None:
     try:
         matrix = SkillMatrix.model_validate_json(Path(path).read_text(encoding="utf-8"))
@@ -512,8 +512,6 @@ def load_matrix(
         return None
     if facts is not None and matrix.facts_sha256 != facts_sha256(facts):
         return None
-    if cluster_map is not None and matrix.canonical_map_sha256 != canonical_map_sha256(
-        cluster_map
-    ):
+    if taxonomy is not None and matrix.taxonomy_revision != taxonomy.semantic_revision:
         return None
     return matrix
