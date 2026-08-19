@@ -162,3 +162,66 @@ def test_revisions_are_sha256_hex_and_echoed_into_the_manifest():
     assert len(snap.semantic_revision) == 64
     assert len(snap.projection_revision) == 64
     assert snap.manifest.semantic == snap.semantic_revision
+
+
+def test_disagreeing_override_and_correction_records_a_conflict():
+    from resume_agent.taxonomy.snapshot import OverrideConflict
+
+    snap = EffectiveTaxonomy.from_parts(
+        ClusterMap(),
+        corrections=TaxonomyCorrections(aliases={"js": "javascript"}),
+        overrides=Overrides(alias={"js": "typescript"}),
+    )
+
+    assert snap.conflicts == (
+        OverrideConflict(
+            token="js",
+            correction_head="javascript",
+            override_head="typescript",
+            resolution="override",
+        ),
+    )
+
+
+def test_agreeing_override_and_correction_is_not_a_conflict():
+    snap = EffectiveTaxonomy.from_parts(
+        ClusterMap(),
+        corrections=TaxonomyCorrections(aliases={"js": "javascript"}),
+        overrides=Overrides(alias={"js": "javascript"}),
+    )
+
+    assert snap.conflicts == ()
+
+
+def test_forbid_alias_defeating_a_correction_is_recorded_as_such():
+    from resume_agent.taxonomy.snapshot import OverrideConflict
+
+    snap = EffectiveTaxonomy.from_parts(
+        ClusterMap(),
+        corrections=TaxonomyCorrections(aliases={"js": "javascript"}),
+        overrides=Overrides(forbid_alias=[["js", "javascript"]]),
+    )
+
+    assert snap.conflicts == (
+        OverrideConflict(
+            token="js",
+            correction_head="javascript",
+            override_head="",
+            resolution="forbid_alias",
+        ),
+    )
+
+
+def test_conflicts_do_not_participate_in_the_semantic_revision():
+    """A conflict diagnoses the derivation; the projection already has the result."""
+    conflicted = EffectiveTaxonomy.from_parts(
+        ClusterMap(),
+        corrections=TaxonomyCorrections(aliases={"js": "javascript"}),
+        overrides=Overrides(alias={"js": "typescript"}),
+    )
+    clean = EffectiveTaxonomy.from_parts(
+        ClusterMap(), overrides=Overrides(alias={"js": "typescript"})
+    )
+
+    assert conflicted.semantic_revision == clean.semantic_revision
+    assert conflicted.conflicts and not clean.conflicts

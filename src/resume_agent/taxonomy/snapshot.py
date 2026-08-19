@@ -163,6 +163,33 @@ class EffectiveTaxonomy:
                 if aliases.get(second) == first:
                     aliases.pop(second, None)
 
+        conflicts: list[OverrideConflict] = []
+        if overrides is not None:
+            override_aliases = _normalized_aliases(overrides.alias)
+            for token, raw_correction_head in _normalized_aliases(
+                corrections.aliases
+            ).items():
+                correction_head = resolved.aliases.get(token, raw_correction_head)
+                override_head = override_aliases.get(token, "")
+                if override_head and override_head != correction_head:
+                    conflicts.append(
+                        OverrideConflict(
+                            token=token,
+                            correction_head=correction_head,
+                            override_head=override_head,
+                            resolution="override",
+                        )
+                    )
+                elif aliases.get(token) != correction_head:
+                    conflicts.append(
+                        OverrideConflict(
+                            token=token,
+                            correction_head=correction_head,
+                            override_head="",
+                            resolution="forbid_alias",
+                        )
+                    )
+
         domain_of = {
             aliases.get(token, token): domain
             for token, domain in resolved.domain_of.items()
@@ -194,6 +221,7 @@ class EffectiveTaxonomy:
             category_overrides=dict(overrides.category) if overrides else {},
             group_overrides=dict(overrides.group) if overrides else {},
             state=state,
+            conflicts=tuple(sorted(conflicts, key=lambda item: item.token)),
             semantic_revision=semantic,
             projection_revision=projection,
             manifest=TaxonomyManifest(semantic=semantic),
