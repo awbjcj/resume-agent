@@ -314,15 +314,15 @@ def _cyclic_subjects(relations: Mapping[str, set[str]]) -> tuple[str, ...]:
         if node_id in visited:
             continue
         component: set[str] = set()
-        stack = [node_id]
+        reverse_stack: list[str] = [node_id]
         visited.add(node_id)
-        while stack:
-            current_id = stack.pop()
+        while reverse_stack:
+            current_id = reverse_stack.pop()
             component.add(current_id)
             for subject_id in reversed(sorted(reverse_relations[current_id])):
                 if subject_id not in visited:
                     visited.add(subject_id)
-                    stack.append(subject_id)
+                    reverse_stack.append(subject_id)
         components.append(component)
 
     cyclic_subjects = []

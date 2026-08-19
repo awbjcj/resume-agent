@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from typing import Literal
 from urllib.parse import quote
 
 from resume_agent.profile.matrix import Overrides
@@ -40,6 +41,24 @@ _LEGACY_NODE_SOURCE_URI = "workspace://profile/cluster_map.json"
 CORRECTION_POLICY_VERSION = "taxonomy-corrections-v1"
 LEGACY_MATCHING_POLICY_VERSION = "legacy-exact-adjacent-gap-v1"
 
+SourceTenantScope = Literal[
+    "global", "workspace", "tenant", "profile", "proposed_shared"
+]
+CorrectionScope = Literal["tenant", "profile", "proposed_shared"]
+CorrectionOperation = Literal[
+    "alias",
+    "add_skill",
+    "remove_skill",
+    "move_skill",
+    "rename_domain",
+    "merge_domain",
+    "set_domain_category",
+    "forbid_alias",
+    "ban_skill",
+    "set_profile_category",
+    "set_profile_group",
+]
+
 
 def legacy_concept_id(token: str) -> str:
     """Return the stable graph ID for one normalized legacy skill token."""
@@ -69,7 +88,7 @@ def _component_source(
     revision: str,
     source_uri: str,
     attribution: str,
-    tenant_scope: str,
+    tenant_scope: SourceTenantScope,
 ) -> SourceManifest:
     return SourceManifest(
         id=identifier,
@@ -201,8 +220,8 @@ def _correction_events(
     events: list[CorrectionEvent] = []
 
     def add(
-        scope: str,
-        operation: str,
+        scope: CorrectionScope,
+        operation: CorrectionOperation,
         subject: str,
         object_: str | None,
         payload: dict[str, object],
