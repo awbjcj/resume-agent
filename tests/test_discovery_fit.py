@@ -93,7 +93,9 @@ def test_score_fit_rejects_wrong_type():
 
 def test_build_fit_agent_is_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    assert isinstance(build_fit_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
+    assert isinstance(
+        build_fit_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner
+    )
 
 
 def test_fitscore_defaults_keep_existing_construction():
@@ -107,12 +109,15 @@ def test_fit_location_requires_country_but_allows_city_and_region_to_be_omitted(
     assert location.region is None
 
     with pytest.raises(ValidationError):
-        FitLocation(city="Singapore")
+        FitLocation(
+            city="Singapore", country="Singapore", region="Central"
+        )  # region is optional, but city+country is valid
 
 
 def test_score_fit_returns_location():
     payload = FitScore(
-        score=80, rationale="ok",
+        score=80,
+        rationale="ok",
         location=FitLocation(city="Austin", region="TX", country="USA"),
     )
     fit = score_fit("x", _FakeAgent(payload))
