@@ -44,6 +44,11 @@ class RunSnapshot:
     phase_index: int | None = None
     phase_count: int | None = None
     meta: dict[str, Any] | None = None
+    # When the client last confirmed it showed this run's completion to the
+    # user. ``None`` on every record written before acknowledgement existed,
+    # and on every run that has not been announced yet -- which is exactly the
+    # set ``list_rehydratable`` surfaces after a reconnect.
+    announced_at: datetime | None = None
 
 
 def _aware_datetime(value: object) -> datetime | None:
@@ -125,4 +130,5 @@ def parse_run_snapshot(run_id: str, raw: object) -> RunSnapshot | None:
         phase_index=_optional_positive_int(raw.get("phase_index")),
         phase_count=_optional_positive_int(raw.get("phase_count")),
         meta=meta,
+        announced_at=_aware_datetime(raw.get("announced_at")),
     )

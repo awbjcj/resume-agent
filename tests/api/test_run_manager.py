@@ -551,3 +551,40 @@ def test_shutdown_waits_for_owned_workers(tmp_path):
     release.set()
     assert stopped.wait(timeout=1)
     shutdown_thread.join(timeout=1)
+
+
+def _raw_record(**overrides):
+    base = {
+        "process": "r1",
+        "kind": "tailor",
+        "state": "done",
+        "label": "Tailoring",
+        "current": 1,
+        "total": 1,
+        "started_at": "2026-08-22T00:00:00+00:00",
+        "created_at": "2026-08-22T00:00:00+00:00",
+        "updated_at": "2026-08-22T00:00:05+00:00",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_snapshot_announced_at_is_none_when_absent():
+    snapshot = parse_run_snapshot("r1", _raw_record())
+    assert snapshot is not None
+    assert snapshot.announced_at is None
+
+
+def test_snapshot_parses_announced_at():
+    snapshot = parse_run_snapshot(
+        "r1", _raw_record(announced_at="2026-08-22T00:01:00+00:00")
+    )
+    assert snapshot is not None
+    assert snapshot.announced_at == datetime(2026, 8, 22, 0, 1, tzinfo=timezone.utc)
+
+
+def test_snapshot_rejects_unusable_announced_at():
+    for value in ("not-a-date", "2026-08-22T00:01:00", 12345, None):
+        snapshot = parse_run_snapshot("r1", _raw_record(announced_at=value))
+        assert snapshot is not None
+        assert snapshot.announced_at is None
