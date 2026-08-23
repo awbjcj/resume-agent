@@ -588,3 +588,41 @@ def test_snapshot_rejects_unusable_announced_at():
         snapshot = parse_run_snapshot("r1", _raw_record(announced_at=value))
         assert snapshot is not None
         assert snapshot.announced_at is None
+
+
+def test_mark_announced_stamps_a_terminal_run_once(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+
+    assert mgr.mark_announced(run_id) is True
+    snapshot = mgr.get(run_id)
+    assert snapshot is not None and snapshot.announced_at is not None
+
+    # Idempotent: a second ack changes nothing and reports nothing done.
+    stamped = snapshot.announced_at
+    assert mgr.mark_announced(run_id) is False
+    assert mgr.get(run_id).announced_at == stamped
+
+
+def test_mark_announced_refuses_unknown_and_active_runs(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    assert mgr.mark_announced("does-not-exist") is False
+
+    pending = mgr.create("tailor")
+    assert mgr.get(pending).state.value == "pending"
+    assert mgr.mark_announced(pending) is False
+    assert mgr.get(pending).announced_at is None
+
+
+def test_mark_announced_preserves_the_rest_of_the_record(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"versions": 3}, meta={"jobId": 7})
+
+    before = mgr.get(run_id)
+    mgr.mark_announced(run_id)
+    after = mgr.get(run_id)
+
+    assert after.result == before.result == {"versions": 3}
+    assert after.meta == before.meta == {"jobId": 7}
+    assert after.state == before.state
+    assert after.kind == before.kind

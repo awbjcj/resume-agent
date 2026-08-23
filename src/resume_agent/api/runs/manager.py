@@ -517,6 +517,29 @@ class RunManager:
     def get(self, run_id: str) -> RunSnapshot | None:
         return parse_run_snapshot(run_id, self._read_record(run_id))
 
+    def mark_announced(self, run_id: str, *, now: str | None = None) -> bool:
+        """Stamp a terminal run as announced. True only if newly stamped.
+
+        Read-modify-write under the manager lock, re-reading inside it: a worker
+        thread may still be flushing this run's record, and two browser tabs can
+        ack the same run at once. Refusing non-terminal runs is what keeps this
+        from ever turning a live progress write into a lost update.
+        ``_singleton_lock`` is an RLock, so the nested ``get``/``_write`` calls
+        are deliberate, not an oversight.
+        """
+        with self._singleton_lock:
+            snapshot = self.get(run_id)
+            if snapshot is None or snapshot.state not in TERMINAL_RUN_STATES:
+                return False
+            if snapshot.announced_at is not None:
+                return False
+            record = self._read_record(run_id)
+            if record is None:
+                return False
+            record["announced_at"] = now or _now()
+            self._write(run_id, record)
+            return True
+
     def list_active(self, user_id: str | None = None) -> list[RunSnapshot]:
         with self._singleton_lock:
             roots = tuple(self._roots)
