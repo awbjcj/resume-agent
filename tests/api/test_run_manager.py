@@ -681,3 +681,30 @@ def test_announce_window_never_resurrects_a_superseded_revision(tmp_path):
         item.run_id for item in mgr.list_rehydratable(announce_window_seconds=3600)
     }
     assert visible == {retry_id}
+
+
+def test_reporter_wakes_the_current_notifier_after_release(tmp_path):
+    """A reconnecting client gets a fresh notifier; the worker must find it.
+
+    ``_release_terminal_notifier`` drops the notifier once nobody is subscribed,
+    and ``notifier()`` then setdefaults a NEW object for the next subscriber. A
+    reporter that captured the old object's bound method would wake an orphan,
+    and the reconnected stream would silently fall back to polling.
+    """
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.create("tailor")
+    reporter = mgr.reporter(run_id, "tailor")
+
+    original = mgr.notifier(run_id)
+    # Simulate the release that happens when the last subscriber goes away.
+    mgr._stream_notifiers.pop(run_id, None)
+
+    replacement = mgr.notifier(run_id)
+    assert replacement is not original
+
+    woken = Event()
+    replacement.notify = lambda: woken.set()  # type: ignore[method-assign]
+
+    reporter.begin(1, "Tailoring")
+
+    assert woken.is_set(), "reporter woke a discarded notifier"

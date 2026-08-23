@@ -329,7 +329,12 @@ class RunManager:
             user_id=record.get("user_id"),
             cancel_check=lambda: self.is_cancel_requested(run_id),
             meta=record.get("meta") if isinstance(record.get("meta"), dict) else None,
-            notify=self.notifier(run_id).notify,
+            # Resolved at call time, not captured: ``_release_terminal_notifier``
+            # can discard this run's notifier between reporter construction and
+            # the next write, and a reconnecting client will have created a
+            # replacement. A captured bound method would wake the orphan, and
+            # the reconnected stream would silently fall back to polling.
+            notify=lambda: self.notifier(run_id).notify(),
         )
 
     def submit(
