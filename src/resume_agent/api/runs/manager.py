@@ -21,7 +21,7 @@ import uuid
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from resume_agent.api.runs.models import (
@@ -554,8 +554,21 @@ class RunManager:
         ]
         return sorted(snapshots, key=lambda item: (item.created_at, item.run_id))
 
-    def list_rehydratable(self, user_id: str | None = None) -> list[RunSnapshot]:
-        """Return active runs plus failed revisions whose metadata enables retry."""
+    def list_rehydratable(
+        self,
+        user_id: str | None = None,
+        *,
+        announce_window_seconds: float | None = None,
+        now: datetime | None = None,
+    ) -> list[RunSnapshot]:
+        """Active runs, failed revisions, and recently-finished unannounced runs.
+
+        ``announce_window_seconds`` is what makes a completion recoverable after
+        the client that launched it went away: without it a run that succeeded
+        while nobody was connected is invisible to the UI forever. It is opt-in
+        so every existing caller keeps the old contract; only the
+        ``GET /api/runs`` route passes it.
+        """
         with self._singleton_lock:
             roots = tuple(self._roots)
         snapshots = [
@@ -571,6 +584,21 @@ class RunManager:
             for snapshot in snapshots
             if snapshot.state in ACTIVE_RUN_STATES
         }
+        if announce_window_seconds is not None:
+            # A completion nobody was connected to see is still news -- but only
+            # for a while. Past the window it is stale, and a toast for a run
+            # that finished yesterday is noise. The record stays readable via
+            # ``get`` either way, until the 24h sweep removes it.
+            cutoff = (now or datetime.now(timezone.utc)) - timedelta(
+                seconds=announce_window_seconds
+            )
+            for snapshot in snapshots:
+                if (
+                    snapshot.state in TERMINAL_RUN_STATES
+                    and snapshot.announced_at is None
+                    and snapshot.updated_at >= cutoff
+                ):
+                    visible[snapshot.run_id] = snapshot
         latest_revision: dict[tuple[str, object], RunSnapshot] = {}
         for snapshot in snapshots:
             meta_key = (

@@ -1,5 +1,5 @@
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Barrier, Event, Lock, Thread
 
 import pytest
@@ -626,3 +626,37 @@ def test_mark_announced_preserves_the_rest_of_the_record(tmp_path):
     assert after.meta == before.meta == {"jobId": 7}
     assert after.state == before.state
     assert after.kind == before.kind
+
+
+def test_list_rehydratable_omits_terminal_runs_without_a_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    mgr.submit("tailor", lambda reporter: {"ok": True})
+    assert mgr.list_rehydratable() == []
+
+
+def test_list_rehydratable_returns_unannounced_terminal_runs_in_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+
+    visible = mgr.list_rehydratable(announce_window_seconds=3600)
+    assert [item.run_id for item in visible] == [run_id]
+
+    mgr.mark_announced(run_id)
+    assert mgr.list_rehydratable(announce_window_seconds=3600) == []
+
+
+def test_list_rehydratable_excludes_terminal_runs_past_the_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+    later = datetime.now(timezone.utc) + timedelta(seconds=7200)
+
+    assert mgr.list_rehydratable(announce_window_seconds=3600, now=later) == []
+    # Still individually readable -- only announcement is windowed.
+    assert mgr.get(run_id) is not None
+
+
+def test_list_rehydratable_still_returns_active_runs_with_a_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    pending = mgr.create("tailor")
+    visible = mgr.list_rehydratable(announce_window_seconds=3600)
+    assert [item.run_id for item in visible] == [pending]
