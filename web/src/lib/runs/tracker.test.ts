@@ -12,7 +12,14 @@ vi.mock("./sse", () => ({
   watchRun: mocks.watchRun,
 }));
 
-import { isTracking, resetRunTrackerForTests, trackRun } from "./tracker";
+import {
+  addTerminalListener,
+  completeRuns,
+  isTracking,
+  resetRunTrackerForTests,
+  trackRun,
+} from "./tracker";
+import { useRunStore } from "./store";
 
 beforeEach(() => {
   resetRunTrackerForTests();
@@ -84,4 +91,74 @@ it("reconciles a terminal backend status after an SSE transport error", async ()
   expect(onDone.mock.calls[0][0].meta).toEqual({ jobIds: [3, 8] });
   expect(mocks.watchRun).toHaveBeenCalledOnce();
   expect(isTracking("r1")).toBe(false);
+});
+
+it("runs one lifecycle for a completion and removes it after the display window", () => {
+  vi.useFakeTimers();
+  useRunStore.setState({ runs: {} });
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+
+  const finished = {
+    runId: "r1",
+    kind: "tailor",
+    status: "succeeded",
+    percent: 100,
+    phase: "Done",
+    current: 1,
+    total: 1,
+    etaText: null,
+  } satisfies RunRecord;
+  completeRuns([finished]);
+
+  expect(seen).toEqual([[finished]]);
+  expect(useRunStore.getState().runs.r1?.percent).toBe(100);
+
+  vi.advanceTimersByTime(4000);
+  expect(useRunStore.getState().runs.r1).toBeUndefined();
+  vi.useRealTimers();
+});
+
+it("announces a completion exactly once even if two paths report it", () => {
+  useRunStore.setState({ runs: {} });
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+  const finished = {
+    runId: "r1",
+    kind: "tailor",
+    status: "succeeded",
+    percent: 100,
+    phase: "Done",
+    current: 1,
+    total: 1,
+    etaText: null,
+  } satisfies RunRecord;
+
+  completeRuns([finished]);
+  completeRuns([finished]);
+
+  expect(seen).toEqual([[finished]]);
+});
+
+it("keeps a failed revise visible for the retry UI", () => {
+  vi.useFakeTimers();
+  useRunStore.setState({ runs: {} });
+  completeRuns([
+    {
+      runId: "r9",
+      kind: "revise",
+      status: "failed",
+      percent: 40,
+      phase: "",
+      current: 0,
+      total: 1,
+      etaText: null,
+      error: "boom",
+      meta: { versionId: 3, instruction: "tighten the summary" },
+    },
+  ]);
+
+  vi.advanceTimersByTime(10_000);
+  expect(useRunStore.getState().runs.r9).toBeDefined();
+  vi.useRealTimers();
 });

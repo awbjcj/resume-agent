@@ -82,12 +82,11 @@ export function watchRun(
     useRunStore.getState().upsert(run);
     if (state === "done" || state === "error" || state === "cancelled") {
       eventSource.close();
+      // Everything a terminal run implies — announcing it, acknowledging it,
+      // refreshing queries, retiring the bar — belongs to the tracker, which
+      // reaches the same lifecycle whether the news arrived here or from the
+      // reconciliation poller. This module only translates the wire.
       onDone?.(run);
-      // Failed revision metadata contains the original instruction used by the
-      // durable retry UI. Other terminal notifications only linger briefly.
-      if (!(state === "error" && ["revise", "coverLetterRevise"].includes(kind))) {
-        setTimeout(() => useRunStore.getState().remove(runId), 4000);
-      }
     }
   };
 

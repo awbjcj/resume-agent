@@ -1,6 +1,56 @@
 import { api, unwrap } from "@/lib/api/client";
+import { forgetInvalidation } from "./invalidation";
 import { stateToStatus, watchRun } from "./sse";
 import { useRunStore, type RunRecord } from "./store";
+
+/** How long a finished run stays on screen at 100% before the bar collapses. */
+export const TERMINAL_DISPLAY_MS = 4000;
+
+export type TerminalListener = (runs: RunRecord[]) => void;
+
+const terminalListeners = new Set<TerminalListener>();
+/** Runs already put through the lifecycle, so SSE and the poller cannot double-fire. */
+const completed = new Set<string>();
+
+export function addTerminalListener(listener: TerminalListener): () => void {
+  terminalListeners.add(listener);
+  return () => {
+    terminalListeners.delete(listener);
+  };
+}
+
+/** Failed revisions carry the retry instruction in `meta`; the retry UI needs them. */
+function isDurableFailure(run: RunRecord): boolean {
+  return (
+    run.status === "failed" && ["revise", "coverLetterRevise"].includes(run.kind)
+  );
+}
+
+/**
+ * The single terminal path, reached from the SSE stream and the poller alike.
+ *
+ * Batched because a reconnect can surface several completions at once and the
+ * announcement cap is a property of the batch, not of each run. Listeners get
+ * the batch; this function owns only store state and the display timer, so the
+ * tracker never needs a QueryClient or a toast library.
+ */
+export function completeRuns(runs: readonly RunRecord[]): void {
+  const fresh = runs.filter((run) => !completed.has(run.runId));
+  if (fresh.length === 0) return;
+  for (const run of fresh) {
+    completed.add(run.runId);
+    useRunStore.getState().upsert(run);
+  }
+  for (const listener of terminalListeners) listener([...fresh]);
+  for (const run of fresh) {
+    forgetInvalidation(run.runId);
+    if (isDurableFailure(run)) continue;
+    setTimeout(
+      () => useRunStore.getState().remove(run.runId),
+      TERMINAL_DISPLAY_MS,
+    );
+  }
+}
 
 export interface RunSeed {
   runId: string;
@@ -31,6 +81,7 @@ const tracked = new Map<string, TrackedRun>();
 function finish(entry: TrackedRun, run: RunRecord): void {
   entry.unsubscribe();
   tracked.delete(entry.seed.runId);
+  completeRuns([run]);
   for (const callback of entry.callbacks) callback(run);
 }
 
@@ -107,4 +158,6 @@ export function isTracking(runId: string): boolean {
 export function resetRunTrackerForTests(): void {
   for (const entry of tracked.values()) entry.unsubscribe();
   tracked.clear();
+  terminalListeners.clear();
+  completed.clear();
 }

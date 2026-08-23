@@ -124,19 +124,18 @@ describe("watchRun", () => {
     expect(useRunStore.getState().runs.r1).toBeUndefined();
   });
 
-  it("retains a failed revision so its retry instruction remains available", async () => {
-    watchRun("r1", "revise");
+  it("leaves store removal to the tracker", async () => {
+    // Lifecycle used to live here, which meant a completion discovered any
+    // other way (the reconciliation poller, a page load) got none of it. This
+    // module now only translates the wire into a RunRecord.
+    watchRun("r1", "tailor");
     await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
 
     FakeEventSource.current.onmessage?.({
-      data: JSON.stringify({ state: "error", label: "Failed", error: "provider failed" }),
+      data: JSON.stringify({ state: "done", percent: 100, label: "Done" }),
     } as MessageEvent);
-    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(10_000);
 
-    expect(useRunStore.getState().runs.r1).toMatchObject({
-      kind: "revise",
-      status: "failed",
-      error: "provider failed",
-    });
+    expect(useRunStore.getState().runs.r1).toBeDefined();
   });
 });
