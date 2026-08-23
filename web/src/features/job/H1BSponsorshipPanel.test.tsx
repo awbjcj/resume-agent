@@ -119,10 +119,13 @@ describe("H1BSponsorshipPanel", () => {
         screen.getByRole("button", { name: /checking… for h-1b sponsorship/i }),
       ).toBeDisabled(),
     );
-    expect(mocks.trackRun).toHaveBeenCalledWith(
-      { runId: "run-1", kind: "h1bSponsorship" },
-      expect.any(Function),
-    );
+    // No per-launch completion callback any more: announcing, acking, and
+    // invalidating are owned by the app-root listener, so a run rediscovered
+    // without its launch closure still gets all three.
+    expect(mocks.trackRun).toHaveBeenCalledWith({
+      runId: "run-1",
+      kind: "h1bSponsorship",
+    });
   });
 
   it("shows a failure banner when the h1bSponsorship run fails", () => {

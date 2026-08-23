@@ -25,6 +25,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { useGenerateSuggestion, useSuggestion } from "./use-suggestion";
+import { useRunCompletionEffects } from "@/features/runs/use-run-completion-effects";
 
 describe("suggestion hooks", () => {
   beforeEach(() => {
@@ -46,6 +47,8 @@ describe("suggestion hooks", () => {
       http.post("/api/suggestions/generate", () =>
         HttpResponse.json({ runId: "run-1", kind: "suggestion" }),
       ),
+      // Completion effects now acknowledge every announced run.
+      http.post("/api/runs/ack", () => HttpResponse.json({ acknowledged: 1 })),
     );
     mocks.watchRun.mockImplementation((_id, _kind, callback) => {
       onDone = callback;
@@ -56,10 +59,15 @@ describe("suggestion hooks", () => {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(
-      () => ({
-        suggestion: useSuggestion("skill", "Kubernetes", true),
-        generation: useGenerateSuggestion(),
-      }),
+      () => {
+        // Invalidation is no longer owned by the launch closure; the app root
+        // mounts this listener, so exercising the real path requires it here.
+        useRunCompletionEffects();
+        return {
+          suggestion: useSuggestion("skill", "Kubernetes", true),
+          generation: useGenerateSuggestion(),
+        };
+      },
       { wrapper },
     );
     await waitFor(() => expect(result.current.suggestion.isSuccess).toBe(true));

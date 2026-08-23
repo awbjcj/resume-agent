@@ -40,6 +40,7 @@ import { ActiveInterviewBanner } from "@/features/interview/ActiveInterviewBanne
 import { useInterviewSessions } from "@/features/interview/use-interview";
 import { RunPanel } from "@/features/runs/RunPanel";
 import { useRehydrateRuns } from "@/features/runs/use-rehydrate-runs";
+import { useRunCompletionEffects } from "@/features/runs/use-run-completion-effects";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationsBell } from "@/features/notifications/NotificationsBell";
 import { LogoutButton } from "@/features/auth/LogoutButton";
@@ -110,6 +111,9 @@ function NavMenuItem({ item, badge }: { item: NavItem; badge?: number }) {
 }
 
 export function AppLayout() {
+  // Registered before the first reconciliation so a completion recovered on
+  // load cannot be dispatched to an empty listener set.
+  useRunCompletionEffects();
   useRehydrateRuns();
   const me = useMe();
   // Shares the cached query the interview banner already runs, so the nav count
