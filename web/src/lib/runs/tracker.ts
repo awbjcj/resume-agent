@@ -1,5 +1,6 @@
-import { api, fetchAllPages } from "@/lib/api/client";
+import { api, fetchAllPages, unwrap } from "@/lib/api/client";
 import { forgetInvalidation } from "./invalidation";
+import { isRevisionKind } from "./revisions";
 import { stateToStatus, watchRun } from "./sse";
 import { useRunStore, type RunRecord } from "./store";
 
@@ -21,9 +22,31 @@ export function addTerminalListener(listener: TerminalListener): () => void {
 
 /** Failed revisions carry the retry instruction in `meta`; the retry UI needs them. */
 function isDurableFailure(run: RunRecord): boolean {
-  return (
-    run.status === "failed" && ["revise", "coverLetterRevise"].includes(run.kind)
-  );
+  return run.status === "failed" && isRevisionKind(run.kind);
+}
+
+/** Put a terminal run on screen and retire its bar, without announcing it. */
+function retain(run: RunRecord): void {
+  completed.add(run.runId);
+  useRunStore.getState().upsert(run);
+  forgetInvalidation(run.runId);
+  if (isDurableFailure(run)) return;
+  setTimeout(() => useRunStore.getState().remove(run.runId), TERMINAL_DISPLAY_MS);
+}
+
+/**
+ * Restore terminal runs the server says were already announced.
+ *
+ * A failed revision stays in `/api/runs` after acknowledgement because the
+ * retry UI needs it, so announcing every terminal run in the payload would
+ * re-toast the same failure on every page load until it was swept. The run
+ * still belongs on screen — it just isn't news any more.
+ */
+export function restoreAnnouncedRuns(runs: readonly RunRecord[]): void {
+  for (const run of runs) {
+    if (completed.has(run.runId)) continue;
+    retain(run);
+  }
 }
 
 /**
@@ -42,14 +65,7 @@ export function completeRuns(runs: readonly RunRecord[]): void {
     useRunStore.getState().upsert(run);
   }
   for (const listener of terminalListeners) listener([...fresh]);
-  for (const run of fresh) {
-    forgetInvalidation(run.runId);
-    if (isDurableFailure(run)) continue;
-    setTimeout(
-      () => useRunStore.getState().remove(run.runId),
-      TERMINAL_DISPLAY_MS,
-    );
-  }
+  for (const run of fresh) retain(run);
 }
 
 export interface RunSeed {
@@ -67,6 +83,8 @@ interface RunStatusPayload extends RunSeed {
   result?: RunRecord["result"];
   error?: string | null;
   meta?: RunRecord["meta"];
+  /** Set once the client has told the user about this run's completion. */
+  announcedAt?: string | null;
 }
 
 interface TrackedRun {
@@ -79,9 +97,21 @@ interface TrackedRun {
 
 const tracked = new Map<string, TrackedRun>();
 
-function finish(entry: TrackedRun, run: RunRecord): void {
+/** Stop watching a run, without deciding anything about its outcome. */
+function detach(entry: TrackedRun): void {
   entry.unsubscribe();
   tracked.delete(entry.seed.runId);
+}
+
+/**
+ * Terminal handling for one run.
+ *
+ * Order matters and is shared with the poller's batch path: the store is
+ * updated first, then per-run callbacks run — so a callback never observes a
+ * run the store still thinks is in flight.
+ */
+function finish(entry: TrackedRun, run: RunRecord): void {
+  detach(entry);
   completeRuns([run]);
   for (const callback of entry.callbacks) callback(run);
 }
@@ -169,18 +199,39 @@ const TERMINAL_STATUSES: readonly RunRecord["status"][] = [
 ];
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
-/** Bumped whenever polling stops, so an in-flight poll knows not to apply. */
+/**
+ * Bumped only when polling is torn down from outside (unmount, test reset), so
+ * an in-flight poll knows its results belong to a client that is gone.
+ *
+ * Deliberately NOT bumped when a poll stops the idle interval itself: that
+ * would let whichever concurrent poll finishes first invalidate the others,
+ * and a poll that had just fetched a completion would throw it away — losing
+ * exactly the completion this whole path exists to deliver.
+ */
 let pollGeneration = 0;
+/** The poll currently in flight, so concurrent callers share one request. */
+let pollInFlight: Promise<void> | null = null;
 
 /**
  * Reconcile every run the server considers live or newly finished.
  *
  * This is the correctness guarantee; SSE is only the latency optimisation. It
- * covers three cases a live stream cannot: a run whose stream died, a run that
- * finished while no client was connected, and a run launched from another tab
- * or device.
+ * covers two cases a live stream cannot: a run whose stream died, and a run
+ * that finished while no client was connected. The interval stops once nothing
+ * is tracked, so a run started in another tab is picked up on the next load or
+ * the next local launch, not continuously.
  */
-export async function pollRunsNow(): Promise<void> {
+export function pollRunsNow(): Promise<void> {
+  // Coalesce. A backend restart errors every tracked run's stream at once, and
+  // each one asks for a reconciliation; N identical requests would return the
+  // same listing N times and race each other applying it.
+  pollInFlight ??= reconcileRuns().finally(() => {
+    pollInFlight = null;
+  });
+  return pollInFlight;
+}
+
+async function reconcileRuns(): Promise<void> {
   const generation = pollGeneration;
   const fetchPage = (page: number) =>
     api.GET("/api/runs", { params: { query: { page, pageSize: 200 } } });
@@ -197,30 +248,80 @@ export async function pollRunsNow(): Promise<void> {
     // A transport error is not evidence about any run.
     return;
   }
-  // The poller was torn down while this request was in flight (the app
-  // unmounted). Applying now would resurrect tracking for a dead client.
   if (generation !== pollGeneration) return;
 
-  const finished: RunRecord[] = [];
+  const listed = new Set<string>();
+  const announce: RunRecord[] = [];
+  const restore: RunRecord[] = [];
+  const settled: { entry: TrackedRun; run: RunRecord }[] = [];
+
   for (const payload of items) {
     const run = recordFromStatus(payload);
-    if (TERMINAL_STATUSES.includes(run.status)) {
-      const entry = tracked.get(run.runId);
-      if (entry) {
-        entry.unsubscribe();
-        tracked.delete(run.runId);
-        for (const callback of entry.callbacks) callback(run);
-      }
-      finished.push(run);
+    listed.add(run.runId);
+    if (!TERMINAL_STATUSES.includes(run.status)) {
+      useRunStore.getState().upsert(run);
+      if (!tracked.has(run.runId)) trackRun({ runId: run.runId, kind: run.kind });
       continue;
     }
-    useRunStore.getState().upsert(run);
-    if (!tracked.has(run.runId)) trackRun({ runId: run.runId, kind: run.kind });
+    const entry = tracked.get(run.runId);
+    if (entry) {
+      detach(entry);
+      settled.push({ entry, run });
+    }
+    // Already acknowledged means the server is listing it for its own reasons
+    // (a failed revision the retry UI still needs), not because it is news.
+    if (payload.announcedAt) restore.push(run);
+    else announce.push(run);
   }
+
+  restoreAnnouncedRuns(restore);
   // One batch, so the announcement cap sees the whole reconnect at once rather
   // than deciding run-by-run without knowing how many siblings follow.
-  completeRuns(finished);
-  if (tracked.size === 0) stopRunPoller();
+  completeRuns(announce);
+  for (const { entry, run } of settled) {
+    for (const callback of entry.callbacks) callback(run);
+  }
+
+  await resolveUnlisted(listed, generation);
+
+  if (tracked.size === 0) stopPolling();
+}
+
+/**
+ * Settle tracked runs the listing did not mention.
+ *
+ * Absence is ambiguous: another tab acknowledged the completion, or the 24h
+ * sweep removed the record. Either way the listing will never mention it
+ * again, so without asking directly the entry stays tracked forever — the
+ * interval never idles and its progress bar never leaves the screen.
+ */
+async function resolveUnlisted(
+  listed: ReadonlySet<string>,
+  generation: number,
+): Promise<void> {
+  const unlisted = [...tracked.keys()].filter((runId) => !listed.has(runId));
+  for (const runId of unlisted) {
+    const entry = tracked.get(runId);
+    if (entry === undefined) continue;
+    let payload: RunStatusPayload | null = null;
+    try {
+      payload = (await unwrap(
+        api.GET("/api/runs/{run_id}", { params: { path: { run_id: runId } } }),
+      )) as RunStatusPayload;
+    } catch {
+      // 404 (swept) or a transport error. Neither leaves anything to wait for.
+    }
+    if (generation !== pollGeneration) return;
+    detach(entry);
+    const run = payload ? recordFromStatus(payload) : null;
+    if (run === null || !TERMINAL_STATUSES.includes(run.status)) {
+      useRunStore.getState().remove(runId);
+      continue;
+    }
+    if (payload?.announcedAt) restoreAnnouncedRuns([run]);
+    else completeRuns([run]);
+    for (const callback of entry.callbacks) callback(run);
+  }
 }
 
 export function startRunPoller(): void {
@@ -228,11 +329,17 @@ export function startRunPoller(): void {
   pollTimer = setInterval(() => void pollRunsNow(), POLL_INTERVAL_MS);
 }
 
-export function stopRunPoller(): void {
-  pollGeneration += 1;
+/** Clear the interval without disowning in-flight results. */
+function stopPolling(): void {
   if (pollTimer === null) return;
   clearInterval(pollTimer);
   pollTimer = null;
+}
+
+/** Tear polling down from outside: in-flight results no longer belong to anyone. */
+export function stopRunPoller(): void {
+  pollGeneration += 1;
+  stopPolling();
 }
 
 export function isTracking(runId: string): boolean {

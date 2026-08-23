@@ -2,6 +2,7 @@ import { toast } from "sonner";
 
 import { api, unwrap } from "@/lib/api/client";
 import { DEFAULT_INVALIDATE, rememberInvalidation } from "@/lib/runs/invalidation";
+import { revisionMetaKey } from "@/lib/runs/revisions";
 import { useRunStore } from "@/lib/runs/store";
 import type { RunMeta } from "@/lib/runs/store";
 import { trackRun } from "@/lib/runs/tracker";
@@ -9,7 +10,7 @@ import { trackRun } from "@/lib/runs/tracker";
 type RunOut = { runId: string; kind: string; meta?: RunMeta | null };
 
 function removeSupersededArtifactFailures(kind: string, meta?: RunMeta): void {
-  const metaKey = kind === "revise" ? "versionId" : kind === "coverLetterRevise" ? "coverLetterId" : null;
+  const metaKey = revisionMetaKey(kind);
   if (!metaKey || meta?.[metaKey] == null) return;
   const store = useRunStore.getState();
   for (const run of Object.values(store.runs)) {

@@ -539,10 +539,13 @@ class RunManager:
     def mark_announced(self, run_id: str, *, now: str | None = None) -> bool:
         """Stamp a terminal run as announced. True only if newly stamped.
 
-        Read-modify-write under the manager lock, re-reading inside it: a worker
-        thread may still be flushing this run's record, and two browser tabs can
-        ack the same run at once. Refusing non-terminal runs is what keeps this
-        from ever turning a live progress write into a lost update.
+        Read-modify-write under the manager lock, re-reading inside it: two
+        browser tabs can ack the same run at once, and the lock is what makes
+        the read-check-write sequence atomic between them. It does **not**
+        exclude a worker thread -- ``ProgressReporter`` and ``request_cancel``
+        write records without taking it. What keeps this from turning a live
+        progress write into a lost update is the terminal-state guard: a run
+        that has reached a terminal state has no worker left to write it.
         ``_singleton_lock`` is an RLock, so the nested ``get``/``_write`` calls
         are deliberate, not an oversight.
         """
@@ -557,6 +560,11 @@ class RunManager:
                 return False
             record["announced_at"] = now or _now()
             self._write(run_id, record)
+            # ``_write`` wakes subscribers through ``notifier()``, which is a
+            # setdefault -- so acking a run whose notifier was already released
+            # silently re-inserts one that nothing will ever pop again. Release
+            # it back if this ack was the only thing that revived it.
+            self._release_terminal_notifier(run_id)
             return True
 
     def list_active(self, user_id: str | None = None) -> list[RunSnapshot]:

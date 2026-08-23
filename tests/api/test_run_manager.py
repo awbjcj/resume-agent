@@ -601,7 +601,9 @@ def test_mark_announced_stamps_a_terminal_run_once(tmp_path):
     # Idempotent: a second ack changes nothing and reports nothing done.
     stamped = snapshot.announced_at
     assert mgr.mark_announced(run_id) is False
-    assert mgr.get(run_id).announced_at == stamped
+    updated = mgr.get(run_id)
+    assert updated is not None
+    assert updated.announced_at == stamped
 
 
 def test_mark_announced_refuses_unknown_and_active_runs(tmp_path):
@@ -609,9 +611,13 @@ def test_mark_announced_refuses_unknown_and_active_runs(tmp_path):
     assert mgr.mark_announced("does-not-exist") is False
 
     pending = mgr.create("tailor")
-    assert mgr.get(pending).state.value == "pending"
+    pending_snapshot = mgr.get(pending)
+    assert pending_snapshot is not None
+    assert pending_snapshot.state.value == "pending"
     assert mgr.mark_announced(pending) is False
-    assert mgr.get(pending).announced_at is None
+    pending_snapshot = mgr.get(pending)
+    assert pending_snapshot is not None
+    assert pending_snapshot.announced_at is None
 
 
 def test_mark_announced_preserves_the_rest_of_the_record(tmp_path):
@@ -619,8 +625,10 @@ def test_mark_announced_preserves_the_rest_of_the_record(tmp_path):
     run_id = mgr.submit("tailor", lambda reporter: {"versions": 3}, meta={"jobId": 7})
 
     before = mgr.get(run_id)
+    assert before is not None
     mgr.mark_announced(run_id)
     after = mgr.get(run_id)
+    assert after is not None
 
     assert after.result == before.result == {"versions": 3}
     assert after.meta == before.meta == {"jobId": 7}
@@ -708,3 +716,47 @@ def test_reporter_wakes_the_current_notifier_after_release(tmp_path):
     reporter.begin(1, "Tailoring")
 
     assert woken.is_set(), "reporter woke a discarded notifier"
+
+
+def test_ack_does_not_revive_a_released_notifier(tmp_path):
+    """``_write`` wakes subscribers via ``notifier()``, which is a setdefault.
+
+    Acking a terminal run therefore used to re-insert a notifier that
+    ``_release_terminal_notifier`` had already popped, and nothing pops it a
+    second time -- one permanent entry per acknowledged run, on a server that
+    runs for weeks.
+    """
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+    assert mgr._stream_notifiers == {}
+
+    assert mgr.mark_announced(run_id) is True
+
+    assert mgr._stream_notifiers == {}
+
+
+def test_concurrent_acks_stamp_exactly_once(tmp_path):
+    """The lock makes read-check-write atomic between competing tabs."""
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+
+    start = Barrier(8)
+    results: list[bool] = []
+    results_lock = Lock()
+
+    def ack() -> None:
+        start.wait(timeout=5)
+        stamped = mgr.mark_announced(run_id)
+        with results_lock:
+            results.append(stamped)
+
+    threads = [Thread(target=ack) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert results.count(True) == 1, results
+    updated = mgr.get(run_id)
+    assert updated is not None
+    assert updated.announced_at is not None

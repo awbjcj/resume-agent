@@ -81,3 +81,16 @@ it("says how many of a collapsed batch failed", () => {
   ]);
   expect(toast.success.mock.calls[0][0]).toContain("2 failed");
 });
+
+it("reports an all-failed batch as an error, not a success", () => {
+  announceCompletions([
+    run({ runId: "a", status: "failed", error: "boom" }),
+    run({ runId: "b", status: "failed", error: "boom" }),
+    run({ runId: "c", status: "failed", error: "boom" }),
+    run({ runId: "d", status: "failed", error: "boom" }),
+  ]);
+
+  expect(toast.success).not.toHaveBeenCalled();
+  expect(toast.error).toHaveBeenCalledOnce();
+  expect(toast.error.mock.calls[0][0]).toContain("4 failed");
+});

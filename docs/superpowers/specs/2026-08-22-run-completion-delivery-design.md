@@ -131,7 +131,16 @@ interval (default 15 s) issues `GET /api/runs` — a single request that already
 returns the caller's active runs plus, after section 1, their unannounced
 terminal ones. Any tracked run returned as terminal is finished. Any tracked run
 **missing** from the payload gets one `GET /api/runs/{id}` to distinguish "acked
-by another tab" from "swept". The interval stops when nothing is tracked.
+by another tab" from "swept"; either way it stops being tracked, or its entry
+would live forever and its bar would never leave the screen. The interval stops
+when nothing is tracked.
+
+**A run the payload reports as already announced is restored, not announced.**
+`list_rehydratable`'s failed-revision clause is independent of `announced_at` —
+the retry UI needs a failed `revise` listed even after acknowledgement — so a
+client that announced every terminal run in the payload would re-toast the same
+failure on every page load until the 24 h sweep. The client reads `announcedAt`
+and puts such runs on screen silently.
 
 This makes a frozen bar structurally impossible: SSE becomes a latency
 optimization rather than the thing correctness depends on. `useRehydrateRuns`
@@ -143,7 +152,14 @@ exponential backoff with jitter — 1 s, 2 s, 4 s, 8 s, 16 s, 30 s ceiling —
 resetting to 1 s on any received message, stopping only when the run is known
 terminal or `trackRun` is torn down. Unbounded retry is safe precisely because
 the poller bounds the cost of being wrong: worst case is one poll per 15 s and
-one reconnect attempt per 30 s.
+one reconnect attempt per 30 s, per run.
+
+A transport error also triggers an immediate reconciliation rather than waiting
+out the interval — the most common reason a stream dies is that its run ended.
+Reconciliations are **coalesced**: a backend restart errors every tracked
+stream at once, and without coalescing N runs would each fire their own
+identical `/api/runs` request and then race one another applying the result.
+Concurrent callers share the one in-flight request.
 
 **The toast fires before the refetch.** In `use-launch-run.ts`, announcement
 moves ahead of `await Promise.all(invalidate.map(...))`. A completion notice
@@ -195,7 +211,13 @@ Backend (`.venv/Scripts/python.exe -m pytest`):
 
 - `announced_at` absent on a legacy record parses as `null`
 - ack stamps the record; ack is idempotent; ack refuses a non-terminal run; ack
-  on another user's run 404s through `_owned_record`
+  on another user's run is **skipped, not raised** — the Design section above
+  already says unusable ids are skipped silently, and a bulk endpoint that 404s
+  over one stale id would make the client re-announce the whole batch. (An
+  earlier draft of this line said "404s through `_owned_record`", contradicting
+  the design two sections up.) The test must run in **hosted** mode: single-tenant
+  has no `UserContext`, so `current_context()` is `None` and no owner filtering
+  applies there at all — the same contract `_owned_record` already has.
 - `list_rehydratable` includes unannounced terminal runs inside the window,
   excludes acked ones, and excludes ones past it
 - a threaded test that a concurrent ack and progress write lose neither, because

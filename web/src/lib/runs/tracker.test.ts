@@ -216,7 +216,9 @@ function payload(overrides: Record<string, unknown> = {}) {
 
 it("reconnects indefinitely with backoff instead of giving up after one try", async () => {
   vi.useFakeTimers();
-  mocks.apiGet.mockResolvedValue(page([]));
+  // The run must stay listed as running: an unlisted tracked run is now
+  // resolved and untracked, which is a different behaviour under test.
+  mocks.apiGet.mockResolvedValue(page([payload({ state: "running" })]));
   trackRun({ runId: "r1", kind: "tailor" });
 
   // Fail the transport five times; the old `reconnects < 1` cap gave up after one.
@@ -313,4 +315,110 @@ it("does not apply a poll that lands after the poller was stopped", async () => 
   await pollRunsNow();
 
   expect(isTracking("late")).toBe(false);
+});
+
+it("does not re-announce a terminal run the server says was already announced", async () => {
+  // A failed revision stays in /api/runs after ack because the retry UI needs
+  // it. Announcing every terminal run in the payload re-toasted the same
+  // failure on every page load until the 24h sweep.
+  mocks.apiGet.mockResolvedValue(
+    page([
+      payload({
+        runId: "old-failure",
+        kind: "revise",
+        state: "error",
+        announcedAt: "2026-08-23T00:00:00Z",
+        meta: { versionId: 5, instruction: "shorter" },
+      }),
+    ]),
+  );
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+
+  await pollRunsNow();
+
+  expect(seen).toEqual([]);
+  // Still on screen for the retry UI, just not announced again.
+  expect(useRunStore.getState().runs["old-failure"]).toBeDefined();
+});
+
+it("resolves a tracked run the listing no longer mentions", async () => {
+  mocks.apiGet.mockImplementation((path: string) =>
+    path === "/api/runs"
+      ? Promise.resolve(page([]))
+      : Promise.resolve({ data: payload({ runId: "gone" }), error: undefined }),
+  );
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+  trackRun({ runId: "gone", kind: "tailor" });
+
+  await pollRunsNow();
+
+  expect(seen.flat().map((run) => run.runId)).toEqual(["gone"]);
+  expect(isTracking("gone")).toBe(false);
+});
+
+it("stops tracking a run that was swept, so its bar cannot freeze", async () => {
+  mocks.apiGet.mockImplementation((path: string) =>
+    path === "/api/runs"
+      ? Promise.resolve(page([]))
+      : Promise.reject(new Error("404")),
+  );
+  trackRun({ runId: "swept", kind: "tailor" });
+
+  await pollRunsNow();
+
+  expect(isTracking("swept")).toBe(false);
+  expect(useRunStore.getState().runs.swept).toBeUndefined();
+});
+
+it("coalesces concurrent reconciliations into one request", async () => {
+  mocks.apiGet.mockResolvedValue(page([]));
+
+  await Promise.all([pollRunsNow(), pollRunsNow(), pollRunsNow()]);
+
+  const listCalls = mocks.apiGet.mock.calls.filter(
+    (call: unknown[]) => call[0] === "/api/runs",
+  );
+  expect(listCalls).toHaveLength(1);
+});
+
+it("keeps a completion found by a poll that raced the idle stop", async () => {
+  // The idle stop used to bump the generation, so whichever concurrent poll
+  // finished first invalidated the others -- discarding a completion they had
+  // already fetched.
+  mocks.apiGet.mockResolvedValue(page([payload({ runId: "racer" })]));
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+
+  await pollRunsNow();
+  resetRunTrackerForTests();
+  addTerminalListener((runs) => seen.push(runs));
+  await pollRunsNow();
+
+  expect(seen.flat().map((run) => run.runId)).toEqual(["racer", "racer"]);
+});
+
+it("resets the reconnect delay when a frame arrives", async () => {
+  vi.useFakeTimers();
+  mocks.apiGet.mockResolvedValue(page([payload({ state: "running" })]));
+  trackRun({ runId: "r1", kind: "tailor" });
+
+  const failThenCount = async () => {
+    const before = mocks.watchRun.mock.calls.length;
+    (mocks.watchRun.mock.calls.at(-1)![3] as () => void)();
+    await vi.advanceTimersByTimeAsync(1100);
+    return mocks.watchRun.mock.calls.length > before;
+  };
+
+  // First failure reconnects within the 1s base delay (plus jitter headroom).
+  expect(await failThenCount()).toBe(true);
+  // Second failure has doubled, so 1.1s is no longer enough...
+  expect(await failThenCount()).toBe(false);
+  await vi.advanceTimersByTimeAsync(60_000);
+
+  // ...until a frame arrives and resets it.
+  (mocks.watchRun.mock.calls.at(-1)![4] as () => void)();
+  expect(await failThenCount()).toBe(true);
+  vi.useRealTimers();
 });

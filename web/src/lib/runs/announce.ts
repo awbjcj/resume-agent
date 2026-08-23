@@ -69,7 +69,11 @@ export function announceCompletions(runs: readonly RunRecord[]): void {
   if (runs.length > ANNOUNCE_TOAST_CAP) {
     const failed = runs.filter((run) => run.status === "failed").length;
     const detail = failed > 0 ? ` (${failed} failed)` : "";
-    toast.success(`${runs.length} runs finished while you were away${detail}.`);
+    const summary = `${runs.length} runs finished while you were away${detail}.`;
+    // A green toast reporting that everything failed is a lie the user has to
+    // read twice. Severity follows the batch.
+    if (failed === runs.length) toast.error(summary);
+    else toast.success(summary);
     return;
   }
   for (const run of runs) announceOne(run);
