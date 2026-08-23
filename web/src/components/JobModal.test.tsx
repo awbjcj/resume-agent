@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { server } from "@/test/server";
@@ -61,7 +61,9 @@ describe("JobModal", () => {
     );
     wrap(<JobModal jobId={42} onClose={() => {}} />);
     await waitFor(() =>
-      expect(screen.getByText(/rejected during discovery/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/rejected during discovery/i),
+      ).toBeInTheDocument(),
     );
     expect(
       screen.getByText("off-target role: not a backend posting"),
@@ -83,7 +85,9 @@ describe("JobModal", () => {
     );
     wrap(<JobModal jobId={42} onClose={() => {}} />);
     await waitFor(() =>
-      expect(screen.getByText(/filtered out during discovery/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/filtered out during discovery/i),
+      ).toBeInTheDocument(),
     );
     expect(screen.getByText("salary below minimum")).toBeInTheDocument();
   });
@@ -103,7 +107,9 @@ describe("JobModal", () => {
       ),
     );
     wrap(<JobModal jobId={42} onClose={() => {}} />);
-    await waitFor(() => expect(screen.getByText("Must-have")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Must-have")).toBeInTheDocument(),
+    );
     expect(screen.getByText("Nice-to-have")).toBeInTheDocument();
     expect(screen.getByText("Python")).toBeInTheDocument();
     expect(screen.getByText("Rust")).toBeInTheDocument();
@@ -123,9 +129,13 @@ describe("JobModal", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("heading", { name: /staff engineer/i }),
+      ).toBeInTheDocument(),
     );
-    expect(screen.getByRole("button", { name: /previous job/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /previous job/i }),
+    ).toBeDisabled();
     expect(screen.getByRole("button", { name: /next job/i })).toBeEnabled();
   });
 
@@ -144,7 +154,9 @@ describe("JobModal", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /next job/i })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: /next job/i }),
+      ).toBeInTheDocument(),
     );
     fireEvent.click(screen.getByRole("button", { name: /next job/i }));
     fireEvent.click(screen.getByRole("button", { name: /previous job/i }));
@@ -156,10 +168,19 @@ describe("JobModal", () => {
     server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
     const onNext = vi.fn();
     wrap(
-      <JobModal jobId={42} onClose={() => {}} onPrev={() => {}} onNext={onNext} hasPrev hasNext />,
+      <JobModal
+        jobId={42}
+        onClose={() => {}}
+        onPrev={() => {}}
+        onNext={onNext}
+        hasPrev
+        hasNext
+      />,
     );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /next job/i })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: /next job/i }),
+      ).toBeInTheDocument(),
     );
 
     fireEvent.keyDown(document.body, { key: "ArrowRight" });
@@ -176,9 +197,13 @@ describe("JobModal", () => {
     server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
     wrap(<JobModal jobId={42} onClose={() => {}} />);
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("heading", { name: /staff engineer/i }),
+      ).toBeInTheDocument(),
     );
-    expect(screen.queryByRole("button", { name: /next job/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /next job/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("uses the expanded workspace canvas and gives resumes a full-width tab", async () => {
@@ -197,15 +222,21 @@ describe("JobModal", () => {
     );
     wrap(<JobModal jobId={42} onClose={() => {}} />);
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("heading", { name: /staff engineer/i }),
+      ).toBeInTheDocument(),
     );
     const dialog = screen.getByRole("dialog");
     expect(dialog.className).toContain("sm:max-w-7xl");
     expect(dialog.className).not.toContain("1760px");
-    expect(screen.getByRole("heading", { name: "Job brief" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Job Brief" }),
+    ).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole("tab", { name: /resumes/i }));
-    expect(screen.getByRole("heading", { name: "Resume versions" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Resume versions" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("3 versions")).toBeInTheDocument();
   });
 
@@ -214,27 +245,41 @@ describe("JobModal", () => {
     const user = userEvent.setup();
     wrap(<JobModal jobId={42} onClose={() => {}} />);
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("heading", { name: /staff engineer/i }),
+      ).toBeInTheDocument(),
     );
 
     await user.click(await screen.findByRole("button", { name: /^redo/i }));
 
-    expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /re-tailor 1 job/i }),
+    ).toBeEnabled();
   });
 
   it("exposes each major section as a top-level full-canvas tab", async () => {
     server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
     wrap(<JobModal jobId={42} onClose={() => {}} />);
 
-    expect(await screen.findByRole("tab", { name: "Job details" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("tab", { name: "Job details" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Resumes" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Sponsorship" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Cover letters" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Sponsorship" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Cover letters" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Tracking" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Interview" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Career Lab" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Application" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Management" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: "Application" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: "Management" }),
+    ).not.toBeInTheDocument();
     expect(screen.getAllByRole("tab")).toHaveLength(7);
   });
 
