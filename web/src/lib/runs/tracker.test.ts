@@ -5,10 +5,34 @@ import type { RunRecord } from "./store";
 const mocks = vi.hoisted(() => ({ apiGet: vi.fn(), watchRun: vi.fn() }));
 vi.mock("@/lib/api/client", () => ({
   api: { GET: mocks.apiGet },
-  unwrap: async (request: Promise<unknown>) => request,
+  // Faithful to the real helpers rather than identity: the tracker reads runs
+  // through fetchAllPages, so a stub that skipped the Page envelope would let
+  // an envelope mistake pass here and fail only in the browser.
+  unwrap: async (request: Promise<{ data?: unknown }>) => (await request).data,
+  fetchAllPages: async (
+    getPage: (page: number) => Promise<{ data?: unknown }>,
+  ) => {
+    const first = (await getPage(1)).data as {
+      data: unknown[];
+      pagination: { totalPages: number };
+    };
+    const all = [...first.data];
+    for (let page = 2; page <= first.pagination.totalPages; page += 1) {
+      const next = (await getPage(page)).data as { data: unknown[] };
+      all.push(...next.data);
+    }
+    return all;
+  },
 }));
 vi.mock("./sse", () => ({
-  stateToStatus: (state: string) => (state === "done" ? "succeeded" : "running"),
+  stateToStatus: (state: string) =>
+    state === "done"
+      ? "succeeded"
+      : state === "error"
+        ? "failed"
+        : state === "cancelled"
+          ? "cancelled"
+          : "running",
   watchRun: mocks.watchRun,
 }));
 
@@ -16,7 +40,9 @@ import {
   addTerminalListener,
   completeRuns,
   isTracking,
+  pollRunsNow,
   resetRunTrackerForTests,
+  stopRunPoller,
   trackRun,
 } from "./tracker";
 import { useRunStore } from "./store";
@@ -69,17 +95,25 @@ it("reset closes active subscriptions", () => {
 it("reconciles a terminal backend status after an SSE transport error", async () => {
   const onDone = vi.fn();
   mocks.apiGet.mockResolvedValue({
-    runId: "r1",
-    kind: "pull",
-    state: "done",
-    label: "Done",
-    percent: 100,
-    current: 1,
-    total: 1,
-    etaText: null,
-    result: null,
-    error: null,
-    meta: { jobIds: [3, 8] },
+    data: {
+      data: [
+        {
+          runId: "r1",
+          kind: "pull",
+          state: "done",
+          label: "Done",
+          percent: 100,
+          current: 1,
+          total: 1,
+          etaText: null,
+          result: null,
+          error: null,
+          meta: { jobIds: [3, 8] },
+        },
+      ],
+      pagination: { totalPages: 1 },
+    },
+    error: undefined,
   });
   trackRun({ runId: "r1", kind: "pull" }, onDone);
 
@@ -161,4 +195,122 @@ it("keeps a failed revise visible for the retry UI", () => {
   vi.advanceTimersByTime(10_000);
   expect(useRunStore.getState().runs.r9).toBeDefined();
   vi.useRealTimers();
+});
+
+function page(items: unknown[]) {
+  return { data: { data: items, pagination: { totalPages: 1 } }, error: undefined };
+}
+
+function payload(overrides: Record<string, unknown> = {}) {
+  return {
+    runId: "r1",
+    kind: "tailor",
+    state: "done",
+    label: "Done",
+    percent: 100,
+    current: 1,
+    total: 1,
+    ...overrides,
+  };
+}
+
+it("reconnects indefinitely with backoff instead of giving up after one try", async () => {
+  vi.useFakeTimers();
+  mocks.apiGet.mockResolvedValue(page([]));
+  trackRun({ runId: "r1", kind: "tailor" });
+
+  // Fail the transport five times; the old `reconnects < 1` cap gave up after one.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const onError = mocks.watchRun.mock.calls.at(-1)![3] as () => void;
+    onError();
+    await vi.advanceTimersByTimeAsync(60_000);
+  }
+
+  expect(mocks.watchRun.mock.calls.length).toBeGreaterThan(5);
+  expect(isTracking("r1")).toBe(true);
+  vi.useRealTimers();
+});
+
+it("finishes a tracked run the poller finds terminal", async () => {
+  mocks.apiGet.mockResolvedValue(page([payload()]));
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+  trackRun({ runId: "r1", kind: "tailor" });
+
+  await pollRunsNow();
+
+  expect(seen.flat().map((run) => run.runId)).toEqual(["r1"]);
+  expect(isTracking("r1")).toBe(false);
+});
+
+it("announces a terminal run it never tracked", async () => {
+  mocks.apiGet.mockResolvedValue(page([payload({ runId: "orphan" })]));
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+
+  await pollRunsNow();
+
+  expect(seen.flat().map((run) => run.runId)).toEqual(["orphan"]);
+});
+
+it("starts tracking an active run it discovers", async () => {
+  mocks.apiGet.mockResolvedValue(
+    page([payload({ runId: "live", state: "running", percent: 40 })]),
+  );
+
+  await pollRunsNow();
+
+  expect(isTracking("live")).toBe(true);
+});
+
+it("treats a failed poll as no news about any run", async () => {
+  mocks.apiGet.mockRejectedValue(new Error("offline"));
+  const seen: RunRecord[][] = [];
+  addTerminalListener((runs) => seen.push(runs));
+  trackRun({ runId: "r1", kind: "tailor" });
+
+  await pollRunsNow();
+
+  expect(seen).toEqual([]);
+  expect(isTracking("r1")).toBe(true);
+});
+
+it("reconciles every page of runs, not just the first", async () => {
+  mocks.apiGet.mockImplementation((_path: string, opts: { params: { query: { page: number } } }) => {
+    const p = opts.params.query.page;
+    return Promise.resolve({
+      data: {
+        data: [payload({ runId: `r${p}`, state: "running", percent: p * 10 })],
+        pagination: { totalPages: 2 },
+      },
+      error: undefined,
+    });
+  });
+
+  await pollRunsNow();
+
+  expect(isTracking("r1")).toBe(true);
+  expect(isTracking("r2")).toBe(true);
+  expect(useRunStore.getState().runs.r2?.percent).toBe(20);
+});
+
+it("retries the run list once after a transient failure", async () => {
+  mocks.apiGet
+    .mockRejectedValueOnce(new Error("503"))
+    .mockResolvedValue(page([payload({ runId: "live", state: "running" })]));
+
+  await pollRunsNow();
+
+  expect(isTracking("live")).toBe(true);
+});
+
+it("does not apply a poll that lands after the poller was stopped", async () => {
+  mocks.apiGet.mockImplementation(async () => {
+    stopRunPoller();
+    return page([payload({ runId: "late", state: "running" })]);
+  });
+
+  await pollRunsNow();
+
+  expect(isTracking("late")).toBe(false);
 });

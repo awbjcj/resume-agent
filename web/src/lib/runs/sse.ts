@@ -36,6 +36,7 @@ export function watchRun(
   kind: string,
   onDone?: (run: RunRecord) => void,
   onTransportError?: () => void,
+  onMessage?: () => void,
 ): () => void {
   let source: EventSource | null = null;
   let closed = false;
@@ -48,6 +49,10 @@ export function watchRun(
     source = eventSource;
 
   eventSource.onmessage = (e) => {
+    // Any frame at all proves the stream is alive, so the tracker resets its
+    // reconnect backoff here rather than on a successful open — a connection
+    // that opens and immediately dies should not look healthy.
+    onMessage?.();
     let data: {
       state?: string;
       percent?: number;
