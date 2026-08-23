@@ -33,6 +33,7 @@ The Docker image intentionally overrides four local defaults:
 | `LLM_CONCURRENCY` | `8` | Maximum LLM fan-out; integer at least 1. |
 | `LLM_RETRIES` | `2` | Structured/provider retry count; non-negative integer. |
 | `LLM_RETRY_DELAY` | `1` | Base retry delay in seconds; non-negative integer. |
+| `RUN_ANNOUNCE_WINDOW_SECONDS` | `3600` | How recently a background run must have finished to be announced on reconnect; integer seconds from 0 through 86400. |
 
 Model IDs can use `openai:`, `gemini:`, or `deepseek:` prefixes. A bare model
 ID uses Anthropic. Reasoning-effort strings are deliberately provider-specific;

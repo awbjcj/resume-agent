@@ -46,6 +46,34 @@
         "title": "AccountUsage",
         "type": "object"
       },
+      "AckRunsIn": {
+        "description": "Runs the client has shown the user.\n\nUnknown, non-terminal, already-acked, and other users' ids are skipped\nrather than rejected -- see ``ack_runs`` for why.",
+        "properties": {
+          "runIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Runids",
+            "type": "array"
+          }
+        },
+        "title": "AckRunsIn",
+        "type": "object"
+      },
+      "AckRunsOut": {
+        "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "acknowledged"
+        ],
+        "title": "AckRunsOut",
+        "type": "object"
+      },
       "AddAliasIn": {
         "properties": {
           "alias": {
@@ -8306,6 +8334,18 @@
       },
       "RunOut": {
         "properties": {
+          "announcedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announcedat"
+          },
           "current": {
             "title": "Current",
             "type": "integer"
@@ -21795,6 +21835,63 @@
           }
         },
         "summary": "List Runs"
+      }
+    },
+    "/api/runs/ack": {
+      "post": {
+        "description": "Record that the user has been shown these completions.\n\nDeliberately forgiving: an id that is unknown, already acked, still running,\nor owned by someone else is skipped rather than raising. The client is\nreporting what it displayed, and a partially stale batch is normal --\nfailing the whole request would make the client re-announce everything it\njust showed the user.",
+        "operationId": "ack_runs_api_runs_ack_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AckRunsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckRunsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ack Runs"
       }
     },
     "/api/runs/{run_id}": {

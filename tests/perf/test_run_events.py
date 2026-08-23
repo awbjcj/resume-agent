@@ -49,6 +49,7 @@ class _Manager:
             error=None,
             error_code=None,
             meta=None,
+            announced_at=None,
         )
 
     def finish(self) -> None:

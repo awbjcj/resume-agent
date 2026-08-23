@@ -1,67 +1,16 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api, unwrap } from "@/lib/api/client";
+import { DEFAULT_INVALIDATE, rememberInvalidation } from "@/lib/runs/invalidation";
+import { revisionMetaKey } from "@/lib/runs/revisions";
 import { useRunStore } from "@/lib/runs/store";
 import type { RunMeta } from "@/lib/runs/store";
 import { trackRun } from "@/lib/runs/tracker";
 
 type RunOut = { runId: string; kind: string; meta?: RunMeta | null };
 
-const DEFAULT_INVALIDATE = ["shortlist", "pipeline", "triage", "job"];
-
-function announceCompletion(run: import("@/lib/runs/store").RunRecord) {
-  if (run.status === "failed") {
-    toast.error(`${run.kind} failed: ${run.error ?? "unknown error"}`);
-    return;
-  }
-  if (run.status === "cancelled") {
-    toast.info(`${run.kind} cancelled`);
-    return;
-  }
-  if (run.kind === "tailor") {
-    const rawJobs = (run.result as { jobs?: unknown } | null)?.jobs;
-    const jobs: unknown[] = Array.isArray(rawJobs) ? rawJobs : [];
-    const versions = jobs.reduce<number>(
-      (total, job) => {
-        const count = (job as { versionCount?: unknown } | null)?.versionCount;
-        return total + (typeof count === "number" ? count : 0);
-      },
-      0,
-    );
-    toast.success(
-      `Tailoring complete: ${versions} resume versions created. Open a job's Versions tab to render PDF.`,
-    );
-    return;
-  }
-  if (run.kind === "refreshClusters") {
-    const result = (run.result as Record<string, unknown> | null) ?? {};
-    const count = (key: string) =>
-      typeof result[key] === "number" ? result[key] : 0;
-    toast.success(
-      `Regroup complete: ${count("assignedSkills")} assigned · ${count("aliasesMerged")} aliases merged · ${count("domainsCreated")} domains created · ${count("uncertainSkills")} uncertain · ${count("failedSkills")} failed · ${count("skippedStaleSkills")} skipped.`,
-    );
-    return;
-  }
-  if (run.kind === "maintainTaxonomy") {
-    const result = (run.result as Record<string, unknown> | null) ?? {};
-    const actions = Array.isArray(result.actions) ? result.actions.length : 0;
-    toast.success(
-      result.changed
-        ? `Taxonomy maintenance applied ${actions} change${actions === 1 ? "" : "s"}.`
-        : "Taxonomy maintenance found no safe changes.",
-    );
-    return;
-  }
-  if (run.kind === "undoTaxonomyMaintenance") {
-    toast.success("Restored the previous taxonomy maintenance generation.");
-    return;
-  }
-  toast.success(`${run.kind} completed`);
-}
-
 function removeSupersededArtifactFailures(kind: string, meta?: RunMeta): void {
-  const metaKey = kind === "revise" ? "versionId" : kind === "coverLetterRevise" ? "coverLetterId" : null;
+  const metaKey = revisionMetaKey(kind);
   if (!metaKey || meta?.[metaKey] == null) return;
   const store = useRunStore.getState();
   for (const run of Object.values(store.runs)) {
@@ -76,17 +25,22 @@ function removeSupersededArtifactFailures(kind: string, meta?: RunMeta): void {
 }
 
 export function useLaunchRun() {
-  const qc = useQueryClient();
   const launch = async (
     kind: string,
     call: () => Promise<unknown>,
-    invalidate: string[] = DEFAULT_INVALIDATE,
+    invalidate: string[] = [...DEFAULT_INVALIDATE],
     meta?: RunMeta,
   ): Promise<boolean> => {
     try {
       const run = (await call()) as RunOut;
       const effectiveMeta = run.meta ?? meta;
       removeSupersededArtifactFailures(kind, effectiveMeta);
+      // The caller knows best which queries this particular run invalidates, so
+      // it registers them against the run id. Announcing, acking and
+      // invalidating then happen once, globally, in useRunCompletionEffects --
+      // which is what lets a completion discovered on page load (with no launch
+      // closure left alive) still refresh the board.
+      rememberInvalidation(run.runId, invalidate);
       useRunStore.getState().upsert({
         runId: run.runId,
         kind,
@@ -98,12 +52,7 @@ export function useLaunchRun() {
         etaText: null,
         meta: effectiveMeta,
       });
-      trackRun({ runId: run.runId, kind }, async (completed) => {
-        await Promise.all(
-          invalidate.map((key) => qc.invalidateQueries({ queryKey: [key] })),
-        );
-        announceCompletion(completed);
-      });
+      trackRun({ runId: run.runId, kind });
       return true;
     } catch (e) {
       toast.error(`Failed to start ${kind}: ${(e as Error).message}`);

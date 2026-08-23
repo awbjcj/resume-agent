@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     detail_fetch_concurrency: int = Field(default=4, ge=1)
     llm_retries: int = Field(default=2, ge=0)
     llm_retry_delay: int = Field(default=1, ge=0)
+    # How recently a terminal run must have finished to still be worth
+    # announcing when a client reconnects. Beyond this it is stale news; the
+    # record stays readable until the 24h run sweep either way.
+    run_announce_window_seconds: int = Field(default=3600, ge=0, le=86_400)
     prompt_cache_enabled: bool = True
     suggestion_batch_concurrency: int = Field(default=3, ge=1, le=16)
     cluster_batch_size: int = Field(default=60, ge=1, le=500)

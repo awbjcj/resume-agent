@@ -1,9 +1,13 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RunRecord } from "@/lib/runs/store";
+import {
+  DEFAULT_INVALIDATE,
+  invalidationKeys,
+  resetInvalidationForTests,
+} from "@/lib/runs/invalidation";
 import { useRunStore } from "@/lib/runs/store";
 
 const mocks = vi.hoisted(() => ({
@@ -23,50 +27,45 @@ import { useLaunchRun } from "./use-launch-run";
 describe("useLaunchRun", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetInvalidationForTests();
     useRunStore.setState({ runs: {} });
   });
 
-  it("refreshes job details and announces generated resume versions on completion", async () => {
+  it("registers the run's invalidation keys and tracks it without owning completion effects", async () => {
+    // Completion effects used to live in this closure, which is precisely why a
+    // run discovered on page load refreshed nothing: the closure was gone. The
+    // launch site now only records which queries THIS run invalidates.
     const qc = new QueryClient();
-    const invalidate = vi.spyOn(qc, "invalidateQueries");
-    let onDone: ((run: RunRecord) => void) | undefined;
-    mocks.trackRun.mockImplementation((_seed, callback) => {
-      onDone = callback;
-    });
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(() => useLaunchRun(), { wrapper });
 
     await act(() =>
-      result.current.launch("tailor", async () => ({ runId: "r1", kind: "tailor" })),
-    );
-    expect(mocks.trackRun).toHaveBeenCalledWith(
-      { runId: "r1", kind: "tailor" },
-      expect.any(Function),
-    );
-    expect(onDone).toBeDefined();
-
-    act(() => {
-      onDone!({
-        runId: "r1",
-        kind: "tailor",
-        status: "succeeded",
-        percent: 100,
-        phase: "Tailoring",
-        current: 1,
-        total: 1,
-        etaText: null,
-        result: { jobs: [{ jobId: 1, versionCount: 3 }] },
-      });
-    });
-
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["job"] });
-    await waitFor(() =>
-      expect(mocks.toastSuccess).toHaveBeenCalledWith(
-        expect.stringMatching(/3 resume versions.*render PDF/i),
+      result.current.launch(
+        "tailor",
+        async () => ({ runId: "r1", kind: "tailor" }),
+        ["job"],
       ),
     );
+
+    expect(mocks.trackRun).toHaveBeenCalledWith({ runId: "r1", kind: "tailor" });
+    expect(invalidationKeys("r1", "tailor")).toEqual(["job"]);
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the default keys when the caller names none", async () => {
+    const qc = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useLaunchRun(), { wrapper });
+
+    await act(() =>
+      result.current.launch("tailor", async () => ({ runId: "r2", kind: "tailor" })),
+    );
+
+    expect(invalidationKeys("r2", "tailor")).toEqual([...DEFAULT_INVALIDATE]);
   });
 
   it("keeps durable artifact metadata on the optimistic run", async () => {

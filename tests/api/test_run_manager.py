@@ -1,5 +1,5 @@
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Barrier, Event, Lock, Thread
 
 import pytest
@@ -551,3 +551,212 @@ def test_shutdown_waits_for_owned_workers(tmp_path):
     release.set()
     assert stopped.wait(timeout=1)
     shutdown_thread.join(timeout=1)
+
+
+def _raw_record(**overrides):
+    base = {
+        "process": "r1",
+        "kind": "tailor",
+        "state": "done",
+        "label": "Tailoring",
+        "current": 1,
+        "total": 1,
+        "started_at": "2026-08-22T00:00:00+00:00",
+        "created_at": "2026-08-22T00:00:00+00:00",
+        "updated_at": "2026-08-22T00:00:05+00:00",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_snapshot_announced_at_is_none_when_absent():
+    snapshot = parse_run_snapshot("r1", _raw_record())
+    assert snapshot is not None
+    assert snapshot.announced_at is None
+
+
+def test_snapshot_parses_announced_at():
+    snapshot = parse_run_snapshot(
+        "r1", _raw_record(announced_at="2026-08-22T00:01:00+00:00")
+    )
+    assert snapshot is not None
+    assert snapshot.announced_at == datetime(2026, 8, 22, 0, 1, tzinfo=timezone.utc)
+
+
+def test_snapshot_rejects_unusable_announced_at():
+    for value in ("not-a-date", "2026-08-22T00:01:00", 12345, None):
+        snapshot = parse_run_snapshot("r1", _raw_record(announced_at=value))
+        assert snapshot is not None
+        assert snapshot.announced_at is None
+
+
+def test_mark_announced_stamps_a_terminal_run_once(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+
+    assert mgr.mark_announced(run_id) is True
+    snapshot = mgr.get(run_id)
+    assert snapshot is not None and snapshot.announced_at is not None
+
+    # Idempotent: a second ack changes nothing and reports nothing done.
+    stamped = snapshot.announced_at
+    assert mgr.mark_announced(run_id) is False
+    updated = mgr.get(run_id)
+    assert updated is not None
+    assert updated.announced_at == stamped
+
+
+def test_mark_announced_refuses_unknown_and_active_runs(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    assert mgr.mark_announced("does-not-exist") is False
+
+    pending = mgr.create("tailor")
+    pending_snapshot = mgr.get(pending)
+    assert pending_snapshot is not None
+    assert pending_snapshot.state.value == "pending"
+    assert mgr.mark_announced(pending) is False
+    pending_snapshot = mgr.get(pending)
+    assert pending_snapshot is not None
+    assert pending_snapshot.announced_at is None
+
+
+def test_mark_announced_preserves_the_rest_of_the_record(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"versions": 3}, meta={"jobId": 7})
+
+    before = mgr.get(run_id)
+    assert before is not None
+    mgr.mark_announced(run_id)
+    after = mgr.get(run_id)
+    assert after is not None
+
+    assert after.result == before.result == {"versions": 3}
+    assert after.meta == before.meta == {"jobId": 7}
+    assert after.state == before.state
+    assert after.kind == before.kind
+
+
+def test_list_rehydratable_omits_terminal_runs_without_a_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    mgr.submit("tailor", lambda reporter: {"ok": True})
+    assert mgr.list_rehydratable() == []
+
+
+def test_list_rehydratable_returns_unannounced_terminal_runs_in_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+
+    visible = mgr.list_rehydratable(announce_window_seconds=3600)
+    assert [item.run_id for item in visible] == [run_id]
+
+    mgr.mark_announced(run_id)
+    assert mgr.list_rehydratable(announce_window_seconds=3600) == []
+
+
+def test_list_rehydratable_excludes_terminal_runs_past_the_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+    later = datetime.now(timezone.utc) + timedelta(seconds=7200)
+
+    assert mgr.list_rehydratable(announce_window_seconds=3600, now=later) == []
+    # Still individually readable -- only announcement is windowed.
+    assert mgr.get(run_id) is not None
+
+
+def test_list_rehydratable_still_returns_active_runs_with_a_window(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    pending = mgr.create("tailor")
+    visible = mgr.list_rehydratable(announce_window_seconds=3600)
+    assert [item.run_id for item in visible] == [pending]
+
+
+def test_announce_window_never_resurrects_a_superseded_revision(tmp_path):
+    """Supersession beats announcement.
+
+    Only the latest attempt per artifact is rehydratable; a failed attempt a
+    retry replaced is deliberately hidden so the retry UI is not offered a
+    failure the user already moved past. The announce window must not undo that.
+    """
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    meta = {"versionId": 5, "jobId": 3, "instruction": "shorter"}
+
+    failed_id = mgr.create("revise", meta=meta)
+    mgr.reporter(failed_id, "revise").done(error="first failed")
+    retry_id = mgr.create("revise", meta=meta)
+    mgr.reporter(retry_id, "revise").done(result={"versionId": 6})
+
+    visible = {
+        item.run_id for item in mgr.list_rehydratable(announce_window_seconds=3600)
+    }
+    assert visible == {retry_id}
+
+
+def test_reporter_wakes_the_current_notifier_after_release(tmp_path):
+    """A reconnecting client gets a fresh notifier; the worker must find it.
+
+    ``_release_terminal_notifier`` drops the notifier once nobody is subscribed,
+    and ``notifier()`` then setdefaults a NEW object for the next subscriber. A
+    reporter that captured the old object's bound method would wake an orphan,
+    and the reconnected stream would silently fall back to polling.
+    """
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.create("tailor")
+    reporter = mgr.reporter(run_id, "tailor")
+
+    original = mgr.notifier(run_id)
+    # Simulate the release that happens when the last subscriber goes away.
+    mgr._stream_notifiers.pop(run_id, None)
+
+    replacement = mgr.notifier(run_id)
+    assert replacement is not original
+
+    woken = Event()
+    replacement.notify = lambda: woken.set()  # type: ignore[method-assign]
+
+    reporter.begin(1, "Tailoring")
+
+    assert woken.is_set(), "reporter woke a discarded notifier"
+
+
+def test_ack_does_not_revive_a_released_notifier(tmp_path):
+    """``_write`` wakes subscribers via ``notifier()``, which is a setdefault.
+
+    Acking a terminal run therefore used to re-insert a notifier that
+    ``_release_terminal_notifier`` had already popped, and nothing pops it a
+    second time -- one permanent entry per acknowledged run, on a server that
+    runs for weeks.
+    """
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+    assert mgr._stream_notifiers == {}
+
+    assert mgr.mark_announced(run_id) is True
+
+    assert mgr._stream_notifiers == {}
+
+
+def test_concurrent_acks_stamp_exactly_once(tmp_path):
+    """The lock makes read-check-write atomic between competing tabs."""
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.submit("tailor", lambda reporter: {"ok": True})
+
+    start = Barrier(8)
+    results: list[bool] = []
+    results_lock = Lock()
+
+    def ack() -> None:
+        start.wait(timeout=5)
+        stamped = mgr.mark_announced(run_id)
+        with results_lock:
+            results.append(stamped)
+
+    threads = [Thread(target=ack) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert results.count(True) == 1, results
+    updated = mgr.get(run_id)
+    assert updated is not None
+    assert updated.announced_at is not None

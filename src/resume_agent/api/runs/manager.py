@@ -21,7 +21,7 @@ import uuid
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from resume_agent.api.runs.models import (
@@ -42,6 +42,20 @@ from resume_agent.progress import (
 from resume_agent.tenancy.context import current_context
 
 RunFn = Callable[[ProgressReporter], object]
+
+#: Run kinds that revise one artifact, and the ``meta`` key naming it. Only
+#: the latest attempt per artifact is ever rehydrated, so a superseded failure
+#: cannot come back and offer a retry the user has already moved past.
+_REVISION_META_KEYS = {"revise": "versionId", "coverLetterRevise": "coverLetterId"}
+
+
+def _revision_key(snapshot: RunSnapshot) -> tuple[str, object] | None:
+    """The (kind, artifact) a revision run belongs to, or None if it is not one."""
+    meta_key = _REVISION_META_KEYS.get(snapshot.kind)
+    if meta_key is None or not snapshot.meta:
+        return None
+    artifact_id = snapshot.meta.get(meta_key)
+    return None if artifact_id is None else (snapshot.kind, artifact_id)
 
 
 class RunCancelled(Exception):
@@ -315,7 +329,12 @@ class RunManager:
             user_id=record.get("user_id"),
             cancel_check=lambda: self.is_cancel_requested(run_id),
             meta=record.get("meta") if isinstance(record.get("meta"), dict) else None,
-            notify=self.notifier(run_id).notify,
+            # Resolved at call time, not captured: ``_release_terminal_notifier``
+            # can discard this run's notifier between reporter construction and
+            # the next write, and a reconnecting client will have created a
+            # replacement. A captured bound method would wake the orphan, and
+            # the reconnected stream would silently fall back to polling.
+            notify=lambda: self.notifier(run_id).notify(),
         )
 
     def submit(
@@ -517,6 +536,37 @@ class RunManager:
     def get(self, run_id: str) -> RunSnapshot | None:
         return parse_run_snapshot(run_id, self._read_record(run_id))
 
+    def mark_announced(self, run_id: str, *, now: str | None = None) -> bool:
+        """Stamp a terminal run as announced. True only if newly stamped.
+
+        Read-modify-write under the manager lock, re-reading inside it: two
+        browser tabs can ack the same run at once, and the lock is what makes
+        the read-check-write sequence atomic between them. It does **not**
+        exclude a worker thread -- ``ProgressReporter`` and ``request_cancel``
+        write records without taking it. What keeps this from turning a live
+        progress write into a lost update is the terminal-state guard: a run
+        that has reached a terminal state has no worker left to write it.
+        ``_singleton_lock`` is an RLock, so the nested ``get``/``_write`` calls
+        are deliberate, not an oversight.
+        """
+        with self._singleton_lock:
+            snapshot = self.get(run_id)
+            if snapshot is None or snapshot.state not in TERMINAL_RUN_STATES:
+                return False
+            if snapshot.announced_at is not None:
+                return False
+            record = self._read_record(run_id)
+            if record is None:
+                return False
+            record["announced_at"] = now or _now()
+            self._write(run_id, record)
+            # ``_write`` wakes subscribers through ``notifier()``, which is a
+            # setdefault -- so acking a run whose notifier was already released
+            # silently re-inserts one that nothing will ever pop again. Release
+            # it back if this ack was the only thing that revived it.
+            self._release_terminal_notifier(run_id)
+            return True
+
     def list_active(self, user_id: str | None = None) -> list[RunSnapshot]:
         with self._singleton_lock:
             roots = tuple(self._roots)
@@ -531,8 +581,21 @@ class RunManager:
         ]
         return sorted(snapshots, key=lambda item: (item.created_at, item.run_id))
 
-    def list_rehydratable(self, user_id: str | None = None) -> list[RunSnapshot]:
-        """Return active runs plus failed revisions whose metadata enables retry."""
+    def list_rehydratable(
+        self,
+        user_id: str | None = None,
+        *,
+        announce_window_seconds: float | None = None,
+        now: datetime | None = None,
+    ) -> list[RunSnapshot]:
+        """Active runs, failed revisions, and recently-finished unannounced runs.
+
+        ``announce_window_seconds`` is what makes a completion recoverable after
+        the client that launched it went away: without it a run that succeeded
+        while nobody was connected is invisible to the UI forever. It is opt-in
+        so every existing caller keeps the old contract; only the
+        ``GET /api/runs`` route passes it.
+        """
         with self._singleton_lock:
             roots = tuple(self._roots)
         snapshots = [
@@ -550,19 +613,9 @@ class RunManager:
         }
         latest_revision: dict[tuple[str, object], RunSnapshot] = {}
         for snapshot in snapshots:
-            meta_key = (
-                "versionId"
-                if snapshot.kind == "revise"
-                else "coverLetterId"
-                if snapshot.kind == "coverLetterRevise"
-                else None
-            )
-            artifact_id = (
-                snapshot.meta.get(meta_key) if snapshot.meta and meta_key else None
-            )
-            if meta_key is None or artifact_id is None:
+            key = _revision_key(snapshot)
+            if key is None:
                 continue
-            key = (snapshot.kind, artifact_id)
             previous = latest_revision.get(key)
             # Timestamps can tie on fast retries. Prefer the active retry over
             # the failed attempt before using the random run id as a final
@@ -580,6 +633,33 @@ class RunManager:
         for snapshot in latest_revision.values():
             if snapshot.state.value == "error":
                 visible[snapshot.run_id] = snapshot
+        if announce_window_seconds is not None:
+            # A completion nobody was connected to see is still news -- but only
+            # for a while. Past the window it is stale, and a toast for a run
+            # that finished yesterday is noise; the record stays readable via
+            # ``get`` either way, until the 24h sweep removes it.
+            #
+            # Runs *after* the revision pass, and skips anything that pass
+            # superseded: a revise attempt that a later attempt replaced is
+            # deliberately hidden, and announcing it would resurrect exactly the
+            # stale failure the supersession logic exists to suppress.
+            cutoff = (now or datetime.now(timezone.utc)) - timedelta(
+                seconds=announce_window_seconds
+            )
+            superseded = {
+                snapshot.run_id
+                for snapshot in snapshots
+                if (key := _revision_key(snapshot)) is not None
+                and latest_revision.get(key) is not snapshot
+            }
+            for snapshot in snapshots:
+                if (
+                    snapshot.state in TERMINAL_RUN_STATES
+                    and snapshot.announced_at is None
+                    and snapshot.updated_at >= cutoff
+                    and snapshot.run_id not in superseded
+                ):
+                    visible[snapshot.run_id] = snapshot
         return sorted(visible.values(), key=lambda item: (item.created_at, item.run_id))
 
     def recover_interrupted(self) -> int:
