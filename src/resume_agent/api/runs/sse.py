@@ -38,6 +38,7 @@ def record_to_run(snapshot: RunSnapshot) -> RunOut:
         error=snapshot.error,
         error_code=snapshot.error_code,
         meta=snapshot.meta,
+        announced_at=snapshot.announced_at,
     )
 
 

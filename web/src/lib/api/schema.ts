@@ -2522,6 +2522,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ack Runs
+         * @description Record that the user has been shown these completions.
+         *
+         *     Deliberately forgiving: an id that is unknown, already acked, still running,
+         *     or owned by someone else is skipped rather than raising. The client is
+         *     reporting what it displayed, and a partially stale batch is normal --
+         *     failing the whole request would make the client re-announce everything it
+         *     just showed the user.
+         */
+        post: operations["ack_runs_api_runs_ack_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -3185,6 +3211,22 @@ export interface components {
             sharedTokens?: components["schemas"]["TokenTotals"];
             /** Weightedtotal */
             weightedTotal: number;
+        };
+        /**
+         * AckRunsIn
+         * @description Runs the client has shown the user.
+         *
+         *     Unknown, non-terminal, already-acked, and other users' ids are skipped
+         *     rather than rejected -- see ``ack_runs`` for why.
+         */
+        AckRunsIn: {
+            /** Runids */
+            runIds?: string[];
+        };
+        /** AckRunsOut */
+        AckRunsOut: {
+            /** Acknowledged */
+            acknowledged: number;
         };
         /** AddAliasIn */
         AddAliasIn: {
@@ -6265,6 +6307,8 @@ export interface components {
         };
         /** RunOut */
         RunOut: {
+            /** Announcedat */
+            announcedAt?: string | null;
             /** Current */
             current: number;
             /** Error */
@@ -13366,6 +13410,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_RunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ack_runs_api_runs_ack_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AckRunsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AckRunsOut"];
                 };
             };
             /** @description Validation Error */

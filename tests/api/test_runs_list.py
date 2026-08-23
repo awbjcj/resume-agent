@@ -79,4 +79,9 @@ def test_list_runs_only_rehydrates_the_latest_revision_attempt(tmp_path):
         completed = client.get("/api/runs").json()["data"]
 
     assert [run["runId"] for run in active] == [retry_id]
-    assert completed == []
+    # The succeeded retry is now rehydratable until acknowledged -- that is the
+    # whole point of the announce window: a completion the client never saw must
+    # still be recoverable. The superseded first attempt stays hidden, so the
+    # retry UI is never offered a failure the user has already moved past.
+    assert [run["runId"] for run in completed] == [retry_id]
+    assert failed_id not in {run["runId"] for run in completed}

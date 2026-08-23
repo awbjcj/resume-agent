@@ -43,6 +43,20 @@ from resume_agent.tenancy.context import current_context
 
 RunFn = Callable[[ProgressReporter], object]
 
+#: Run kinds that revise one artifact, and the ``meta`` key naming it. Only
+#: the latest attempt per artifact is ever rehydrated, so a superseded failure
+#: cannot come back and offer a retry the user has already moved past.
+_REVISION_META_KEYS = {"revise": "versionId", "coverLetterRevise": "coverLetterId"}
+
+
+def _revision_key(snapshot: RunSnapshot) -> tuple[str, object] | None:
+    """The (kind, artifact) a revision run belongs to, or None if it is not one."""
+    meta_key = _REVISION_META_KEYS.get(snapshot.kind)
+    if meta_key is None or not snapshot.meta:
+        return None
+    artifact_id = snapshot.meta.get(meta_key)
+    return None if artifact_id is None else (snapshot.kind, artifact_id)
+
 
 class RunCancelled(Exception):
     """Raised inside a worker when its run has been cancel-requested.
@@ -584,36 +598,11 @@ class RunManager:
             for snapshot in snapshots
             if snapshot.state in ACTIVE_RUN_STATES
         }
-        if announce_window_seconds is not None:
-            # A completion nobody was connected to see is still news -- but only
-            # for a while. Past the window it is stale, and a toast for a run
-            # that finished yesterday is noise. The record stays readable via
-            # ``get`` either way, until the 24h sweep removes it.
-            cutoff = (now or datetime.now(timezone.utc)) - timedelta(
-                seconds=announce_window_seconds
-            )
-            for snapshot in snapshots:
-                if (
-                    snapshot.state in TERMINAL_RUN_STATES
-                    and snapshot.announced_at is None
-                    and snapshot.updated_at >= cutoff
-                ):
-                    visible[snapshot.run_id] = snapshot
         latest_revision: dict[tuple[str, object], RunSnapshot] = {}
         for snapshot in snapshots:
-            meta_key = (
-                "versionId"
-                if snapshot.kind == "revise"
-                else "coverLetterId"
-                if snapshot.kind == "coverLetterRevise"
-                else None
-            )
-            artifact_id = (
-                snapshot.meta.get(meta_key) if snapshot.meta and meta_key else None
-            )
-            if meta_key is None or artifact_id is None:
+            key = _revision_key(snapshot)
+            if key is None:
                 continue
-            key = (snapshot.kind, artifact_id)
             previous = latest_revision.get(key)
             # Timestamps can tie on fast retries. Prefer the active retry over
             # the failed attempt before using the random run id as a final
@@ -631,6 +620,33 @@ class RunManager:
         for snapshot in latest_revision.values():
             if snapshot.state.value == "error":
                 visible[snapshot.run_id] = snapshot
+        if announce_window_seconds is not None:
+            # A completion nobody was connected to see is still news -- but only
+            # for a while. Past the window it is stale, and a toast for a run
+            # that finished yesterday is noise; the record stays readable via
+            # ``get`` either way, until the 24h sweep removes it.
+            #
+            # Runs *after* the revision pass, and skips anything that pass
+            # superseded: a revise attempt that a later attempt replaced is
+            # deliberately hidden, and announcing it would resurrect exactly the
+            # stale failure the supersession logic exists to suppress.
+            cutoff = (now or datetime.now(timezone.utc)) - timedelta(
+                seconds=announce_window_seconds
+            )
+            superseded = {
+                snapshot.run_id
+                for snapshot in snapshots
+                if (key := _revision_key(snapshot)) is not None
+                and latest_revision.get(key) is not snapshot
+            }
+            for snapshot in snapshots:
+                if (
+                    snapshot.state in TERMINAL_RUN_STATES
+                    and snapshot.announced_at is None
+                    and snapshot.updated_at >= cutoff
+                    and snapshot.run_id not in superseded
+                ):
+                    visible[snapshot.run_id] = snapshot
         return sorted(visible.values(), key=lambda item: (item.created_at, item.run_id))
 
     def recover_interrupted(self) -> int:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import Field, field_validator
@@ -33,6 +34,21 @@ class RunOut(CamelModel):
     error: str | None = None
     error_code: str | None = None
     meta: dict[str, Any] | None = None
+    announced_at: datetime | None = None
+
+
+class AckRunsIn(CamelModel):
+    """Runs the client has shown the user.
+
+    Unknown, non-terminal, already-acked, and other users' ids are skipped
+    rather than rejected -- see ``ack_runs`` for why.
+    """
+
+    run_ids: list[str] = Field(default_factory=list, max_length=200)
+
+
+class AckRunsOut(CamelModel):
+    acknowledged: int
 
 
 class PullParams(CamelModel):

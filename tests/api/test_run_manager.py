@@ -660,3 +660,24 @@ def test_list_rehydratable_still_returns_active_runs_with_a_window(tmp_path):
     pending = mgr.create("tailor")
     visible = mgr.list_rehydratable(announce_window_seconds=3600)
     assert [item.run_id for item in visible] == [pending]
+
+
+def test_announce_window_never_resurrects_a_superseded_revision(tmp_path):
+    """Supersession beats announcement.
+
+    Only the latest attempt per artifact is rehydratable; a failed attempt a
+    retry replaced is deliberately hidden so the retry UI is not offered a
+    failure the user already moved past. The announce window must not undo that.
+    """
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    meta = {"versionId": 5, "jobId": 3, "instruction": "shorter"}
+
+    failed_id = mgr.create("revise", meta=meta)
+    mgr.reporter(failed_id, "revise").done(error="first failed")
+    retry_id = mgr.create("revise", meta=meta)
+    mgr.reporter(retry_id, "revise").done(result={"versionId": 6})
+
+    visible = {
+        item.run_id for item in mgr.list_rehydratable(announce_window_seconds=3600)
+    }
+    assert visible == {retry_id}

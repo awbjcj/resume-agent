@@ -24,6 +24,8 @@ from resume_agent.api.runs.stream_sse import stream_events
 from resume_agent.api.schemas.base import Page
 from resume_agent.api.schemas.jobs import ReviseRequest
 from resume_agent.api.schemas.runs import (
+    AckRunsIn,
+    AckRunsOut,
     AddJobUrlParams,
     CoverLetterParams,
     DiscoverParams,
@@ -511,16 +513,41 @@ def list_runs(
     mgr: RunManager = Depends(get_run_manager),
 ):
     context = current_context()
+    # Read per request: settings must never be cached across requests (ADR-0003).
+    window = get_settings().run_announce_window_seconds
     return to_page(
         paginate(
             mgr.list_rehydratable(
-                user_id=context.user_id if context is not None else None
+                user_id=context.user_id if context is not None else None,
+                announce_window_seconds=window,
             ),
             page=page,
             page_size=page_size,
         ),
         RunOut,
     )
+
+
+@router.post("/runs/ack", response_model=AckRunsOut)
+def ack_runs(body: AckRunsIn, mgr: RunManager = Depends(get_run_manager)):
+    """Record that the user has been shown these completions.
+
+    Deliberately forgiving: an id that is unknown, already acked, still running,
+    or owned by someone else is skipped rather than raising. The client is
+    reporting what it displayed, and a partially stale batch is normal --
+    failing the whole request would make the client re-announce everything it
+    just showed the user.
+    """
+    context = current_context()
+    user_id = context.user_id if context is not None else None
+    acknowledged = 0
+    for run_id in body.run_ids:
+        snapshot = mgr.get(run_id)
+        if snapshot is None or (user_id is not None and snapshot.user_id != user_id):
+            continue
+        if mgr.mark_announced(run_id):
+            acknowledged += 1
+    return AckRunsOut(acknowledged=acknowledged)
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)

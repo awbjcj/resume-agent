@@ -27,6 +27,7 @@ class _RecordStub:
     error = None
     error_code = None
     meta = None
+    announced_at = None
 
     def __init__(self, run_id: str):
         self.run_id = run_id
