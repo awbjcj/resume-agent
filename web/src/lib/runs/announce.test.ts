@@ -37,18 +37,81 @@ it("does nothing for an empty batch", () => {
   expect(toast.success).not.toHaveBeenCalled();
 });
 
-it("announces a tailor completion with its version count", () => {
+it("announces a tailor completion with its successful job and version counts", () => {
   announceCompletions([run()]);
   expect(toast.success).toHaveBeenCalledOnce();
+  expect(toast.success.mock.calls[0][0]).toContain("1 job tailored");
   expect(toast.success.mock.calls[0][0]).toContain("2 resume versions");
 });
 
-it("routes failures and cancellations to their own toast kinds", () => {
-  announceCompletions([run({ status: "failed", error: "boom" })]);
-  expect(toast.error).toHaveBeenCalledOnce();
+it("counts tailored jobs from the jobs array even when nested version counts are absent", () => {
+  announceCompletions([
+    run({ result: { jobs: [{ jobId: 1 }, { jobId: 2 }] } }),
+  ]);
 
-  announceCompletions([run({ status: "cancelled" })]);
-  expect(toast.info).toHaveBeenCalledOnce();
+  expect(toast.success.mock.calls[0][0]).toContain("2 jobs tailored");
+  expect(toast.success.mock.calls[0][0]).not.toContain("resume version");
+});
+
+it("accepts snake-case nested counts from restored or legacy run payloads", () => {
+  announceCompletions([
+    run({ result: { jobs: [{ job_id: 1, version_count: 3 }] } }),
+  ]);
+
+  expect(toast.success.mock.calls[0][0]).toContain("1 job tailored");
+  expect(toast.success.mock.calls[0][0]).toContain("3 resume versions");
+});
+
+it("does not invent a zero-job result when tailoring detail is unavailable", () => {
+  announceCompletions([run({ result: null })]);
+
+  expect(toast.success.mock.calls[0][0]).toBe(
+    "Tailoring complete. Open a job's Versions tab to render PDF.",
+  );
+});
+
+it("renders accurate cover-letter and redo completion summaries", () => {
+  announceCompletions([
+    run({ kind: "coverLetter", result: { coverLetters: [{}, {}] } }),
+    run({ kind: "redo", result: { outcomes: [{}] } }),
+  ]);
+
+  expect(toast.success).toHaveBeenNthCalledWith(
+    1,
+    "Cover-letter generation complete: 2 cover letters created.",
+  );
+  expect(toast.success).toHaveBeenNthCalledWith(
+    2,
+    "Pipeline redo complete: 1 stage processed.",
+  );
+});
+
+it("uses honest generic summaries when specialized result detail is malformed", () => {
+  announceCompletions([
+    run({ kind: "refreshClusters", result: {} }),
+    run({ kind: "maintainTaxonomy", result: null }),
+  ]);
+
+  expect(toast.success).toHaveBeenNthCalledWith(1, "Skill regrouping complete.");
+  expect(toast.success).toHaveBeenNthCalledWith(2, "Taxonomy maintenance complete.");
+});
+
+it("renders user-facing labels instead of internal run identifiers", () => {
+  announceCompletions([
+    run({ kind: "profile-build", result: null }),
+    run({ kind: "coverLetterRevise", result: null }),
+  ]);
+
+  expect(toast.success).toHaveBeenNthCalledWith(1, "Profile build completed");
+  expect(toast.success).toHaveBeenNthCalledWith(2, "Cover-letter revision completed");
+});
+
+it("routes failures and cancellations to their own toast kinds", () => {
+  announceCompletions([run({ kind: "coverLetter", status: "failed", error: "boom" })]);
+  expect(toast.error).toHaveBeenCalledWith("Cover-letter generation failed: boom");
+
+  announceCompletions([run({ kind: "refreshClusters", status: "cancelled" })]);
+  expect(toast.info).toHaveBeenCalledWith("Skill regrouping cancelled");
 });
 
 it("gives three completions three toasts", () => {

@@ -10,38 +10,128 @@ import type { RunRecord } from "./store";
  */
 export const ANNOUNCE_TOAST_CAP = 3;
 
+const RUN_LABELS: Record<string, string> = {
+  addJobUrl: "Job import",
+  coverLetter: "Cover-letter generation",
+  coverLetterRevise: "Cover-letter revision",
+  discover: "Discovery",
+  emailDraft: "Email-draft generation",
+  gmailSync: "Gmail sync",
+  "github-sync": "GitHub sync",
+  h1bSponsorship: "H-1B sponsorship check",
+  importUrls: "Job import",
+  linkedinScrape: "LinkedIn import",
+  maintainTaxonomy: "Taxonomy maintenance",
+  "profile-build": "Profile build",
+  pull: "Job pull",
+  redo: "Pipeline redo",
+  refreshClusters: "Skill regrouping",
+  refresh: "Job refresh",
+  reprocess: "Job reprocessing",
+  revise: "Resume revision",
+  tailor: "Tailoring",
+  undoTaxonomyMaintenance: "Taxonomy maintenance undo",
+};
+
+function runLabel(kind: string): string {
+  return RUN_LABELS[kind] ?? kind;
+}
+
+function resultRecord(run: RunRecord): Record<string, unknown> | null {
+  return run.result && typeof run.result === "object" && !Array.isArray(run.result)
+    ? run.result as Record<string, unknown>
+    : null;
+}
+
+function numberField(value: unknown, ...keys: string[]): number | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  for (const key of keys) {
+    if (typeof record[key] === "number") return record[key];
+  }
+  return null;
+}
+
+function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
 function announceOne(run: RunRecord): void {
   if (run.status === "failed") {
-    toast.error(`${run.kind} failed: ${run.error ?? "unknown error"}`);
+    toast.error(`${runLabel(run.kind)} failed: ${run.error ?? "unknown error"}`);
     return;
   }
   if (run.status === "cancelled") {
-    toast.info(`${run.kind} cancelled`);
+    toast.info(`${runLabel(run.kind)} cancelled`);
     return;
   }
   if (run.kind === "tailor") {
-    const rawJobs = (run.result as { jobs?: unknown } | null)?.jobs;
-    const jobs: unknown[] = Array.isArray(rawJobs) ? rawJobs : [];
-    const versions = jobs.reduce<number>((total, job) => {
-      const count = (job as { versionCount?: unknown } | null)?.versionCount;
-      return total + (typeof count === "number" ? count : 0);
-    }, 0);
+    const rawJobs = resultRecord(run)?.jobs;
+    if (!Array.isArray(rawJobs)) {
+      toast.success("Tailoring complete. Open a job's Versions tab to render PDF.");
+      return;
+    }
+    const jobs: unknown[] = rawJobs;
+    const versionCounts = jobs.map((job) =>
+      numberField(job, "versionCount", "version_count"),
+    );
+    const hasCompleteVersionCounts = versionCounts.every((count) => count !== null);
+    const versions = versionCounts.reduce<number>(
+      (total, count) => total + (count ?? 0),
+      0,
+    );
+    const jobSummary = plural(jobs.length, "job");
     toast.success(
-      `Tailoring complete: ${versions} resume versions created. Open a job's Versions tab to render PDF.`,
+      hasCompleteVersionCounts
+        ? `Tailoring complete: ${jobSummary} tailored, ${plural(versions, "resume version")} created. Open a job's Versions tab to render PDF.`
+        : `Tailoring complete: ${jobSummary} tailored. Open a job's Versions tab to render PDF.`,
+    );
+    return;
+  }
+  if (run.kind === "coverLetter") {
+    const coverLetters = resultRecord(run)?.coverLetters;
+    toast.success(
+      Array.isArray(coverLetters)
+        ? `Cover-letter generation complete: ${plural(coverLetters.length, "cover letter")} created.`
+        : "Cover-letter generation complete.",
+    );
+    return;
+  }
+  if (run.kind === "redo") {
+    const outcomes = resultRecord(run)?.outcomes;
+    toast.success(
+      Array.isArray(outcomes)
+        ? `Pipeline redo complete: ${plural(outcomes.length, "stage")} processed.`
+        : "Pipeline redo complete.",
     );
     return;
   }
   if (run.kind === "refreshClusters") {
-    const result = (run.result as Record<string, unknown> | null) ?? {};
-    const count = (key: string) =>
-      typeof result[key] === "number" ? result[key] : 0;
+    const result = resultRecord(run);
+    const fields = result && [
+      numberField(result, "assignedSkills", "assigned_skills"),
+      numberField(result, "aliasesMerged", "aliases_merged"),
+      numberField(result, "domainsCreated", "domains_created"),
+      numberField(result, "uncertainSkills", "uncertain_skills"),
+      numberField(result, "failedSkills", "failed_skills"),
+      numberField(result, "skippedStaleSkills", "skipped_stale_skills"),
+    ];
+    if (!fields || fields.some((value) => value === null)) {
+      toast.success("Skill regrouping complete.");
+      return;
+    }
+    const [assigned, aliases, domains, uncertain, failed, skipped] = fields;
     toast.success(
-      `Regroup complete: ${count("assignedSkills")} assigned · ${count("aliasesMerged")} aliases merged · ${count("domainsCreated")} domains created · ${count("uncertainSkills")} uncertain · ${count("failedSkills")} failed · ${count("skippedStaleSkills")} skipped.`,
+      `Regroup complete: ${assigned} assigned · ${aliases} aliases merged · ${domains} domains created · ${uncertain} uncertain · ${failed} failed · ${skipped} skipped.`,
     );
     return;
   }
   if (run.kind === "maintainTaxonomy") {
-    const result = (run.result as Record<string, unknown> | null) ?? {};
+    const result = resultRecord(run);
+    if (!result || typeof result.changed !== "boolean") {
+      toast.success("Taxonomy maintenance complete.");
+      return;
+    }
     const actions = Array.isArray(result.actions) ? result.actions.length : 0;
     toast.success(
       result.changed
@@ -54,7 +144,7 @@ function announceOne(run: RunRecord): void {
     toast.success("Restored the previous taxonomy maintenance generation.");
     return;
   }
-  toast.success(`${run.kind} completed`);
+  toast.success(`${runLabel(run.kind)} completed`);
 }
 
 /**

@@ -2255,7 +2255,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agno", extras = ["mcp"], specifier = ">=2.8.6,<2.9" },
+    { name = "agno", extras = ["mcp"], specifier = ">=2.8.6,<2.10" },
     { name = "anthropic", specifier = ">=0.107.1" },
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "ddgs", specifier = ">=9.14.4" },
@@ -2264,7 +2264,7 @@ requires-dist = [
     { name = "google-api-python-client", specifier = ">=2.197.0" },
     { name = "google-auth", specifier = ">=2.53.0" },
     { name = "google-auth-oauthlib", specifier = ">=1.4.0" },
-    { name = "google-genai", specifier = ">=2.5.0,<2.18.0" },
+    { name = "google-genai", specifier = ">=2.5.0,<2.19.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "markdownify", specifier = ">=0.13.0" },
     { name = "markitdown", extras = ["docx", "pdf", "pptx", "xlsx"], specifier = ">=0.1.6" },
