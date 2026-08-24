@@ -419,6 +419,24 @@ export interface paths {
         patch: operations["patch_tier_api_admin_quota_tiers__tier_id__patch"];
         trace?: never;
     };
+    "/api/admin/routing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Routing */
+        get: operations["get_routing_api_admin_routing_get"];
+        /** Put Routing */
+        put: operations["put_routing_api_admin_routing_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/system/defaults": {
         parameters: {
             query?: never;
@@ -5594,6 +5612,23 @@ export interface components {
             /** Provider */
             provider: string;
         };
+        /** ProviderRoutingStatus */
+        ProviderRoutingStatus: {
+            /** Configurationerror */
+            configurationError?: string | null;
+            /** Effectivemode */
+            effectiveMode?: ("subscription" | "api") | null;
+            key: components["schemas"]["RoutingKeyStatus"];
+            /** Label */
+            label: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Routemode
+             * @enum {string}
+             */
+            routeMode: "auto" | "subscription" | "api";
+        };
         /** PruneConfigDoc */
         PruneConfigDoc: {
             /**
@@ -6304,6 +6339,44 @@ export interface components {
              * @default false
              */
             reReview: boolean;
+        };
+        /** RoutingConfigDoc */
+        RoutingConfigDoc: {
+            /** Baseurl */
+            baseUrl: string;
+            /** Providers */
+            providers: components["schemas"]["ProviderRoutingStatus"][];
+        };
+        /** RoutingKeyStatus */
+        RoutingKeyStatus: {
+            /** Hint */
+            hint?: string | null;
+            /** Isset */
+            isSet: boolean;
+        };
+        /**
+         * RoutingUpdate
+         * @description Only fields present in the request are written; null clears a key or URL.
+         */
+        RoutingUpdate: {
+            /** Anthropickey */
+            anthropicKey?: string | null;
+            /** Anthropicroutemode */
+            anthropicRouteMode?: ("auto" | "subscription" | "api") | null;
+            /** Baseurl */
+            baseUrl?: string | null;
+            /** Deepseekkey */
+            deepseekKey?: string | null;
+            /** Deepseekroutemode */
+            deepseekRouteMode?: ("auto" | "subscription" | "api") | null;
+            /** Geminikey */
+            geminiKey?: string | null;
+            /** Geminiroutemode */
+            geminiRouteMode?: ("auto" | "subscription" | "api") | null;
+            /** Openaikey */
+            openaiKey?: string | null;
+            /** Openairoutemode */
+            openaiRouteMode?: ("auto" | "subscription" | "api") | null;
         };
         /** RunOut */
         RunOut: {
@@ -8432,6 +8505,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuotaTierOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_routing_api_admin_routing_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutingConfigDoc"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_routing_api_admin_routing_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoutingUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutingConfigDoc"];
                 };
             };
             /** @description Validation Error */

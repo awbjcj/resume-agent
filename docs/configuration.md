@@ -22,6 +22,15 @@ The Docker image intentionally overrides four local defaults:
 | `OPENAI_API_KEY` | empty | Shared OpenAI credential for `openai:` model IDs and optional embeddings. |
 | `GEMINI_API_KEY` | empty | Shared Google Gemini credential for `gemini:` model IDs. |
 | `DEEPSEEK_API_KEY` | empty | Shared DeepSeek credential for `deepseek:` model IDs. |
+| `SUB2API_BASE_URL` | empty | Subscription-gateway origin shared by all routed providers; empty disables gateway routing unless a provider is pinned to `subscription`. |
+| `SUB2API_ANTHROPIC_KEY` | empty | Write-only Anthropic credential for the subscription gateway. |
+| `SUB2API_OPENAI_KEY` | empty | Write-only OpenAI credential for the subscription gateway. |
+| `SUB2API_GEMINI_KEY` | empty | Write-only Gemini credential for the subscription gateway. |
+| `SUB2API_DEEPSEEK_KEY` | empty | Write-only DeepSeek credential for the subscription gateway. |
+| `ANTHROPIC_ROUTE_MODE` | `auto` | `auto`, `subscription`, or `api`; selects gateway routing when configured, forces the gateway, or forces the direct Anthropic API. |
+| `OPENAI_ROUTE_MODE` | `auto` | `auto`, `subscription`, or `api`; selects gateway routing when configured, forces the gateway, or forces the direct OpenAI API. |
+| `GEMINI_ROUTE_MODE` | `auto` | `auto`, `subscription`, or `api`; selects gateway routing when configured, forces the gateway, or forces the direct Gemini API. |
+| `DEEPSEEK_ROUTE_MODE` | `auto` | `auto`, `subscription`, or `api`; selects gateway routing when configured, forces the gateway, or forces the direct DeepSeek API. |
 | `CHEAP_MODEL` | `claude-haiku-4-5` | Model used for inexpensive extraction and classification work. |
 | `MID_MODEL` | `claude-sonnet-5` | Model used for intermediate reasoning and review work. |
 | `PREMIUM_MODEL` | `claude-opus-5` | Model used for the highest-quality writing and escalation paths. |

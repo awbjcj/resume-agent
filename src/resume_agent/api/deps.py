@@ -278,6 +278,11 @@ def refresh_app_settings(app, fresh: Settings) -> None:
     """Keep startup/platform fields when volume-backed settings are refreshed."""
     if current_context() is not None:
         return
+    refresh_platform_settings(app, fresh)
+
+
+def refresh_platform_settings(app, fresh: Settings) -> None:
+    """Refresh deployment settings after an admin writes the platform env file."""
     app.state.settings = fresh.model_copy(
         update={
             "db_url": app.state.db_url,

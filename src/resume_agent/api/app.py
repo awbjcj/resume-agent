@@ -26,6 +26,7 @@ from resume_agent.api.routers import admin as admin_router
 from resume_agent.api.routers import admin_invites as admin_invites_router
 from resume_agent.api.routers import admin_quotas as admin_quotas_router
 from resume_agent.api.routers import admin_system as admin_system_router
+from resume_agent.api.routers import admin_routing as admin_routing_router
 from resume_agent.api.routers import admin_users as admin_users_router
 from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import auth as auth_router
@@ -380,6 +381,7 @@ def create_app(
     app.include_router(admin_users_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_invites_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_system_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(admin_routing_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_quotas_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so

@@ -6631,6 +6631,64 @@
         "title": "ProviderModelCatalog",
         "type": "object"
       },
+      "ProviderRoutingStatus": {
+        "properties": {
+          "configurationError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configurationerror"
+          },
+          "effectiveMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "subscription",
+                  "api"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectivemode"
+          },
+          "key": {
+            "$ref": "#/components/schemas/RoutingKeyStatus"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "routeMode": {
+            "enum": [
+              "auto",
+              "subscription",
+              "api"
+            ],
+            "title": "Routemode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "label",
+          "routeMode",
+          "key"
+        ],
+        "title": "ProviderRoutingStatus",
+        "type": "object"
+      },
       "PruneConfigDoc": {
         "properties": {
           "enableLowFit": {
@@ -8330,6 +8388,177 @@
           "instruction"
         ],
         "title": "ReviseRequest",
+        "type": "object"
+      },
+      "RoutingConfigDoc": {
+        "properties": {
+          "baseUrl": {
+            "title": "Baseurl",
+            "type": "string"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderRoutingStatus"
+            },
+            "title": "Providers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "baseUrl",
+          "providers"
+        ],
+        "title": "RoutingConfigDoc",
+        "type": "object"
+      },
+      "RoutingKeyStatus": {
+        "properties": {
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "isSet": {
+            "title": "Isset",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isSet"
+        ],
+        "title": "RoutingKeyStatus",
+        "type": "object"
+      },
+      "RoutingUpdate": {
+        "description": "Only fields present in the request are written; null clears a key or URL.",
+        "properties": {
+          "anthropicKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anthropickey"
+          },
+          "anthropicRouteMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "subscription",
+                  "api"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anthropicroutemode"
+          },
+          "baseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurl"
+          },
+          "deepseekKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deepseekkey"
+          },
+          "deepseekRouteMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "subscription",
+                  "api"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deepseekroutemode"
+          },
+          "geminiKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geminikey"
+          },
+          "geminiRouteMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "subscription",
+                  "api"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geminiroutemode"
+          },
+          "openaiKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openaikey"
+          },
+          "openaiRouteMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "subscription",
+                  "api"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openairoutemode"
+          }
+        },
+        "title": "RoutingUpdate",
         "type": "object"
       },
       "RunOut": {
@@ -13395,6 +13624,112 @@
         "summary": "Patch Tier",
         "tags": [
           "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/routing": {
+      "get": {
+        "operationId": "get_routing_api_admin_routing_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Routing",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "put_routing_api_admin_routing_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutingUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Routing",
+        "tags": [
+          "admin"
         ]
       }
     },
