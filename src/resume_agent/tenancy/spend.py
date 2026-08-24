@@ -71,13 +71,18 @@ __all__ = [
 
 @dataclass(frozen=True)
 class SpendDecision:
-    """Which key funds this call, and why."""
+    """Which key funds this call, where it is sent, and why."""
 
     api_key: str
     own_key: bool
     provider: str
     model: str
     reason: str
+    # Non-None only for subscription-routed calls. Carried here rather than
+    # derived separately by ``build_model`` so the endpoint and the credential
+    # can never come from two different evaluations of the same config -- the
+    # same reason key selection and budget share this class (ADR-0009).
+    base_url: str | None = None
 
 
 @dataclass
@@ -115,6 +120,39 @@ def _settings_provider_key(settings: Settings, provider: str) -> str:
         "gemini": settings.gemini_api_key,
         "deepseek": settings.deepseek_api_key,
     }.get(provider, "")
+
+
+def _subscription_decision(
+    provider: str, model: str, settings: Settings
+) -> SpendDecision | None:
+    """The gateway decision for ``provider``, or ``None`` to use its API.
+
+    Checked ahead of every key source because a subscription is not a *cheaper*
+    key, it is a different endpoint: once a provider is on the gateway, the
+    platform and per-user API keys are not merely lower priority, they are
+    wrong -- sending an ``sk-ant-`` key to sub2api authenticates nothing.
+
+    ``own_key=True`` marks the call non-billable. Subscription traffic is
+    flat-rate, so metering it against a shared cost quota would throttle calls
+    that have no marginal cost. The trade-off is that usage reports attribute
+    no spend to these calls; that is accurate, not a gap.
+    """
+    from resume_agent.llm_routing import (
+        effective_mode,
+        gateway_base_url,
+        subscription_key,
+    )
+
+    if effective_mode(provider, settings) != "subscription":
+        return None
+    return SpendDecision(
+        api_key=subscription_key(provider, settings),
+        own_key=True,
+        provider=provider,
+        model=model,
+        reason="subscription",
+        base_url=gateway_base_url(provider, settings),
+    )
 
 
 @dataclass(frozen=True)
@@ -288,6 +326,9 @@ class SpendGate:
         context = current_context()
         if context is None:
             settings = self._settings or _current_settings()
+            routed = _subscription_decision(provider, model, settings)
+            if routed is not None:
+                return routed, None
             return (
                 SpendDecision(
                     api_key=_settings_provider_key(settings, provider),
@@ -328,6 +369,15 @@ class SpendGate:
         *,
         now: datetime | None,
     ) -> _CachedDecision:
+        # Ahead of every key source: a routed provider has a different
+        # endpoint, so no API key -- platform, user, or settings -- is the
+        # right credential for it.
+        routed = _subscription_decision(
+            provider, model, self._settings or context.settings
+        )
+        if routed is not None:
+            return _settled(routed)
+
         platform_key = context.platform_provider_keys.get(provider, "")
         user_key = context.user_provider_keys.get(provider, "")
 

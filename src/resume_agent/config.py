@@ -11,6 +11,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppMode = Literal["local", "hosted"]
 
+# Where one provider's traffic goes. "auto" resolves to "subscription" when a
+# sub2api key is configured for that provider and "api" otherwise; the other
+# two are an admin's explicit override. Defined here rather than in
+# ``llm_routing`` so ``Settings`` can annotate its fields without importing a
+# module that itself needs ``Settings``.
+RouteMode = Literal["auto", "subscription", "api"]
+
 
 class Settings(BaseSettings):
     """Secrets and environment-level config, loaded from ``.env``."""
@@ -23,6 +30,24 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     gemini_api_key: str = ""
     deepseek_api_key: str = ""
+
+    # -- subscription routing (see llm_routing.py) --------------------------
+    # One sub2api gateway, one key per provider, and a per-provider mode. The
+    # gateway speaks each provider's native wire format at its own path, so a
+    # single base URL serves all four; llm_routing derives the per-SDK suffix.
+    sub2api_base_url: str = ""
+    sub2api_anthropic_key: str = ""
+    sub2api_openai_key: str = ""
+    sub2api_gemini_key: str = ""
+    sub2api_deepseek_key: str = ""
+    # "auto" means subscription when that provider has a gateway key, else the
+    # direct API. It is the default because it makes the fallback a property of
+    # configuration -- a provider with no subscription simply has no key -- so
+    # no call site needs to special-case DeepSeek or Gemini.
+    anthropic_route_mode: RouteMode = "auto"
+    openai_route_mode: RouteMode = "auto"
+    gemini_route_mode: RouteMode = "auto"
+    deepseek_route_mode: RouteMode = "auto"
     github_token: str = ""
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""

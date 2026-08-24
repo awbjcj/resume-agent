@@ -16,6 +16,14 @@ builder imports a concrete agno model class directly.
   its `Settings` field (`anthropic_api_key` / `openai_api_key` / `gemini_api_key`
   / `deepseek_api_key`). `relevance.py`'s "no key → return `None`" guard uses it,
   so it is provider-aware.
+- **Subscription routing stays inside the spend decision.** Deployment-level
+  `SUB2API_BASE_URL`, one `SUB2API_<PROVIDER>_KEY` per provider, and each
+  `<PROVIDER>_ROUTE_MODE` (`auto` / `subscription` / `api`) are resolved by
+  `tenancy/spend.py` together with the funding key. `auto` uses the gateway only
+  when that provider has a subscription key; an explicit `subscription` pin
+  fails loudly when incomplete. `build_model` and `build_search_equipped` carry
+  the resulting key and endpoint together through the provider SDK's native
+  base-URL spelling. Audio transcription remains on direct provider APIs.
 - **Lazy SDK imports.** `build_model` imports the agno provider class _inside_ its
   branch, so a Claude-only run never imports `openai` or `google-genai`, and a
   missing optional SDK fails only when that provider is actually selected.

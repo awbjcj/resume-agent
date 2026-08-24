@@ -946,13 +946,39 @@ def resolve_api_key(model_id: str, *, settings: Settings | None = None) -> str:
     return SpendGate(settings=settings).select(model_id).api_key
 
 
+def resolve_route(model_id: str, *, settings: Settings | None = None) -> Any:
+    """The full ``SpendDecision`` for ``model_id``: key *and* endpoint.
+
+    ``resolve_api_key`` answers half the question. Once a provider can be
+    routed to a subscription gateway, "which key?" and "which endpoint?" are
+    one decision -- a gateway key sent to ``api.anthropic.com`` fails, and so
+    does an ``sk-ant-`` key sent to the gateway. Both come from the same
+    ``SpendGate`` evaluation so they cannot disagree.
+    """
+    from resume_agent.tenancy.spend import SpendGate
+
+    return SpendGate(settings=settings).select(model_id)
+
+
 def model_access_available(model_id: str, *, settings: Settings | None = None) -> bool:
     """Whether the active user can fund a call to ``model_id`` right now."""
 
     provider, model = split_provider(model_id)
+    from resume_agent.llm_routing import effective_mode
     from resume_agent.tenancy.context import current_context
 
     context = current_context()
+    # A subscription-routed provider needs no API key at all, so asking "is
+    # there a key?" would report every model unavailable on a deployment that
+    # runs entirely off the gateway -- greying out the model picker and
+    # gating off the coach and interview routers.
+    if (
+        effective_mode(
+            provider, settings or (context.settings if context else get_settings())
+        )
+        == "subscription"
+    ):
+        return True
     if context is not None:
         if context.user_provider_keys.get(provider):
             return True
@@ -974,9 +1000,68 @@ def provider_access_available(
     )
 
 
-def refresh_agent_api_key(agent: object, *, settings: Settings | None = None) -> None:
-    """Refresh a reusable agent when its shared allowance changes key source."""
+def _current_gateway(model: Any, provider: str) -> str | None:
+    """The base URL ``model`` is currently pointed at, in that SDK's spelling.
 
+    Mirrors ``_gateway_kwargs``: the three providers store it in three places,
+    so reading it back needs the same three-way split.
+    """
+    if provider in {"openai", "deepseek"}:
+        value = getattr(model, "base_url", None)
+        return str(value) if value else None
+    params = getattr(model, "client_params", None) or {}
+    if provider == "anthropic":
+        return params.get("base_url")
+    if provider == "gemini":
+        return (params.get("http_options") or {}).get("base_url")
+    return None
+
+
+def _gateway_target(model: Any, provider: str, base_url: str | None) -> str | None:
+    """What ``model``'s base URL should become for ``base_url``.
+
+    ``base_url=None`` means "off the gateway", which is not the same as "no
+    base URL": the DeepSeek class carries ``api.deepseek.com`` as a field
+    default, so clearing it to ``None`` would break the direct path rather than
+    restore it. Resolving that here -- rather than inside ``_apply_gateway``
+    alone -- is what lets the caller compare current against target without
+    the unrouted DeepSeek case reporting a change on every single refresh.
+    """
+    if provider in {"openai", "deepseek"}:
+        return base_url or type(model).__dataclass_fields__["base_url"].default
+    return base_url
+
+
+def _apply_gateway(model: Any, provider: str, base_url: str | None) -> None:
+    """Repoint an already-built model, including back to its own default."""
+    if provider in {"openai", "deepseek"}:
+        model.base_url = _gateway_target(model, provider, base_url)
+        return
+    params = dict(getattr(model, "client_params", None) or {})
+    if provider == "anthropic":
+        params.pop("base_url", None)
+    elif provider == "gemini":
+        http_options = dict(params.get("http_options") or {})
+        http_options.pop("base_url", None)
+        if base_url:
+            http_options["base_url"] = base_url
+        if http_options:
+            params["http_options"] = http_options
+        else:
+            params.pop("http_options", None)
+    params.update(_gateway_kwargs(provider, base_url).get("client_params", {}))
+    model.client_params = params or None
+
+
+def refresh_agent_api_key(agent: object, *, settings: Settings | None = None) -> None:
+    """Refresh a reusable agent when its shared allowance changes key source.
+
+    Also re-points it when routing changes. Key and endpoint move together --
+    a gateway key left aimed at ``api.anthropic.com`` authenticates nothing --
+    so refreshing one without the other is worse than refreshing neither.
+    """
+
+    from resume_agent.llm_routing import subscription_configured
     from resume_agent.tenancy.context import current_context
     from resume_agent.tenancy.costs import normalize_provider
 
@@ -992,21 +1077,30 @@ def refresh_agent_api_key(agent: object, *, settings: Settings | None = None) ->
     if (
         provider not in context.platform_provider_keys
         and provider not in context.user_provider_keys
+        # A routed provider often has neither -- a subscription-only
+        # deployment configures no API key at all -- so without this it would
+        # return early and never pick up a mode change.
+        and not subscription_configured(provider, settings or context.settings)
     ):
         return
     model_name = str(getattr(model, "id", "") or "")
     if not provider or not model_name:
         return
     model_id = model_name if provider == "anthropic" else f"{provider}:{model_name}"
-    selected = resolve_api_key(model_id, settings=settings) or None
+    route = resolve_route(model_id, settings=settings)
+    selected = route.api_key or None
     context.selected_model_own_keys[id(model)] = context.selected_own_key_providers[
         provider
     ]
-    if getattr(model, "api_key", None) == selected:
+    if getattr(model, "api_key", None) == selected and _current_gateway(
+        model, provider
+    ) == _gateway_target(model, provider, route.base_url):
         return
     model.api_key = selected
+    _apply_gateway(model, provider, route.base_url)
     # Agno caches clients after first use. Clearing them makes the next request
-    # honor the newly selected credential instead of retaining the old client.
+    # honor the newly selected credential and endpoint instead of retaining the
+    # old client.
     if hasattr(model, "client"):
         model.client = None
     if hasattr(model, "async_client"):
@@ -1449,8 +1543,37 @@ def _openai_max_output_tokens(*, reasoning: bool) -> int:
     return 64000 if reasoning else 32000
 
 
+def _gateway_kwargs(provider: str, base_url: str | None) -> dict[str, Any]:
+    """Spell "send this elsewhere" the way ``provider``'s agno class wants.
+
+    The three spellings are not interchangeable, and only one is a real field.
+    Measured against the installed agno:
+
+    * ``OpenAIResponses`` (and the DeepSeek subclass) declare ``base_url``.
+    * ``Claude`` does **not**. It merges ``client_params`` into
+      ``anthropic.Anthropic(**params)``, which is where ``base_url`` is
+      accepted.
+    * ``Gemini`` does not either, and google-genai takes an endpoint override
+      only as ``http_options={"base_url": ...}``.
+
+    Isolated here so ``build_model`` reads as one uniform decision. Note the
+    Gemini branch replaces any ``http_options`` agno would have built itself --
+    that dict carries only ``timeout``, which this codebase never sets on a
+    Gemini model, so nothing is lost today; it would need merging if one were.
+    """
+    if not base_url:
+        return {}
+    if provider in {"openai", "deepseek"}:
+        return {"base_url": base_url}
+    if provider == "anthropic":
+        return {"client_params": {"base_url": base_url}}
+    if provider == "gemini":
+        return {"client_params": {"http_options": {"base_url": base_url}}}
+    return {}
+
+
 def _build_openai_responses(
-    model_id: str, *, api_key: str | None, reasoning: bool
+    model_id: str, *, api_key: str | None, reasoning: bool, base_url: str | None = None
 ) -> Any:
     """Build an OpenAI model with the shared Responses request policy."""
     OpenAIResponses = _compatible_openai_responses_class()
@@ -1458,6 +1581,7 @@ def _build_openai_responses(
     return OpenAIResponses(
         id=split_provider(model_id)[1],
         api_key=api_key,
+        **_gateway_kwargs("openai", base_url),
         # Agno's reasoning_effort Literal omits valid Responses values.
         reasoning={"effort": effort} if effort is not None else None,
         # Ask for a summary whenever a reasoning config is sent, including at
@@ -1480,7 +1604,7 @@ def _build_openai_responses(
 
 
 def _build_deepseek_responses(
-    model_id: str, *, api_key: str | None, reasoning: bool
+    model_id: str, *, api_key: str | None, reasoning: bool, base_url: str | None = None
 ) -> Any:
     """Build a DeepSeek model on the Responses API.
 
@@ -1497,6 +1621,9 @@ def _build_deepseek_responses(
     return DeepSeekResponses(
         id=split_provider(model_id)[1],
         api_key=api_key,
+        # Omitted when not routed, so the class default (api.deepseek.com)
+        # stands -- passing base_url=None explicitly would null it instead.
+        **_gateway_kwargs("deepseek", base_url),
         reasoning={"effort": effort} if effort is not None else None,
         # Same rule as OpenAI: whenever a reasoning config is sent, ask for a
         # summary, or agno's streaming branch relabels every visible output_text
@@ -1549,6 +1676,7 @@ def build_model(
     *,
     cache_system_prompt: bool = False,
     reasoning: bool = False,
+    settings: Settings | None = None,
 ) -> Any:
     """Construct the agno model for a (possibly provider-prefixed) ``model_id``.
 
@@ -1556,13 +1684,23 @@ def build_model(
     imports ``openai`` or ``google-genai``, and a missing optional SDK fails only
     when that provider is actually selected. ``cache_system_prompt`` is forwarded
     only to Anthropic; other providers ignore it.
+
+    Routing is resolved here rather than by callers: the endpoint and the
+    credential are one decision (see ``resolve_route``). An explicit
+    ``api_key`` overrides only the credential -- every such caller already
+    sources it from ``resolve_api_key``, so it is the same decision re-passed,
+    and it must not also suppress the endpoint half.
     """
     provider, model = split_provider(model_id)
     reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
     reasoning_effort = _reasoning_effort_for(model_id, provider) if reasoning else None
-    key = api_key or resolve_api_key(model_id) or None
+    route = resolve_route(model_id, settings=settings)
+    key = api_key or route.api_key or None
+    base_url = route.base_url
     if provider == "openai":
-        return _build_openai_responses(model_id, api_key=key, reasoning=reasoning)
+        return _build_openai_responses(
+            model_id, api_key=key, reasoning=reasoning, base_url=base_url
+        )
     if provider == "gemini":
         Gemini = _compatible_gemini_class()
 
@@ -1581,6 +1719,7 @@ def build_model(
                 id=model,
                 api_key=key,
                 thinking_level=reasoning_effort if reasoning else "low",
+                **_gateway_kwargs("gemini", base_url),
             )
         # Pre-3 ids have no thinking_level at all -- sending one is the mirror
         # image of the thinking_budget-on-Gemini-3 failure, and agno forwards any
@@ -1590,9 +1729,12 @@ def build_model(
             id=model,
             api_key=key,
             thinking_budget=None if reasoning else 0,
+            **_gateway_kwargs("gemini", base_url),
         )
     if provider == "deepseek":
-        return _build_deepseek_responses(model_id, api_key=key, reasoning=reasoning)
+        return _build_deepseek_responses(
+            model_id, api_key=key, reasoning=reasoning, base_url=base_url
+        )
     from agno.models.anthropic import Claude
 
     thinking, output_config = _anthropic_thinking(model, reasoning=reasoning)
@@ -1605,6 +1747,7 @@ def build_model(
         max_tokens=_anthropic_max_tokens(model, reasoning=reasoning),
         thinking=thinking,
         output_config=output_config,
+        **_gateway_kwargs("anthropic", base_url),
     )
 
 
@@ -1615,24 +1758,31 @@ def build_search_equipped(
     reasoning: bool = False,
     cache_system_prompt: bool = False,
     tool_search: Any | None = None,
+    settings: Settings | None = None,
 ) -> tuple[Any, list[Any]]:
     """Build a model and its search tools for advisor research."""
-    settings = get_settings()
-    plan = plan_search(model_id, mode or settings.search_mode)
+    resolved_settings = settings or get_settings()
+    plan = plan_search(model_id, mode or resolved_settings.search_mode)
     if plan.strategy == "none":
         raise ValueError("advisor web search is disabled by search_mode=off")
     _provider, model_name = split_provider(model_id)
-    api_key = resolve_api_key(model_id) or None
+    route = resolve_route(model_id, settings=resolved_settings)
+    api_key = route.api_key or None
+    base_url = route.base_url
     reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
 
     if plan.strategy == "native_openai":
         return (
-            _build_openai_responses(model_id, api_key=api_key, reasoning=reasoning),
+            _build_openai_responses(
+                model_id, api_key=api_key, reasoning=reasoning, base_url=base_url
+            ),
             [OPENAI_WEB_SEARCH_TOOL],
         )
     if plan.strategy == "native_deepseek":
         return (
-            _build_deepseek_responses(model_id, api_key=api_key, reasoning=reasoning),
+            _build_deepseek_responses(
+                model_id, api_key=api_key, reasoning=reasoning, base_url=base_url
+            ),
             [DEEPSEEK_WEB_SEARCH_TOOL],
         )
     if plan.strategy == "native_gemini":
@@ -1653,6 +1803,7 @@ def build_search_equipped(
             # therefore returns no callable in the agent tool list.
             "search": True,
             "store": False,
+            **_gateway_kwargs("gemini", base_url),
         }
         if model_name.casefold().startswith("gemini-3"):
             kwargs["thinking_level"] = (

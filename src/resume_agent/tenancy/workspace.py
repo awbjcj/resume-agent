@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from resume_agent.config import Settings
+from resume_agent.llm_routing import SUB2API_KEY_FIELDS
 from resume_agent.setup.env_writer import parse_env
 
 _PLATFORM_FIELDS = frozenset(
@@ -24,6 +25,14 @@ _PLATFORM_FIELDS = frozenset(
         "h1b_mcp_timeout_seconds",
         "h1b_mcp_max_result_chars",
         "h1b_cache_ttl_days",
+        # Subscription routing is a deployment decision an admin makes, not a
+        # per-user preference: a member's secrets.env must not be able to
+        # repoint the gateway or swap its credential. Derived from the routing
+        # map so a new provider cannot be added there and silently become
+        # user-overridable here. The *_route_mode fields need no entry --
+        # _OVERLAY_FIELDS only ever admits plain str fields, and they are not.
+        "sub2api_base_url",
+        *SUB2API_KEY_FIELDS.values(),
     }
 )
 _PROVIDER_FIELDS = {
