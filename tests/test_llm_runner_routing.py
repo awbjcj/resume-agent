@@ -4,12 +4,14 @@ from types import SimpleNamespace
 
 from resume_agent.config import Settings
 from resume_agent.llm_runner import (
+    AgentRunner,
     build_model,
     build_search_equipped,
     model_access_available,
     refresh_agent_api_key,
 )
 from resume_agent.tenancy.context import UserContext, use_context
+from resume_agent.tenancy.spend import SpendDecision
 from resume_agent.tenancy.workspace import WorkspacePaths
 
 GATEWAY = "https://sub2api.example.com"
@@ -63,6 +65,21 @@ def test_search_builder_uses_the_same_route_as_the_normal_builder():
 
     assert (model.api_key, model.base_url) == ("oai-sub", f"{GATEWAY}/v1")
     assert tools == [{"type": "web_search"}]
+
+
+def test_tool_search_reuses_the_exact_anthropic_route_decision():
+    settings = _settings(sub2api_base_url=GATEWAY, sub2api_anthropic_key="ant-sub")
+
+    model, tools = build_search_equipped(
+        "claude-sonnet-5",
+        mode="tool",
+        settings=settings,
+        tool_search=object(),
+    )
+
+    assert model.api_key == "ant-sub"
+    assert model.client_params["base_url"] == GATEWAY
+    assert len(tools) == 1
 
 
 def test_api_pin_does_not_claim_subscription_only_access():
@@ -122,3 +139,26 @@ def test_refresh_restores_deepseek_direct_default_after_gateway_is_disabled(tmp_
 
     assert model.api_key == "deep-direct"
     assert model.base_url == "https://api.deepseek.com"
+
+
+def test_agent_runner_applies_endpoint_and_key_from_the_same_decision():
+    model = build_model(
+        "claude-sonnet-5",
+        settings=_settings(sub2api_base_url=GATEWAY, sub2api_anthropic_key="ant-sub"),
+    )
+    runner = AgentRunner(SimpleNamespace(model=model))
+
+    runner._apply_locked(
+        model,
+        SpendDecision(
+            api_key="ant-direct",
+            own_key=False,
+            provider="anthropic",
+            model="claude-sonnet-5",
+            reason="shared",
+            base_url=None,
+        ),
+    )
+
+    assert model.api_key == "ant-direct"
+    assert not model.client_params or "base_url" not in model.client_params

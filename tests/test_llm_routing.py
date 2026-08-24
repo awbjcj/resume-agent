@@ -15,7 +15,7 @@ from resume_agent.config import Settings
 from resume_agent.llm_routing import (
     RouteConfigError,
     effective_mode,
-    gateway_base_url,
+    gateway_origin,
     subscription_configured,
     subscription_key,
 )
@@ -53,7 +53,7 @@ def test_auto_leaves_a_provider_without_a_gateway_key_on_its_api():
 
     assert effective_mode("deepseek", settings) == "api"
     assert effective_mode("gemini", settings) == "api"
-    assert gateway_base_url("deepseek", settings) is not None  # origin is set...
+    assert gateway_origin(settings) is not None  # origin is set...
     assert not subscription_configured("deepseek", settings)  # ...but no key
 
 
@@ -64,7 +64,7 @@ def test_auto_with_no_gateway_at_all_leaves_every_provider_on_its_api():
         "api",
         "api",
     ]
-    assert gateway_base_url("anthropic", settings) is None
+    assert gateway_origin(settings) is None
 
 
 # -- explicit modes ---------------------------------------------------------
@@ -116,32 +116,20 @@ def test_a_gateway_key_with_no_origin_raises_even_in_auto_mode():
 # -- base URLs: each SDK appends a different path ---------------------------
 
 
-@pytest.mark.parametrize(
-    ("provider", "expected"),
-    [
-        # The Anthropic SDK appends /v1/messages and google-genai appends
-        # /v1beta/models/..., so both want the bare origin.
-        ("anthropic", GATEWAY),
-        ("gemini", GATEWAY),
-        # The OpenAI SDK appends only /responses, so it wants the /v1 already on.
-        ("openai", f"{GATEWAY}/v1"),
-        ("deepseek", f"{GATEWAY}/v1"),
-    ],
-)
-def test_base_url_carries_the_suffix_each_sdk_expects(provider, expected):
-    assert gateway_base_url(provider, _settings(sub2api_base_url=GATEWAY)) == expected
+def test_gateway_origin_is_provider_agnostic():
+    assert gateway_origin(_settings(sub2api_base_url=GATEWAY)) == GATEWAY
 
 
 def test_a_trailing_slash_does_not_produce_a_doubled_path():
     settings = _settings(sub2api_base_url=f"{GATEWAY}/")
 
-    assert gateway_base_url("openai", settings) == f"{GATEWAY}/v1"
+    assert gateway_origin(settings) == GATEWAY
 
 
 def test_a_gateway_behind_a_path_prefix_is_allowed():
     settings = _settings(sub2api_base_url="https://proxy.example.com/sub2api")
 
-    assert gateway_base_url("openai", settings) == "https://proxy.example.com/sub2api/v1"
+    assert gateway_origin(settings) == "https://proxy.example.com/sub2api"
 
 
 @pytest.mark.parametrize(
@@ -155,4 +143,4 @@ def test_a_gateway_behind_a_path_prefix_is_allowed():
 )
 def test_an_unusable_origin_raises_rather_than_being_concatenated(bad):
     with pytest.raises(RouteConfigError):
-        gateway_base_url("openai", _settings(sub2api_base_url=bad))
+        gateway_origin(_settings(sub2api_base_url=bad))

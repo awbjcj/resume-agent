@@ -139,7 +139,7 @@ def _subscription_decision(
     """
     from resume_agent.llm_routing import (
         effective_mode,
-        gateway_base_url,
+        gateway_origin,
         subscription_key,
     )
 
@@ -151,7 +151,7 @@ def _subscription_decision(
         provider=provider,
         model=model,
         reason="subscription",
-        base_url=gateway_base_url(provider, settings),
+        base_url=gateway_origin(settings),
     )
 
 
@@ -303,6 +303,11 @@ class SpendGate:
     def select(self, model_id: str, *, now: datetime | None = None) -> SpendDecision:
         """Return the key this call would use. Never raises on budget."""
         return self._resolve(model_id, now=now)[0]
+
+    def available(self, model_id: str, *, now: datetime | None = None) -> bool:
+        """Whether a call has both a credential and permission to spend."""
+        decision, fatal = self._resolve(model_id, now=now)
+        return bool(decision.api_key) and fatal is None
 
     def open(self, model_id: str, *, now: datetime | None = None) -> SpendDecision:
         """Return the funded key for ``model_id``, raising if nothing funds it.

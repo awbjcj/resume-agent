@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 from collections.abc import AsyncGenerator, Iterator
 from contextlib import aclosing
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from fastapi import Depends, Header, Request
@@ -21,7 +22,7 @@ from resume_agent.tenancy.bootstrap import build_context
 from resume_agent.tenancy.context import UserContext, current_context, use_context
 from resume_agent.tenancy.secrets import hash_secret
 from resume_agent.tenancy.system_db import ApiToken, User
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_agent.tenancy.workspace import WorkspacePaths, effective_settings
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -283,7 +284,7 @@ def refresh_app_settings(app, fresh: Settings) -> None:
 
 def refresh_platform_settings(app, fresh: Settings) -> None:
     """Refresh deployment settings after an admin writes the platform env file."""
-    app.state.settings = fresh.model_copy(
+    refreshed = fresh.model_copy(
         update={
             "db_url": app.state.db_url,
             "api_token": app.state.settings.api_token,
@@ -292,4 +293,29 @@ def refresh_platform_settings(app, fresh: Settings) -> None:
             "session_secret": app.state.settings.session_secret,
             "browser_enabled": app.state.settings.browser_enabled,
         }
+    )
+    app.state.settings = refreshed
+    context = getattr(app.state, "default_context", None)
+    if context is None:
+        return
+    overlay = effective_settings(refreshed, context.paths)
+    platform_provider_keys = {
+        provider: key
+        for provider, key in {
+            "anthropic": refreshed.anthropic_api_key,
+            "openai": refreshed.openai_api_key,
+            "gemini": refreshed.gemini_api_key,
+            "deepseek": refreshed.deepseek_api_key,
+        }.items()
+        if key
+    }
+    app.state.default_context = replace(
+        context,
+        settings=overlay.settings,
+        own_key_providers=overlay.own_key_providers,
+        platform_provider_keys=platform_provider_keys,
+        user_provider_keys=overlay.user_provider_keys,
+        selected_own_key_providers={},
+        selected_model_own_keys={},
+        spend_decisions={},
     )

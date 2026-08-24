@@ -31,7 +31,7 @@ __all__ = [
     "EffectiveMode",
     "RouteConfigError",
     "effective_mode",
-    "gateway_base_url",
+    "gateway_origin",
     "route_mode",
     "subscription_configured",
     "subscription_key",
@@ -65,19 +65,6 @@ ROUTE_MODE_FIELDS: dict[str, str] = {
     "gemini": "gemini_route_mode",
     "deepseek": "deepseek_route_mode",
 }
-
-# What each provider's SDK expects to be handed, given a gateway origin. These
-# differ because each SDK appends its own path to whatever base it is given:
-# the Anthropic SDK appends "/v1/messages" and google-genai appends
-# "/v1beta/models/...", so both want the bare origin, while the OpenAI SDK
-# appends only "/responses" and therefore wants the "/v1" already on the end.
-_BASE_URL_SUFFIX: dict[str, str] = {
-    "anthropic": "",
-    "openai": "/v1",
-    "deepseek": "/v1",
-    "gemini": "",
-}
-
 
 def _origin(settings: Settings) -> str:
     """The configured gateway origin, validated, without a trailing slash.
@@ -162,13 +149,12 @@ def effective_mode(provider: str, settings: Settings) -> EffectiveMode:
     return "subscription" if key else "api"
 
 
-def gateway_base_url(provider: str, settings: Settings) -> str | None:
-    """The ``base_url`` ``provider``'s SDK needs to reach the gateway.
+def gateway_origin(settings: Settings) -> str | None:
+    """The validated gateway origin, or ``None`` when it is unset.
 
-    ``None`` when the provider is not on the gateway, which every caller reads
-    as "leave the SDK's own default alone".
+    Provider SDK path spelling deliberately lives in ``llm_runner``'s provider
+    seam. The spend decision carries this single validated routing value next
+    to its credential; the seam adapts it without re-reading configuration.
     """
     origin = _origin(settings)
-    if not origin:
-        return None
-    return f"{origin}{_BASE_URL_SUFFIX.get(provider, '')}"
+    return origin or None

@@ -161,6 +161,7 @@ class AgentRunner:
         self._key_lock = threading.Lock()
         self._inflight = 0
         self._applied_key: str | None = None
+        self._applied_base_url: str | None = None
 
     @property
     def agent(self) -> Any:
@@ -197,7 +198,13 @@ class AgentRunner:
         if context is not None:
             context.selected_model_own_keys[id(model)] = decision.own_key
         key = decision.api_key or None
-        if key == self._applied_key and getattr(model, "api_key", None) == key:
+        target_base_url = _gateway_target(model, decision.provider, decision.base_url)
+        if (
+            key == self._applied_key
+            and target_base_url == self._applied_base_url
+            and getattr(model, "api_key", None) == key
+            and _current_gateway(model, decision.provider) == target_base_url
+        ):
             return
         if self._inflight:
             # A sibling is mid-request on this model's client. Nulling it now
@@ -205,6 +212,7 @@ class AgentRunner:
             # finds the runner idle, which is the next phase in practice.
             return
         model.api_key = key
+        _apply_gateway(model, decision.provider, decision.base_url)
         # Agno caches clients after first use. Clearing them makes the next
         # request honor the newly selected credential.
         if hasattr(model, "client"):
@@ -212,6 +220,7 @@ class AgentRunner:
         if hasattr(model, "async_client"):
             model.async_client = None
         self._applied_key = key
+        self._applied_base_url = target_base_url
 
     def _exit(self) -> None:
         with self._key_lock:
@@ -963,30 +972,12 @@ def resolve_route(model_id: str, *, settings: Settings | None = None) -> Any:
 def model_access_available(model_id: str, *, settings: Settings | None = None) -> bool:
     """Whether the active user can fund a call to ``model_id`` right now."""
 
-    provider, model = split_provider(model_id)
-    from resume_agent.llm_routing import effective_mode
-    from resume_agent.tenancy.context import current_context
+    # SpendGate is the single authority for direct and subscription funding.
+    # Re-reading route mode or provider key maps here would create a second
+    # policy evaluator that can disagree with the call-time decision.
+    from resume_agent.tenancy.spend import SpendGate
 
-    context = current_context()
-    # A subscription-routed provider needs no API key at all, so asking "is
-    # there a key?" would report every model unavailable on a deployment that
-    # runs entirely off the gateway -- greying out the model picker and
-    # gating off the coach and interview routers.
-    if (
-        effective_mode(
-            provider, settings or (context.settings if context else get_settings())
-        )
-        == "subscription"
-    ):
-        return True
-    if context is not None:
-        if context.user_provider_keys.get(provider):
-            return True
-        if context.platform_provider_keys.get(provider):
-            from resume_agent.tenancy.limits import shared_key_available
-
-            return shared_key_available(provider, model)
-    return bool(_settings_provider_key(settings or get_settings(), provider))
+    return SpendGate(settings=settings).available(model_id)
 
 
 def provider_access_available(
@@ -1027,13 +1018,15 @@ def _gateway_target(model: Any, provider: str, base_url: str | None) -> str | No
     alone -- is what lets the caller compare current against target without
     the unrouted DeepSeek case reporting a change on every single refresh.
     """
+    sdk_base_url = _provider_gateway_base_url(provider, base_url)
     if provider in {"openai", "deepseek"}:
-        return base_url or type(model).__dataclass_fields__["base_url"].default
-    return base_url
+        return sdk_base_url or type(model).__dataclass_fields__["base_url"].default
+    return sdk_base_url
 
 
 def _apply_gateway(model: Any, provider: str, base_url: str | None) -> None:
     """Repoint an already-built model, including back to its own default."""
+    sdk_base_url = _provider_gateway_base_url(provider, base_url)
     if provider in {"openai", "deepseek"}:
         model.base_url = _gateway_target(model, provider, base_url)
         return
@@ -1043,8 +1036,8 @@ def _apply_gateway(model: Any, provider: str, base_url: str | None) -> None:
     elif provider == "gemini":
         http_options = dict(params.get("http_options") or {})
         http_options.pop("base_url", None)
-        if base_url:
-            http_options["base_url"] = base_url
+        if sdk_base_url:
+            http_options["base_url"] = sdk_base_url
         if http_options:
             params["http_options"] = http_options
         else:
@@ -1061,7 +1054,6 @@ def refresh_agent_api_key(agent: object, *, settings: Settings | None = None) ->
     so refreshing one without the other is worse than refreshing neither.
     """
 
-    from resume_agent.llm_routing import subscription_configured
     from resume_agent.tenancy.context import current_context
     from resume_agent.tenancy.costs import normalize_provider
 
@@ -1074,15 +1066,6 @@ def refresh_agent_api_key(agent: object, *, settings: Settings | None = None) ->
     if not provider_value and callable(get_provider):
         provider_value = get_provider()
     provider = normalize_provider(str(provider_value or ""))
-    if (
-        provider not in context.platform_provider_keys
-        and provider not in context.user_provider_keys
-        # A routed provider often has neither -- a subscription-only
-        # deployment configures no API key at all -- so without this it would
-        # return early and never pick up a mode change.
-        and not subscription_configured(provider, settings or context.settings)
-    ):
-        return
     model_name = str(getattr(model, "id", "") or "")
     if not provider or not model_name:
         return
@@ -1561,15 +1544,23 @@ def _gateway_kwargs(provider: str, base_url: str | None) -> dict[str, Any]:
     that dict carries only ``timeout``, which this codebase never sets on a
     Gemini model, so nothing is lost today; it would need merging if one were.
     """
-    if not base_url:
+    sdk_base_url = _provider_gateway_base_url(provider, base_url)
+    if not sdk_base_url:
         return {}
     if provider in {"openai", "deepseek"}:
-        return {"base_url": base_url}
+        return {"base_url": sdk_base_url}
     if provider == "anthropic":
-        return {"client_params": {"base_url": base_url}}
+        return {"client_params": {"base_url": sdk_base_url}}
     if provider == "gemini":
-        return {"client_params": {"http_options": {"base_url": base_url}}}
+        return {"client_params": {"http_options": {"base_url": sdk_base_url}}}
     return {}
+
+
+def _provider_gateway_base_url(provider: str, origin: str | None) -> str | None:
+    """Adapt one resolved gateway origin to the selected provider SDK."""
+    if not origin:
+        return None
+    return f"{origin}/v1" if provider in {"openai", "deepseek"} else origin
 
 
 def _build_openai_responses(
@@ -1691,10 +1682,28 @@ def build_model(
     sources it from ``resolve_api_key``, so it is the same decision re-passed,
     and it must not also suppress the endpoint half.
     """
+    route = resolve_route(model_id, settings=settings)
+    return _build_model_from_route(
+        model_id,
+        route,
+        api_key=api_key,
+        cache_system_prompt=cache_system_prompt,
+        reasoning=reasoning,
+    )
+
+
+def _build_model_from_route(
+    model_id: str,
+    route: Any,
+    *,
+    api_key: str | None = None,
+    cache_system_prompt: bool = False,
+    reasoning: bool = False,
+) -> Any:
+    """Build from one already-resolved spend decision without re-evaluation."""
     provider, model = split_provider(model_id)
     reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
     reasoning_effort = _reasoning_effort_for(model_id, provider) if reasoning else None
-    route = resolve_route(model_id, settings=settings)
     key = api_key or route.api_key or None
     base_url = route.base_url
     if provider == "openai":
@@ -1813,8 +1822,9 @@ def build_search_equipped(
             )
         return (GeminiInteractions(**kwargs), [])
 
-    model = build_model(
+    model = _build_model_from_route(
         model_id,
+        route,
         api_key=api_key,
         cache_system_prompt=cache_system_prompt,
         reasoning=reasoning,

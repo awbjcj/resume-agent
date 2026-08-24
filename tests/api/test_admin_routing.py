@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient
 
+from resume_agent.api.app import create_app
 from resume_agent.api.auth import hash_password
 from resume_agent.tenancy.system_db import User
 from resume_agent.tenancy.workspace import provision_workspace
@@ -77,3 +79,32 @@ def test_invalid_route_document_is_rejected_without_changing_the_env(mu_app, mu_
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_ROUTING_CONFIG"
     assert mu_app.state.env_path.read_text(encoding="utf-8") == before
+
+
+def test_local_mode_refreshes_the_default_context_and_clears_route_cache(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("", encoding="utf-8")
+    app = create_app(
+        db_url=f"sqlite:///{(tmp_path / 'data' / 'local.db').as_posix()}",
+        app_mode="local",
+        env_path=env,
+        data_dir=tmp_path / "data",
+        config_dir=tmp_path / "config",
+    )
+    with TestClient(app) as client:
+        previous = app.state.default_context
+        previous.spend_decisions["claude-sonnet-5"] = object()
+
+        response = client.put(
+            "/api/admin/routing",
+            json={
+                "baseUrl": "https://sub2api.example.com",
+                "anthropicKey": "ant-subscription-key",
+            },
+        )
+
+        assert response.status_code == 200
+        refreshed = app.state.default_context
+        assert refreshed is not previous
+        assert refreshed.settings.sub2api_anthropic_key == "ant-subscription-key"
+        assert refreshed.spend_decisions == {}
