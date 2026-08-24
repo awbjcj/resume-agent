@@ -28,7 +28,8 @@ export function AdminPage() {
       />
       <nav aria-label="Administration sections" className="-mt-5 flex gap-2">
         <Button variant="secondary" size="sm">Access &amp; data</Button>
-        <Button variant="outline" size="sm" render={<Link to="/admin/quotas" />}>Cost quotas</Button>
+        <Button nativeButton={false} variant="outline" size="sm" render={<Link to="/admin/quotas" />}>Cost quotas</Button>
+        <Button nativeButton={false} variant="outline" size="sm" render={<Link to="/admin/routing" />}>Provider routing</Button>
       </nav>
       <Alert className="-mt-5">
         <ShieldCheck aria-hidden="true" />

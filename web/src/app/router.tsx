@@ -129,6 +129,9 @@ const AdminPage = lazy(() =>
 const AdminQuotasPage = lazy(() =>
   import("@/features/admin/AdminQuotasPage").then((m) => ({ default: m.AdminQuotasPage })),
 );
+const AdminRoutingPage = lazy(() =>
+  import("@/features/admin/AdminRoutingPage").then((m) => ({ default: m.AdminRoutingPage })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
@@ -157,6 +160,7 @@ export const router = createBrowserRouter([
       { path: "account", element: page(<AccountPage />) },
       { path: "admin", element: page(<AdminPage />) },
       { path: "admin/quotas", element: page(<AdminQuotasPage />) },
+      { path: "admin/routing", element: page(<AdminRoutingPage />) },
       { path: "sources", element: <Navigate to="/settings/sources" replace /> },
       {
         path: "settings",

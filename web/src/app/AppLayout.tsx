@@ -11,6 +11,7 @@ import {
   CircleUserRound,
   ShieldCheck,
   Banknote,
+  Network,
   Compass,
   Sparkles,
   Target,
@@ -172,6 +173,7 @@ export function AppLayout() {
                   <>
                     <NavMenuItem item={{ to: "/admin", label: "Admin", end: true, icon: ShieldCheck }} />
                     <NavMenuItem item={{ to: "/admin/quotas", label: "Cost quotas", icon: Banknote }} />
+                    <NavMenuItem item={{ to: "/admin/routing", label: "Provider routing", icon: Network }} />
                   </>
                 )}
               </SidebarMenu>
