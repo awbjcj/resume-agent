@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
@@ -41,7 +41,8 @@ describe("AdminRoutingPage", () => {
     expect(await screen.findByRole("heading", { name: "Provider routing" })).toBeInTheDocument();
     expect(screen.getByText("Subscription")).toBeInTheDocument();
     expect(screen.getAllByText("Direct API").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("Anthropic route mode")).toHaveTextContent("auto");
+    expect(screen.getByLabelText("Anthropic route mode")).toHaveTextContent("Auto");
+    expect(screen.getByLabelText("Gemini route mode")).toHaveTextContent("Direct API");
     expect(screen.getByLabelText("Gateway key", { selector: "#anthropic-gateway-key" })).toHaveAttribute("placeholder", "Configured ····1234");
 
     await user.click(screen.getByRole("button", { name: "Clear key" }));
@@ -55,6 +56,23 @@ describe("AdminRoutingPage", () => {
       geminiRouteMode: "api",
       deepseekRouteMode: "api",
     });
+  });
+
+  it("labels the closed trigger with the same name as its option", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const trigger = await screen.findByLabelText("Gemini route mode");
+    await user.click(trigger);
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Auto",
+      "Subscription",
+      "Direct API",
+    ]);
+
+    await user.click(within(listbox).getByRole("option", { name: "Subscription" }));
+    await waitFor(() => expect(trigger).toHaveTextContent("Subscription"));
   });
 
   it("has no automated accessibility violations", async () => {
