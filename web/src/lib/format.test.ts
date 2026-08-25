@@ -90,7 +90,9 @@ describe("fieldLabel", () => {
     expect(fieldLabel("ai")).toBe("AI");
     expect(fieldLabel("artificial_intelligence_and_ml")).toBe("Artificial Intelligence and ML");
     expect(fieldLabel("h1b")).toBe("H1B");
-    expect(fieldLabel("saas")).toBe("SAAS");
+    expect(fieldLabel("saas")).toBe("SaaS");
+    expect(fieldLabel("PaaS")).toBe("PaaS");
+    expect(fieldLabel("iaas")).toBe("IaaS");
   });
 
   it("keeps connector words lowercase mid-phrase but capitalizes them as the first word", () => {

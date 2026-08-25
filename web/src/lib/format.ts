@@ -172,14 +172,21 @@ const ALWAYS_LOWERCASE_FIELD_WORDS = new Set(["and/or"]);
 // displayed.
 const UPPERCASE_FIELD_ACRONYMS = new Set([
   "ai", "ml", "nlp", "llm", "llms", "api", "apis", "sql", "aws", "gcp", "iot",
-  "saas", "paas", "iaas", "ui", "ux", "seo", "sem", "hr", "it", "qa", "pr",
+  "ui", "ux", "seo", "sem", "hr", "it", "qa", "pr",
   "b2b", "b2c", "r&d", "hipaa", "sox", "gdpr", "kyc", "aml", "cpa", "mba",
   "phd", "h1b", "us", "uk", "eu", "usa", "vp", "svp", "ceo", "cto", "cfo", "coo",
+]);
+const MIXED_CASE_FIELD_ACRONYMS = new Map([
+  ["saas", "SaaS"],
+  ["paas", "PaaS"],
+  ["iaas", "IaaS"],
 ]);
 
 function fieldLabelWord(word: string, isFirst: boolean): string {
   const lower = word.toLowerCase();
   if (ALWAYS_LOWERCASE_FIELD_WORDS.has(lower)) return lower;
+  const mixedCase = MIXED_CASE_FIELD_ACRONYMS.get(lower);
+  if (mixedCase) return mixedCase;
   if (UPPERCASE_FIELD_ACRONYMS.has(lower)) return lower.toUpperCase();
   if (!isFirst && LOWERCASE_FIELD_CONNECTORS.has(lower)) return lower;
   return titleCaseWord(word);
