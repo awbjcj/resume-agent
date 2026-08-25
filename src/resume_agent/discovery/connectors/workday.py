@@ -14,6 +14,7 @@ from resume_agent.discovery.connectors.text import (
     html_to_markdown,
     join_locations,
     primary_search_term,
+    with_meta_lines,
 )
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.tenancy.context import current_context
@@ -273,9 +274,43 @@ def detail_location(info: dict) -> str | None:
     return join_locations([primary, *additional])
 
 
+def workday_meta_lines(info: dict) -> list[str]:
+    """The facts Workday renders above a posting's description.
+
+    Kept shared with URL ingestion so a board pull and a pasted Workday URL
+    preserve the same header fields.
+    """
+    lines: list[str] = []
+    location = info.get("location") or info.get("jobRequisitionLocation")
+    if isinstance(location, dict):
+        location = location.get("descriptor")
+    if location:
+        lines.append(f"Location: {location}")
+    if additional := info.get("additionalLocations"):
+        names = [
+            item.get("descriptor") if isinstance(item, dict) else item
+            for item in additional
+        ]
+        if joined := ", ".join(str(name) for name in names if name):
+            lines.append(f"Additional Locations: {joined}")
+    if remote := info.get("remoteType"):
+        lines.append(f"Workplace Type: {remote}")
+    if time_type := info.get("timeType"):
+        lines.append(f"Employment Type: {time_type}")
+    if job_family := info.get("jobFamily"):
+        lines.append(f"Department: {job_family}")
+    if req_id := info.get("jobReqId"):
+        lines.append(f"Requisition ID: {req_id}")
+    if posted := info.get("postedOn"):
+        lines.append(f"Posted: {posted}")
+    return lines
+
+
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
     info = detail.get("jobPostingInfo") or {}
-    row.jd_text = html_to_markdown(info.get("jobDescription", ""))
+    row.jd_text = with_meta_lines(
+        workday_meta_lines(info), html_to_markdown(info.get("jobDescription", ""))
+    )
     if info.get("externalUrl"):
         row.url = info["externalUrl"]
     if location := detail_location(info):

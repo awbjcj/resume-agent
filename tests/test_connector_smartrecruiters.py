@@ -20,9 +20,7 @@ def test_smartrecruiters_maps_list_and_detail():
     apply_detail(rows[0], json.loads((FIXTURES / "detail.json").read_text()))
 
     assert rows[0].company == "SmartRecruiters Inc"
-    # No `fullLocation` in this payload, so the parts are joined -- with the
-    # alpha-2 country upper-cased, the form every other connector emits.
-    assert rows[0].location == "United States, REMOTE, US"
+    assert rows[0].location == "United States, REMOTE, United States"
     assert rows[0].url is not None
     assert rows[0].url.startswith("https://jobs.smartrecruiters.com/")
     assert "Enterprise SaaS experience" in rows[0].jd_text
@@ -70,6 +68,16 @@ def test_smartrecruiters_prefers_the_providers_own_full_location():
     [row] = parse_postings(payload, "IFS1")
 
     assert row.location == "Colombo, Western Province, Sri Lanka"
+
+
+def test_smartrecruiters_detail_upgrades_the_list_location():
+    [row] = parse_postings(
+        json.loads((FIXTURES / "list.json").read_text()), "smartrecruiters"
+    )
+
+    apply_detail(row, json.loads((FIXTURES / "detail.json").read_text()))
+
+    assert row.location == "United States, REMOTE, United States"
 
 
 def test_smartrecruiters_pushes_only_supported_search_text():

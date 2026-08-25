@@ -40,7 +40,10 @@ from bs4.element import Tag
 from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
-from resume_agent.discovery.connectors.bamboohr import detail_url as bamboohr_detail_url
+from resume_agent.discovery.connectors.bamboohr import (
+    bamboohr_meta_lines,
+    detail_url as bamboohr_detail_url,
+)
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import AtsTarget, workday_external_path
 from resume_agent.discovery.connectors.greenhouse import (
@@ -63,6 +66,7 @@ from resume_agent.discovery.connectors.text import (
     html_to_markdown,
     jobposting_json_ld,
     jobposting_location,
+    jobposting_meta_lines,
     with_meta_lines,
 )
 from resume_agent.discovery.connectors.workable import (
@@ -73,6 +77,7 @@ from resume_agent.discovery.connectors.workday import (
     detail_company_name,
     detail_location,
     fetch_job_detail,
+    workday_meta_lines,
 )
 from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
 from resume_agent.discovery.url_ingest.models import ExtractedJob
@@ -198,101 +203,6 @@ def _prefer(*candidates: ExtractedJob | None) -> ExtractedJob | None:
 
 # -- schema.org JobPosting ---------------------------------------------------
 
-_JSON_LD_EMPLOYMENT_LABELS = {
-    "FULL_TIME": "Full time",
-    "PART_TIME": "Part time",
-    "CONTRACTOR": "Contract",
-    "TEMPORARY": "Temporary",
-    "INTERN": "Internship",
-    "VOLUNTEER": "Volunteer",
-    "PER_DIEM": "Per diem",
-    "OTHER": "Other",
-}
-_JSON_LD_PERIODS = {
-    "HOUR": "per hour",
-    "DAY": "per day",
-    "WEEK": "per week",
-    "MONTH": "per month",
-    "YEAR": "per year",
-}
-
-
-def _names(value) -> list[str]:
-    """Flatten a schema.org field that may be a string, an object, or a list of either."""
-    items = value if isinstance(value, list) else [value]
-    names: list[str] = []
-    for item in items:
-        if isinstance(item, str) and item.strip():
-            names.append(item.strip())
-        elif isinstance(item, dict):
-            name = item.get("name")
-            if isinstance(name, str) and name.strip():
-                names.append(name.strip())
-    return names
-
-
-def _amount(value) -> str | None:
-    if isinstance(value, int | float):
-        return f"{value:,.0f}"
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return None
-
-
-def _json_ld_salary(posting: dict) -> str | None:
-    """Render ``baseSalary`` (a MonetaryAmount) the way the page's pay band reads."""
-    salary = posting.get("baseSalary") or posting.get("estimatedSalary")
-    if isinstance(salary, list):
-        salary = next((item for item in salary if isinstance(item, dict)), None)
-    if not isinstance(salary, dict):
-        return None
-    value = salary.get("value")
-    if not isinstance(value, dict):
-        return _amount(value)
-    low = _amount(value.get("minValue"))
-    high = _amount(value.get("maxValue"))
-    exact = _amount(value.get("value"))
-    span = f"{low} - {high}" if low and high else (low or high or exact)
-    if not span:
-        return None
-    currency = salary.get("currency") or value.get("currency")
-    period = _JSON_LD_PERIODS.get(str(value.get("unitText") or "").upper())
-    return " ".join(part for part in (currency, span, period) if part)
-
-
-def _json_ld_meta_lines(posting: dict) -> list[str]:
-    """The sidebar/top-bar facts schema.org markup carries beyond the body text.
-
-    ``description`` alone loses the pay band, employment type, and remote
-    status that a posting renders in its header -- fields the fit scorer and
-    tailoring rely on. Labels match ``ashby._sidebar_lines`` so a job read
-    through either path produces the same text shape.
-    """
-    lines = []
-    if location := jobposting_location(posting):
-        lines.append(f"Location: {location}")
-
-    remote = posting.get("jobLocationType") == "TELECOMMUTE"
-    regions = _names(posting.get("applicantLocationRequirements"))
-    if remote and regions:
-        lines.append(f"Workplace Type: Remote ({', '.join(regions)})")
-    elif remote:
-        lines.append("Workplace Type: Remote")
-
-    types = [
-        _JSON_LD_EMPLOYMENT_LABELS.get(str(item).upper().replace("-", "_"), str(item))
-        for item in _names(posting.get("employmentType"))
-    ]
-    if types:
-        lines.append(f"Employment Type: {', '.join(types)}")
-
-    if departments := _names(posting.get("occupationalCategory")):
-        lines.append(f"Department: {', '.join(departments)}")
-
-    if salary := _json_ld_salary(posting):
-        lines.append(f"Compensation: {salary}")
-
-    return lines
 
 
 def _from_json_ld(html: str) -> ExtractedJob | None:
@@ -307,7 +217,7 @@ def _from_json_ld(html: str) -> ExtractedJob | None:
         company=company,
         title=posting.get("title"),
         location=jobposting_location(posting),
-        jd_text=_with_meta(_json_ld_meta_lines(posting), body),
+        jd_text=_with_meta(jobposting_meta_lines(posting), body),
     )
 
 
@@ -341,7 +251,7 @@ def with_json_ld_meta(extracted: ExtractedJob | None, html: str) -> ExtractedJob
     existing = extracted.jd_text
     lines = [
         line
-        for line in _json_ld_meta_lines(posting)
+        for line in jobposting_meta_lines(posting)
         if line.split(":", 1)[0] + ":" not in existing
     ]
     update = {
@@ -491,15 +401,7 @@ def _read_workable(target: AtsTarget, url: str, html: str) -> ExtractedJob | Non
         if item is None:
             return None
         row = parse_workable({"name": payload.get("name"), "jobs": [item]}, target.token)[0]
-        extracted = _extracted_from_row(row)
-        meta = []
-        if row.location:
-            meta.append(f"Location: {row.location}")
-        if employment := item.get("employment_type"):
-            meta.append(f"Employment Type: {employment}")
-        if department := item.get("department"):
-            meta.append(f"Department: {department}")
-        return extracted.model_copy(update={"jd_text": _with_meta(meta, extracted.jd_text)})
+        return _extracted_from_row(row)
 
     return _prefer(_api(api), _from_json_ld(html))
 
@@ -563,49 +465,17 @@ def _read_bamboohr(target: AtsTarget, url: str, html: str) -> ExtractedJob | Non
         if not opening:
             return None
         location = _bamboohr_location(opening)
-        meta = []
-        if location:
-            meta.append(f"Location: {location}")
-        for label, key in (("Employment Type", "employmentStatusLabel"), ("Department", "departmentLabel")):
-            if value := opening.get(key):
-                meta.append(f"{label}: {value}")
-        if pay := opening.get("compensation"):
-            meta.append(f"Compensation: {pay}")
         return ExtractedJob(
             company=target.token,
             title=opening.get("jobOpeningName"),
             location=location,
-            jd_text=_with_meta(meta, html_to_markdown(opening.get("description") or "")),
+            jd_text=_with_meta(
+                bamboohr_meta_lines(opening, location=location),
+                html_to_markdown(opening.get("description") or ""),
+            ),
         )
 
     return _prefer(_api(api), _from_json_ld(html))
-
-
-def _workday_meta(info: dict) -> list[str]:
-    """Workday's header strip: locations, time type, req id, posted date."""
-    lines = []
-    location = info.get("location") or info.get("jobRequisitionLocation")
-    if isinstance(location, dict):
-        location = location.get("descriptor")
-    if location:
-        lines.append(f"Location: {location}")
-    if additional := info.get("additionalLocations"):
-        names = [
-            item.get("descriptor") if isinstance(item, dict) else item for item in additional
-        ]
-        if joined := ", ".join(str(name) for name in names if name):
-            lines.append(f"Additional Locations: {joined}")
-    if remote := info.get("remoteType"):
-        lines.append(f"Workplace Type: {remote}")
-    if time_type := info.get("timeType"):
-        lines.append(f"Employment Type: {time_type}")
-    if job_family := info.get("jobFamily"):
-        lines.append(f"Department: {job_family}")
-    if req_id := info.get("jobReqId"):
-        lines.append(f"Requisition ID: {req_id}")
-    if posted := info.get("postedOn"):
-        lines.append(f"Posted: {posted}")
-    return lines
 
 
 def _read_workday(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
@@ -628,7 +498,8 @@ def _read_workday(target: AtsTarget, url: str, html: str) -> ExtractedJob | None
             title=info.get("title"),
             location=detail_location(info),
             jd_text=_with_meta(
-                _workday_meta(info), html_to_markdown(info.get("jobDescription") or "")
+                workday_meta_lines(info),
+                html_to_markdown(info.get("jobDescription") or ""),
             ),
         )
 

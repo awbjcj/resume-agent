@@ -9,6 +9,8 @@ from resume_agent.discovery.connectors.text import (
     html_to_markdown,
     jobposting_json_ld,
     jobposting_location,
+    jobposting_meta_lines,
+    with_meta_lines,
 )
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -42,7 +44,12 @@ def apply_detail(row: RawJob, detail: dict) -> None:
         raise ValueError("Breezy detail did not contain JobPosting JSON-LD")
     row.url = str(posting.get("url") or row.url).split("?", 1)[0]
     row.title = posting.get("title") or row.title
-    row.jd_text = html_to_markdown(posting.get("description") or "")
+    # The markup carries the pay band, employment type and remote status
+    # alongside the body; `description` alone drops all three.
+    row.jd_text = with_meta_lines(
+        jobposting_meta_lines(posting),
+        html_to_markdown(posting.get("description") or ""),
+    )
     if location := jobposting_location(posting):
         row.location = location
     organization = posting.get("hiringOrganization") or {}

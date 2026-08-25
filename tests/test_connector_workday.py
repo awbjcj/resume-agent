@@ -489,3 +489,39 @@ def test_apply_detail_ignores_a_blank_hiring_organization():
     apply_detail(row, {**DETAIL, "hiringOrganization": {"name": "   ", "url": ""}})
     assert row.company == "acme"
     assert row.company_provenance == "token"
+
+
+def test_workday_detail_renders_time_and_remote_type():
+    """`timeType` and `remoteType` are the only statement of the employment and
+    workplace types -- neither appears in `jobDescription`."""
+    from resume_agent.discovery.connectors.workday import WorkdayRow, apply_detail
+
+    row = WorkdayRow(
+        source="workday", url=None, company="GM", title="Engineer",
+        location="2 Locations", jd_text="",
+    )
+    apply_detail(
+        row,
+        {
+            "jobPostingInfo": {
+                "jobDescription": "<p>Build cars.</p>",
+                "location": "Warren, Michigan, United States of America",
+                "additionalLocations": [{"descriptor": "Austin, Texas"}],
+                "timeType": "Full time",
+                "remoteType": "Hybrid",
+                "jobFamily": "Engineering",
+                "jobReqId": "JR-42",
+                "postedOn": "Posted Today",
+            }
+        },
+    )
+    header = row.jd_text.split("\n\n")[0].splitlines()
+
+    assert "Location: Warren, Michigan, United States of America" in header
+    assert "Workplace Type: Hybrid" in header
+    assert "Employment Type: Full time" in header
+    assert "Additional Locations: Austin, Texas" in header
+    assert "Department: Engineering" in header
+    assert "Requisition ID: JR-42" in header
+    assert "Posted: Posted Today" in header
+    assert "Build cars." in row.jd_text

@@ -120,6 +120,7 @@ def apply_detail(row: SmartRecruitersRow, detail: dict) -> None:
     body = html_to_markdown(
         "\n".join((sections.get(name) or {}).get("text") or "" for name in names)
     )
+    row.location = smartrecruiters_location(detail.get("location")) or row.location
     row.jd_text = with_meta_lines(smartrecruiters_meta_lines(detail), body)
     row.url = detail.get("applyUrl") or detail.get("postingUrl") or row.url
 

@@ -92,3 +92,77 @@ def test_fetch_ashby_board_hits_posting_api(monkeypatch):
     assert captured == {
         "url": "https://api.ashbyhq.com/posting-api/job-board/acme?includeCompensation=true",
     }
+
+
+def test_ashby_completes_a_bare_city_from_the_postings_own_address():
+    """`location` is often a bare city, which strands the taxonomy with no
+    country -- and an unresolved country drops the region too. The posting's
+    `address.postalAddress` is job-specific (measured: it tracks `location`
+    one-to-one across a 758-job board), so it fills the gaps."""
+    payload = {
+        "jobs": [
+            {
+                "title": "Engineer",
+                "location": "San Francisco",
+                "address": {
+                    "postalAddress": {
+                        "addressLocality": "San Francisco",
+                        "addressRegion": "California",
+                        "addressCountry": "United States",
+                    }
+                },
+            }
+        ]
+    }
+
+    [job] = parse_ashby(payload, company="Acme")
+
+    assert job.location == "San Francisco, California, United States"
+
+
+def test_ashby_never_overwrites_a_label_the_employer_already_structured():
+    """Three shapes must survive untouched, or the address does harm rather
+    than good: an already-comma-structured label, a label naming several
+    places, and a label that is itself a country."""
+    address = {
+        "postalAddress": {
+            "addressLocality": "San Francisco",
+            "addressRegion": "California",
+            "addressCountry": "United States",
+        }
+    }
+    payload = {
+        "jobs": [
+            {"title": "A", "location": "London, UK", "address": address},
+            {"title": "B", "location": "United States & Canada", "address": address},
+            {"title": "C", "location": "Singapore", "address": address},
+        ]
+    }
+
+    a, b, c = parse_ashby(payload, company="Acme")
+
+    assert a.location == "London, UK"
+    assert b.location == "United States & Canada"
+    assert c.location == "Singapore"
+
+
+def test_ashby_does_not_append_an_office_to_a_remote_label():
+    payload = {
+        "jobs": [
+            {
+                "title": "Engineer",
+                "location": "US - Remote",
+                "address": {
+                    "postalAddress": {
+                        "addressLocality": "San Francisco",
+                        "addressRegion": "California",
+                        "addressCountry": "United States",
+                    }
+                },
+            }
+        ]
+    }
+
+    [job] = parse_ashby(payload, company="Acme")
+
+    assert job.location == "US - Remote"

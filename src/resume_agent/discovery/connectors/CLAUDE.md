@@ -133,6 +133,50 @@ Two Greenhouse-specific traps:
   Stripe and Figma set no metadata at all, and an unanswered field has
   `value: null`.
 
+**Every board connector now renders this header** — the four that did not
+(`workable`, `recruitee`, `personio`, `workday`) plus the three JSON-LD ones
+(`breezy`, `jazzhr`, `bamboohr`) were mapping only the description body. The
+join lives once in `text.with_meta_lines`, and `text.jobposting_meta_lines`
+(moved out of `url_ingest/ats_readers.py`, which could not be imported from here
+without a cycle) renders the schema.org equivalents for the JSON-LD connectors.
+Measured drops: Workable lost employment type / experience / education /
+department / industry and the `telecommuting` flag, which is the only statement
+of its remote policy; Recruitee lost the pay band plus experience, education and
+its three placement booleans; Personio lost employment type, seniority, schedule
+and department; Workday lost `timeType` and `remoteType`, neither of which
+appears anywhere in `jobDescription`.
+
+**A provider's free-text location field may not name a place at all.**
+`recruitee`'s `location` is employer-typed and is very often a *status* —
+"Remote job" on **5 of 6** postings on one live board — which resolves to no
+city, region or country whatsoever, while `city` / `state_name` / `country` and
+the `locations` array carried all three. Structured fields win there; the label
+is only the fallback. `personio`'s `office` scalar has the sibling problem: it
+joins offices with a bare comma and no space ("Madrid,Madrid (Remote)"), which
+reads as one "City, Region" pair, so the `offices` array is used instead (7 of 9
+postings on one board carry more than one).
+
+**`ashby` completes its location from `address.postalAddress`, and only ever
+fills gaps.** Ashby's `location` is frequently a bare city, which strands the
+taxonomy with no country — and an unresolved country drops the region too, so
+**577 of 758** OpenAI rows carried neither (0 after). The address is safe to use
+because it is *job-specific*: it tracks `location` one-to-one across 22 distinct
+values, and remote rows correctly carry no locality. It must never *replace* the
+employer's own text, for three separate reasons, each pinned by a test — an
+already-comma-structured label ("London, UK") gets its real city pushed out of
+the city slot; a multi-place label ("United States & Canada") would be pinned to
+one office; and a label that is itself a country ("Singapore") would be doubled.
+Provider data quality is the other reason: Ramp writes "San Fransisco" and a
+region of "Sweden" for Sweden.
+
+**Greenhouse's `offices[]` is the counter-example — do not adopt it.** It looks
+like the same upgrade (`offices[0].location` is the tidy "Ann Arbor, Michigan,
+United States" against a `location.name` of "Ann Arbor, MI - Hybrid") and on
+maymobility it "resolves better" for 14 of 44 rows. But those 14 are exactly the
+`USA - Remote` rows, where `offices[]` is the org's HQ: adopting it would pin a
+remote job to a city it is not in. Unlike Ashby's `address`, `offices[]` is an
+organization-level list, not a per-posting one.
+
 `smartrecruiters.apply_detail` had the same gap and now renders Location,
 Employment Type, Experience Level, Department and Industry through the shared
 `text.with_meta_lines`. Its location comes from **`location.fullLocation`**, not

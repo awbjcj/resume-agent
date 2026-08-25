@@ -49,3 +49,36 @@ def test_workable_fetch_uses_details_endpoint(monkeypatch):
 
     assert captured["params"] == {"details": "true"}
     assert jobs[0].title == "Senior Software Engineer"
+
+
+def test_workable_renders_the_dedicated_metadata_fields():
+    """`details=true` returns employment type, department, industry, experience
+    and education as fields, plus the only statement of the remote policy.
+    Mapping the three description sections alone dropped every one."""
+    payload = {
+        "name": "Acme",
+        "jobs": [
+            {
+                "title": "Engineer",
+                "city": "New York",
+                "state": "New York",
+                "country": "United States",
+                "telecommuting": True,
+                "employment_type": "Full-time",
+                "experience": "Mid-Senior Level",
+                "education": "Bachelor's Degree",
+                "department": "Engineering",
+                "industry": "Hospital & Health Care",
+                "description": "<p>Build.</p>",
+            }
+        ],
+    }
+
+    [job] = parse_workable(payload, "acme")
+    header = job.jd_text.split("\n\n")[0].splitlines()
+
+    assert "Location: New York, New York, United States" in header
+    assert "Workplace Type: Remote" in header
+    assert "Employment Type: Full-time" in header
+    assert "Experience Level: Mid-Senior Level" in header
+    assert "Industry: Hospital & Health Care" in header

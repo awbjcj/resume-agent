@@ -289,6 +289,8 @@ def test_workable_keeps_requirements_and_benefits_sections(monkeypatch):
     assert "5 years of Python." in extracted.jd_text
     assert "Full health cover." in extracted.jd_text
     assert "Employment Type: Full-time" in extracted.jd_text
+    assert extracted.jd_text.count("Employment Type: Full-time") == 1
+    assert extracted.jd_text.count("Department: Engineering") == 1
 
 
 def test_workable_returns_none_when_shortcode_not_found(monkeypatch):

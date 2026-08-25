@@ -1,3 +1,4 @@
+import re
 
 from resume_agent.discovery.connectors import http as board
 
@@ -12,8 +13,12 @@ from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import harvest
 from resume_agent.discovery.connectors.text import html_to_markdown, join_locations
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.taxonomy.location import normalize_country
 
 _BASE = "https://api.ashbyhq.com/posting-api/job-board"
+# A label naming more than one place ("United States & Canada", "US/Canada").
+_MULTI_PLACE_RE = re.compile(r"\s(?:&|and|or)\s|/")
+_REMOTE_LOCATION_RE = re.compile(r"\bremote\b", re.IGNORECASE)
 
 # Ashby's posting-api employmentType enum -> a readable label for the JD sidebar.
 _EMPLOYMENT_TYPE_LABELS = {
@@ -26,13 +31,61 @@ _EMPLOYMENT_TYPE_LABELS = {
 }
 
 
+def _completed_location(item: dict) -> str | None:
+    """The posting's own location label, completed from its structured address.
+
+    Ashby's `location` is whatever the employer typed -- often a bare city
+    ("San Francisco"), which strands the taxonomy with no region and no
+    country, and an unresolved country drops the region too. The posting also
+    carries a schema.org `address.postalAddress`, and it is *job-specific*:
+    measured across a 758-job board it tracks `location` one-to-one over 22
+    distinct values, with remote rows correctly carrying no locality.
+
+    It only ever *fills gaps*, never replaces. Employers mistype these fields
+    ("San Fransisco", region "Sweden" for Sweden), and a label like
+    "US - Remote" must not be rewritten into the office city behind it -- so
+    the employer's own text stays the head of the string and the address
+    supplies only the parts it does not already name.
+    """
+    location = (item.get("location") or "").strip()
+    address = ((item.get("address") or {}).get("postalAddress")) or {}
+    if not location or not isinstance(address, dict):
+        return location or None
+
+    # Three labels must be left exactly as written. One already carrying a
+    # comma is structured by the employer ("San Francisco, CA", "London, UK"),
+    # and appending to it only pushes the real city out of the city slot. One
+    # naming several places ("United States & Canada") would be pinned to a
+    # single office. One that *is* a country ("Singapore") would be doubled.
+    if (
+        "," in location
+        or _MULTI_PLACE_RE.search(location)
+        or _REMOTE_LOCATION_RE.search(location)
+        or normalize_country(location)
+    ):
+        return location
+
+    known = {location.casefold()}
+    extra: list[str] = []
+    for key in ("addressRegion", "addressCountry"):
+        value = address.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        value = value.strip()
+        if value.casefold() in known:
+            continue
+        known.add(value.casefold())
+        extra.append(value)
+    return ", ".join([location, *extra])
+
+
 def _location(item: dict) -> str | None:
     secondary = [
         entry.get("location")
         for entry in item.get("secondaryLocations") or []
         if isinstance(entry, dict)
     ]
-    return join_locations([item.get("location"), *secondary])
+    return join_locations([_completed_location(item), *secondary])
 
 
 def _sidebar_lines(item: dict) -> list[str]:
@@ -42,7 +95,7 @@ def _sidebar_lines(item: dict) -> list[str]:
     """
     lines: list[str] = []
 
-    location = item.get("location")
+    location = _completed_location(item)
     secondary = [
         loc.get("location") for loc in item.get("secondaryLocations") or [] if loc.get("location")
     ]

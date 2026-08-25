@@ -183,6 +183,103 @@ def primary_search_term(search: SearchConfig) -> str:
     return terms[0] if terms else ""
 
 
+_JSON_LD_EMPLOYMENT_LABELS = {
+    "FULL_TIME": "Full time",
+    "PART_TIME": "Part time",
+    "CONTRACTOR": "Contract",
+    "TEMPORARY": "Temporary",
+    "INTERN": "Internship",
+    "VOLUNTEER": "Volunteer",
+    "PER_DIEM": "Per diem",
+    "OTHER": "Other",
+}
+_JSON_LD_PERIODS = {
+    "HOUR": "per hour",
+    "DAY": "per day",
+    "WEEK": "per week",
+    "MONTH": "per month",
+    "YEAR": "per year",
+}
+
+
+def _names(value) -> list[str]:
+    """Flatten a schema.org field that may be a string, an object, or a list of either."""
+    items = value if isinstance(value, list) else [value]
+    names: list[str] = []
+    for item in items:
+        if isinstance(item, str) and item.strip():
+            names.append(item.strip())
+        elif isinstance(item, dict):
+            name = item.get("name")
+            if isinstance(name, str) and name.strip():
+                names.append(name.strip())
+    return names
+
+
+def _amount(value) -> str | None:
+    if isinstance(value, int | float):
+        return f"{value:,.0f}"
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _json_ld_salary(posting: dict) -> str | None:
+    """Render ``baseSalary`` (a MonetaryAmount) the way the page's pay band reads."""
+    salary = posting.get("baseSalary") or posting.get("estimatedSalary")
+    if isinstance(salary, list):
+        salary = next((item for item in salary if isinstance(item, dict)), None)
+    if not isinstance(salary, dict):
+        return None
+    value = salary.get("value")
+    if not isinstance(value, dict):
+        return _amount(value)
+    low = _amount(value.get("minValue"))
+    high = _amount(value.get("maxValue"))
+    exact = _amount(value.get("value"))
+    span = f"{low} - {high}" if low and high else (low or high or exact)
+    if not span:
+        return None
+    currency = salary.get("currency") or value.get("currency")
+    period = _JSON_LD_PERIODS.get(str(value.get("unitText") or "").upper())
+    return " ".join(part for part in (currency, span, period) if part)
+
+
+def jobposting_meta_lines(posting: dict) -> list[str]:
+    """The sidebar/top-bar facts schema.org markup carries beyond the body text.
+
+    ``description`` alone loses the pay band, employment type, and remote
+    status that a posting renders in its header -- fields the fit scorer and
+    tailoring rely on. Labels match ``ashby._sidebar_lines`` so a job read
+    through either path produces the same text shape.
+    """
+    lines = []
+    if location := jobposting_location(posting):
+        lines.append(f"Location: {location}")
+
+    remote = posting.get("jobLocationType") == "TELECOMMUTE"
+    regions = _names(posting.get("applicantLocationRequirements"))
+    if remote and regions:
+        lines.append(f"Workplace Type: Remote ({', '.join(regions)})")
+    elif remote:
+        lines.append("Workplace Type: Remote")
+
+    types = [
+        _JSON_LD_EMPLOYMENT_LABELS.get(str(item).upper().replace("-", "_"), str(item))
+        for item in _names(posting.get("employmentType"))
+    ]
+    if types:
+        lines.append(f"Employment Type: {', '.join(types)}")
+
+    if departments := _names(posting.get("occupationalCategory")):
+        lines.append(f"Department: {', '.join(departments)}")
+
+    if salary := _json_ld_salary(posting):
+        lines.append(f"Compensation: {salary}")
+
+    return lines
+
+
 def primary_location(search: SearchConfig) -> str:
     """Return the first non-empty location for coarse server-side filtering."""
     return next(

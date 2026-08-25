@@ -12,6 +12,8 @@ from resume_agent.discovery.connectors.text import (
     html_to_markdown,
     jobposting_json_ld,
     jobposting_location,
+    jobposting_meta_lines,
+    with_meta_lines,
 )
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -54,7 +56,12 @@ def apply_detail(row: RawJob, detail: dict) -> None:
         raise ValueError("JazzHR detail did not contain JobPosting JSON-LD")
     row.url = posting.get("url") or row.url
     row.title = posting.get("title") or row.title
-    row.jd_text = html_to_markdown(posting.get("description") or "")
+    # The markup carries the pay band, employment type and remote status
+    # alongside the body; `description` alone drops all three.
+    row.jd_text = with_meta_lines(
+        jobposting_meta_lines(posting),
+        html_to_markdown(posting.get("description") or ""),
+    )
     row.posted_at = parse_iso_datetime(posting.get("datePosted"))
     organization = posting.get("hiringOrganization") or {}
     row.company = organization.get("name") or row.company

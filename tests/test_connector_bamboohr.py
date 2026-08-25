@@ -21,6 +21,64 @@ def test_bamboohr_maps_list_then_nested_detail():
     assert "Design cloud-native systems" in rows[0].jd_text
 
 
+def test_bamboohr_detail_metadata_replaces_stale_list_metadata():
+    [row] = parse_bamboohr(
+        {
+            "result": [
+                {
+                    "id": "132",
+                    "departmentLabel": "Old department",
+                    "isRemote": True,
+                }
+            ]
+        },
+        "eleven",
+    )
+
+    apply_detail(
+        row,
+        {
+            "result": {
+                "jobOpening": {
+                    "description": "<p>Build systems.</p>",
+                    "employmentStatusLabel": "Full-time",
+                    "departmentLabel": "Engineering",
+                    "compensation": "$150,000 - $180,000",
+                }
+            }
+        },
+    )
+
+    assert "Employment Type: Full-time" in row.jd_text
+    assert "Department: Engineering" in row.jd_text
+    assert "Department: Old department" not in row.jd_text
+    assert "Compensation: $150,000 - $180,000" in row.jd_text
+    assert "Workplace Type: Remote" in row.jd_text
+
+
+def test_bamboohr_detail_can_clear_stale_remote_list_metadata():
+    [row] = parse_bamboohr(
+        {"result": [{"id": "132", "isRemote": True}]},
+        "eleven",
+    )
+
+    apply_detail(
+        row,
+        {
+            "result": {
+                "jobOpening": {
+                    "description": "<p>Work from the office.</p>",
+                    "isRemote": False,
+                }
+            }
+        },
+    )
+
+    assert row.location is None
+    assert "Workplace Type: Remote" not in row.jd_text
+    assert "Location: Remote" not in row.jd_text
+
+
 def test_bamboohr_skip_seen_prevents_detail_request(monkeypatch):
     payload = json.loads((FIXTURES / "list.json").read_text())
 

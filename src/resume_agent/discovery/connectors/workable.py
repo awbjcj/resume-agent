@@ -4,7 +4,7 @@ from resume_agent.discovery.connectors import http as board
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen, provenance_for
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_markdown
+from resume_agent.discovery.connectors.text import html_to_markdown, with_meta_lines
 from resume_agent.discovery.search_config import SearchConfig
 
 
@@ -21,6 +21,32 @@ def _location(item: dict) -> str | None:
         )
         or None
     )
+
+
+def _sidebar_lines(item: dict) -> list[str]:
+    """The facts a Workable posting shows above its body.
+
+    ``details=true`` returns employment type, department, industry, and the
+    required experience and education as dedicated fields, plus a
+    ``telecommuting`` flag that is the only place the remote policy is stated.
+    Mapping the three description sections alone dropped all of them.
+    """
+    lines: list[str] = []
+    if location := _location(item):
+        lines.append(f"Location: {location}")
+    if item.get("telecommuting"):
+        lines.append("Workplace Type: Remote")
+    for label, key in (
+        ("Employment Type", "employment_type"),
+        ("Experience Level", "experience"),
+        ("Education", "education"),
+        ("Department", "department"),
+        ("Function", "function"),
+        ("Industry", "industry"),
+    ):
+        if value := item.get(key):
+            lines.append(f"{label}: {value}")
+    return lines
 
 
 def _jd_html(item: dict) -> str:
@@ -48,7 +74,9 @@ def parse_workable(payload: dict, account: str) -> list[RawJob]:
             company=company,
             title=item.get("title"),
             location=_location(item),
-            jd_text=html_to_markdown(_jd_html(item)),
+            jd_text=with_meta_lines(
+                _sidebar_lines(item), html_to_markdown(_jd_html(item))
+            ),
             posted_at=parse_iso_datetime(item.get("published_on")),
             company_provenance=provenance_for(provider_company),
         )
