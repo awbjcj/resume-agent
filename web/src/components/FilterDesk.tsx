@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Facets } from "@/features/board/use-board-query";
+import { fieldLabel } from "@/lib/format";
 import { industryLabel } from "@/lib/filters/industry-label";
 import {
   emptyFilterState,
@@ -101,6 +102,11 @@ function hasOptions(counts: Record<string, number>, selected: Set<string>) {
   return Object.keys(counts).length > 0 || selected.size > 0;
 }
 
+// Default facet label: underscore-to-space only, no case changes. Facets
+// whose canonical values are job-brief enums (source, remote, sponsorship,
+// seniority, type, company size, industry) opt into `fieldLabel`'s title
+// casing explicitly below; free-text facets like skills, country, region,
+// and city keep their own canonical casing untouched.
 function pretty(value: string) {
   return value.replace(/_/g, " ");
 }
@@ -243,16 +249,16 @@ export function FilterDesk({
   };
 
   const facetSpecs: FacetSpec[] = [
-    { key: "source", label: "Source" },
-    { key: "remote", label: "Remote", options: REMOTE },
-    { key: "sponsorship", label: "Sponsorship", options: SPONSORSHIP },
-    { key: "seniority", label: "Seniority", options: SENIORITY },
-    { key: "employmentType", label: "Type", options: EMPLOYMENT_TYPE },
+    { key: "source", label: "Source", getLabel: fieldLabel },
+    { key: "remote", label: "Remote", options: REMOTE, getLabel: fieldLabel },
+    { key: "sponsorship", label: "Sponsorship", options: SPONSORSHIP, getLabel: fieldLabel },
+    { key: "seniority", label: "Seniority", options: SENIORITY, getLabel: fieldLabel },
+    { key: "employmentType", label: "Type", options: EMPLOYMENT_TYPE, getLabel: fieldLabel },
     { key: "industry", label: "Industry", getLabel: industryLabel },
     { key: "country", label: "Country" },
     { key: "region", label: "Region" },
     { key: "city", label: "City" },
-    { key: "companySize", label: "Company size" },
+    { key: "companySize", label: "Company size", getLabel: fieldLabel },
     { key: "skills", label: "Skills" },
   ];
   const statusCounts = countsWithSelected(facets.status, filter.status);

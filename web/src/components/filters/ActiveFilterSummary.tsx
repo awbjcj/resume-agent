@@ -1,7 +1,7 @@
 import { XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { industryLabel } from "@/lib/filters/industry-label";
+import { fieldLabel } from "@/lib/format";
 import type { FilterState } from "@/lib/filters/types";
 
 const SET_KEYS: (keyof FilterState)[] = [
@@ -19,6 +19,22 @@ const SET_KEYS: (keyof FilterState)[] = [
   "skills",
 ];
 
+// Canonical job-brief enum facets get the shared title-cased label; free-text
+// facets (skills, country, region, city) keep their own canonical casing.
+const FIELD_LABEL_KEYS = new Set<keyof FilterState>([
+  "source",
+  "remote",
+  "sponsorship",
+  "seniority",
+  "employmentType",
+  "industry",
+  "companySize",
+]);
+
+function chipLabel(key: keyof FilterState, value: string): string {
+  return FIELD_LABEL_KEYS.has(key) ? fieldLabel(value) : value.replace(/_/g, " ");
+}
+
 export function ActiveFilterSummary({
   filter,
   total,
@@ -34,7 +50,7 @@ export function ActiveFilterSummary({
   const chips: { key: keyof FilterState; value: string; label: string }[] = [];
   for (const key of SET_KEYS) {
     for (const value of filter[key] as Set<string>) {
-      const label = key === "industry" ? industryLabel(value) : value.replace(/_/g, " ");
+      const label = chipLabel(key, value);
       chips.push({ key, value, label });
     }
   }

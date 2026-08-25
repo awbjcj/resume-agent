@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 
-import { salaryLabel } from "@/lib/format";
+import { fieldLabel, salaryLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type PipelineDetailsRow = {
@@ -15,10 +15,6 @@ type PipelineDetailsRow = {
   remotePolicy?: string | null;
   sponsorshipSignal?: string | null;
 };
-
-function pretty(value: string) {
-  return value.replace(/_/g, " ");
-}
 
 export function PipelineDetails({ row }: { row: PipelineDetailsRow }) {
   if (
@@ -54,22 +50,22 @@ export function PipelineDetails({ row }: { row: PipelineDetailsRow }) {
     },
     {
       label: "Seniority",
-      value: row.seniority ? pretty(row.seniority) : null,
+      value: row.seniority ? fieldLabel(row.seniority) : null,
       className: "text-muted-foreground",
     },
     {
       label: "Type",
-      value: row.employmentType ? pretty(row.employmentType) : null,
+      value: row.employmentType ? fieldLabel(row.employmentType) : null,
       className: "text-muted-foreground",
     },
     {
       label: "Work arrangement",
-      value: row.remotePolicy ? pretty(row.remotePolicy) : null,
+      value: row.remotePolicy ? fieldLabel(row.remotePolicy) : null,
       className: "text-muted-foreground",
     },
     {
       label: "Sponsorship",
-      value: row.sponsorshipSignal ? pretty(row.sponsorshipSignal) : null,
+      value: row.sponsorshipSignal ? fieldLabel(row.sponsorshipSignal) : null,
       className:
         row.sponsorshipSignal === "denied"
           ? "text-destructive"

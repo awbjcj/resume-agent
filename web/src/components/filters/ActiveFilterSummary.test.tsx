@@ -19,7 +19,7 @@ describe("ActiveFilterSummary", () => {
       />,
     );
     expect(screen.getByText(/1,284 matching/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /senior/ }));
+    fireEvent.click(screen.getByRole("button", { name: /senior/i }));
     expect(onRemove).toHaveBeenCalledWith("seniority", "senior");
   });
 });

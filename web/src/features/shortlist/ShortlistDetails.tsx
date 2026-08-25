@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 
-import { recency, salaryLabel } from "@/lib/format";
+import { fieldLabel, recency, salaryLabel } from "@/lib/format";
 
 type ShortlistDetailsRow = {
   salaryMin?: number | null;
@@ -19,7 +19,7 @@ export function ShortlistDetails({ row }: { row: ShortlistDetailsRow }) {
     },
     {
       label: "Industry",
-      value: row.industry,
+      value: row.industry ? fieldLabel(row.industry) : null,
       className: "text-primary",
     },
     {

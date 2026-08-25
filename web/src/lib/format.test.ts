@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatLocationText, locationLabel } from "./format";
+import { fieldLabel, formatLocationText, locationLabel } from "./format";
 
 describe("location display formatting", () => {
   it("normalizes all-caps place names and country codes in raw locations", () => {
@@ -71,5 +71,41 @@ describe("location display formatting", () => {
         ],
       }),
     ).toBe("Remote - US");
+  });
+
+  it("upper-cases a dotted abbreviation instead of lowercasing after its first letter", () => {
+    expect(formatLocationText("remote - U.S")).toBe("Remote - U.S");
+    expect(formatLocationText("New York, N.Y.")).toBe("New York, N.Y.");
+  });
+});
+
+describe("fieldLabel", () => {
+  it("title-cases a snake_case job-brief value", () => {
+    expect(fieldLabel("full_time")).toBe("Full Time");
+    expect(fieldLabel("part_time")).toBe("Part Time");
+    expect(fieldLabel("senior")).toBe("Senior");
+  });
+
+  it("upper-cases known acronyms instead of title-casing them", () => {
+    expect(fieldLabel("ai")).toBe("AI");
+    expect(fieldLabel("artificial_intelligence_and_ml")).toBe("Artificial Intelligence and ML");
+    expect(fieldLabel("h1b")).toBe("H1B");
+    expect(fieldLabel("saas")).toBe("SAAS");
+  });
+
+  it("keeps connector words lowercase mid-phrase but capitalizes them as the first word", () => {
+    expect(fieldLabel("media_and_entertainment")).toBe("Media and Entertainment");
+    expect(fieldLabel("food_and_beverage")).toBe("Food and Beverage");
+    expect(fieldLabel("and_the_rest")).toBe("And the Rest");
+  });
+
+  it("never capitalizes and/or", () => {
+    expect(fieldLabel("visa_and/or_relocation")).toBe("Visa and/or Relocation");
+  });
+
+  it("handles null/undefined/empty gracefully", () => {
+    expect(fieldLabel(null)).toBe("");
+    expect(fieldLabel(undefined)).toBe("");
+    expect(fieldLabel("")).toBe("");
   });
 });

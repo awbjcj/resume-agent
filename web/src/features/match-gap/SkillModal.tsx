@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { fieldLabel } from "@/lib/format";
 import type { SkillRow, SuggestionState } from "./aggregate";
 import { SuggestionPanel } from "./SuggestionPanel";
 import { useGenerateSuggestion, useSuggestion } from "./use-suggestion";
@@ -157,7 +158,7 @@ export function SkillModal({
                               <p className="text-sm font-medium">{job.company ?? "Unknown company"}</p>
                               <p className="mt-0.5 text-sm text-muted-foreground">
                                 {job.title ?? "Untitled role"}
-                                {job.seniority ? ` · ${job.seniority}` : ""}
+                                {job.seniority ? ` · ${fieldLabel(job.seniority)}` : ""}
                               </p>
                             </div>
                           </li>

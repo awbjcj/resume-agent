@@ -88,7 +88,7 @@ describe("ShortlistContainer", () => {
     expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
     expect(screen.getByLabelText("Job details")).toBeInTheDocument();
     expect(screen.getByText("$120k–150k")).toBeInTheDocument();
-    expect(screen.getByText("Design software")).toBeInTheDocument();
+    expect(screen.getByText("Design Software")).toBeInTheDocument();
     expect(screen.queryByText("Level")).not.toBeInTheDocument();
     expect(screen.queryByText("Work type")).not.toBeInTheDocument();
   });

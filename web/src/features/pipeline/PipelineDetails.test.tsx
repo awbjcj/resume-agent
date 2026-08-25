@@ -17,7 +17,7 @@ describe("PipelineDetails", () => {
     );
 
     expect(screen.getByLabelText("Filtered: salary below minimum")).toBeInTheDocument();
-    expect(screen.queryByText("full time")).not.toBeInTheDocument();
+    expect(screen.queryByText("Full Time")).not.toBeInTheDocument();
   });
 
   it("shows compact metadata when no rejection reason exists", () => {
@@ -38,7 +38,7 @@ describe("PipelineDetails", () => {
 
     expect(screen.getByLabelText("Pipeline details")).toBeInTheDocument();
     expect(screen.getByText("$140k–180k")).toBeInTheDocument();
-    expect(screen.getByText("full time")).toBeInTheDocument();
-    expect(screen.getByText("offered")).toBeInTheDocument();
+    expect(screen.getByText("Full Time")).toBeInTheDocument();
+    expect(screen.getByText("Offered")).toBeInTheDocument();
   });
 });

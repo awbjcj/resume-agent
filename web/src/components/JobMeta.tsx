@@ -1,7 +1,7 @@
 // Structured meta panel for the modal rail. Labeled rows, null-omitting,
 // surfacing the full per-job facet set.
 
-import { locationLabel, salaryLabel, recency } from "@/lib/format";
+import { fieldLabel, locationLabel, salaryLabel, recency } from "@/lib/format";
 import { industryLabel } from "@/lib/filters/industry-label";
 import type { JobDetail } from "@/features/job/use-job-detail";
 
@@ -29,21 +29,21 @@ export function JobMeta({ job }: { job: JobDetail }) {
 
   const rows: Array<[string, React.ReactNode]> = [];
   if (salary) rows.push(["Salary", salary]);
-  if (job.seniority) rows.push(["Seniority", job.seniority]);
-  if (job.employmentType) rows.push(["Type", job.employmentType]);
-  if (job.remotePolicy) rows.push(["Remote", job.remotePolicy]);
+  if (job.seniority) rows.push(["Seniority", fieldLabel(job.seniority)]);
+  if (job.employmentType) rows.push(["Type", fieldLabel(job.employmentType)]);
+  if (job.remotePolicy) rows.push(["Remote", fieldLabel(job.remotePolicy)]);
   if (job.sponsorshipSignal)
     rows.push([
       "Sponsorship",
       <span className={SPONSORSHIP_TONE[job.sponsorshipSignal] ?? ""}>
-        {job.sponsorshipSignal}
+        {fieldLabel(job.sponsorshipSignal)}
       </span>,
     ]);
   if (job.industry) rows.push(["Industry", industryLabel(job.industry)]);
-  if (job.companySize) rows.push(["Company size", job.companySize]);
+  if (job.companySize) rows.push(["Company size", fieldLabel(job.companySize)]);
   if (location) rows.push(["Location", location]);
   if (posted) rows.push(["Posted", posted]);
-  rows.push(["Source", job.source]);
+  rows.push(["Source", fieldLabel(job.source)]);
 
   return (
     <dl className="divide-y divide-border/60">

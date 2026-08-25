@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { locationLabel } from "@/lib/format";
+import { fieldLabel, locationLabel } from "@/lib/format";
 
 type Row = {
   jobId: number;
@@ -45,10 +45,7 @@ type ExtraColumn = {
 };
 
 function sourceLabel(source: string | undefined): string {
-  if (!source) return "—";
-  return source
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+  return source ? fieldLabel(source) : "—";
 }
 
 export function JobTable({

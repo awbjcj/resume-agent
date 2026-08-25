@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FacetPopover } from "@/components/filters/FacetPopover";
 import { pipelineStageLabel } from "@/features/pipeline/pipeline-stages";
+import { fieldLabel } from "@/lib/format";
 import { TARGET_STATUSES, type Filters as FilterValue } from "./aggregate";
 
 const ALL = "__all__";
@@ -41,7 +42,7 @@ export function Filters({
   ];
   const seniorityItems = [
     { label: "All levels", value: ALL },
-    ...seniorities.map((seniority) => ({ label: seniority, value: seniority })),
+    ...seniorities.map((seniority) => ({ label: fieldLabel(seniority), value: seniority })),
   ];
 
   return (

@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FitMeter } from "@/components/FitMeter";
 import { StatusBadge } from "@/components/StatusBadge";
-import { locationLabel } from "@/lib/format";
+import { fieldLabel, locationLabel } from "@/lib/format";
 import type { TriageItem } from "./use-triage";
 
 export function TriageCard({
@@ -38,7 +38,7 @@ export function TriageCard({
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <StatusBadge status={row.status} />
-          <span className="text-xs font-medium text-muted-foreground">{row.source}</span>
+          <span className="text-xs font-medium text-muted-foreground">{fieldLabel(row.source)}</span>
         </div>
         {(row.status === "rejected" || row.status === "filtered") && row.rejectReason && (
           <span className="mt-2.5 block text-sm leading-snug text-rose-700 dark:text-rose-300">

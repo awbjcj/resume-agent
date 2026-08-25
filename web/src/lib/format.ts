@@ -44,7 +44,13 @@ export function recency(postedAt: string | null | undefined): string | null {
 // (e.g. "United States of America" -> "of" stays lowercase, not "Of").
 const LOWERCASE_LOCATION_WORDS = new Set(["of", "the", "and", "de", "la", "van", "von"]);
 
+// A dotted abbreviation ("U.S", "U.S.", "N.Y.") is single letters joined by
+// periods -- the generic per-word capitalize-first-lowercase-rest pass below
+// would otherwise turn it into "U.s", since "." isn't a recognized separator.
+const DOTTED_ABBREVIATION_RE = /^[A-Za-z](\.[A-Za-z])*\.?$/;
+
 function titleCaseWord(word: string): string {
+  if (DOTTED_ABBREVIATION_RE.test(word)) return word.toUpperCase();
   return word
     .split(/([-()[\]'])/)
     .map((part) => (/^[-()[\]']$/.test(part) || !part ? part : part[0].toUpperCase() + part.slice(1).toLowerCase()))
@@ -151,6 +157,45 @@ export function locationLabel(job: {
   return formatLocationText(job.location);
 }
 
+// Connector words that stay lowercase mid-phrase in a job-brief label ("Media
+// and Entertainment", not "Media And Entertainment"); still capitalized when
+// they're the label's first word. "and/or" is never capitalized -- it never
+// reads as a title, first word or not.
+const LOWERCASE_FIELD_CONNECTORS = new Set([
+  "and", "or", "of", "the", "in", "for", "&", "nor", "a", "an", "to", "with", "vs",
+]);
+const ALWAYS_LOWERCASE_FIELD_WORDS = new Set(["and/or"]);
+
+// Abbreviations that must render fully upper-case rather than title-cased
+// ("ai" -> "AI", not "Ai"; "h1b" -> "H1B", not "H1b") wherever a job-brief
+// field (remote policy, sponsorship, seniority, industry, source, ...) is
+// displayed.
+const UPPERCASE_FIELD_ACRONYMS = new Set([
+  "ai", "ml", "nlp", "llm", "llms", "api", "apis", "sql", "aws", "gcp", "iot",
+  "saas", "paas", "iaas", "ui", "ux", "seo", "sem", "hr", "it", "qa", "pr",
+  "b2b", "b2c", "r&d", "hipaa", "sox", "gdpr", "kyc", "aml", "cpa", "mba",
+  "phd", "h1b", "us", "uk", "eu", "usa", "vp", "svp", "ceo", "cto", "cfo", "coo",
+]);
+
+function fieldLabelWord(word: string, isFirst: boolean): string {
+  const lower = word.toLowerCase();
+  if (ALWAYS_LOWERCASE_FIELD_WORDS.has(lower)) return lower;
+  if (UPPERCASE_FIELD_ACRONYMS.has(lower)) return lower.toUpperCase();
+  if (!isFirst && LOWERCASE_FIELD_CONNECTORS.has(lower)) return lower;
+  return titleCaseWord(word);
+}
+
+/** The single source of truth for rendering a raw job-brief enum/free-text
+ * value (seniority, remote policy, sponsorship, employment type, industry,
+ * source, ...) as a readable label anywhere in the UI: underscores become
+ * spaces, connectors stay lowercase, known acronyms render upper-case, and
+ * everything else is title-cased. */
+export function fieldLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  const words = value.replaceAll("_", " ").trim().split(/\s+/).filter(Boolean);
+  return words.map((word, i) => fieldLabelWord(word, i === 0)).join(" ");
+}
+
 /** One compact line: salary · seniority · type · industry · recency. */
 export function metaLine(row: {
   salaryMin?: number | null;
@@ -163,9 +208,9 @@ export function metaLine(row: {
 }): string[] {
   return [
     salaryLabel(row.salaryMin, row.salaryMax, row.salaryCurrency),
-    row.seniority,
-    row.employmentType,
-    row.industry,
+    fieldLabel(row.seniority),
+    fieldLabel(row.employmentType),
+    fieldLabel(row.industry),
     recency(row.postedAt),
   ].filter((p): p is string => Boolean(p));
 }
