@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 
 def _load_script(name: str):
     path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
@@ -87,3 +89,18 @@ def test_dev_passes_selected_api_port_to_vite_proxy(monkeypatch):
     ) == 0
     assert environments[0] is None
     assert environments[1]["VITE_API_PROXY_TARGET"] == "http://127.0.0.1:8123"
+
+
+def test_dev_formats_ipv6_and_wildcard_proxy_targets():
+    dev = _load_script("dev")
+
+    assert dev.api_proxy_target("::1", 8123) == "http://[::1]:8123"
+    assert dev.api_proxy_target("::", 8123) == "http://[::1]:8123"
+    assert dev.api_proxy_target("0.0.0.0", 8123) == "http://127.0.0.1:8123"
+
+
+def test_dev_rejects_scoped_ipv6_proxy_targets():
+    dev = _load_script("dev")
+
+    with pytest.raises(SystemExit, match="Scoped IPv6"):
+        dev.api_proxy_target("fe80::1%12", 8123)

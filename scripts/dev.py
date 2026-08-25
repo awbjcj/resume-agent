@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import time
+from ipaddress import ip_address
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,6 +75,23 @@ def _stop(process: subprocess.Popen[bytes]) -> None:
         process.kill()
 
 
+def api_proxy_target(host: str, port: int) -> str:
+    """Return a client-reachable HTTP origin for an API bind address."""
+    proxy_host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(host, host)
+    try:
+        parsed = ip_address(proxy_host)
+    except ValueError:
+        rendered_host = proxy_host
+    else:
+        if parsed.version == 6 and parsed.scope_id is not None:
+            raise SystemExit(
+                "Scoped IPv6 API hosts are not supported by the Vite proxy; "
+                "use ::1 or a hostname instead."
+            )
+        rendered_host = f"[{parsed.compressed}]" if parsed.version == 6 else str(parsed)
+    return f"http://{rendered_host}:{port}"
+
+
 def run(*, api_host: str, api_port: int, web_host: str, web_port: int) -> int:
     backend_command, frontend_command = commands(
         api_host=api_host,
@@ -84,8 +102,8 @@ def run(*, api_host: str, api_port: int, web_host: str, web_port: int) -> int:
     processes: list[subprocess.Popen[bytes]] = []
     try:
         frontend_environment = os.environ.copy()
-        frontend_environment["VITE_API_PROXY_TARGET"] = (
-            f"http://{api_host}:{api_port}"
+        frontend_environment["VITE_API_PROXY_TARGET"] = api_proxy_target(
+            api_host, api_port
         )
         processes = [
             _spawn(backend_command),
