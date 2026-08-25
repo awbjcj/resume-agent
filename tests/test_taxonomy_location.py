@@ -89,6 +89,24 @@ def test_parse_location_recovers_a_two_part_foreign_country():
     assert (parsed.city, parsed.region, parsed.country) == ("Colombo", None, "LK")
 
 
+def test_parse_location_matches_a_comma_bearing_country_suffix():
+    parsed = location._parse_location(
+        "Kralendijk, Bonaire, Sint Eustatius and Saba"
+    )
+
+    assert (parsed.city, parsed.region, parsed.country) == (
+        "Kralendijk",
+        None,
+        "BQ",
+    )
+
+
+def test_parse_location_matches_a_comma_bearing_country_without_a_city():
+    parsed = location._parse_location("Korea, Republic of")
+
+    assert (parsed.city, parsed.region, parsed.country) == (None, None, "KR")
+
+
 def test_workplace_type_suffix_does_not_swallow_the_locality():
     """Boards glue the workplace type onto the label ("Ann Arbor, MI - Hybrid").
 

@@ -6,10 +6,9 @@ module is data, not behaviour.
 `_ISO3166_NAME_TO_ISO2` is generated from the ISO 3166-1 standard (official
 short names, plus an ASCII-folded variant of every accented name so
 "Turkiye"/"Curacao"/"Reunion" resolve as typed). Do not hand-edit it — regenerate
-it. Fourteen official names contain a comma ("Korea, Republic of") and are
-therefore unreachable from `_parse_location`, which splits on commas before
-consulting this table; `COUNTRY_ALIASES` is what makes those countries
-resolvable, and is the only half meant to grow by hand.
+it. `_parse_location` matches the longest trailing country suffix, including
+official names containing commas. `COUNTRY_ALIASES` is the only half meant to
+grow by hand.
 """
 
 _ISO3166_NAME_TO_ISO2: dict[str, str] = {

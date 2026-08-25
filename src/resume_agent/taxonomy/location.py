@@ -67,10 +67,13 @@ _CITY_COUNTRY_ALIASES: dict[str, tuple[str, str]] = {
 _ZIP_RE = re.compile(r"\s+\d{5}(?:-\d{4})?$")
 _LOCATION_SEPARATOR_RE = re.compile(r"\s*(?:\||;|//)\s*")
 _REMOTE_RE = re.compile(r"\bremote\b", re.IGNORECASE)
-# A workplace type tacked onto the end of a location label. Deliberately does
-# not include "|", which `split_locations` has already consumed as a separator.
+# A workplace type or office qualifier tacked onto the end of a location label.
+# Deliberately does not include "|", which `split_locations` has already
+# consumed as a separator.
 _WORKPLACE_SUFFIX_RE = re.compile(
-    r"[\s,]*[-–—(/]?\s*(?:hybrid|on-?site|in[-\s]?office|remote)\s*\)?[\s.]*$",
+    r"[\s,]*[-–—(/]?\s*"
+    r"(?:hybrid|on-?site|in[-\s]?office|remote|hq|headquarters|office)"
+    r"\s*\)?[\s.]*$",
     re.IGNORECASE,
 )
 
@@ -216,12 +219,17 @@ def _strip_workplace_suffix(raw: str) -> str:
     value that is *only* a workplace tag ("Remote") is left alone for the
     remote branch below to handle.
     """
-    stripped = _WORKPLACE_SUFFIX_RE.sub("", raw).strip().strip(",-–— ")
+    stripped = raw
+    # Loop: a label can carry two of them ("New York, NY (HQ) - Hybrid").
+    while (shorter := _WORKPLACE_SUFFIX_RE.sub("", stripped).strip().strip(",-–— ")):
+        if shorter == stripped:
+            break
+        stripped = shorter
     return stripped or raw
 
 
-def _trailing_part_is_country(parts: list[str]) -> bool:
-    """Whether the last comma-separated part fills the country slot.
+def _country_suffix(parts: list[str]) -> tuple[str, int] | None:
+    """Return the longest trailing country name and its starting index.
 
     Ambiguity is confined to the two-part shape. "San Francisco, CA" and
     "Colombo, Sri Lanka" are structurally identical, and 17 ISO country codes
@@ -231,10 +239,22 @@ def _trailing_part_is_country(parts: list[str]) -> bool:
     often than anyone writes "City, CountryCode", and `build_location` infers
     the country from the state anyway, so nothing is lost. Three or more parts
     put the trailing token in an unambiguous country slot ("Toronto, ON, CA").
+    A country can itself contain commas, so the full trailing suffix must be
+    checked before its individual tokens (for example "Bonaire, Sint Eustatius
+    and Saba").
     """
-    if not parts or normalize_country(parts[-1]) is None:
-        return False
-    return not (len(parts) == 2 and _region_to_usps(parts[-1]) is not None)
+    for start in range(len(parts)):
+        candidate = ", ".join(parts[start:])
+        if normalize_country(candidate) is None:
+            continue
+        if (
+            len(parts) == 2
+            and start == 1
+            and _region_to_usps(candidate) is not None
+        ):
+            return None
+        return candidate, start
+    return None
 
 
 def _parse_location(raw: str) -> StructuredLocation:
@@ -253,8 +273,9 @@ def _parse_location(raw: str) -> StructuredLocation:
     region: str | None = None
     city: str | None = None
 
-    if _trailing_part_is_country(parts):
-        country = parts.pop()
+    if suffix := _country_suffix(parts):
+        country, start = suffix
+        del parts[start:]
     if _REMOTE_RE.search(locality):
         if country is None:
             trailing = re.search(r"(?:[-(]\s*)([A-Za-z.]{2,24})\)?\s*$", locality)

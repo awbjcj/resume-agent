@@ -11,13 +11,12 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   board as "Colombo". `taxonomy/countries.py` now carries the whole ISO 3166-1
   standard (official short names plus an ASCII-folded variant, so "Turkiye"
   resolves as typed) with `COUNTRY_ALIASES` for the colloquial names the
-  standard lacks. Fourteen official names contain a comma ("Korea, Republic
-  of") and are unreachable from `_parse_location`, which splits on commas
-  first — that is what the alias half is for. Regenerate the table; do not
-  hand-edit it.
+  standard lacks. `_country_suffix` matches the longest trailing sequence so
+  official comma-bearing names such as "Korea, Republic of" remain reachable.
+  Regenerate the table; do not hand-edit it.
 - **17 ISO alpha-2 codes are also USPS state codes, and "Georgia" is both a
   country and a state.** Completing the country table therefore could not be
-  done alone: it would have read "Atlanta, GA" as Gabon. `_trailing_part_is_country`
+  done alone: it would have read "Atlanta, GA" as Gabon. `_country_suffix`
   confines the ambiguity to the two-part shape, where the US-state reading
   wins ("City, ST" is far more common than "City, CountryCode", and the
   country is inferred from the state anyway); three or more parts put the
