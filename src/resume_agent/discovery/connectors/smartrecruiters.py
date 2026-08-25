@@ -7,7 +7,11 @@ from resume_agent.discovery.connectors.base import RawJob, SkipSeen, provenance_
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
+from resume_agent.discovery.connectors.text import (
+    html_to_markdown,
+    primary_search_term,
+    with_meta_lines,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://api.smartrecruiters.com/v1/companies"
@@ -35,18 +39,24 @@ def list_params(search: SearchConfig, offset: int) -> dict[str, str | int]:
     return params
 
 
-def _location(location: dict | None) -> str | None:
+def smartrecruiters_location(location: dict | None) -> str | None:
+    """The posting's location, preferring the provider's own rendered form.
+
+    SmartRecruiters ships a ready-made ``fullLocation`` ("Colombo, Western
+    Province, Sri Lanka") alongside the parts, and it spells the country out
+    where ``country`` is a lowercase alpha-2 code ("lk"). Joining the parts
+    ourselves therefore produced a country the taxonomy had to re-resolve from
+    an abbreviation, so the field is used as given and the join is kept only as
+    a fallback — with the code upper-cased, since that is how a country code
+    renders everywhere else.
+    """
     if not location:
         return None
-    return (
-        ", ".join(
-            filter(
-                None,
-                (location.get("city"), location.get("region"), location.get("country")),
-            )
-        )
-        or None
-    )
+    if full := (location.get("fullLocation") or "").strip():
+        return full
+    country = (location.get("country") or "").strip()
+    parts = (location.get("city"), location.get("region"), country.upper() or None)
+    return ", ".join(part for part in parts if part) or None
 
 
 def parse_postings(payload: dict, company: str) -> list[SmartRecruitersRow]:
@@ -64,7 +74,7 @@ def parse_postings(payload: dict, company: str) -> list[SmartRecruitersRow]:
                 ),
                 company=provider_company or company,
                 title=item.get("name"),
-                location=_location(item.get("location")),
+                location=smartrecruiters_location(item.get("location")),
                 jd_text="",
                 posted_at=parse_iso_datetime(item.get("releasedDate")),
                 posting_id=posting_id,
@@ -72,6 +82,31 @@ def parse_postings(payload: dict, company: str) -> list[SmartRecruitersRow]:
             )
         )
     return rows
+
+
+_META_FIELDS = (
+    ("Employment Type", "typeOfEmployment"),
+    ("Experience Level", "experienceLevel"),
+    ("Department", "department"),
+    ("Industry", "industry"),
+)
+
+
+def smartrecruiters_meta_lines(detail: dict) -> list[str]:
+    """The facts SmartRecruiters renders above the description body.
+
+    These live in dedicated API fields, never inside the description sections,
+    so a connector that maps only the body drops them -- the same gap
+    `parse_greenhouse` and `parse_lever` were fixed for.
+    """
+    lines = []
+    if location := smartrecruiters_location(detail.get("location")):
+        remote = (detail.get("location") or {}).get("remote")
+        lines.append(f"Location: {location}{' (Remote)' if remote else ''}")
+    for label, key in _META_FIELDS:
+        if name := (detail.get(key) or {}).get("label"):
+            lines.append(f"{label}: {name}")
+    return lines
 
 
 def apply_detail(row: SmartRecruitersRow, detail: dict) -> None:
@@ -82,9 +117,10 @@ def apply_detail(row: SmartRecruitersRow, detail: dict) -> None:
         "qualifications",
         "additionalInformation",
     )
-    row.jd_text = html_to_markdown(
+    body = html_to_markdown(
         "\n".join((sections.get(name) or {}).get("text") or "" for name in names)
     )
+    row.jd_text = with_meta_lines(smartrecruiters_meta_lines(detail), body)
     row.url = detail.get("applyUrl") or detail.get("postingUrl") or row.url
 
 

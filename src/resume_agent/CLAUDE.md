@@ -305,8 +305,10 @@ to `build_model` with a lazy import. Nothing else changes.
   because the mounted volume root itself cannot be renamed.
 - **Runtime mode is explicit.** `resume-agent serve` defaults to auth-free local
   mode and one automatically activated workspace; non-loopback binds require
-  `--mode hosted`. The container entrypoint always selects hosted mode, where
-  login and per-request tenant selection remain mandatory.
+  `--mode hosted`. The container defaults to local mode for a loopback-published
+  port and selects hosted mode when explicitly configured (or when hosted-only
+  settings are present); hosted mode retains login and per-request tenant
+  selection.
 
 ---
 

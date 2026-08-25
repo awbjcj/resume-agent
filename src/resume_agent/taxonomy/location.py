@@ -12,24 +12,8 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from typing import Any
 
-# Minimal controlled vocab; extend as real data demands.
-_COUNTRY_TO_ISO2 = {
-    "us": "US", "usa": "US", "u.s.": "US", "u.s.a.": "US",
-    "united states": "US", "united states of america": "US",
-    "uk": "GB", "u.k.": "GB", "united kingdom": "GB", "great britain": "GB", "england": "GB",
-    "canada": "CA", "germany": "DE", "france": "FR", "india": "IN",
-    "ireland": "IE", "netherlands": "NL", "australia": "AU", "singapore": "SG",
-    "spain": "ES", "poland": "PL", "brazil": "BR", "japan": "JP", "israel": "IL",
-    "taiwan": "TW", "china": "CN", "hong kong": "HK",
-    "south korea": "KR", "korea, republic of": "KR", "republic of korea": "KR",
-    "mexico": "MX", "italy": "IT", "switzerland": "CH", "sweden": "SE",
-    "portugal": "PT", "new zealand": "NZ", "austria": "AT", "belgium": "BE",
-    "denmark": "DK", "norway": "NO", "finland": "FI",
-    "czechia": "CZ", "czech republic": "CZ", "romania": "RO",
-    "uae": "AE", "united arab emirates": "AE", "south africa": "ZA",
-    "argentina": "AR", "colombia": "CO", "chile": "CL", "philippines": "PH",
-    "vietnam": "VN", "indonesia": "ID", "malaysia": "MY", "thailand": "TH",
-}
+from resume_agent.taxonomy.countries import COUNTRY_TO_ISO2 as _COUNTRY_TO_ISO2
+from resume_agent.taxonomy.countries import ISO2_CODES as _ISO2_CODES
 
 _US_STATE_TO_USPS = {
     "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA",
@@ -83,6 +67,12 @@ _CITY_COUNTRY_ALIASES: dict[str, tuple[str, str]] = {
 _ZIP_RE = re.compile(r"\s+\d{5}(?:-\d{4})?$")
 _LOCATION_SEPARATOR_RE = re.compile(r"\s*(?:\||;|//)\s*")
 _REMOTE_RE = re.compile(r"\bremote\b", re.IGNORECASE)
+# A workplace type tacked onto the end of a location label. Deliberately does
+# not include "|", which `split_locations` has already consumed as a separator.
+_WORKPLACE_SUFFIX_RE = re.compile(
+    r"[\s,]*[-–—(/]?\s*(?:hybrid|on-?site|in[-\s]?office|remote)\s*\)?[\s.]*$",
+    re.IGNORECASE,
+)
 
 
 def _key(raw: str | None) -> str:
@@ -110,7 +100,7 @@ def normalize_country(raw: str | None) -> str | None:
     key = raw.strip().lower()
     if not key:
         return None
-    if key.upper() in _COUNTRY_TO_ISO2.values():
+    if key.upper() in _ISO2_CODES:
         return key.upper()
     return _COUNTRY_TO_ISO2.get(key)
 
@@ -214,23 +204,60 @@ def join_locations(values: Iterable[object]) -> str | None:
     return " | ".join(normalized) or None
 
 
+def _strip_workplace_suffix(raw: str) -> str:
+    """Drop a trailing workplace-type tag so the locality itself can resolve.
+
+    Boards glue the workplace type onto the location label ("Ann Arbor, MI -
+    Hybrid", "Seattle, WA (Hybrid)", "London, UK - Hybrid"). The suffix leaves
+    the trailing part unresolvable as a state *or* a country, and since an
+    unresolved country also drops the region, the whole thing collapsed to a
+    bare city. Removing it costs nothing: the workplace type is captured
+    separately as its own sidebar line, `raw` keeps the original string, and a
+    value that is *only* a workplace tag ("Remote") is left alone for the
+    remote branch below to handle.
+    """
+    stripped = _WORKPLACE_SUFFIX_RE.sub("", raw).strip().strip(",-–— ")
+    return stripped or raw
+
+
+def _trailing_part_is_country(parts: list[str]) -> bool:
+    """Whether the last comma-separated part fills the country slot.
+
+    Ambiguity is confined to the two-part shape. "San Francisco, CA" and
+    "Colombo, Sri Lanka" are structurally identical, and 17 ISO country codes
+    are also USPS state codes (CA, GA, IN, LA, MA, PA, VA, …), as are the state
+    names "Georgia" and — via `_US_STATE_ABBREV` — "Ala". With no third part to
+    disambiguate, the US-state reading wins: postings write "City, ST" far more
+    often than anyone writes "City, CountryCode", and `build_location` infers
+    the country from the state anyway, so nothing is lost. Three or more parts
+    put the trailing token in an unambiguous country slot ("Toronto, ON, CA").
+    """
+    if not parts or normalize_country(parts[-1]) is None:
+        return False
+    return not (len(parts) == 2 and _region_to_usps(parts[-1]) is not None)
+
+
 def _parse_location(raw: str) -> StructuredLocation:
     """Best-effort deterministic parsing for one provider location instance."""
-    city_country = _CITY_COUNTRY_ALIASES.get(_key(raw))
+    # `raw` stays the provider's original string; only the structural read
+    # works off the locality with any workplace-type tag removed.
+    locality = _strip_workplace_suffix(raw)
+
+    city_country = _CITY_COUNTRY_ALIASES.get(_key(locality))
     if city_country is not None:
         city, country = city_country
         return build_location(city, None, country, raw=raw)
 
-    parts = [part.strip() for part in raw.split(",") if part.strip()]
+    parts = [part.strip() for part in locality.split(",") if part.strip()]
     country: str | None = None
     region: str | None = None
     city: str | None = None
 
-    if parts and normalize_country(parts[-1]) is not None:
+    if _trailing_part_is_country(parts):
         country = parts.pop()
-    if _REMOTE_RE.search(raw):
+    if _REMOTE_RE.search(locality):
         if country is None:
-            trailing = re.search(r"(?:[-(]\s*)([A-Za-z.]{2,24})\)?\s*$", raw)
+            trailing = re.search(r"(?:[-(]\s*)([A-Za-z.]{2,24})\)?\s*$", locality)
             if trailing and normalize_country(trailing.group(1)) is not None:
                 country = trailing.group(1)
         return build_location(None, None, country, raw=raw)
@@ -239,7 +266,7 @@ def _parse_location(raw: str) -> StructuredLocation:
         region = parts.pop()
     city = ", ".join(parts) if parts else None
     if city is None and region is None and country is None:
-        city = raw
+        city = locality
     return build_location(city, region, country, raw=raw)
 
 

@@ -18,6 +18,108 @@ def test_normalize_country_variants_to_iso2():
     assert location.normalize_country(None) is None
 
 
+def test_normalize_country_covers_the_whole_iso_3166_standard():
+    """The table was a ~45-country hand list, so most of the world was unresolvable.
+
+    An unresolved country makes `build_location` drop the region too, which is
+    how "Colombo, Western Province, Sri Lanka" reached the board as "Colombo".
+    """
+    assert location.normalize_country("Sri Lanka") == "LK"
+    assert location.normalize_country("lk") == "LK"
+    assert location.normalize_country("Kenya") == "KE"
+    assert location.normalize_country("Egypt") == "EG"
+    assert location.normalize_country("Peru") == "PE"
+    # Accented official names also resolve as an ASCII-folded variant.
+    assert location.normalize_country("Turkiye") == "TR"
+    assert location.normalize_country("Türkiye") == "TR"
+    assert location.normalize_country("Curacao") == "CW"
+    # Colloquial names the standard does not carry.
+    assert location.normalize_country("Turkey") == "TR"
+    assert location.normalize_country("Russia") == "RU"
+    assert location.normalize_country("Netherlands") == "NL"
+
+
+def test_full_country_table_does_not_capture_us_state_codes():
+    """17 ISO alpha-2 codes double as USPS codes; "Georgia" is both, too.
+
+    With only two parts there is no country slot to disambiguate, so the
+    US-state reading wins -- otherwise completing the country table would have
+    turned every "Atlanta, GA" into Gabon.
+    """
+    for raw, region in (
+        ("Atlanta, GA", "GA"),      # GA is also Gabon
+        ("Atlanta, Georgia", "GA"),  # Georgia is also a country
+        ("Boston, MA", "MA"),       # MA is also Morocco
+        ("New Orleans, LA", "LA"),  # LA is also Laos
+        ("Philadelphia, PA", "PA"),  # PA is also Panama
+        ("Richmond, VA", "VA"),     # VA is also the Holy See
+        ("Birmingham, Ala", "AL"),  # ALA is also the Aland Islands
+    ):
+        parsed = location._parse_location(raw)
+        assert (parsed.region, parsed.country) == (region, "US"), raw
+
+
+def test_two_part_us_state_no_longer_reads_as_a_foreign_country():
+    """Regression: "San Francisco, CA" resolved to Canada, losing the state."""
+    parsed = location._parse_location("San Francisco, CA")
+
+    assert (parsed.city, parsed.region, parsed.country) == ("San Francisco", "CA", "US")
+
+
+def test_three_parts_still_put_the_trailing_token_in_the_country_slot():
+    parsed = location._parse_location("Toronto, ON, CA")
+
+    assert (parsed.city, parsed.region, parsed.country) == ("Toronto", "ON", "CA")
+
+
+def test_build_location_keeps_region_for_a_country_outside_the_legacy_table():
+    """The reported bug, at the seam the fit agent actually feeds."""
+    loc = location.build_location("Colombo", "Western Province", "Sri Lanka")
+
+    assert (loc.city, loc.region, loc.country, loc.is_us) == (
+        "Colombo", "Western Province", "LK", False
+    )
+
+
+def test_parse_location_recovers_a_two_part_foreign_country():
+    """"Colombo, Sri Lanka" used to yield city-only: the country was unresolved,
+    so the trailing part stayed in the region slot and was then discarded."""
+    parsed = location._parse_location("Colombo, Sri Lanka")
+
+    assert (parsed.city, parsed.region, parsed.country) == ("Colombo", None, "LK")
+
+
+def test_workplace_type_suffix_does_not_swallow_the_locality():
+    """Boards glue the workplace type onto the label ("Ann Arbor, MI - Hybrid").
+
+    The suffix left the trailing part unresolvable as a state or a country, and
+    an unresolved country drops the region too, so the whole value collapsed to
+    a bare city.
+    """
+    for raw, expected in (
+        ("Ann Arbor, MI - Hybrid", ("Ann Arbor", "MI", "US")),
+        ("Seattle, WA (Hybrid)", ("Seattle", "WA", "US")),
+        ("New York, NY - Onsite", ("New York", "NY", "US")),
+        ("New York, NY - On-site", ("New York", "NY", "US")),
+        ("Ann Arbor, MI - In-Office", ("Ann Arbor", "MI", "US")),
+        ("London, UK - Hybrid", ("London", None, "GB")),
+        ("Singapore (Hybrid)", ("Singapore", None, "SG")),
+        # A trailing "Remote" is a workplace tag like any other when a real
+        # locality precedes it; this used to yield an empty location.
+        ("Austin, TX - Remote", ("Austin", "TX", "US")),
+    ):
+        parsed = location._parse_location(raw)
+        assert (parsed.city, parsed.region, parsed.country) == expected, raw
+        assert parsed.raw == raw, "the provider's original string is preserved"
+
+
+def test_a_purely_remote_location_is_still_country_only():
+    """Regression guard: stripping workplace tags must not eat these shapes."""
+    for raw, country in (("Remote", None), ("Remote - US", "US"), ("Remote, US", "US")):
+        parsed = location._parse_location(raw)
+        assert (parsed.city, parsed.region, parsed.country) == (None, None, country), raw
+
+
 def test_normalize_region_us_and_pass_through():
     assert location.normalize_region("California", "US") == "CA"
     assert location.normalize_region("CA", "US") == "CA"

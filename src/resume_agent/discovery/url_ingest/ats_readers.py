@@ -55,10 +55,15 @@ from resume_agent.discovery.connectors.recruitee import offers_url, parse_recrui
 from resume_agent.discovery.connectors.smartrecruiters import (
     detail_url as sr_detail_url,
 )
+from resume_agent.discovery.connectors.smartrecruiters import (
+    smartrecruiters_location,
+    smartrecruiters_meta_lines,
+)
 from resume_agent.discovery.connectors.text import (
     html_to_markdown,
     jobposting_json_ld,
     jobposting_location,
+    with_meta_lines,
 )
 from resume_agent.discovery.connectors.workable import (
     account_url as workable_account_url,
@@ -104,10 +109,7 @@ def _segment_after(url: str, marker: str) -> str | None:
 
 def _with_meta(lines: list[str], jd_text: str) -> str:
     """Prepend the sidebar/top-bar facts to a description body."""
-    kept = [line for line in lines if line]
-    if not kept:
-        return jd_text
-    return "\n".join(kept) + ("\n\n" + jd_text if jd_text else "")
+    return with_meta_lines(lines, jd_text)
 
 
 def read_employer_hosted_greenhouse(html: str) -> ExtractedJob | None:
@@ -445,29 +447,6 @@ def _smartrecruiters_posting_id(url: str) -> str | None:
     return leading_digits.group(1) if leading_digits else candidate or None
 
 
-def _smartrecruiters_location(location: dict | None) -> str | None:
-    if not location:
-        return None
-    parts = (location.get("city"), location.get("region"), location.get("country"))
-    return ", ".join(part for part in parts if part) or None
-
-
-def _smartrecruiters_meta(detail: dict) -> list[str]:
-    """The facts SmartRecruiters renders above the description body."""
-    lines = []
-    if location := _smartrecruiters_location(detail.get("location")):
-        remote = (detail.get("location") or {}).get("remote")
-        lines.append(f"Location: {location}{' (Remote)' if remote else ''}")
-    for label, key in (("Employment Type", "typeOfEmployment"), ("Experience Level", "experienceLevel")):
-        if name := (detail.get(key) or {}).get("label"):
-            lines.append(f"{label}: {name}")
-    if department := (detail.get("department") or {}).get("label"):
-        lines.append(f"Department: {department}")
-    if industry := (detail.get("industry") or {}).get("label"):
-        lines.append(f"Industry: {industry}")
-    return lines
-
-
 def _read_smartrecruiters(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
     def api() -> ExtractedJob | None:
         posting_id = _smartrecruiters_posting_id(url)
@@ -483,8 +462,8 @@ def _read_smartrecruiters(target: AtsTarget, url: str, html: str) -> ExtractedJo
         return ExtractedJob(
             company=(detail.get("company") or {}).get("name") or company,
             title=detail.get("name"),
-            location=_smartrecruiters_location(detail.get("location")),
-            jd_text=_with_meta(_smartrecruiters_meta(detail), body),
+            location=smartrecruiters_location(detail.get("location")),
+            jd_text=_with_meta(smartrecruiters_meta_lines(detail), body),
         )
 
     return _prefer(_api(api), _from_json_ld(html))

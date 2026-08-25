@@ -2,6 +2,37 @@
 
 Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loads only when working under `src/resume_agent/taxonomy/`.
 
+- **An unresolved country silently drops the region too, so the country table
+  is load-bearing.** `build_location` assigns `region` only when a country
+  resolved (deliberate — see
+  `docs/superpowers/specs/2026-07-20-international-location-region-design.md`),
+  which meant a ~45-entry hand-written country list quietly truncated most of
+  the world to a bare city: "Colombo, Western Province, Sri Lanka" reached the
+  board as "Colombo". `taxonomy/countries.py` now carries the whole ISO 3166-1
+  standard (official short names plus an ASCII-folded variant, so "Turkiye"
+  resolves as typed) with `COUNTRY_ALIASES` for the colloquial names the
+  standard lacks. Fourteen official names contain a comma ("Korea, Republic
+  of") and are unreachable from `_parse_location`, which splits on commas
+  first — that is what the alias half is for. Regenerate the table; do not
+  hand-edit it.
+- **17 ISO alpha-2 codes are also USPS state codes, and "Georgia" is both a
+  country and a state.** Completing the country table therefore could not be
+  done alone: it would have read "Atlanta, GA" as Gabon. `_trailing_part_is_country`
+  confines the ambiguity to the two-part shape, where the US-state reading
+  wins ("City, ST" is far more common than "City, CountryCode", and the
+  country is inferred from the state anyway); three or more parts put the
+  trailing token in an unambiguous country slot ("Toronto, ON, CA"). This also
+  fixed a live bug in the other direction — "San Francisco, CA" was resolving
+  to Canada.
+- **A workplace-type suffix is stripped before the structural read.** Boards
+  glue it onto the label ("Ann Arbor, MI - Hybrid", "Seattle, WA (Hybrid)"),
+  which leaves the trailing part unresolvable as either a state or a country
+  and — via the region rule above — collapses the value to a bare city.
+  `_strip_workplace_suffix` removes it; nothing is lost, because the workplace
+  type is captured separately as its own sidebar line and `raw` keeps the
+  provider's original string. A value that is *only* a workplace tag
+  ("Remote", "Remote - US") is left intact for the remote branch, which is why
+  the strip requires a preceding locality.
 - **Skill groups are a derived display axis.** `MatrixRow.group` comes from the
   active data root's `taxonomy/skill_groups.json` (token → slug, fixed 20-slug
   vocabulary in `taxonomy/vocabulary.py`). Profile builds classify only missing

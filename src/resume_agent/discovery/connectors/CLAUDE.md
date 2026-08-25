@@ -133,6 +133,16 @@ Two Greenhouse-specific traps:
   Stripe and Figma set no metadata at all, and an unanswered field has
   `value: null`.
 
+`smartrecruiters.apply_detail` had the same gap and now renders Location,
+Employment Type, Experience Level, Department and Industry through the shared
+`text.with_meta_lines`. Its location comes from **`location.fullLocation`**, not
+a hand-join of the parts: SmartRecruiters ships that field on every posting
+(measured 100/100 on one board, on both the list and detail endpoints) and
+spells the country out, where the sibling `country` key is a *lowercase* alpha-2
+code. Joining the parts fed the taxonomy "Colombo, Western Province, lk" — a
+strictly poorer input than the string the provider already rendered. The join
+survives only as a fallback, with the code upper-cased.
+
 `parse_lever` had the same gap (0/133 rows) and now emits Location (with
 `allLocations` extras as `(also: …)`), Workplace Type, Employment Type
 (`categories.commitment`), Department (`department (team)`), Level, and

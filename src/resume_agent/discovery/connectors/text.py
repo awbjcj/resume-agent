@@ -77,6 +77,19 @@ def join_locations(values: Iterable[object]) -> str | None:
     return _join_locations(values)
 
 
+def with_meta_lines(lines: list[str], jd_text: str) -> str:
+    """Prepend sidebar/top-bar ``Label: value`` facts to a description body.
+
+    Shared by the single-URL readers and the board connectors so both render
+    the header identically -- the relevance gate, criteria extraction and
+    tailoring all read these lines as part of the description.
+    """
+    kept = [line for line in lines if line]
+    if not kept:
+        return jd_text
+    return "\n".join(kept) + ("\n\n" + jd_text if jd_text else "")
+
+
 def jobposting_location(posting: dict) -> str | None:
     """Read every work location from schema.org ``JobPosting`` data."""
     locations: list[object] = []
