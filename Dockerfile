@@ -30,14 +30,17 @@ RUN uv export --frozen --no-dev --no-emit-project --format requirements-txt > /t
 
 COPY templates ./templates
 COPY resume-template ./resume-template
-COPY config ./config.defaults
+COPY config/*.example ./config.defaults/
+COPY config/prune.yaml config/review.early_stop.yaml config/review.match_plan.yaml ./config.defaults/
 COPY --from=web /build/web/dist ./web/dist
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN groupadd --system resume-agent \
+    && useradd --system --gid resume-agent --home-dir /app resume-agent \
+    && mkdir -p /app/data \
+    && chown -R resume-agent:resume-agent /app
 
-ENV BROWSER_ENABLED=false \
-    SECURE_COOKIES=true \
-    DISABLE_API_DOCS=true \
-    REGISTRATION_MODE=open
+ENV BROWSER_ENABLED=false
+USER resume-agent
 EXPOSE 8000
-ENTRYPOINT ["/entrypoint.sh"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+ENTRYPOINT ["python", "-m", "resume_agent.container_runtime"]

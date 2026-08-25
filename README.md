@@ -54,9 +54,16 @@ points where _you_ (not the agent) make the call.
 
 ## Prerequisites
 
-- **Python 3.13+**
-- **[uv](https://docs.astral.sh/uv/)** for dependency and environment management
-- An **LLM provider key** — the discover, tailor, and cover-letter steps default to **Claude**, so an **Anthropic API key** works out of the box. You can instead (or additionally) use **OpenAI**, **Google Gemini**, or **DeepSeek** — see [LLM providers](#env--secrets-and-models)
+Choose either setup path:
+
+- **Container:** Docker Engine with the Compose plugin (Docker Desktop includes both).
+- **Native development:** **[uv](https://docs.astral.sh/uv/)** and **Node.js 22+** with npm. `uv` manages Python 3.13 for the project.
+
+- An **LLM provider key** is needed for AI-powered operations. The discover,
+  tailor, and cover-letter steps default to **Claude**, so an Anthropic key
+  works out of the box; OpenAI, Google Gemini, and DeepSeek are also supported.
+  The app starts without a key, so you can configure one from the web UI. See
+  [LLM providers](#env--secrets-and-models).
 - _Optional:_ a **GitHub token** (enriches your profile from your repos)
 - _Optional:_ a **burner LinkedIn account** (only needed for `scrape`)
 - _Optional:_ **job-board connector keys** for `pull` — e.g. [Adzuna API](https://developer.adzuna.com/) credentials (Greenhouse and RemoteOK need no key)
@@ -64,33 +71,56 @@ points where _you_ (not the agent) make the call.
 
 ---
 
-## Setup
+## Start with Docker
+
+This builds the frontend and backend into one image, stores application data in
+a named volume, and exposes the app only on the host's loopback interface:
 
 ```bash
-# 1. Install dependencies into a managed virtualenv
-uv sync
-
-# 1a. (Recommended) Run the guided setup wizard instead of hand-editing config
-uv run resume-agent setup
-
-# 2. Install the browser the scraper drives (only needed if you'll use `scrape`)
-uv run playwright install chromium
-
-# 3. Configure secrets
-cp .env.example .env          # then edit .env and fill in ANTHROPIC_API_KEY
-
-# 4. Create your config files from the examples (drop the .example suffix)
-cp config/profile_sources.yaml.example config/profile_sources.yaml
-cp config/search.yaml.example          config/search.yaml
-cp config/review.yaml.example          config/review.yaml
-cp config/render.yaml.example          config/render.yaml
-cp config/style_guide.md.example       config/style_guide.md   # optional: house writing style
-cp config/connectors.yaml.example      config/connectors.yaml   # only if you'll use `pull`
+docker compose up --build
 ```
 
-> **Windows PowerShell:** use `Copy-Item .env.example .env` instead of `cp`.
+Open <http://localhost:8000>. Stop it with `Ctrl+C` and later restart with
+`docker compose up`. `docker compose down` removes the container and network
+but retains your named data volume.
 
-`resume-agent setup` walks you through secrets, search criteria, and connectors, then writes `.env` and `config/*.yaml` for you — the manual steps below are the alternative.
+To build and run the image without Compose:
+
+```bash
+docker build -t resume-agent .
+docker run --name resume-agent --init --restart unless-stopped \
+  -e APP_MODE=local \
+  -p 127.0.0.1:8000:8000 \
+  -v resume-agent-data:/app/data \
+  resume-agent
+```
+
+PowerShell accepts the same command with backticks instead of backslashes, or
+as one line. Add `--env-file .env` after creating `.env` if you want to inject
+provider keys at container startup; keys can also be saved from the web UI.
+
+The image defaults to auth-free local mode. For an internet-facing multi-user
+deployment, set `APP_MODE=hosted` and follow [Hosted multi-user server](#hosted-multi-user-server); hosted mode requires credentials and a canonical HTTPS URL.
+
+## Native setup (Windows, macOS, and Linux)
+
+One idempotent bootstrap command installs locked Python and frontend
+dependencies and creates missing local config files without overwriting edits:
+
+```bash
+uv run --no-project scripts/bootstrap.py
+uv run resume-agent setup                 # optional guided configuration
+uv run python scripts/dev.py              # API + frontend; Ctrl+C stops both
+```
+
+Open <http://localhost:5173>. The same commands work in PowerShell, Command
+Prompt, and POSIX shells. If you use `make`, `make setup` and `make dev` are
+short aliases. Pass `--browser` to the bootstrap command only when you need
+browser-backed job sources such as LinkedIn.
+
+`resume-agent setup` walks through secrets, search criteria, and connectors and
+writes `.env` plus `config/*.yaml`. You can instead edit the files created from
+the checked-in examples.
 
 Everything else (the SQLite database, the `output/` and `data/` folders) is
 created automatically on first run.
@@ -118,8 +148,9 @@ Only these read-only MCP tools are exposed: `h1b_get_company_stats`,
 never treated as confirmation of current sponsorship or current employer
 policy, never flip the posting signal, and never hard-reject a job.
 
-For local development, `make dev` starts the API, Vite frontend, and the sibling
-`h1b-job-search-mcp` server together. The launcher uses
+For local development, `make dev` starts only the API and Vite frontend, so a
+fresh clone has no sibling-repository dependency. `make full-stack` additionally
+starts the optional sibling `h1b-job-search-mcp` server. That launcher uses
 `http://127.0.0.1:8001/mcp` for the API's Streamable HTTP connection, so no
 manual MCP command or URL is needed. Run `make stack-health` after startup to
 check both HTTP health endpoints and the MCP handshake/tool allowlist.
@@ -432,8 +463,9 @@ uv run resume-agent serve --mode hosted --host 0.0.0.0 --port 8080
 The default local mode skips account authentication and always activates the
 one default workspace. It refuses non-loopback binds. Hosted mode is the
 deployment boundary: it enables login, bearer/PAT checks, tenant selection,
-registration, and isolated user workspaces. The shipped container selects
-hosted mode explicitly.
+registration, and isolated user workspaces. The container defaults to local
+mode and switches to hosted mode when `APP_MODE=hosted` is set (or when
+hosted-only settings such as `APP_BASE_URL` are present).
 
 - Interactive docs at `/docs`; the OpenAPI schema at `/openapi.json`.
 - The committed contract the frontend consumes lives in `contracts/`

@@ -11,14 +11,16 @@ checks your change must pass.
 ## Setup
 
 ```bash
-make setup           # uv sync + npm install (in web/)
+uv run --no-project scripts/bootstrap.py
+make setup           # equivalent short alias
 make setup-browser   # optional: Playwright Chromium, only for live scraping
 ```
 
 ## Running the app
 
 ```bash
-make dev             # FastAPI backend + Vite frontend together
+uv run python scripts/dev.py  # works on Windows, macOS, and Linux
+make dev                     # equivalent short alias
 ```
 
 ## Before you open a PR

@@ -36,15 +36,17 @@ endif
 # not reuse PORT, which belongs to the resume-agent API.
 export H1B_HOST H1B_PORT
 
-.PHONY: help setup setup-browser api web h1b dev full-stack h1b-health api-health mcp-health stack-health test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port backup-remote seed
+.PHONY: help setup setup-browser api web h1b dev full-stack docker-up docker-down h1b-health api-health mcp-health stack-health test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port backup-remote seed
 
 help:
 	@echo "Common targets:"
 	@echo "  make setup          Install Python and web dependencies"
 	@echo "  make api            Run FastAPI backend at http://$(HOST):$(PORT)"
 	@echo "  make web            Run Vite frontend at http://$(WEB_HOST):$(WEB_PORT)"
-	@echo "  make dev            Run API, frontend, and the local H-1B MCP server together"
-	@echo "  make full-stack     Alias for make dev"
+	@echo "  make dev            Run FastAPI and Vite together (Windows/macOS/Linux)"
+	@echo "  make full-stack     Run API, frontend, and the optional local H-1B MCP server"
+	@echo "  make docker-up      Build and run the single-container app"
+	@echo "  make docker-down    Stop the container (persistent data is retained)"
 	@echo "  make h1b            Run H-1B MCP at http://$(H1B_HOST):$(H1B_PORT)/mcp"
 	@echo "  make stack-health   Check API health and the H-1B MCP connection"
 	@echo "  make test           Run API and frontend tests"
@@ -67,8 +69,7 @@ help:
 	@echo "  make seed RAILWAY_URL=https://your-app.up.railway.app API_TOKEN=..."
 
 setup:
-	$(UV) sync
-	$(NPM) --prefix web install
+	$(UV) run --no-project scripts/bootstrap.py
 
 setup-browser:
 	$(UV) run playwright install chromium
@@ -85,10 +86,17 @@ web:
 h1b:
 	$(UV) --directory "$(H1B_DIR)" run python src/server.py
 
-dev: full-stack
+dev:
+	$(UV) run python scripts/dev.py --api-host $(HOST) --api-port $(PORT) --web-host $(WEB_HOST) --web-port $(WEB_PORT)
 
 full-stack:
 	+$(MAKE) -j3 H1B_MCP_ENABLED=true H1B_MCP_TRANSPORT=streamable-http H1B_MCP_COMMAND= H1B_MCP_URL=http://$(H1B_HOST):$(H1B_PORT)/mcp api web h1b
+
+docker-up:
+	docker compose up --build
+
+docker-down:
+	docker compose down
 
 h1b-health:
 	powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-RestMethod -ErrorAction Stop -Uri 'http://$(H1B_HOST):$(H1B_PORT)/health' -TimeoutSec 15 | ConvertTo-Json -Compress"

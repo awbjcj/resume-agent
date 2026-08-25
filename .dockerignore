@@ -15,3 +15,8 @@ node_modules
 __pycache__
 *.pyc
 .env
+config/*
+!config/*.example
+!config/prune.yaml
+!config/review.early_stop.yaml
+!config/review.match_plan.yaml

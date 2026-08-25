@@ -1,0 +1,20 @@
+services:
+  resume-agent:
+    build:
+      context: .
+    image: resume-agent:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${RESUME_AGENT_PORT:-8000}:8000"
+    environment:
+      APP_MODE: local
+      PORT: 8000
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - resume-agent-data:/app/data
+
+volumes:
+  resume-agent-data:

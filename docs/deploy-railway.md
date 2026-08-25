@@ -4,9 +4,10 @@ This is a public multi-user deployment: one service, one persistent volume,
 one replica, an owner/admin account, and email-verified self-registration.
 SQLite plus a Railway volume still requires a single replica.
 
-The container entrypoint explicitly starts `resume-agent serve --mode hosted`.
-This keeps Railway authentication and tenant isolation independent from the
-auth-free, single-workspace default used by local `resume-agent serve`.
+Set `APP_MODE=hosted` for Railway. The container also infers hosted mode from
+`APP_BASE_URL` and the bootstrap credentials for compatibility, but the explicit
+setting makes the deployment boundary auditable. This keeps authentication and
+tenant isolation independent from the auth-free local container default.
 
 ## One-time setup
 
@@ -25,6 +26,7 @@ auth-free, single-workspace default used by local `resume-agent serve`.
 
    | Variable                           | Value                                                                                           |
    | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+   | `APP_MODE`                         | `hosted`                                                                                        |
    | `AUTH_USERNAME`                    | Owner login name                                                                                |
    | `AUTH_PASSWORD_HASH`               | Output from `hash-password`                                                                     |
    | `SESSION_SECRET`                   | The generated 64-character secret                                                               |
@@ -211,8 +213,8 @@ local browser. To update the cloud snapshot:
   skips its browser fallback.
 - Session cookies last 30 days. Rotate `SESSION_SECRET` to invalidate all live
   sessions; changing only the password hash does not revoke existing cookies.
-- The container forces Secure cookies and disables API docs. It refuses to
-  start unless `APP_BASE_URL` is an HTTPS origin.
+- In hosted mode the container defaults to Secure cookies and disabled API
+  docs. It refuses to start unless `APP_BASE_URL` is an HTTPS origin.
 - Shared LLM credentials come only from Railway environment variables. All
   account tiers use them first; per-user limits and the global circuit breaker
   are checked before each provider call, and a configured workspace key becomes

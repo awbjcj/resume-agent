@@ -10,9 +10,13 @@ override is disabled. Boolean values accept the normal Pydantic settings forms,
 including `true` and `false`. Restart the API and workers after changing a
 setting because process settings are cached.
 
-The Docker image intentionally overrides four local defaults:
-`BROWSER_ENABLED=false`, `SECURE_COOKIES=true`, `DISABLE_API_DOCS=true`, and
-`REGISTRATION_MODE=open`.
+The Docker image always defaults `BROWSER_ENABLED=false`. Its other defaults are
+mode-aware: a zero-config image starts in local mode with API docs enabled and
+non-secure localhost cookies; hosted mode defaults `SECURE_COOKIES=true`,
+`DISABLE_API_DOCS=true`, and `REGISTRATION_MODE=open`. Set `APP_MODE` to `local`
+or `hosted`; `auto` (the image default) selects hosted mode when hosted-only
+settings such as `APP_BASE_URL`, `AUTH_PASSWORD_HASH`, or `SESSION_SECRET` are
+present.
 
 ## LLM providers and models
 
@@ -54,6 +58,7 @@ chosen value.
 | Variable | Default | Accepted values and purpose |
 | --- | --- | --- |
 | `DB_URL` | `sqlite:///data/resume_agent.db` | SQLAlchemy database URL. The supported Railway topology uses one SQLite replica and one persistent volume. |
+| `APP_MODE` | `auto` in Docker | Container runtime mode: `local`, `hosted`, or `auto`. Outside the container, use the `serve --mode` option. |
 | `API_TOKEN` | empty | Optional bearer token for scripts in hosted mode. Local mode ignores API/account authentication. |
 | `BROWSER_ENABLED` | `true` | Enables browser-backed connectors. The Docker image sets this to `false`. |
 | `STREAM_ENABLED` | `true` | Enables streamed conversational turns; `false` uses the blocking fallback. |
@@ -72,9 +77,9 @@ chosen value.
 | `AUTH_EMAIL` | empty | Optional verified email assigned to the bootstrap administrator. |
 | `APP_BASE_URL` | empty | Canonical public origin used for OAuth callbacks and email links. Use HTTPS in production. |
 | `ALLOWED_HOSTS` | empty | Comma-separated `Host` header allowlist. |
-| `SECURE_COOKIES` | `false` | Forces secure session cookies. The Docker image sets this to `true`. |
-| `DISABLE_API_DOCS` | `false` | Disables `/docs`, `/redoc`, and `/openapi.json`. The Docker image sets this to `true`. |
-| `REGISTRATION_MODE` | `invite` | `closed`, `invite`, or `open`. The Docker image sets `open`. |
+| `SECURE_COOKIES` | `false` | Forces secure session cookies. The Docker image defaults this to `true` only in hosted mode. |
+| `DISABLE_API_DOCS` | `false` | Disables `/docs`, `/redoc`, and `/openapi.json`. The Docker image defaults this to `true` only in hosted mode. |
+| `REGISTRATION_MODE` | `invite` | `closed`, `invite`, or `open`. The Docker image defaults this to `open` only in hosted mode. |
 | `GLOBAL_DAILY_SIGNUP_LIMIT` | `50` | Platform-wide rolling daily verification-email limit; integer at least 1. |
 | `GLOBAL_WEEKLY_TOKEN_BUDGET` | `50000000` | Legacy shared-key weekly token circuit breaker; non-negative integer, used while cost enforcement is in shadow mode. |
 | `COST_QUOTA_ENFORCEMENT` | `shadow` | `shadow` dual-records USD while token enforcement remains active; `enforce` makes cost quotas authoritative. |
