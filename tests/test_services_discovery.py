@@ -147,7 +147,9 @@ def test_discover_jobs_with_empty_job_ids_scopes_to_nothing_not_everything(
         ),
     )
     with _session() as session:
-        discovery.discover_jobs(session, job_ids=set())
+        discovery.discover_jobs(
+            session, facts_path=str(tmp_path / "facts.json"), job_ids=set()
+        )
 
     assert seen["scope"].job_ids == frozenset()
 
