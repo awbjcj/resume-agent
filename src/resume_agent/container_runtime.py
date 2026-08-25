@@ -4,12 +4,44 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from typing import cast
 
 from resume_agent.config import AppMode
 from resume_agent.deploy import main as prepare_data_root
 
 APP_MODES = {"auto", "local", "hosted"}
+
+
+def _drop_privileges_to_app_user() -> None:
+    """Reclaim the mounted data volume, then drop from root to resume-agent.
+
+    The image bakes ownership of /app into the resume-agent user at build
+    time, but /app/data is a Railway volume: its ownership is whatever UID
+    last wrote to it, not what the current image says. `useradd --system`
+    allocates the next free system UID from the base image, so a routine
+    rebuild of the floating `python:3.13-slim` tag can silently hand
+    resume-agent a different UID than the one the volume's existing files
+    are owned by, and every write inside it starts failing with
+    PermissionError. Running as root just long enough to chown the volume
+    to the current build's UID before dropping privileges makes this
+    self-healing regardless of how the UID drifts between builds.
+    """
+    if os.geteuid() != 0:
+        return
+    import pwd
+
+    user = pwd.getpwnam("resume-agent")
+    app_root = Path(os.environ.get("APP_ROOT", "/app"))
+    data_root = Path(os.environ.get("DATA_ROOT", str(app_root / "data")))
+    if data_root.exists():
+        for dirpath, dirnames, filenames in os.walk(data_root):
+            os.chown(dirpath, user.pw_uid, user.pw_gid)
+            for name in filenames:
+                os.chown(os.path.join(dirpath, name), user.pw_uid, user.pw_gid)
+    os.setgroups([])
+    os.setgid(user.pw_gid)
+    os.setuid(user.pw_uid)
 
 
 def resolve_app_mode(environ: Mapping[str, str]) -> AppMode:
@@ -49,6 +81,7 @@ def main() -> None:
 
     from resume_agent.api.app import create_app
 
+    _drop_privileges_to_app_user()
     prepare_data_root()
     mode = configure_environment(os.environ)
     try:

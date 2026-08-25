@@ -1,8 +1,13 @@
+import os
 from pathlib import Path
 
 import pytest
 
-from resume_agent.container_runtime import configure_environment, resolve_app_mode
+from resume_agent.container_runtime import (
+    _drop_privileges_to_app_user,
+    configure_environment,
+    resolve_app_mode,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,15 +53,26 @@ def test_invalid_container_mode_fails_loudly():
         resolve_app_mode({"APP_MODE": "public"})
 
 
-def test_image_uses_non_root_runtime_and_does_not_copy_local_config():
+def test_image_creates_app_user_and_starts_as_root_and_does_not_copy_local_config():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
 
-    assert "USER resume-agent" in dockerfile
+    # The container starts as root so container_runtime.py can reclaim the
+    # mounted /app/data volume before dropping to resume-agent -- a static
+    # `USER resume-agent` here would skip that reclaim and reintroduce the
+    # UID-drift permission failure it fixes.
+    assert "useradd --system --gid resume-agent" in dockerfile
+    assert "USER resume-agent" not in dockerfile
     assert 'ENTRYPOINT ["python", "-m", "resume_agent.container_runtime"]' in dockerfile
     assert "COPY config ./config.defaults" not in dockerfile
     assert "config/*" in dockerignore
     assert "!config/*.example" in dockerignore
+
+
+@pytest.mark.skipif(not hasattr(os, "geteuid"), reason="privilege drop is POSIX-only")
+def test_drop_privileges_is_a_noop_when_not_root():
+    assert os.geteuid() != 0
+    _drop_privileges_to_app_user()
 
 
 def test_compose_binds_localhost_and_persists_the_data_root():

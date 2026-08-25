@@ -39,7 +39,10 @@ RUN groupadd --system resume-agent \
     && chown -R resume-agent:resume-agent /app
 
 ENV BROWSER_ENABLED=false
-USER resume-agent
+# Stay root at container start: /app/data is a Railway volume whose ownership
+# comes from whatever UID a prior build's resume-agent user had, which drifts
+# across image rebuilds. container_runtime.py reclaims the volume for the
+# current build's UID and drops to resume-agent before the app runs.
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
