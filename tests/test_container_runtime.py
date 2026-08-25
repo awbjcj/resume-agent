@@ -29,7 +29,7 @@ def test_container_auto_selects_secure_hosted_mode_from_public_origin():
     assert environment["REGISTRATION_MODE"] == "open"
 
 
-def test_explicit_values_override_container_defaults():
+def test_hosted_mode_preserves_safe_overrides_but_forces_secure_cookies():
     environment = {
         "APP_MODE": "hosted",
         "SECURE_COOKIES": "false",
@@ -38,7 +38,7 @@ def test_explicit_values_override_container_defaults():
     }
 
     assert configure_environment(environment) == "hosted"
-    assert environment["SECURE_COOKIES"] == "false"
+    assert environment["SECURE_COOKIES"] == "true"
     assert environment["DISABLE_API_DOCS"] == "false"
     assert environment["REGISTRATION_MODE"] == "invite"
 

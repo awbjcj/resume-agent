@@ -29,11 +29,13 @@ def resolve_app_mode(environ: Mapping[str, str]) -> AppMode:
 
 
 def configure_environment(environ: MutableMapping[str, str]) -> AppMode:
-    """Apply secure mode-aware defaults without overriding operator choices."""
+    """Apply mode-aware defaults and enforce the hosted HTTPS boundary."""
     mode = resolve_app_mode(environ)
     environ.setdefault("BROWSER_ENABLED", "false")
     if mode == "hosted":
-        environ.setdefault("SECURE_COOKIES", "true")
+        # Hosted containers are an internet-facing boundary. Do not allow an
+        # environment override to bypass create_app's canonical-HTTPS check.
+        environ["SECURE_COOKIES"] = "true"
         environ.setdefault("DISABLE_API_DOCS", "true")
         environ.setdefault("REGISTRATION_MODE", "open")
     else:

@@ -35,7 +35,7 @@ tenant isolation independent from the auth-free local container default.
    | `ALLOWED_HOSTS`                    | Canonical host, for example `resume.example.com`                                                |
    | `BROWSER_ENABLED`                  | `false` (also the image default)                                                                |
    | `REGISTRATION_MODE`                | `open` for public registration; use `invite` for a controlled launch                            |
-   | `SECURE_COOKIES`                   | `true` (also the image default; startup fails without HTTPS `APP_BASE_URL`)                     |
+   | `SECURE_COOKIES`                   | `true` (enforced by the image; startup fails without HTTPS `APP_BASE_URL`)                       |
    | `DISABLE_API_DOCS`                 | `true` (also the image default)                                                                 |
    | `GLOBAL_DAILY_SIGNUP_LIMIT`        | Maximum verification emails started per rolling day                                             |
    | `COST_QUOTA_ENFORCEMENT`           | `shadow` dual-records USD while token enforcement remains active; `enforce` enables cost quotas |
@@ -213,8 +213,8 @@ local browser. To update the cloud snapshot:
   skips its browser fallback.
 - Session cookies last 30 days. Rotate `SESSION_SECRET` to invalidate all live
   sessions; changing only the password hash does not revoke existing cookies.
-- In hosted mode the container defaults to Secure cookies and disabled API
-  docs. It refuses to start unless `APP_BASE_URL` is an HTTPS origin.
+- In hosted mode the container enforces Secure cookies, defaults to disabled
+  API docs, and refuses to start unless `APP_BASE_URL` is an HTTPS origin.
 - Shared LLM credentials come only from Railway environment variables. All
   account tiers use them first; per-user limits and the global circuit breaker
   are checked before each provider call, and a configured workspace key becomes

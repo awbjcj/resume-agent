@@ -77,7 +77,7 @@ chosen value.
 | `AUTH_EMAIL` | empty | Optional verified email assigned to the bootstrap administrator. |
 | `APP_BASE_URL` | empty | Canonical public origin used for OAuth callbacks and email links. Use HTTPS in production. |
 | `ALLOWED_HOSTS` | empty | Comma-separated `Host` header allowlist. |
-| `SECURE_COOKIES` | `false` | Forces secure session cookies. The Docker image defaults this to `true` only in hosted mode. |
+| `SECURE_COOKIES` | `false` | Forces secure session cookies. The Docker image enforces `true` in hosted mode so canonical HTTPS validation cannot be bypassed. |
 | `DISABLE_API_DOCS` | `false` | Disables `/docs`, `/redoc`, and `/openapi.json`. The Docker image defaults this to `true` only in hosted mode. |
 | `REGISTRATION_MODE` | `invite` | `closed`, `invite`, or `open`. The Docker image defaults this to `open` only in hosted mode. |
 | `GLOBAL_DAILY_SIGNUP_LIMIT` | `50` | Platform-wide rolling daily verification-email limit; integer at least 1. |
