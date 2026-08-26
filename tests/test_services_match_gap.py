@@ -10,6 +10,7 @@ import pytest
 
 import resume_agent.services.match_gap as match_gap_module
 from resume_agent.db import get_session, init_db, make_engine
+from resume_agent.progress import ProgressReporter
 from resume_agent.services.match_gap import refresh_clusters, slugify_domain
 from resume_agent.taxonomy.classification import (
     ClassificationMetrics,
@@ -123,6 +124,37 @@ def test_incremental_refresh_persists_success_and_returns_metrics(tmp_path):
     assert summary["failedCanonicalTokens"] == 0
     assert canonicalizer.closed is True
     assert themer.closed is True
+
+
+def test_refresh_progress_uses_monotonic_phase_indices(tmp_path):
+    class _Reporter(ProgressReporter):
+        def __init__(self):
+            self.phases: list[int] = []
+
+        def begin(self, _total, _label, *, phase_index=None, **_extra):
+            assert phase_index is not None
+            self.phases.append(phase_index)
+
+        def step(self, _current, **_extra):
+            pass
+
+        def checkpoint(self):
+            pass
+
+    reporter = _Reporter()
+    engine = _engine_with_target_skills("Python", "Rust")
+    with get_session(engine) as session:
+        refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(),
+            path=tmp_path / "clusters.json",
+            batch_size=1,
+            reporter=reporter,
+        )
+
+    assert reporter.phases == list(range(1, len(reporter.phases) + 1))
+    assert len(reporter.phases) >= 3
 
 
 def test_existing_alias_and_theme_choices_win(tmp_path):
@@ -581,6 +613,13 @@ def test_a_skill_that_failed_before_goes_straight_to_escalation(tmp_path):
             escalation_themer=escalation,
             path=path,
         )
+
+    assert result["elapsedMs"] >= result["modelElapsedMs"]
+    assert result["maxInFlight"] <= 2
+    assert result["operationWaitMs"] >= 0
+    assert result["snapshotMs"] >= 0
+    assert result["retrievalMs"] >= 0
+    assert result["commitMs"] >= 0
 
     assert first_pass.calls == 0
     assert escalation.calls == 1

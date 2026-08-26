@@ -74,6 +74,38 @@ def test_embedding_cache_batches_hits_and_invalidates_descriptors(tmp_path):
     assert embedding_cache_path(tmp_path / "cluster_map.json").exists()
 
 
+def test_embedding_result_reports_real_cache_and_provider_work(tmp_path):
+    provider = _EmbeddingProvider()
+    cluster_path = tmp_path / "cluster_map.json"
+    descriptors = {"a": "python", "b": "java", "c": "rust"}
+
+    cold = asyncio.run(
+        embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors=descriptors,
+            provider=provider,
+            batch_size=2,
+        )
+    )
+    warm = asyncio.run(
+        embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors=descriptors,
+            provider=provider,
+            batch_size=2,
+        )
+    )
+
+    assert cold.cache_hits == 0
+    assert cold.cache_misses == 3
+    assert cold.provider_batches == 2
+    assert cold.cache_bytes > 0
+    assert warm.cache_hits == 3
+    assert warm.cache_misses == 0
+    assert warm.provider_batches == 0
+    assert warm.elapsed_ms >= 0
+
+
 def test_embedding_cache_prunes_stale_records_in_managed_namespaces(tmp_path):
     provider = _EmbeddingProvider()
     cluster_path = tmp_path / "cluster_map.json"

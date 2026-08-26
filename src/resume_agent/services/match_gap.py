@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 
 from sqlmodel import Session
@@ -47,6 +48,38 @@ from resume_agent.tracking.canonicalize import build_classification_agents
 # prefix is a naming convention, not a protected kind: maintenance is expected
 # to split these into real domains over time.
 FLOOR_DOMAIN_PREFIX = "general-"
+
+
+class _MonotonicPhaseReporter(ProgressReporter):
+    """Add a run-wide phase index to nested classification progress segments."""
+
+    def __init__(self, delegate: ProgressReporter) -> None:
+        self._delegate = delegate
+        self._phase_index = 0
+
+    def begin(
+        self,
+        total: int,
+        label: str,
+        *,
+        phase_index: int | None = None,
+        phase_count: int | None = None,
+        **extra: object,
+    ) -> None:
+        self._phase_index += 1
+        self._delegate.begin(
+            total,
+            label,
+            phase_index=self._phase_index,
+            phase_count=phase_count,
+            **extra,
+        )
+
+    def step(self, current: int, *, label: str | None = None, **extra: object) -> None:
+        self._delegate.step(current, label=label, **extra)
+
+    def checkpoint(self) -> None:
+        self._delegate.checkpoint()
 
 
 def floor_domain(category: str) -> tuple[str, str]:
@@ -178,6 +211,7 @@ def refresh_clusters(
     escalation_themer: Runner | None = None,
 ) -> dict[str, object]:
     """Classify a complete or explicitly scoped Unassigned backlog and save once."""
+    started = time.monotonic()
     settings = get_settings()
     size = settings.cluster_batch_size if batch_size is None else batch_size
     width = settings.llm_concurrency if concurrency is None else concurrency
@@ -207,9 +241,14 @@ def refresh_clusters(
         if corrections_path is not None
         else Path(path).with_name("taxonomy_corrections.json")
     )
+    phase_reporter = _MonotonicPhaseReporter(reporter) if reporter is not None else None
     custody = TaxonomyCustody(path, correction_file)
+    operation_wait_started = time.monotonic()
     with custody.operation():
+        operation_wait_ms = round((time.monotonic() - operation_wait_started) * 1000)
+        snapshot_started = time.monotonic()
         snapshot = custody.read_for_mutation()
+        snapshot_ms = round((time.monotonic() - snapshot_started) * 1000)
         corrections = snapshot.corrections
         taxonomy_state = snapshot.state
         demanded = (
@@ -270,6 +309,8 @@ def refresh_clusters(
 
         candidate_context: CandidateContext | None = None
         if first_pass:
+            if phase_reporter is not None:
+                phase_reporter.begin(1, "Retrieving taxonomy candidates")
             candidate_context = asyncio.run(
                 build_candidate_context(
                     cluster_path=path,
@@ -277,10 +318,14 @@ def refresh_clusters(
                     existing=existing,
                     provider=embedding_provider,
                     checkpoint=(
-                        reporter.checkpoint if reporter is not None else None
+                        phase_reporter.checkpoint
+                        if phase_reporter is not None
+                        else None
                     ),
                 )
             )
+            if phase_reporter is not None:
+                phase_reporter.step(1, label="Retrieved taxonomy candidates")
         # Retrieval may only veto reuse it did not surface when it is actually
         # semantic.  Under a lexical or partial fallback it narrows the prompt
         # but no longer forbids an otherwise valid domain.
@@ -304,7 +349,7 @@ def refresh_clusters(
                 concurrency=width,
                 category_cap=settings.domains_per_category_target,
                 reconcile_batch_size=reconcile_size,
-                reporter=reporter,
+                reporter=phase_reporter,
                 candidate_context=candidate_context,
                 allow_category_growth=True,
                 min_new_domain_members=2,
@@ -346,7 +391,7 @@ def refresh_clusters(
                 concurrency=width,
                 category_cap=settings.domains_per_category_target,
                 reconcile_batch_size=reconcile_size,
-                reporter=reporter,
+                reporter=phase_reporter,
                 candidate_context=None,
                 allow_category_growth=True,
                 min_new_domain_members=1,
@@ -410,8 +455,8 @@ def refresh_clusters(
         # backlog; it must never prune established domains or aliases that are
         # merely outside today's visible jobs.
         final = apply_taxonomy_corrections(merged, corrections)
-        if reporter is not None:
-            reporter.checkpoint()
+        if phase_reporter is not None:
+            phase_reporter.checkpoint()
         # Distinct tokens, not token-attempts: a token the first pass and the
         # escalation pass both failed is one unresolved skill, not two.
         canonical_failures = len(
@@ -470,14 +515,22 @@ def refresh_clusters(
                 retired={token: "not a skill" for token in retired_canonicals},
             )
 
+        commit_started = time.monotonic()
         custody.commit(snapshot, commit_refresh)
+        commit_ms = round((time.monotonic() - commit_started) * 1000)
+        invalidation_started = time.monotonic()
         stale_suggestions = _invalidate_changed_domain_suggestions(
             session, existing, final
         )
+        invalidation_ms = round((time.monotonic() - invalidation_started) * 1000)
         domains_created = len(set(final.domain_label) - set(existing.domain_label))
         aliases_merged = sum(
             final.aliases.get(token, token) != token for token in target_raw
         )
+    model_elapsed_ms = outcome.metrics.elapsed_ms + (
+        escalated.metrics.elapsed_ms if escalated else 0
+    )
+    retrieval_metrics = candidate_context.metrics if candidate_context else None
     return {
         "skills": len(set(final.aliases.values())),
         "domains": len(final.domain_label),
@@ -489,8 +542,36 @@ def refresh_clusters(
         + (escalated.metrics.domain_batches if escalated else 0),
         "promptBytes": outcome.metrics.prompt_bytes
         + (escalated.metrics.prompt_bytes if escalated else 0),
-        "elapsedMs": outcome.metrics.elapsed_ms
-        + (escalated.metrics.elapsed_ms if escalated else 0),
+        "elapsedMs": round((time.monotonic() - started) * 1000),
+        "modelElapsedMs": model_elapsed_ms,
+        "operationWaitMs": operation_wait_ms,
+        "snapshotMs": snapshot_ms,
+        "retrievalMs": retrieval_metrics.elapsed_ms if retrieval_metrics else 0,
+        "candidateIndexMs": retrieval_metrics.index_ms if retrieval_metrics else 0,
+        "candidateRankingMs": (
+            retrieval_metrics.ranking_ms if retrieval_metrics else 0
+        ),
+        "embeddingDescriptors": (
+            retrieval_metrics.descriptors if retrieval_metrics else 0
+        ),
+        "embeddingCacheHits": (
+            retrieval_metrics.cache_hits if retrieval_metrics else 0
+        ),
+        "embeddingCacheMisses": (
+            retrieval_metrics.cache_misses if retrieval_metrics else 0
+        ),
+        "embeddingProviderBatches": (
+            retrieval_metrics.provider_batches if retrieval_metrics else 0
+        ),
+        "embeddingCacheBytes": (
+            retrieval_metrics.cache_bytes if retrieval_metrics else 0
+        ),
+        "commitMs": commit_ms,
+        "invalidationMs": invalidation_ms,
+        "maxInFlight": max(
+            outcome.metrics.max_in_flight,
+            escalated.metrics.max_in_flight if escalated else 0,
+        ),
         "embeddingMode": outcome.metrics.embedding_mode,
         # Retrieval degrading to a lexical fallback used to be invisible, which
         # is how it ran that way for the entire life of the feature.

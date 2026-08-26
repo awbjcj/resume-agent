@@ -17,11 +17,12 @@ import struct
 import sys
 import tempfile
 import threading
+import time
 import weakref
 from array import array
 from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Protocol
@@ -229,6 +230,11 @@ class EmbeddingResult:
     requested: int
     failed: int
     reason: str = ""
+    cache_hits: int = 0
+    cache_misses: int = 0
+    provider_batches: int = 0
+    cache_bytes: int = 0
+    elapsed_ms: int = 0
 
     @property
     def complete(self) -> bool:
@@ -255,6 +261,7 @@ async def embed_descriptors(
     the result instead of discarding it.
     """
 
+    started = time.monotonic()
     if batch_size < 1:
         raise ValueError("embedding batch_size must be positive")
     if concurrency < 1:
@@ -334,11 +341,20 @@ async def embed_descriptors(
             latest.records.update(landed)
             if landed or stale:
                 _save_cache(cache_path, latest)
+    try:
+        cache_bytes = cache_path.stat().st_size
+    except OSError:
+        cache_bytes = 0
     return EmbeddingResult(
         vectors=result,
         requested=len(descriptors),
         failed=failed,
         reason=reasons[0] if reasons else "",
+        cache_hits=len(descriptors) - len(missing),
+        cache_misses=len(missing),
+        provider_batches=len(shards),
+        cache_bytes=cache_bytes,
+        elapsed_ms=round((time.monotonic() - started) * 1000),
     )
 
 
@@ -654,6 +670,18 @@ def candidate_index(cmap: ClusterMap, revision: str | None = None) -> CandidateI
 
 
 @dataclass(frozen=True)
+class CandidateRetrievalMetrics:
+    elapsed_ms: int = 0
+    index_ms: int = 0
+    ranking_ms: int = 0
+    descriptors: int = 0
+    cache_hits: int = 0
+    cache_misses: int = 0
+    provider_batches: int = 0
+    cache_bytes: int = 0
+
+
+@dataclass(frozen=True)
 class CandidateContext:
     mode: str
     canonical_candidates: dict[str, tuple[str, ...]]
@@ -662,6 +690,9 @@ class CandidateContext:
     # Why retrieval degraded, when it did.  Without this a total embedding
     # outage is indistinguishable from a healthy run anywhere downstream.
     reason: str = ""
+    metrics: CandidateRetrievalMetrics = field(
+        default_factory=CandidateRetrievalMetrics
+    )
 
     @property
     def degraded(self) -> bool:
@@ -686,11 +717,14 @@ async def build_candidate_context(
 ) -> CandidateContext:
     """Return bounded synonym/domain/peer candidates with a lexical fallback."""
 
+    started = time.monotonic()
     normalized = {token for raw in tokens if (token := normalize_skill(raw))}
     # Older maps may contain a canonical domain assignment without an explicit
     # identity alias.  It is still a legitimate synonym candidate, so derive
     # the candidate universe from both axes of the canonical tree.
+    index_started = time.monotonic()
     index = candidate_index(existing, revision)
+    index_ms = round((time.monotonic() - index_started) * 1000)
     canonical_ids = index.canonical_ids
     domain_ids = index.domain_ids
     canonical_descriptors = index.canonical_descriptors
@@ -702,6 +736,7 @@ async def build_candidate_context(
     vectors: dict[str, tuple[float, ...]] = {}
     mode = "lexical"
     reason = "no embedding provider is configured"
+    embedding_metrics = EmbeddingResult(vectors={}, requested=0, failed=0)
     if resolved_provider is not None:
         descriptors = {
             **{f"skill:{key}": value for key, value in canonical_descriptors.items()},
@@ -723,7 +758,9 @@ async def build_candidate_context(
             mode, reason = "partial", outcome.reason
         else:
             mode, reason = "lexical", outcome.reason
+        embedding_metrics = outcome
 
+    ranking_started = time.monotonic()
     canonical_vectors = {
         key: vectors[f"skill:{key}"]
         for key in canonical_ids
@@ -785,6 +822,20 @@ async def build_candidate_context(
         domain_candidates=domain_candidates,
         peer_candidates=peer_candidates,
         reason=reason,
+        metrics=CandidateRetrievalMetrics(
+            elapsed_ms=round((time.monotonic() - started) * 1000),
+            index_ms=index_ms,
+            ranking_ms=round((time.monotonic() - ranking_started) * 1000),
+            descriptors=(
+                len(canonical_descriptors)
+                + len(domain_descriptors)
+                + len(new_descriptors)
+            ),
+            cache_hits=embedding_metrics.cache_hits,
+            cache_misses=embedding_metrics.cache_misses,
+            provider_batches=embedding_metrics.provider_batches,
+            cache_bytes=embedding_metrics.cache_bytes,
+        ),
     )
 
 
