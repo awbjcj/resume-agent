@@ -55,6 +55,42 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   last by `apply_taxonomy_corrections` on every load — corrections beat LLM output;
   dangling references are inert. Legacy cluster files load aliases-only (themes ignored),
   so the first refresh reclassifies once; legacy `theme`-kind suggestions are purged.
+- **Regroup telemetry is diagnostic-only, and deliberately unrendered.**
+  `refresh_clusters` returns wall-clock (`elapsedMs`) alongside a breakdown —
+  `modelElapsedMs`, `operationWaitMs`, `snapshotMs`, `retrievalMs`,
+  `candidateIndexMs`, `candidateRankingMs`, `commitMs`, `invalidationMs`,
+  `maxInFlight`, and the embedding-cache counters. These land on the run record
+  and in `run_corpus_build`'s report under `taxonomy`; **no UI reads them**, and
+  none is a contract any surface depends on. They exist so a slow regroup can be
+  diagnosed from a run record without re-running the classification — which of
+  index build, ranking, provider batches or the commit actually cost the time.
+  One caveat when comparing runs across the 2026-08-26 boundary: `elapsedMs`
+  used to mean model time and now means whole-operation wall clock, with the old
+  quantity available as `modelElapsedMs`.
+- **Custody splits the lock that admits a mutation from the lock that guards
+  the files.** `TaxonomyCustody` holds two per-workspace `RLock`s. The
+  *operation* lock (`operation()`) admits one long-running mutation — a regroup
+  spends minutes in LLM calls under it — while the *artifact* lock is taken only
+  for the read and for the commit, so `read()` stays available throughout. A
+  writer therefore: takes `operation()`, calls `read_for_mutation()` for a
+  validated base, does its slow work, then calls `commit(snapshot, write)`,
+  which re-reads under both locks, raises `TaxonomyConflictError` if the
+  revision moved, and rolls every artifact back (via `rollback.rollback_scope`)
+  if `write` raises. `mutation()` remains the short-operation shorthand that
+  takes both locks at once. Two limits are deliberate and unclosed: the locks
+  are in-process, so `commit`'s revision check is not a guard against a second
+  **process** (a multi-worker deploy needs an on-disk lock); and because every
+  in-process writer serializes on the operation lock, `TaxonomyConflictError`
+  is currently unreachable in a single-process deployment and has no handler.
+- **A mutation base is loaded strictly; a read is not.** The lenient loaders
+  (`load_cluster_map`, `load_taxonomy_corrections`, `load_taxonomy_state`)
+  return empty on corruption, which is right for display and catastrophic for a
+  mutation — an unreadable corrections ledger would read as "no user intent"
+  and the next save would erase it. The `*_strict` variants distinguish absence
+  (empty) from corruption (`ValueError`), and both `read_for_mutation()` and
+  `mutation()` use them. Consequence to keep in mind when adding a caller:
+  `mutation()` now *raises* on a corrupt sidecar, so any expensive work already
+  done inside that caller is lost.
 - **Retrieval narrows the prompt; it never forbids an answer unless it is
   semantic.** `taxonomy/embeddings.py` only reduces what the classifier is
   shown, but `_project_domains` also used `allowed_domain_ids` as a hard veto on
@@ -75,10 +111,24 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   `mode == "embedding"`. Cosine and lexical scores are never ranked against each
   other — an embedded query competes only among embedded candidates.
 - **A regroup is two passes, and the second one differs.** `refresh_clusters`
-  sends only tokens with no recorded `grouping_status` to the first pass;
-  anything that failed before skips straight to escalation, because a replay of
-  the same batch, prompt and gates is exactly why clicking Regroup twice used to
-  change nothing. Escalation uses the premium themer
+  sends only tokens with no recorded *domain-phase* `grouping_status` to the
+  first pass; anything that failed to be **grouped** before skips straight to
+  escalation, because a replay of the same batch, prompt and gates is exactly
+  why clicking Regroup twice used to change nothing. A **canonicalize**-phase
+  failure is different and is *not* an escalation candidate: escalation only
+  re-runs domain assignment, so a token that never got a canonical form has
+  nothing to escalate. `GroupingStatus.phase` carries that distinction and
+  sends those tokens back through pass one. `phase` is **nullable, and `None`
+  means "recorded before the distinction existed"** — it cannot be recovered
+  from `reason`, because both phases emit `"invalid or incomplete model
+  output"`. An unknown phase is therefore routed like a canonicalize failure:
+  one standard-path re-attempt, after which the record carries a real phase and
+  routes correctly forever. The alternative (defaulting to `"domain"`) left
+  legacy canonicalize failures sitting on the bounded escalation budget doing
+  work the cheap pass does — not stuck, since escalation re-canonicalizes too,
+  just paid for at the premium tier. Every status this code writes sets `phase`
+  explicitly, including the `"no high-confidence existing or coherent new
+  domain"` fallback, which is `"domain"` because canonicalization did settle. Escalation uses the premium themer
   (`build_escalation_themer_agent`), quarter-size batches, the whole taxonomy
   (`candidate_context=None`, so no allowlist), and `min_new_domain_members=1` —
   the first pass still requires 2, so a genuinely novel lone skill is placed by
@@ -91,12 +141,19 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   `general-<category>` (`Settings.taxonomy_placement_floor`), preferring the
   category the model stated in a group it declined to certify — `_project_domains`
   keeps that intent in `fallback_categories` precisely so the floor honours a
-  real judgment instead of guessing `other`. A token whose model **call** failed
-  is excluded: there is no judgment to honour, only an outage, and filing a
-  skill because a request timed out would make a transient error permanent.
-  `ClassificationFailure.kind` (`"call"` / `"output"`) carries that distinction,
-  because the message is the raised exception's own text and the old
-  `"model call failed" in message` check therefore never matched a real outage.
+  real judgment instead of guessing `other`. The floor's `excluded` argument
+  withholds a token on **two** axes, because filing a token places it and a
+  placed token is never re-attempted — so anything still owed a verdict must
+  stay out. First, a token whose model **call** failed: there is no judgment to
+  honour, only an outage, and filing a skill because a request timed out would
+  make a transient error permanent. `ClassificationFailure.kind` (`"call"` /
+  `"output"`) carries that distinction, because the message is the raised
+  exception's own text and the old `"model call failed" in message` check
+  therefore never matched a real outage. Second, a token that failed
+  **canonicalization** and is still `retryable` — output failures included,
+  since a token with no settled canonical form has nothing to file. Only the
+  reconcile-omission failure is `retryable=False`: each omitted head is already
+  a valid canonical, so it is a refinement gap, not backlog.
 - **`not_skills` is a terminal disposition, and it is reversible.** The domain
   classifier may return tokens that name no skill (`8+ years of machine learning
 experience`); they land in `TaxonomyState.retired_skills`, are subtracted from
