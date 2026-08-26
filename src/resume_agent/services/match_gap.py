@@ -317,6 +317,7 @@ def refresh_clusters(
                     tokens=first_pass,
                     existing=existing,
                     provider=embedding_provider,
+                    revision=snapshot.effective_sha256,
                     checkpoint=(
                         phase_reporter.checkpoint
                         if phase_reporter is not None

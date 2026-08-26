@@ -117,6 +117,25 @@ def load_taxonomy_corrections(path: str | Path) -> TaxonomyCorrections:
     return _from_raw(raw)
 
 
+def load_taxonomy_corrections_strict(path: str | Path) -> TaxonomyCorrections:
+    """Load a mutation base without treating corrupt user intent as empty."""
+
+    destination = Path(path)
+    try:
+        raw = json.loads(destination.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return TaxonomyCorrections()
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"taxonomy corrections are unreadable: {destination}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"taxonomy corrections are unreadable: {destination}")
+    try:
+        parsed = TaxonomyCorrections.model_validate(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"taxonomy corrections are unreadable: {destination}") from exc
+    return sanitize_taxonomy_corrections(parsed)
+
+
 def _write_taxonomy_corrections(
     ledger: TaxonomyCorrections, destination: Path
 ) -> TaxonomyCorrections:

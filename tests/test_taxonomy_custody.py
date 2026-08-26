@@ -12,6 +12,7 @@ from resume_agent.taxonomy.corrections import (
 )
 from resume_agent.taxonomy.custody import TaxonomyCustody
 from resume_agent.taxonomy.custody import TaxonomyConflictError
+from resume_agent.taxonomy.state import taxonomy_state_path
 
 
 def test_read_returns_one_correction_applied_snapshot(tmp_path):
@@ -137,6 +138,27 @@ def test_mutation_snapshot_rejects_a_corrupt_existing_cluster_map(tmp_path):
     with pytest.raises(ValueError, match="cluster map"):
         custody.read_for_mutation()
     assert custody.read().generated == ClusterMap.empty()
+
+
+@pytest.mark.parametrize("sidecar", ["corrections", "state"])
+def test_mutation_snapshot_rejects_corrupt_sidecars(tmp_path, sidecar):
+    cluster_path = tmp_path / "one" / "cluster_map.json"
+    corrections_path = tmp_path / "one" / "taxonomy_corrections.json"
+    save_cluster_map(ClusterMap(aliases={"python": "python"}), cluster_path)
+    target = (
+        corrections_path
+        if sidecar == "corrections"
+        else taxonomy_state_path(cluster_path)
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("{not-json", encoding="utf-8")
+    custody = TaxonomyCustody(cluster_path, corrections_path)
+
+    with pytest.raises(ValueError, match="taxonomy (corrections|state)"):
+        custody.read_for_mutation()
+    with pytest.raises(ValueError, match="taxonomy (corrections|state)"):
+        with custody.mutation():
+            raise AssertionError("corrupt artifact entered mutation body")
 
 
 def test_revision_checked_commit_refuses_stale_generated_data(tmp_path):

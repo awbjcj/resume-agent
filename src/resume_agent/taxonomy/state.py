@@ -138,6 +138,25 @@ def load_taxonomy_state(cluster_path: str | Path) -> TaxonomyState:
     return _clean_state(payload)
 
 
+def load_taxonomy_state_strict(cluster_path: str | Path) -> TaxonomyState:
+    """Load lifecycle state without erasing a corrupt existing sidecar."""
+
+    destination = taxonomy_state_path(cluster_path)
+    try:
+        payload = json.loads(destination.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return TaxonomyState()
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"taxonomy state is unreadable: {destination}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"taxonomy state is unreadable: {destination}")
+    try:
+        parsed = TaxonomyState.model_validate(payload)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"taxonomy state is unreadable: {destination}") from exc
+    return _clean_state(parsed.model_dump(mode="python"))
+
+
 def save_taxonomy_state(
     state: TaxonomyState, cluster_path: str | Path
 ) -> TaxonomyState:

@@ -23,10 +23,12 @@ from resume_agent.taxonomy.corrections import (
     TaxonomyCorrections,
     apply_taxonomy_corrections,
     load_taxonomy_corrections,
+    load_taxonomy_corrections_strict,
 )
 from resume_agent.taxonomy.state import (
     TaxonomyState,
     load_taxonomy_state,
+    load_taxonomy_state_strict,
     taxonomy_state_path,
 )
 
@@ -82,6 +84,7 @@ class TaxonomySnapshot:
     generated_sha256: str = ""
     corrections_sha256: str = ""
     state_sha256: str = ""
+    effective_sha256: str = ""
 
 
 def _component(payload: object) -> str:
@@ -158,6 +161,7 @@ class TaxonomyCustody:
         """Serialize a complete mutation of this Workspace's artifact set."""
 
         with self._operation_lock, self._artifact_lock:
+            self._read_unlocked(strict_generated=True)
             yield
 
     def _read_unlocked(self, *, strict_generated: bool) -> TaxonomySnapshot:
@@ -166,17 +170,27 @@ class TaxonomyCustody:
             if strict_generated
             else load_cluster_map(self.cluster_path)
         )
-        corrections = load_taxonomy_corrections(self.corrections_path)
-        state = load_taxonomy_state(self.cluster_path)
+        corrections = (
+            load_taxonomy_corrections_strict(self.corrections_path)
+            if strict_generated
+            else load_taxonomy_corrections(self.corrections_path)
+        )
+        state = (
+            load_taxonomy_state_strict(self.cluster_path)
+            if strict_generated
+            else load_taxonomy_state(self.cluster_path)
+        )
+        effective = apply_taxonomy_corrections(generated, corrections)
         return TaxonomySnapshot(
             generated=generated,
             corrections=corrections,
-            effective=apply_taxonomy_corrections(generated, corrections),
+            effective=effective,
             state=state,
             revision=_revision(generated, corrections, state),
             generated_sha256=_component(asdict(generated)),
             corrections_sha256=_component(corrections.model_dump(mode="json")),
             state_sha256=_component(state.model_dump(mode="json")),
+            effective_sha256=_component(asdict(effective)),
         )
 
     def read(self) -> TaxonomySnapshot:
@@ -198,7 +212,7 @@ class TaxonomyCustody:
     ) -> T:
         """Apply one short commit only if every persisted input is unchanged."""
 
-        with self.mutation():
+        with self._operation_lock, self._artifact_lock:
             current = self._read_unlocked(strict_generated=True)
             if current.revision != expected.revision:
                 raise TaxonomyConflictError(
