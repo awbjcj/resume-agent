@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import cast
@@ -131,12 +132,13 @@ def test_refresh_progress_uses_monotonic_phase_indices(tmp_path):
         def __init__(self):
             self.phases: list[int] = []
 
-        def begin(self, _total, _label, *, phase_index=None, **_extra):
+        def begin(self, total, label, *, phase_index=None, **_extra):
+            del total, label
             assert phase_index is not None
             self.phases.append(phase_index)
 
-        def step(self, _current, **_extra):
-            pass
+        def step(self, current, **_extra):
+            del current
 
         def checkpoint(self):
             pass
@@ -614,12 +616,13 @@ def test_a_skill_that_failed_before_goes_straight_to_escalation(tmp_path):
             path=path,
         )
 
-    assert result["elapsedMs"] >= result["modelElapsedMs"]
-    assert result["maxInFlight"] <= 2
-    assert result["operationWaitMs"] >= 0
-    assert result["snapshotMs"] >= 0
-    assert result["retrievalMs"] >= 0
-    assert result["commitMs"] >= 0
+    metrics = cast(Mapping[str, int], result)
+    assert metrics["elapsedMs"] >= metrics["modelElapsedMs"]
+    assert metrics["maxInFlight"] <= 2
+    assert metrics["operationWaitMs"] >= 0
+    assert metrics["snapshotMs"] >= 0
+    assert metrics["retrievalMs"] >= 0
+    assert metrics["commitMs"] >= 0
 
     assert first_pass.calls == 0
     assert escalation.calls == 1

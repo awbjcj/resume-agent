@@ -69,9 +69,11 @@ def test_image_creates_app_user_and_starts_as_root_and_does_not_copy_local_confi
     assert "!config/*.example" in dockerignore
 
 
-@pytest.mark.skipif(not hasattr(os, "geteuid"), reason="privilege drop is POSIX-only")
 def test_drop_privileges_is_a_noop_when_not_root():
-    assert os.geteuid() != 0
+    geteuid = getattr(os, "geteuid", None)
+    if not callable(geteuid):
+        pytest.skip("privilege drop is POSIX-only")
+    assert geteuid() != 0
     _drop_privileges_to_app_user()
 
 
