@@ -638,3 +638,38 @@ def test_a_declined_group_still_records_its_category_for_the_placement_floor():
     assert result.not_skills == frozenset({"ten years of experience"})
     # A retired token is not a failure to retry.
     assert result.failed_tokens == frozenset({"depth estimation"})
+
+
+def test_a_status_recorded_before_phase_existed_returns_to_the_first_pass():
+    """A legacy sidecar carries no phase, and it must not be read as 'grouped'.
+
+    Escalation re-canonicalizes, so such a token was never permanently stuck --
+    but it occupied the bounded escalation budget for work the standard pass
+    does cheaply, and one re-attempt rewrites the record with a real phase.
+    """
+
+    from resume_agent.taxonomy.state import GroupingStatus, TaxonomyState
+
+    legacy = TaxonomyState.model_validate(
+        {"grouping_status": {"rust": {"state": "uncertain", "reason": "whatever"}}}
+    )
+    assert legacy.grouping_status["rust"].phase is None
+
+    attempted = {
+        token
+        for token, status in legacy.grouping_status.items()
+        if status.phase == "domain"
+    }
+    assert attempted == set()
+
+    # A domain failure this build records is explicit, and still skips pass one.
+    current = TaxonomyState(
+        grouping_status={
+            "rust": GroupingStatus(reason="no coherent domain", phase="domain")
+        }
+    )
+    assert {
+        token
+        for token, status in current.grouping_status.items()
+        if status.phase == "domain"
+    } == {"rust"}

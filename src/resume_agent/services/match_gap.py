@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 from sqlmodel import Session
@@ -12,6 +13,7 @@ from resume_agent.config import get_settings
 from resume_agent.llm_runner import Runner, run_with_cleanup
 from resume_agent.progress import ProgressReporter
 from resume_agent.taxonomy.classification import (
+    ClassificationFailure,
     ClassificationOutcome,
     classify_incrementally,
 )
@@ -34,6 +36,8 @@ from resume_agent.taxonomy.maintenance import maintain_taxonomy as evaluate_main
 from resume_agent.taxonomy.state import (
     ALGORITHM_VERSION,
     GroupingStatus,
+    TaxonomyState,
+    taxonomy_generation_dir,
     restore_retired_skills,
     set_grouping_statuses,
     snapshot_before_maintenance,
@@ -51,7 +55,13 @@ FLOOR_DOMAIN_PREFIX = "general-"
 
 
 class _MonotonicPhaseReporter(ProgressReporter):
-    """Add a run-wide phase index to nested classification progress segments."""
+    """Add a run-wide phase index to nested classification progress segments.
+
+    Every method the delegate owns must be forwarded, including the terminal
+    ones this wrapper has no opinion about: it deliberately never calls
+    ``super().__init__``, so any inherited method that reached the base class's
+    own record would fail on state that was never created.
+    """
 
     def __init__(self, delegate: ProgressReporter) -> None:
         self._delegate = delegate
@@ -66,6 +76,8 @@ class _MonotonicPhaseReporter(ProgressReporter):
         phase_count: int | None = None,
         **extra: object,
     ) -> None:
+        # A nested segment counts its own phases from one; the run-wide index
+        # is this wrapper's whole purpose, so an inner phase_index is dropped.
         self._phase_index += 1
         self._delegate.begin(
             total,
@@ -80,6 +92,12 @@ class _MonotonicPhaseReporter(ProgressReporter):
 
     def checkpoint(self) -> None:
         self._delegate.checkpoint()
+
+    def done(self, *, error: str | None = None, **extra: object) -> None:
+        self._delegate.done(error=error, **extra)
+
+    def cancelled(self, **extra: object) -> None:
+        self._delegate.cancelled(**extra)
 
 
 def floor_domain(category: str) -> tuple[str, str]:
@@ -99,12 +117,31 @@ def _unassigned(cmap: ClusterMap, tokens: set[str]) -> set[str]:
     }
 
 
+def _retryable_canonical_tokens(
+    failures: Sequence[ClassificationFailure],
+) -> set[str]:
+    """Tokens canonicalization still owes a verdict on, so nothing may file them.
+
+    Filing one into a general domain would place it, and a placed token is
+    never re-attempted -- which is precisely how a retryable failure would
+    become permanent.
+    """
+
+    return {
+        normalized
+        for failure in failures
+        if failure.phase == "canonicalize" and failure.retryable
+        for token in failure.tokens
+        if (normalized := normalize_skill(token))
+    }
+
+
 def _apply_placement_floor(
     merged: ClusterMap,
     *,
     target_raw: set[str],
     not_skills: set[str],
-    call_failed: set[str],
+    excluded: set[str],
     hints: dict[str, str],
     candidate_context: CandidateContext | None,
     existing: ClusterMap,
@@ -119,13 +156,16 @@ def _apply_placement_floor(
     stated intent wherever it gave one, so this honours the classification it
     was unwilling to certify rather than inventing a new one.
 
-    A token whose model *call* failed is excluded: there is no judgment to
-    honour there, only an outage, and filing a skill because a request timed
-    out would turn a transient error into a permanent misplacement.  Those keep
-    their failed status and are retried on the next run.
+    ``excluded`` names the tokens the floor must not touch, on two axes.  A
+    token whose model *call* failed carries no judgment to honour, only an
+    outage, and filing a skill because a request timed out would turn a
+    transient error into a permanent misplacement.  A token canonicalization
+    still owes a verdict on is excluded for the same reason from the other end:
+    it has no settled canonical form to file.  Both keep their failed status
+    and are retried on the next run.
     """
 
-    remaining = sorted(_unassigned(merged, target_raw) - not_skills - call_failed)
+    remaining = sorted(_unassigned(merged, target_raw) - not_skills - excluded)
     if not enabled or not remaining:
         return merged, []
     retrieved: dict[str, str] = {}
@@ -231,10 +271,9 @@ def refresh_clusters(
         canonicalizer = agents.canonicalizer
         themer = agents.themer
         escalation_themer = agents.escalation_themer
-    elif canonicalizer is None or themer is None:
+    # Narrowed by the raise rather than by `assert`, which `-O` strips out.
+    if canonicalizer is None or themer is None:
         raise ValueError("canonicalizer and themer must be provided together")
-    assert canonicalizer is not None
-    assert themer is not None
 
     correction_file = (
         corrections_path
@@ -358,13 +397,7 @@ def refresh_clusters(
                 enforce_candidates=enforce_candidates,
             )
             after_first = merge_cluster_map(existing, first.additions)
-            canonical_failed = {
-                normalized
-                for failure in first.failures
-                if failure.phase == "canonicalize" and failure.retryable
-                for token in failure.tokens
-                if (normalized := normalize_skill(token))
-            }
+            canonical_failed = _retryable_canonical_tokens(first.failures)
             pending = sorted(
                 _unassigned(after_first, target_raw)
                 - set(first.not_skills)
@@ -431,18 +464,12 @@ def refresh_clusters(
             for token in failure.tokens
             if (normalized := normalize_skill(token))
         }
-        canonical_failed = {
-            normalized
-            for failure in all_failures
-            if failure.phase == "canonicalize" and failure.retryable
-            for token in failure.tokens
-            if (normalized := normalize_skill(token))
-        }
+        canonical_failed = _retryable_canonical_tokens(all_failures)
         merged, floor_placed = _apply_placement_floor(
             merged,
             target_raw=target_raw,
             not_skills=not_skills,
-            call_failed=call_failed | canonical_failed | deferred,
+            excluded=call_failed | canonical_failed | deferred,
             hints={
                 **outcome.fallback_categories,
                 **(escalated.fallback_categories if escalated else {}),
@@ -505,6 +532,8 @@ def refresh_clusters(
                 GroupingStatus(
                     state="uncertain",
                     reason="no high-confidence existing or coherent new domain",
+                    # Canonicalization settled; only the domain is unresolved.
+                    phase="domain",
                 ),
             )
         def commit_refresh(_current: TaxonomySnapshot) -> object:
@@ -650,12 +679,22 @@ def maintain_taxonomy(
         )
         final = apply_taxonomy_corrections(outcome.cluster_map, corrections)
         changed = outcome.changed and final != existing
-        def commit_maintenance(current: TaxonomySnapshot) -> object:
-            if changed:
-                state, _generation = snapshot_before_maintenance(path, existing)
+
+        def commit_maintenance(current: TaxonomySnapshot) -> TaxonomyState:
+            if not changed:
+                return current.state
+            # The generation file lives outside custody's rollback set, so a
+            # failed map write would otherwise strand a snapshot that the
+            # restored state no longer references.
+            state, generation = snapshot_before_maintenance(path, existing)
+            try:
                 save_cluster_map(final, path)
-                return state
-            return current.state
+            except BaseException:
+                (taxonomy_generation_dir(path) / generation.snapshot).unlink(
+                    missing_ok=True
+                )
+                raise
+            return state
 
         state = custody.commit(snapshot, commit_maintenance)
         stale_suggestions = _invalidate_changed_domain_suggestions(

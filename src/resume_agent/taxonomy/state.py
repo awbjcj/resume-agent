@@ -62,7 +62,13 @@ class GroupingStatus(ExtensibleModel):
 
     state: Literal["uncertain", "failed"] = "uncertain"
     reason: str
-    phase: Literal["canonicalize", "domain"] = "domain"
+    # Which pass owes this token a verdict.  ``None`` means the record predates
+    # the distinction: it cannot be recovered from ``reason`` (both phases emit
+    # "invalid or incomplete model output"), so an unknown phase is routed like
+    # a canonicalize failure -- one standard-path re-attempt that rewrites the
+    # record with an explicit phase, rather than a permanent seat on the
+    # bounded escalation budget.
+    phase: Literal["canonicalize", "domain"] | None = None
     last_attempted_at: str = Field(default_factory=_utcnow)
 
 
