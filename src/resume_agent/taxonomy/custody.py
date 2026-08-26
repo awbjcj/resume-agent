@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import tempfile
 import threading
 import weakref
 from collections.abc import Callable
@@ -14,6 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator, TypeVar
 
+from resume_agent.rollback import rollback_scope
 from resume_agent.taxonomy.clusters import (
     ClusterMap,
     load_cluster_map,
@@ -109,33 +108,6 @@ def _revision(
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _restore_file(path: Path, payload: bytes | None) -> None:
-    """Restore one artifact atomically after a failed multi-file commit."""
-
-    if payload is None:
-        path.unlink(missing_ok=True)
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            delete=False,
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".rollback",
-        ) as handle:
-            temporary = Path(handle.name)
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        temporary = None
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-
-
 class TaxonomyCustody:
     """Own locking and coherent reads for one Workspace's Cluster map."""
 
@@ -223,12 +195,5 @@ class TaxonomyCustody:
                 self.corrections_path,
                 taxonomy_state_path(self.cluster_path),
             )
-            before = {
-                path: path.read_bytes() if path.exists() else None for path in paths
-            }
-            try:
+            with rollback_scope(paths):
                 return write(current)
-            except BaseException:
-                for path, payload in before.items():
-                    _restore_file(path, payload)
-                raise
