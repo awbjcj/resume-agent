@@ -21,7 +21,7 @@ import time
 import weakref
 from array import array
 from collections import OrderedDict, defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
@@ -249,7 +249,7 @@ async def embed_descriptors(
     batch_size: int = EMBEDDING_BATCH_SIZE,
     concurrency: int = EMBEDDING_CONCURRENCY,
     managed_namespaces: frozenset[str] = frozenset(),
-    checkpoint=None,
+    checkpoint: Callable[[], None] | None = None,
 ) -> EmbeddingResult:
     """Embed changed descriptors concurrently and keep every batch that lands.
 
@@ -484,28 +484,71 @@ def _rank(
     ]
 
 
-def skill_descriptor(token: str, aliases: Mapping[str, str]) -> str:
-    forms = sorted(alias for alias, canonical in aliases.items() if canonical == token)
-    aliases_text = ", ".join(forms[:12])
+# How much of a long alias or member list a descriptor is allowed to carry.
+ALIAS_PREVIEW = 12
+MEMBER_PREVIEW = 24
+
+# The four functions below and CandidateIndex both render these strings, but
+# they must not share a lookup: the single-token functions scan the whole map
+# to find one entry's forms, which is correct once and quadratic across a
+# taxonomy.  So only the wording is shared, and each caller supplies the forms
+# it already has.
+
+
+def _skill_descriptor_text(token: str, forms: Sequence[str]) -> str:
+    aliases_text = ", ".join(forms[:ALIAS_PREVIEW])
     return f"technical skill: {token}" + (
         f"; aliases: {aliases_text}" if aliases_text else ""
     )
 
 
-def domain_descriptor(domain_id: str, cmap: ClusterMap) -> str:
-    members = sorted(
-        token for token, value in cmap.domain_of.items() if value == domain_id
+def _domain_descriptor_text(
+    category: str, label: str, members: Sequence[str]
+) -> str:
+    member_text = ", ".join(members[:MEMBER_PREVIEW])
+    return (
+        f"skill taxonomy category: {category}; domain: {label}; "
+        f"members: {member_text}"
     )
-    category = cmap.category_of.get(domain_id, "other")
-    label = cmap.domain_label.get(domain_id, domain_id)
-    return f"skill taxonomy category: {category}; domain: {label}; members: {', '.join(members[:24])}"
+
+
+def _skill_lexical_text(token: str, forms: Sequence[str]) -> tuple[str, str]:
+    return token, ", ".join(forms[:ALIAS_PREVIEW])
+
+
+def _domain_lexical_text(
+    category: str, label: str, members: Sequence[str]
+) -> tuple[str, str]:
+    return (
+        f"{label} {SKILL_GROUPS.get(category, category)}",
+        ", ".join(members[:MEMBER_PREVIEW]),
+    )
+
+
+def _alias_forms(token: str, aliases: Mapping[str, str]) -> list[str]:
+    return sorted(alias for alias, canonical in aliases.items() if canonical == token)
+
+
+def _domain_members(domain_id: str, cmap: ClusterMap) -> list[str]:
+    return sorted(token for token, value in cmap.domain_of.items() if value == domain_id)
+
+
+def skill_descriptor(token: str, aliases: Mapping[str, str]) -> str:
+    return _skill_descriptor_text(token, _alias_forms(token, aliases))
+
+
+def domain_descriptor(domain_id: str, cmap: ClusterMap) -> str:
+    return _domain_descriptor_text(
+        cmap.category_of.get(domain_id, "other"),
+        cmap.domain_label.get(domain_id, domain_id),
+        _domain_members(domain_id, cmap),
+    )
 
 
 def skill_lexical_parts(token: str, aliases: Mapping[str, str]) -> tuple[str, str]:
     """Split a skill into its own name and the synonyms that merely support it."""
 
-    forms = sorted(alias for alias, canonical in aliases.items() if canonical == token)
-    return token, ", ".join(forms[:12])
+    return _skill_lexical_text(token, _alias_forms(token, aliases))
 
 
 def domain_lexical_parts(domain_id: str, cmap: ClusterMap) -> tuple[str, str]:
@@ -516,12 +559,11 @@ def domain_lexical_parts(domain_id: str, cmap: ClusterMap) -> tuple[str, str]:
     none with ``ai-ml``.
     """
 
-    members = sorted(
-        token for token, value in cmap.domain_of.items() if value == domain_id
+    return _domain_lexical_text(
+        cmap.category_of.get(domain_id, "other"),
+        cmap.domain_label.get(domain_id, domain_id),
+        _domain_members(domain_id, cmap),
     )
-    category = cmap.category_of.get(domain_id, "other")
-    label = cmap.domain_label.get(domain_id, domain_id)
-    return f"{label} {SKILL_GROUPS.get(category, category)}", ", ".join(members[:24])
 
 
 @dataclass(frozen=True)
@@ -569,38 +611,31 @@ class CandidateIndex:
             sorted(set(cmap.domain_of.values()) | set(cmap.domain_label))
         )
 
-        def describe_skill(token: str) -> str:
-            aliases_text = ", ".join(aliases_by_canonical.get(token, ())[:12])
-            return f"technical skill: {token}" + (
-                f"; aliases: {aliases_text}" if aliases_text else ""
-            )
-
         def describe_domain(domain_id: str) -> str:
-            category = cmap.category_of.get(domain_id, "other")
-            label = cmap.domain_label.get(domain_id, domain_id)
-            member_text = ", ".join(members_by_domain.get(domain_id, ())[:24])
-            return (
-                f"skill taxonomy category: {category}; domain: {label}; "
-                f"members: {member_text}"
+            return _domain_descriptor_text(
+                cmap.category_of.get(domain_id, "other"),
+                cmap.domain_label.get(domain_id, domain_id),
+                members_by_domain.get(domain_id, ()),
             )
 
         canonical_descriptors = {
-            token: describe_skill(token) for token in canonical_ids
+            token: _skill_descriptor_text(
+                token, aliases_by_canonical.get(token, ())
+            )
+            for token in canonical_ids
         }
         domain_descriptors = {
             domain_id: describe_domain(domain_id) for domain_id in domain_ids
         }
         canonical_parts = {
-            token: (token, ", ".join(aliases_by_canonical.get(token, ())[:12]))
+            token: _skill_lexical_text(token, aliases_by_canonical.get(token, ()))
             for token in canonical_ids
         }
         domain_parts = {
-            domain_id: (
-                (
-                    f"{cmap.domain_label.get(domain_id, domain_id)} "
-                    f"{SKILL_GROUPS.get(cmap.category_of.get(domain_id, 'other'), cmap.category_of.get(domain_id, 'other'))}"
-                ),
-                ", ".join(members_by_domain.get(domain_id, ())[:24]),
+            domain_id: _domain_lexical_text(
+                cmap.category_of.get(domain_id, "other"),
+                cmap.domain_label.get(domain_id, domain_id),
+                members_by_domain.get(domain_id, ()),
             )
             for domain_id in domain_ids
         }
@@ -622,16 +657,13 @@ class CandidateIndex:
         cached = self.canonical_descriptors.get(token)
         if cached is not None:
             return cached
-        aliases_text = ", ".join(self.aliases_by_canonical.get(token, ())[:12])
-        return f"technical skill: {token}" + (
-            f"; aliases: {aliases_text}" if aliases_text else ""
-        )
+        return _skill_descriptor_text(token, self.aliases_by_canonical.get(token, ()))
 
     def skill_lexical_parts(self, token: str) -> tuple[str, str]:
-        return self.canonical_lexical_parts.get(
-            token,
-            (token, ", ".join(self.aliases_by_canonical.get(token, ())[:12])),
-        )
+        cached = self.canonical_lexical_parts.get(token)
+        if cached is not None:
+            return cached
+        return _skill_lexical_text(token, self.aliases_by_canonical.get(token, ()))
 
 
 _INDEX_CACHE_LIMIT = 8
@@ -713,7 +745,7 @@ async def build_candidate_context(
     existing: ClusterMap,
     provider: EmbeddingProvider | None = None,
     revision: str | None = None,
-    checkpoint=None,
+    checkpoint: Callable[[], None] | None = None,
 ) -> CandidateContext:
     """Return bounded synonym/domain/peer candidates with a lexical fallback."""
 
