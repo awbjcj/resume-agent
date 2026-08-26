@@ -147,14 +147,9 @@ def _sanitized_categories(
     return category_of
 
 
-def load_cluster_map(path: str | Path) -> ClusterMap:
-    """Load and validate a cluster map; any unreadable boundary is empty."""
-    try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return ClusterMap.empty()
+def _cluster_map_from_data(data: object) -> ClusterMap:
     if not isinstance(data, dict):
-        return ClusterMap.empty()
+        raise ValueError("cluster map must contain a JSON object")
 
     raw_aliases = _validated_map(
         data.get("aliases"),
@@ -180,6 +175,28 @@ def load_cluster_map(path: str | Path) -> ClusterMap:
             data.get("category_of"), domain_of, domain_label
         ),
     )
+
+
+def load_cluster_map(path: str | Path) -> ClusterMap:
+    """Load and validate a cluster map; any unreadable boundary is empty."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        return _cluster_map_from_data(data)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+        return ClusterMap.empty()
+
+
+def load_cluster_map_strict(path: str | Path) -> ClusterMap:
+    """Load a mutation input, distinguishing absence from corrupt last-good data."""
+
+    source = Path(path)
+    if not source.exists():
+        return ClusterMap.empty()
+    try:
+        data = json.loads(source.read_text(encoding="utf-8"))
+        return _cluster_map_from_data(data)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError(f"cluster map is unreadable: {source}") from exc
 
 
 def save_cluster_map(cmap: ClusterMap, path: str | Path) -> None:

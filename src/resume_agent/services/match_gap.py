@@ -16,16 +16,14 @@ from resume_agent.taxonomy.classification import (
 )
 from resume_agent.taxonomy.clusters import (
     ClusterMap,
-    load_cluster_map,
     merge_cluster_map,
     save_cluster_map,
     slugify_domain as slugify_domain,
 )
 from resume_agent.taxonomy.corrections import (
     apply_taxonomy_corrections,
-    load_taxonomy_corrections,
 )
-from resume_agent.taxonomy.custody import TaxonomyCustody
+from resume_agent.taxonomy.custody import TaxonomyCustody, TaxonomySnapshot
 from resume_agent.taxonomy.embeddings import (
     CandidateContext,
     EmbeddingProvider,
@@ -35,7 +33,6 @@ from resume_agent.taxonomy.maintenance import maintain_taxonomy as evaluate_main
 from resume_agent.taxonomy.state import (
     ALGORITHM_VERSION,
     GroupingStatus,
-    load_taxonomy_state,
     restore_retired_skills,
     set_grouping_statuses,
     snapshot_before_maintenance,
@@ -201,9 +198,10 @@ def refresh_clusters(
         else Path(path).with_name("taxonomy_corrections.json")
     )
     custody = TaxonomyCustody(path, correction_file)
-    with custody.mutation():
-        corrections = load_taxonomy_corrections(correction_file)
-        taxonomy_state = load_taxonomy_state(path)
+    with custody.operation():
+        snapshot = custody.read_for_mutation()
+        corrections = snapshot.corrections
+        taxonomy_state = snapshot.state
         demanded = (
             (
                 set(demanded_tokens)
@@ -221,7 +219,7 @@ def refresh_clusters(
         # A retired token names no skill.  Dropping it here is what stops the
         # backlog from re-buying the same LLM verdict on every single run.
         demanded -= set(taxonomy_state.retired_skills)
-        existing = apply_taxonomy_corrections(load_cluster_map(path), corrections)
+        existing = snapshot.effective
         normalized_requested = {
             token for raw in (skill_keys or set()) if (token := normalize_skill(raw))
         }
@@ -404,7 +402,6 @@ def refresh_clusters(
         final = apply_taxonomy_corrections(merged, corrections)
         if reporter is not None:
             reporter.checkpoint()
-        save_cluster_map(final, path)
         # Distinct tokens, not token-attempts: a token the first pass and the
         # escalation pass both failed is one unresolved skill, not two.
         canonical_failures = len(
@@ -454,12 +451,16 @@ def refresh_clusters(
                     reason="no high-confidence existing or coherent new domain",
                 ),
             )
-        set_grouping_statuses(
-            path,
-            assigned=assigned,
-            statuses=statuses,
-            retired={token: "not a skill" for token in retired_canonicals},
-        )
+        def commit_refresh(_current: TaxonomySnapshot) -> object:
+            save_cluster_map(final, path)
+            return set_grouping_statuses(
+                path,
+                assigned=assigned,
+                statuses=statuses,
+                retired={token: "not a skill" for token in retired_canonicals},
+            )
+
+        custody.commit(snapshot, commit_refresh)
         stale_suggestions = _invalidate_changed_domain_suggestions(
             session, existing, final
         )
@@ -537,9 +538,11 @@ def maintain_taxonomy(
         if corrections_path is not None
         else Path(path).with_name("taxonomy_corrections.json")
     )
-    with TaxonomyCustody(path, correction_file).mutation():
-        corrections = load_taxonomy_corrections(correction_file)
-        existing = apply_taxonomy_corrections(load_cluster_map(path), corrections)
+    custody = TaxonomyCustody(path, correction_file)
+    with custody.operation():
+        snapshot = custody.read_for_mutation()
+        corrections = snapshot.corrections
+        existing = snapshot.effective
         outcome = asyncio.run(
             run_with_cleanup(
                 evaluate_maintenance(
@@ -555,11 +558,14 @@ def maintain_taxonomy(
         )
         final = apply_taxonomy_corrections(outcome.cluster_map, corrections)
         changed = outcome.changed and final != existing
-        if changed:
-            state, _generation = snapshot_before_maintenance(path, existing)
-            save_cluster_map(final, path)
-        else:
-            state = load_taxonomy_state(path)
+        def commit_maintenance(current: TaxonomySnapshot) -> object:
+            if changed:
+                state, _generation = snapshot_before_maintenance(path, existing)
+                save_cluster_map(final, path)
+                return state
+            return current.state
+
+        state = custody.commit(snapshot, commit_maintenance)
         stale_suggestions = _invalidate_changed_domain_suggestions(
             session, existing, final
         )
@@ -590,9 +596,11 @@ def undo_taxonomy_maintenance(
         if corrections_path is not None
         else Path(path).with_name("taxonomy_corrections.json")
     )
-    with TaxonomyCustody(path, correction_file).mutation():
-        corrections = load_taxonomy_corrections(correction_file)
-        existing = apply_taxonomy_corrections(load_cluster_map(path), corrections)
+    custody = TaxonomyCustody(path, correction_file)
+    with custody.mutation():
+        snapshot = custody.read_for_mutation()
+        corrections = snapshot.corrections
+        existing = snapshot.effective
         restored, state = undo_last_maintenance(path)
         final = apply_taxonomy_corrections(restored, corrections)
         save_cluster_map(final, path)

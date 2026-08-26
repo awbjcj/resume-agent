@@ -3,12 +3,15 @@ from __future__ import annotations
 import threading
 import time
 
+import pytest
+
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
 from resume_agent.taxonomy.custody import TaxonomyCustody
+from resume_agent.taxonomy.custody import TaxonomyConflictError
 
 
 def test_read_returns_one_correction_applied_snapshot(tmp_path):
@@ -100,3 +103,78 @@ def test_different_workspaces_do_not_serialize(tmp_path):
         thread.start()
         assert acquired.wait(timeout=0.5)
         thread.join(timeout=1)
+
+
+def test_long_operation_does_not_block_coherent_reads(tmp_path):
+    custody = TaxonomyCustody(
+        tmp_path / "one" / "cluster_map.json",
+        tmp_path / "one" / "taxonomy_corrections.json",
+    )
+    save_cluster_map(ClusterMap(aliases={"python": "python"}), custody.cluster_path)
+
+    with custody.operation():
+        completed = threading.Event()
+
+        def read() -> None:
+            custody.read()
+            completed.set()
+
+        thread = threading.Thread(target=read)
+        thread.start()
+        assert completed.wait(timeout=0.5)
+        thread.join(timeout=1)
+
+
+def test_mutation_snapshot_rejects_a_corrupt_existing_cluster_map(tmp_path):
+    cluster_path = tmp_path / "one" / "cluster_map.json"
+    cluster_path.parent.mkdir(parents=True)
+    cluster_path.write_text("{not-json", encoding="utf-8")
+    custody = TaxonomyCustody(
+        cluster_path,
+        tmp_path / "one" / "taxonomy_corrections.json",
+    )
+
+    with pytest.raises(ValueError, match="cluster map"):
+        custody.read_for_mutation()
+    assert custody.read().generated == ClusterMap.empty()
+
+
+def test_revision_checked_commit_refuses_stale_generated_data(tmp_path):
+    cluster_path = tmp_path / "one" / "cluster_map.json"
+    custody = TaxonomyCustody(
+        cluster_path,
+        tmp_path / "one" / "taxonomy_corrections.json",
+    )
+    save_cluster_map(ClusterMap(aliases={"python": "python"}), cluster_path)
+    snapshot = custody.read_for_mutation()
+    save_cluster_map(ClusterMap(aliases={"rust": "rust"}), cluster_path)
+
+    called = False
+
+    def write(_current):
+        nonlocal called
+        called = True
+
+    with pytest.raises(TaxonomyConflictError, match="changed during classification"):
+        custody.commit(snapshot, write)
+    assert called is False
+
+
+def test_commit_rolls_back_artifacts_when_a_writer_fails(tmp_path):
+    cluster_path = tmp_path / "one" / "cluster_map.json"
+    custody = TaxonomyCustody(
+        cluster_path,
+        tmp_path / "one" / "taxonomy_corrections.json",
+    )
+    original = ClusterMap(aliases={"python": "python"})
+    save_cluster_map(original, cluster_path)
+    snapshot = custody.read_for_mutation()
+
+    def write(_current):
+        save_cluster_map(ClusterMap(aliases={"rust": "rust"}), cluster_path)
+        raise RuntimeError("state write failed")
+
+    with pytest.raises(RuntimeError, match="state write failed"):
+        custody.commit(snapshot, write)
+
+    assert custody.read_for_mutation().generated == original
