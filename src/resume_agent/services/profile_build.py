@@ -2,44 +2,18 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.store import save_facts
+from resume_agent.rollback import rollback_scope
 from resume_agent.tenancy.limits import enforce_active_budget
 from resume_agent.tenancy.paths import resolve_tenant_path
 
 if TYPE_CHECKING:
     from resume_agent.profile.matrix import SkillMatrix
-
-
-def _restore_publication_file(path: Path, previous: bytes | None) -> None:
-    if previous is None:
-        path.unlink(missing_ok=True)
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            delete=False,
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".rollback",
-        ) as handle:
-            temporary = Path(handle.name)
-            handle.write(previous)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        temporary = None
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
 
 
 def _publish_profile_artifacts(
@@ -52,15 +26,9 @@ def _publish_profile_artifacts(
 ) -> None:
     """Publish facts and their derived matrix as one rollback-safe operation."""
 
-    paths = (facts_path, matrix_path)
-    previous = {path: path.read_bytes() if path.exists() else None for path in paths}
-    try:
+    with rollback_scope((facts_path, matrix_path)):
         save_facts(facts, facts_path)
         matrix_writer(matrix, matrix_path)
-    except BaseException:
-        for path in paths:
-            _restore_publication_file(path, previous[path])
-        raise
 
 
 def run_corpus_build(
@@ -150,8 +118,16 @@ def run_corpus_build(
             )
             is None
         }
+        facts_path = Path(facts_out)
+        matrix_path = facts_path.with_name("matrix.json")
+        # A failed taxonomy stage deliberately publishes nothing.  Per-document
+        # extraction and synthesis are already cached by content hash in
+        # ``profile/fragments.py``, so a rerun does not re-pay for them, and
+        # replacing a matrix built on a complete taxonomy with one built on a
+        # stale read would be a silent downgrade of persisted state.
+        taxonomy_telemetry: dict[str, object] = {}
         if missing:
-            refresh_clusters(
+            taxonomy_telemetry = refresh_clusters(
                 None,
                 path=cluster_path,
                 demanded_tokens=missing,
@@ -168,8 +144,8 @@ def run_corpus_build(
         _publish_profile_artifacts(
             facts,
             matrix,
-            facts_path=Path(facts_out),
-            matrix_path=Path(facts_out).with_name("matrix.json"),
+            facts_path=facts_path,
+            matrix_path=matrix_path,
             matrix_writer=save_matrix,
         )
     if reporter is not None:
@@ -185,4 +161,7 @@ def run_corpus_build(
         "verificationDrops": list(report.verification_drops),
         "inferred": list(report.inferred_added),
         "warnings": list(report.warnings),
+        # Diagnostic-only: the regroup's own telemetry, carried through so a
+        # slow corpus build can be read without re-running the classification.
+        "taxonomy": taxonomy_telemetry,
     }

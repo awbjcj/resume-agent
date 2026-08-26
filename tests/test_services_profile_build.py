@@ -265,3 +265,69 @@ def test_run_corpus_build_rolls_back_facts_when_matrix_publication_fails(
 
     assert facts_out.read_text(encoding="utf-8") == "old facts\n"
     assert matrix_out.read_text(encoding="utf-8") == "old matrix\n"
+
+
+def _stub_build_agents(monkeypatch, facts):
+    def fake_build(*_args, **_kwargs):
+        return facts, BuildReport()
+
+    monkeypatch.setattr("resume_agent.profile.build.build_corpus_profile", fake_build)
+    for target in (
+        "resume_agent.profile.inference.build_inference_agent",
+        "resume_agent.profile.merge.build_bullet_dedup_agent",
+        "resume_agent.profile.synthesis.build_synthesis_agent",
+        "resume_agent.profile.synthesis.build_entailment_agent",
+        "resume_agent.profile.project_extractor.build_project_extractor_agent",
+        "resume_agent.tracking.canonicalize.build_incremental_canonicalizer_agent",
+        "resume_agent.tracking.canonicalize.build_incremental_themer_agent",
+    ):
+        monkeypatch.setattr(target, lambda: object())
+
+
+def test_run_corpus_build_carries_the_regroup_telemetry(tmp_path, monkeypatch):
+    profile_dir = tmp_path / "data" / "profile"
+    facts_out = profile_dir / "facts.json"
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"Languages": [Skill(name="Python")]},
+    )
+    _stub_build_agents(monkeypatch, facts)
+
+    def refresh(_session, *, path, demanded_tokens, **_kwargs):
+        save_cluster_map(
+            ClusterMap(
+                aliases={token: token for token in demanded_tokens},
+                domain_of={"python": "languages"},
+                domain_label={"languages": "Languages"},
+                category_of={"languages": "languages"},
+            ),
+            path,
+        )
+        return {"elapsedMs": 12, "embeddingCacheHits": 3}
+
+    monkeypatch.setattr("resume_agent.services.match_gap.refresh_clusters", refresh)
+
+    report = run_corpus_build(
+        profile_dir=profile_dir,
+        github_username=None,
+        facts_out=facts_out,
+    )
+
+    assert report["taxonomy"] == {"elapsedMs": 12, "embeddingCacheHits": 3}
+
+
+def test_a_build_with_nothing_to_classify_reports_empty_telemetry(
+    tmp_path, monkeypatch
+):
+    profile_dir = tmp_path / "data" / "profile"
+    facts_out = profile_dir / "facts.json"
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    _stub_build_agents(monkeypatch, facts)
+
+    report = run_corpus_build(
+        profile_dir=profile_dir,
+        github_username=None,
+        facts_out=facts_out,
+    )
+
+    assert report["taxonomy"] == {}
