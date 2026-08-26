@@ -164,7 +164,7 @@ def verify_email(
     rate_event(request, body.email)
     engine = system_engine(request)
     invalid = False
-    identity: tuple[str, str, str, int] | None = None
+    identity: tuple[str, str, int] | None = None
     workspace: Path | None = None
     with Session(engine) as session:
         session.execute(text("BEGIN IMMEDIATE"))
