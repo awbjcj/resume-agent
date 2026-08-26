@@ -7,6 +7,8 @@ from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.embeddings import (
     EmbeddingUnavailable,
     OpenAIEmbeddingProvider,
+    _LexicalCorpus,
+    _rank,
     build_candidate_context,
     cached_embeddings,
     embed_descriptors,
@@ -37,6 +39,39 @@ class _UnavailableProvider:
 
     async def embed(self, texts):
         raise EmbeddingUnavailable("offline")
+
+
+def test_lexical_rank_scores_only_candidates_in_the_term_postings():
+    class _CountingCorpus(_LexicalCorpus):
+        def __init__(self, entries):
+            super().__init__(entries)
+            self.score_calls = 0
+
+        def score(self, query_terms, key):
+            self.score_calls += 1
+            return super().score(query_terms, key)
+
+    corpus = _CountingCorpus(
+        {
+            "matching": ("rare needle", ""),
+            **{
+                f"unrelated-{index:05d}": (f"common filler {index}", "")
+                for index in range(10_000)
+            },
+        }
+    )
+
+    ranked = _rank(
+        frozenset({"needle"}),
+        query_vector=None,
+        corpus=corpus,
+        candidate_vectors={},
+        limit=8,
+    )
+
+    assert ranked[0] == "matching"
+    assert len(ranked) == 8
+    assert corpus.score_calls == 1
 
 
 def test_embedding_cache_batches_hits_and_invalidates_descriptors(tmp_path):

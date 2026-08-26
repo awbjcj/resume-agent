@@ -418,15 +418,21 @@ class _LexicalCorpus:
             key: _Candidate(identity=_terms(identity), support=_terms(support))
             for key, (identity, support) in entries.items()
         }
+        self._keys = tuple(sorted(self._entries))
         document_frequency: dict[str, int] = {}
-        for candidate in self._entries.values():
+        postings: dict[str, list[str]] = defaultdict(list)
+        for key, candidate in self._entries.items():
             for term in candidate.identity | candidate.support:
                 document_frequency[term] = document_frequency.get(term, 0) + 1
+                postings[term].append(key)
         total = len(self._entries)
         self._unseen = math.log(1 + total)
         self._idf = {
             term: math.log(1 + total / (1 + count))
             for term, count in document_frequency.items()
+        }
+        self._postings = {
+            term: tuple(sorted(keys)) for term, keys in postings.items()
         }
 
     def _weight(self, term: str) -> float:
@@ -434,8 +440,19 @@ class _LexicalCorpus:
         # lower a score by widening the denominator, never inflate one.
         return self._idf.get(term, self._unseen)
 
-    def keys(self) -> list[str]:
-        return list(self._entries)
+    def keys(self) -> tuple[str, ...]:
+        return self._keys
+
+    def contains(self, key: str) -> bool:
+        return key in self._entries
+
+    def matching_keys(self, query_terms: frozenset[str]) -> set[str]:
+        """Return only candidates sharing a query term via the inverted index."""
+
+        matches: set[str] = set()
+        for term in query_terms:
+            matches.update(self._postings.get(term, ()))
+        return matches
 
     def score(self, query_terms: frozenset[str], key: str) -> float:
         candidate = self._entries.get(key)
@@ -462,26 +479,46 @@ def _rank(
     limit: int,
     exclude: frozenset[str] = frozenset(),
 ) -> list[str]:
-    scored = []
-    for key in corpus.keys():
-        if key in exclude:
-            continue
-        vector = candidate_vectors.get(key)
-        # Cosine and lexical coverage are different scales, so a partially
-        # embedded corpus must never rank the two against each other.  An
-        # embedded query competes only among embedded candidates; the rest wait
-        # for a warmer cache rather than being ordered by an incomparable score.
-        if query_vector is not None:
-            if vector is None:
-                continue
-            score = cosine_similarity(query_vector, vector)
-        else:
-            score = corpus.score(query_terms, key)
-        scored.append((score, key))
-    return [
+    # Cosine and lexical coverage are different scales, so a partially
+    # embedded corpus must never rank the two against each other. An embedded
+    # query competes only among embedded candidates; the rest wait for a warmer
+    # cache rather than being ordered by an incomparable score.
+    if query_vector is not None:
+        scored = [
+            (cosine_similarity(query_vector, vector), key)
+            for key, vector in candidate_vectors.items()
+            if key not in exclude and corpus.contains(key)
+        ]
+        return [
+            key
+            for _score, key in sorted(
+                scored, key=lambda item: (-item[0], item[1])
+            )[:limit]
+        ]
+
+    # Lexical scoring is positive only when a query term occurs in a candidate,
+    # so the inverted index avoids the old full-corpus score pass per query.
+    # Preserve the previous deterministic zero-score tail when fewer than
+    # ``limit`` candidates match.
+    scored = [
+        (corpus.score(query_terms, key), key)
+        for key in corpus.matching_keys(query_terms)
+        if key not in exclude
+    ]
+    ranked = [
         key
         for _score, key in sorted(scored, key=lambda item: (-item[0], item[1]))[:limit]
     ]
+    if len(ranked) >= limit:
+        return ranked
+    selected = set(ranked)
+    for key in corpus.keys():
+        if key in exclude or key in selected:
+            continue
+        ranked.append(key)
+        if len(ranked) >= limit:
+            break
+    return ranked
 
 
 # How much of a long alias or member list a descriptor is allowed to carry.
@@ -765,7 +802,7 @@ async def build_candidate_context(
         token: index.skill_descriptor(token) for token in normalized
     }
     resolved_provider = provider or _provider_from_settings()
-    vectors: dict[str, tuple[float, ...]] = {}
+    vectors: dict[str, Sequence[float]] = {}
     mode = "lexical"
     reason = "no embedding provider is configured"
     embedding_metrics = EmbeddingResult(vectors={}, requested=0, failed=0)
@@ -884,7 +921,7 @@ async def domain_neighbor_candidates(
     domain_ids = index.domain_ids
     descriptors = index.domain_descriptors
     resolved_provider = provider or _provider_from_settings()
-    vectors: dict[str, tuple[float, ...]] = {}
+    vectors: dict[str, Sequence[float]] = {}
     mode = "lexical"
     if resolved_provider is not None:
         outcome = await embed_descriptors(
