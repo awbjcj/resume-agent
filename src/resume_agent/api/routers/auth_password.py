@@ -129,20 +129,17 @@ def reset_password(
         identity = (
             user.id,
             user.username,
-            user.password_hash,
             user.session_epoch,
             user.email_verified_at,
             user.google_sub,
             user.role,
         )
     attempts.reset(engine, email=body.email, ip=client_ip(request))
-    user_id, username, password_hash, epoch, verified, google_sub, role = identity
+    user_id, username, epoch, verified, google_sub, role = identity
     auth.set_session_cookie(
         request,
         response,
-        auth.issue_user_session(
-            settings, user_id=user_id, password_hash=password_hash, epoch=epoch
-        ),
+        auth.issue_user_session(settings, user_id=user_id, epoch=epoch),
     )
     notice = messages.password_changed(settings.app_base_url)
     request.app.state.mailer.notify(

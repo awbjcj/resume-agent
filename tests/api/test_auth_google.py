@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from resume_agent.api import auth
 from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, User
+from resume_agent.tenancy.system_db import InviteCode, OAuthFlow, User
 
 
 CLIENT = {"google_oauth_client_id": "cid", "google_oauth_client_secret": "secret"}
@@ -54,19 +54,18 @@ def _fake_google(monkeypatch, claims):
 
 
 def _callback(client, app, *, mode="login", invite_hash=""):
+    from resume_agent.api.routers import auth_google
+
     state = auth.issue_oauth_state(
         app.state.settings, mode=mode, invite_hash=invite_hash
     )
     verifier = "v" * 64
     client.cookies.set(
-        auth.OAUTH_STATE_COOKIE,
-        auth._encode_oauth_cookie_value(state),
-        path=auth.OAUTH_COOKIE_PATH,
-    )
-    client.cookies.set(
-        auth.OAUTH_PKCE_COOKIE,
-        auth._encode_oauth_cookie_value(
-            auth.issue_oauth_pkce_cookie(app.state.settings, state, verifier)
+        auth.OAUTH_FLOW_COOKIE,
+        auth_google._store_oauth_flow(
+            app.state.system_engine,
+            state=state,
+            verifier=verifier,
         ),
         path=auth.OAUTH_COOKIE_PATH,
     )
@@ -92,29 +91,21 @@ def test_google_start_requires_client_and_uses_identity_only_prompt(
     assert flow.authorization_kwargs["prompt"] == "select_account"
     assert flow.code_verifier is not None
     cookie_headers = response.headers.get_list("set-cookie")
-    assert any(auth.OAUTH_STATE_COOKIE in value for value in cookie_headers)
-    assert any(auth.OAUTH_PKCE_COOKIE in value for value in cookie_headers)
+    assert any(auth.OAUTH_FLOW_COOKIE in value for value in cookie_headers)
     assert all("HttpOnly" in value for value in cookie_headers)
     assert all("SameSite=lax" in value for value in cookie_headers)
-    state_cookie = next(
+    flow_cookie = next(
         value.split(";", 1)[0].partition("=")[2]
         for value in cookie_headers
-        if value.startswith(f"{auth.OAUTH_STATE_COOKIE}=")
+        if value.startswith(f"{auth.OAUTH_FLOW_COOKIE}=")
     )
-    pkce_cookie = next(
-        value.split(";", 1)[0].partition("=")[2]
-        for value in cookie_headers
-        if value.startswith(f"{auth.OAUTH_PKCE_COOKIE}=")
-    )
-    assert auth._decode_oauth_cookie_value(state_cookie) == flow.authorization_kwargs["state"]
-    assert (
-        auth.verify_oauth_pkce_cookie(
-            auth._decode_oauth_cookie_value(pkce_cookie),
-            mu_app.state.settings,
-            flow.authorization_kwargs["state"],
-        )
-        == flow.code_verifier
-    )
+    assert flow_cookie != flow.authorization_kwargs["state"]
+    assert flow_cookie != flow.code_verifier
+    with Session(mu_app.state.system_engine) as session:
+        stored = session.get(OAuthFlow, flow_cookie)
+        assert stored is not None
+        assert stored.state == flow.authorization_kwargs["state"]
+        assert stored.pkce_verifier == flow.code_verifier
 
 
 def test_google_callback_rejects_state_from_another_browser(mu_app, monkeypatch):
@@ -152,13 +143,52 @@ def test_google_callback_consumes_oauth_cookies(mu_app, monkeypatch):
     assert response.headers["location"].startswith("/register?")
     cookie_headers = response.headers.get_list("set-cookie")
     assert any(
-        auth.OAUTH_STATE_COOKIE in value and "Max-Age=0" in value
+        auth.OAUTH_FLOW_COOKIE in value and "Max-Age=0" in value
         for value in cookie_headers
     )
-    assert any(
-        auth.OAUTH_PKCE_COOKIE in value and "Max-Age=0" in value
-        for value in cookie_headers
+    with Session(mu_app.state.system_engine) as session:
+        assert session.execute(select(OAuthFlow)).scalars().all() == []
+
+
+def test_google_callback_consumes_oauth_flow_once(mu_app, monkeypatch):
+    from resume_agent.api.routers import auth_google
+
+    _configure(mu_app)
+    flow = _fake_google(
+        monkeypatch,
+        {"sub": "new", "email": "new@example.com", "email_verified": True},
     )
+    state = auth.issue_oauth_state(mu_app.state.settings, mode="login")
+    with TestClient(mu_app) as client:
+        flow_cookie = auth_google._store_oauth_flow(
+            mu_app.state.system_engine,
+            state=state,
+            verifier="v" * 64,
+        )
+        client.cookies.set(
+            auth.OAUTH_FLOW_COOKIE,
+            flow_cookie,
+            path=auth.OAUTH_COOKIE_PATH,
+        )
+        first = client.get(
+            "/api/auth/google/callback",
+            params={"code": "code", "state": state},
+            follow_redirects=False,
+        )
+        client.cookies.set(
+            auth.OAUTH_FLOW_COOKIE,
+            flow_cookie,
+            path=auth.OAUTH_COOKIE_PATH,
+        )
+        replay = client.get(
+            "/api/auth/google/callback",
+            params={"code": "code", "state": state},
+            follow_redirects=False,
+        )
+
+    assert first.headers["location"].startswith("/register?")
+    assert replay.headers["location"] == "/login?error=invalid_state"
+    assert flow.fetch_calls == 1
 
 
 def test_google_callback_uses_configured_origin_not_forwarded_host(mu_app, monkeypatch):

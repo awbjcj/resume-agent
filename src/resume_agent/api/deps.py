@@ -123,7 +123,6 @@ def _authenticated_user(
             if candidate is not None and auth_module.verify_user_session(
                 cookie,
                 request.app.state.settings,
-                password_hash=candidate.password_hash,
                 epoch=candidate.session_epoch,
             ):
                 user = candidate

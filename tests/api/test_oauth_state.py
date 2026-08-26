@@ -1,5 +1,3 @@
-import pytest
-
 from resume_agent.api import auth
 from resume_agent.config import Settings
 
@@ -30,14 +28,8 @@ def test_oauth_state_rejects_tampering_expiry_and_garbage():
     )
 
 
-def test_oauth_pkce_cookie_is_bound_to_state_and_rejects_tampering():
+def test_oauth_state_rejects_a_different_signing_secret():
     state = auth.issue_oauth_state(SETTINGS, mode="login", now=1000.0)
-    verifier = "v" * 64
-    cookie = auth.issue_oauth_pkce_cookie(SETTINGS, state, verifier)
-
-    assert auth.verify_oauth_pkce_cookie(cookie, SETTINGS, state) == verifier
-    assert auth.verify_oauth_pkce_cookie(cookie, SETTINGS, state + "x") is None
-    assert auth.verify_oauth_pkce_cookie(cookie + "x", SETTINGS, state) is None
     assert auth.verify_oauth_state("garbage", SETTINGS) is None
     assert (
         auth.verify_oauth_state(
@@ -47,13 +39,18 @@ def test_oauth_pkce_cookie_is_bound_to_state_and_rejects_tampering():
     )
 
 
-def test_oauth_cookie_encoding_is_header_safe_and_fails_closed():
-    state = auth.issue_oauth_state(SETTINGS, mode="login", now=1000.0)
-    pkce = auth.issue_oauth_pkce_cookie(SETTINGS, state, "v" * 64)
+def test_oauth_flow_cookie_is_random_header_safe_and_fails_closed():
+    cookie = auth.issue_oauth_flow_cookie()
 
-    assert auth._decode_oauth_cookie_value(auth._encode_oauth_cookie_value(state)) == state
-    assert auth._decode_oauth_cookie_value(auth._encode_oauth_cookie_value(pkce)) == pkce
-    assert auth._decode_oauth_cookie_value("state:raw") is None
-    assert auth._decode_oauth_cookie_value("unsafe\r\nSet-Cookie") is None
-    with pytest.raises(ValueError, match="PKCE verifier"):
-        auth.issue_oauth_pkce_cookie(SETTINGS, state, "too-short")
+    assert auth._valid_oauth_flow_cookie_value(cookie) is True
+    assert auth._valid_oauth_flow_cookie_value("state:raw") is False
+    assert auth._valid_oauth_flow_cookie_value("unsafe\r\nSet-Cookie") is False
+    assert auth._valid_oauth_flow_cookie_value("x" * 129) is False
+
+
+def test_oauth_pkce_verifier_has_the_required_size_and_alphabet():
+    assert auth._valid_oauth_pkce_verifier("v" * 64)
+    assert auth._valid_oauth_pkce_verifier("too-short") is False
+    assert auth._valid_oauth_pkce_verifier("v" * 42) is False
+    assert auth._valid_oauth_pkce_verifier("v" * 129) is False
+    assert auth._valid_oauth_pkce_verifier("v" * 63 + "\n") is False

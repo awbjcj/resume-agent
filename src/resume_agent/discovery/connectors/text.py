@@ -80,6 +80,17 @@ def _drop_material_icon_tokens(text: str, *, escaped: bool) -> str:
     return "".join(kept)
 
 
+def _strip_horizontal_space_before_punctuation(text: str) -> str:
+    """Drop spaces and tabs immediately before punctuation in linear time."""
+    cleaned: list[str] = []
+    for character in text:
+        if character in ",.;:":
+            while cleaned and cleaned[-1] in " \t":
+                cleaned.pop()
+        cleaned.append(character)
+    return "".join(cleaned)
+
+
 def clean_job_description_text(text: str) -> str:
     """Remove source chrome tokens that leak into fetched job descriptions."""
     if not text:
@@ -87,7 +98,7 @@ def clean_job_description_text(text: str) -> str:
     cleaned = _drop_material_icon_tokens(text, escaped=True)
     cleaned = _drop_material_icon_tokens(cleaned, escaped=False)
     cleaned = _ESCAPED_STRONG.sub(r"\1", cleaned)
-    cleaned = re.sub(r"[ \t]+([,.;:])", r"\1", cleaned)
+    cleaned = _strip_horizontal_space_before_punctuation(cleaned)
     lines = (re.sub(r"[ \t]{2,}", " ", line).strip() for line in cleaned.splitlines())
     cleaned = "\n".join(lines)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)

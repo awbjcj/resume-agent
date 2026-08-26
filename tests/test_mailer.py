@@ -89,12 +89,11 @@ def test_failed_send_logs_the_smtp_cause(
     ):
         mailer.send(to="user@example.com", subject="Verify", body="code")
 
-    logged = caplog.text
-    assert "535" in logged
-    assert "Username and Password not accepted" in logged
-    # codeql[py/incomplete-url-substring-sanitization] -- Assertion only; no URL is constructed or trusted.
-    assert "smtp.example.com" in logged
-    assert "user@example.com" in logged
+    assert caplog.records[-1].getMessage() == (
+        "SMTP delivery to user@example.com failed via smtp.example.com:587 "
+        "(starttls=True, auth=on): "
+        "(535, b'5.7.8 Username and Password not accepted.')"
+    )
 
 
 def test_failed_send_never_logs_the_password(

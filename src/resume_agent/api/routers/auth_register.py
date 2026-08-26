@@ -257,18 +257,16 @@ def verify_email(
                     shutil.rmtree(workspace, ignore_errors=True)
                 raise
             session.refresh(user)
-            identity = (user.id, user.username, user.password_hash, user.session_epoch)
+            identity = (user.id, user.username, user.session_epoch)
     if invalid:
         raise ApiException(400, "CODE_INVALID", "That code is not valid")
     assert identity is not None
-    user_id, username, password_hash, epoch = identity
+    user_id, username, epoch = identity
     attempts.reset(engine, email=body.email, ip=client_ip(request))
     auth.set_session_cookie(
         request,
         response,
-        auth.issue_user_session(
-            settings, user_id=user_id, password_hash=password_hash, epoch=epoch
-        ),
+        auth.issue_user_session(settings, user_id=user_id, epoch=epoch),
     )
     return MeResponse(
         username=username,

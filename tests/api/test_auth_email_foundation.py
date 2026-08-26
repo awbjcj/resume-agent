@@ -74,15 +74,9 @@ def test_system_migration_preserves_legacy_users(tmp_path):
 
 
 def test_session_epoch_revokes_an_existing_cookie():
-    token = auth.issue_user_session(
-        SETTINGS, user_id="u1", password_hash="hash", epoch=0
-    )
-    assert (
-        auth.verify_user_session(token, SETTINGS, password_hash="hash", epoch=0) == "u1"
-    )
-    assert (
-        auth.verify_user_session(token, SETTINGS, password_hash="hash", epoch=1) is None
-    )
+    token = auth.issue_user_session(SETTINGS, user_id="u1", epoch=0)
+    assert auth.verify_user_session(token, SETTINGS, epoch=0) == "u1"
+    assert auth.verify_user_session(token, SETTINGS, epoch=1) is None
 
 
 @dataclass

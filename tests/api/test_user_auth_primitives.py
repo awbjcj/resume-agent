@@ -22,27 +22,20 @@ def test_old_password_hashes_verify_and_are_upgradeable():
     assert not hash_needs_upgrade(hash_password("correct horse"))
 
 
-def test_user_session_roundtrip_expiry_and_password_invalidation():
-    stored = hash_password("correct horse", iterations=1000)
-    token = issue_user_session(
-        SETTINGS, user_id="abc123def456", password_hash=stored, now=1000
-    )
+def test_user_session_roundtrip_expiry_and_epoch_invalidation():
+    token = issue_user_session(SETTINGS, user_id="abc123def456", epoch=0, now=1000)
     assert parse_session_user_id(token) == "abc123def456"
-    assert (
-        verify_user_session(token, SETTINGS, password_hash=stored, now=1000)
-        == "abc123def456"
-    )
+    assert verify_user_session(token, SETTINGS, epoch=0, now=1000) == "abc123def456"
     assert (
         verify_user_session(
             token,
             SETTINGS,
-            password_hash=stored,
+            epoch=0,
             now=1000 + SESSION_LIFETIME_SECONDS + 1,
         )
         is None
     )
-    rotated = hash_password("different", iterations=1000)
-    assert verify_user_session(token, SETTINGS, password_hash=rotated, now=1000) is None
+    assert verify_user_session(token, SETTINGS, epoch=1, now=1000) is None
 
 
 def test_link_tokens_are_signed_expiring_purpose_capabilities():

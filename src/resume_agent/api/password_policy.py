@@ -26,8 +26,8 @@ class NullBreachChecker:
 class HibpBreachChecker:
     def is_breached(self, password: str) -> bool:
         password_bytes = password.encode()
-        # HIBP's k-anonymity range protocol requires SHA-1; this is not a password verifier.
-        # codeql[py/weak-sensitive-data-hashing] -- Required HIBP range-query protocol.
+        # HIBP's k-anonymity range protocol requires SHA-1; this is not a password
+        # verifier and the request sends only the first five digest characters.
         digest = hashlib.sha1(password_bytes, usedforsecurity=False).hexdigest().upper()
         try:
             response = httpx.get(

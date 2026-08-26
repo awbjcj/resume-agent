@@ -108,11 +108,10 @@ def login(
         user.last_active_at = now
         session.commit()
         session.refresh(user)
-        user_id, username, role, password_hash, epoch, email, verified, google_sub = (
+        user_id, username, role, epoch, email, verified, google_sub = (
             user.id,
             user.username,
             user.role,
-            user.password_hash,
             user.session_epoch,
             user.email,
             user.email_verified_at,
@@ -123,7 +122,7 @@ def login(
         request,
         response,
         auth.issue_user_session(
-            settings, user_id=user_id, password_hash=password_hash, epoch=epoch
+            settings, user_id=user_id, epoch=epoch
         ),
     )
     # The users.role CHECK constraint guarantees 'admin' | 'user' at the DB layer.
@@ -186,7 +185,6 @@ def me(request: Request, settings: Settings = Depends(get_settings_dep)) -> MeRe
             or auth.verify_user_session(
                 token,
                 settings,
-                password_hash=user.password_hash,
                 epoch=user.session_epoch,
             )
             is None

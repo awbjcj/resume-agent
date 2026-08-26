@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from resume_agent.api import attempts, auth
@@ -23,7 +24,7 @@ from resume_agent.mail import messages
 from resume_agent.tenancy.context import new_user_id
 from resume_agent.tenancy.quotas import assign_new_member
 from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, User
+from resume_agent.tenancy.system_db import InviteCode, OAuthFlow, User
 from resume_agent.tenancy.workspace import provision_workspace, workspace_paths
 
 
@@ -78,6 +79,64 @@ def _build_flow(
     )
 
 
+def _store_oauth_flow(engine: Any, *, state: str, verifier: str) -> str:
+    """Persist the PKCE verifier behind a one-time, browser-bound opaque handle."""
+    if engine is None:
+        raise ApiException(503, "OAUTH_UNAVAILABLE", "Google sign-in is unavailable")
+    if not auth._valid_oauth_pkce_verifier(verifier):
+        raise ValueError("invalid OAuth PKCE verifier")
+    now = datetime.now(timezone.utc)
+    flow_cookie = auth.issue_oauth_flow_cookie()
+    with Session(engine) as session:
+        # One writer transaction makes consume-once semantics work across workers.
+        session.execute(text("BEGIN IMMEDIATE"))
+        session.execute(delete(OAuthFlow).where(OAuthFlow.expires_at <= now))
+        session.add(
+            OAuthFlow(
+                id=flow_cookie,
+                state=state,
+                pkce_verifier=verifier,
+                expires_at=now + timedelta(seconds=auth.OAUTH_STATE_TTL_SECONDS),
+            )
+        )
+        session.commit()
+    return flow_cookie
+
+
+def _consume_oauth_flow(
+    engine: Any,
+    *,
+    flow_cookie: str | None,
+    state: str,
+) -> str | None:
+    """Atomically consume an opaque flow handle only for its signed OAuth state."""
+    if engine is None or flow_cookie is None or not state:
+        return None
+    now = datetime.now(timezone.utc)
+    try:
+        with Session(engine) as session:
+            session.execute(text("BEGIN IMMEDIATE"))
+            flow = session.get(OAuthFlow, flow_cookie)
+            if flow is None:
+                session.rollback()
+                return None
+            session.delete(flow)
+            session.commit()
+    except Exception:  # noqa: BLE001 - reject callback if its one-time state cannot be consumed
+        logger.exception("Unable to consume Google OAuth flow")
+        return None
+    expires_at = flow.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if (
+        expires_at <= now
+        or not hmac.compare_digest(flow.state, state)
+        or not auth._valid_oauth_pkce_verifier(flow.pkce_verifier)
+    ):
+        return None
+    return flow.pkce_verifier
+
+
 def _verify_id_token(flow: Any, settings: Settings) -> dict[str, Any]:
     from google.auth.transport import requests as google_requests
     from google.oauth2 import id_token
@@ -115,12 +174,8 @@ def google_start(
     verifier = str(flow.code_verifier or "")
     if not verifier:
         raise ApiException(500, "OAUTH_START_FAILED", "Google sign-in could not start")
-    auth.set_oauth_flow_cookies(
-        request,
-        response,
-        state=state,
-        verifier=verifier,
-    )
+    flow_cookie = _store_oauth_flow(engine, state=state, verifier=verifier)
+    auth.set_oauth_flow_cookie(request, response, flow_cookie=flow_cookie)
     return GoogleStartOut(auth_url=url)
 
 
@@ -161,7 +216,6 @@ def _sign_in(request: Request, settings: Settings, user: User) -> RedirectRespon
         auth.issue_user_session(
             settings,
             user_id=user.id,
-            password_hash=user.password_hash,
             epoch=user.session_epoch,
         ),
     )
@@ -184,12 +238,18 @@ def google_callback(
         return _failure(request, "/login?error=denied")
     settings = request.app.state.settings
     parsed = auth.verify_oauth_state(state, settings)
-    verifier = auth.oauth_flow_verifier(request, state, settings)
-    if parsed is None or verifier is None:
+    if parsed is None:
         return _failure(request, "/login?error=invalid_state")
     engine = getattr(request.app.state, "system_engine", None)
     if engine is None:
         return _failure(request, "/login?error=unavailable")
+    verifier = _consume_oauth_flow(
+        engine,
+        flow_cookie=auth.oauth_flow_cookie(request),
+        state=state,
+    )
+    if verifier is None:
+        return _failure(request, "/login?error=invalid_state")
     try:
         _require_client(settings)
         flow = _build_flow(

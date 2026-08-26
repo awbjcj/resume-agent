@@ -114,6 +114,18 @@ class PasswordResetCode(SystemBase):
     pending_email: Mapped[str | None] = mapped_column(String(320))
 
 
+class OAuthFlow(SystemBase):
+    """One-time server-side state for the Google sign-in redirect."""
+
+    __tablename__ = "oauth_flows"
+    __table_args__ = (Index("ix_oauth_flows_expires_at", "expires_at"),)
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    state: Mapped[str] = mapped_column(String(2048), nullable=False)
+    pkce_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class LoginAttempt(SystemBase):
     __tablename__ = "login_attempts"
     __table_args__ = (

@@ -74,10 +74,9 @@ must go through — see ADR-0008.
 
 ## Threat-model gaps not yet implemented
 
-The threat-model documents still record items **not yet implemented**: OAuth
-state is not bound to the initiating browser or atomically consumed
-(browser-binding, not just the existing HMAC), there is no explicit CSRF
-token/Origin check for cookie-authenticated mutations, Typst/document
+The threat-model documents still record items **not yet implemented**: there is
+no explicit CSRF token/Origin check for cookie-authenticated mutations,
+Typst/document
 parsing/transcription still run in the API process rather than an isolated
 worker, user provider keys are plaintext in `secrets.env` rather than
 envelope-encrypted, and there is no dedicated security audit-event stream.

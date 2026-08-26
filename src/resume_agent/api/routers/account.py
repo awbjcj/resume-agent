@@ -213,15 +213,10 @@ def change_password(
         user.password_hash = auth.hash_password(body.new_password)
         user.session_epoch += 1
         session.commit()
-        password_hash, epoch, email = (
-            user.password_hash,
-            user.session_epoch,
-            user.email,
-        )
+        epoch, email = user.session_epoch, user.email
     token = auth.issue_user_session(
         settings,
         user_id=context.user_id,
-        password_hash=password_hash,
         epoch=epoch,
     )
     auth.set_session_cookie(request, response, token)
@@ -358,7 +353,6 @@ def revoke_all_sessions(
         token = auth.issue_user_session(
             settings,
             user_id=user.id,
-            password_hash=user.password_hash,
             epoch=user.session_epoch,
         )
     auth.set_session_cookie(request, response, token)
