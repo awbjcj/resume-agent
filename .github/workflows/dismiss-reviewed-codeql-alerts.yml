@@ -1,7 +1,11 @@
 name: Dismiss reviewed CodeQL false positives
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/dismiss-reviewed-codeql-alerts.yml
 
 permissions:
   contents: read
