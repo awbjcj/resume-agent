@@ -2,15 +2,39 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 
 from resume_agent.config import AppMode
 from resume_agent.deploy import main as prepare_data_root
 
 APP_MODES = {"auto", "local", "hosted"}
+
+
+class _UnixOS(Protocol):
+    """POSIX-only ``os`` operations used by the Linux container entrypoint."""
+
+    def geteuid(self) -> int: ...
+
+    def chown(self, path: str, uid: int, gid: int) -> None: ...
+
+    def setgroups(self, groups: list[int]) -> None: ...
+
+    def setgid(self, gid: int) -> None: ...
+
+    def setuid(self, uid: int) -> None: ...
+
+
+class _PasswdEntry(Protocol):
+    pw_uid: int
+    pw_gid: int
+
+
+class _PwdModule(Protocol):
+    def getpwnam(self, name: str) -> _PasswdEntry: ...
 
 
 def _drop_privileges_to_app_user() -> None:
@@ -27,21 +51,22 @@ def _drop_privileges_to_app_user() -> None:
     to the current build's UID before dropping privileges makes this
     self-healing regardless of how the UID drifts between builds.
     """
-    if os.geteuid() != 0:
+    unix_os = cast(_UnixOS, os)
+    if unix_os.geteuid() != 0:
         return
-    import pwd
 
-    user = pwd.getpwnam("resume-agent")
+    pwd_module = cast(_PwdModule, importlib.import_module("pwd"))
+    user = pwd_module.getpwnam("resume-agent")
     app_root = Path(os.environ.get("APP_ROOT", "/app"))
     data_root = Path(os.environ.get("DATA_ROOT", str(app_root / "data")))
     if data_root.exists():
         for dirpath, dirnames, filenames in os.walk(data_root):
-            os.chown(dirpath, user.pw_uid, user.pw_gid)
+            unix_os.chown(dirpath, user.pw_uid, user.pw_gid)
             for name in filenames:
-                os.chown(os.path.join(dirpath, name), user.pw_uid, user.pw_gid)
-    os.setgroups([])
-    os.setgid(user.pw_gid)
-    os.setuid(user.pw_uid)
+                unix_os.chown(os.path.join(dirpath, name), user.pw_uid, user.pw_gid)
+    unix_os.setgroups([])
+    unix_os.setgid(user.pw_gid)
+    unix_os.setuid(user.pw_uid)
 
 
 def resolve_app_mode(environ: Mapping[str, str]) -> AppMode:
