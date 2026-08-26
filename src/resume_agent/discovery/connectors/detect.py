@@ -68,9 +68,6 @@ _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 
-_WORKDAY_HOST = re.compile(
-    r"([a-z0-9-]+)\.([a-z0-9-]+)\.myworkdayjobs\.com", re.IGNORECASE
-)
 _WORKDAY_URL = re.compile(
     r"(?:(?:https?:)?//)?"
     r"(?P<host>[a-z0-9-]+\.[a-z0-9-]+\.myworkdayjobs\.com)"
@@ -119,16 +116,27 @@ def _workday_site_segment(path: str) -> str | None:
 
 
 def _workday_target(host: str, path: str) -> AtsTarget | None:
-    workday = _WORKDAY_HOST.fullmatch(host)
-    if not workday:
+    labels = host.casefold().split(".")
+    if (
+        len(labels) != 4
+        or labels[2:] != ["myworkdayjobs", "com"]
+        or not all(
+            label
+            and all(
+                character.isascii() and (character.isalnum() or character == "-")
+                for character in label
+            )
+            for label in labels[:2]
+        )
+    ):
         return None
     site = _workday_site_segment(path)
     if not site:
         return None
     return AtsTarget(
         "workday",
-        tenant=workday.group(1),
-        datacenter=workday.group(2),
+        tenant=labels[0],
+        datacenter=labels[1],
         site=site,
     )
 

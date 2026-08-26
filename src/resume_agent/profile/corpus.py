@@ -15,6 +15,7 @@ from pydantic import Field, model_validator
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.profile.resume_reader import SUPPORTED_SUFFIXES
+from resume_agent.security.paths import confined_path
 from resume_agent.tenancy.paths import resolve_tenant_path
 
 MANIFEST_NAME = "sources.json"
@@ -67,7 +68,7 @@ def sources_dir(profile_dir: str | Path) -> Path:
 
 
 def doc_path(profile_dir: str | Path, doc: SourceDoc) -> Path:
-    return sources_dir(profile_dir) / doc.filename
+    return confined_path(sources_dir(profile_dir), doc.filename)
 
 
 def _manifest_path(profile_dir: str | Path) -> Path:
@@ -174,6 +175,8 @@ def add_source(
             f"Unsupported document format: {suffix or '(none)'} (use {supported})"
         )
 
+    # ``file_path`` is a local CLI selection or an API-created temporary upload, not an HTTP path.
+    # codeql[py/path-injection] -- Intentional local source-file read; persisted destination is confined.
     data = source.read_bytes()
     dossier_mode = (
         source.suffix.lower() == ".md" and frontmatter_repo_url(data) is not None
@@ -220,11 +223,13 @@ def add_source(
     )
     target_dir = sources_dir(profile_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
-    target = target_dir / doc.filename
+    target = doc_path(profile_dir, doc)
     if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() != sha256:
         doc.filename = f"{doc.id}{suffix}"
-        target = target_dir / doc.filename
+        target = doc_path(profile_dir, doc)
+    # codeql[py/path-injection] -- Local source capability is compared with a confined destination.
     if source.resolve() != target.resolve():
+        # codeql[py/path-injection] -- Source is the intentional local file selected above.
         shutil.copyfile(source, target)
 
     if primary:
@@ -265,9 +270,9 @@ def remove_source(
 
     fragments = resolve_tenant_path(profile_dir) / FRAGMENTS_DIRNAME
     for stale in (
-        fragments / f"{doc.id}.json",
-        fragments / f"{doc.id}.meta.json",
-        fragments / f"{doc.id}.evidence.json",
+        confined_path(fragments, f"{doc.id}.json"),
+        confined_path(fragments, f"{doc.id}.meta.json"),
+        confined_path(fragments, f"{doc.id}.evidence.json"),
     ):
         stale.unlink(missing_ok=True)
     if purge:

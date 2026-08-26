@@ -60,12 +60,14 @@ def _callback(client, app, *, mode="login", invite_hash=""):
     verifier = "v" * 64
     client.cookies.set(
         auth.OAUTH_STATE_COOKIE,
-        state,
+        auth._encode_oauth_cookie_value(state),
         path=auth.OAUTH_COOKIE_PATH,
     )
     client.cookies.set(
         auth.OAUTH_PKCE_COOKIE,
-        auth.issue_oauth_pkce_cookie(app.state.settings, state, verifier),
+        auth._encode_oauth_cookie_value(
+            auth.issue_oauth_pkce_cookie(app.state.settings, state, verifier)
+        ),
         path=auth.OAUTH_COOKIE_PATH,
     )
     return client.get(
@@ -94,6 +96,25 @@ def test_google_start_requires_client_and_uses_identity_only_prompt(
     assert any(auth.OAUTH_PKCE_COOKIE in value for value in cookie_headers)
     assert all("HttpOnly" in value for value in cookie_headers)
     assert all("SameSite=lax" in value for value in cookie_headers)
+    state_cookie = next(
+        value.split(";", 1)[0].partition("=")[2]
+        for value in cookie_headers
+        if value.startswith(f"{auth.OAUTH_STATE_COOKIE}=")
+    )
+    pkce_cookie = next(
+        value.split(";", 1)[0].partition("=")[2]
+        for value in cookie_headers
+        if value.startswith(f"{auth.OAUTH_PKCE_COOKIE}=")
+    )
+    assert auth._decode_oauth_cookie_value(state_cookie) == flow.authorization_kwargs["state"]
+    assert (
+        auth.verify_oauth_pkce_cookie(
+            auth._decode_oauth_cookie_value(pkce_cookie),
+            mu_app.state.settings,
+            flow.authorization_kwargs["state"],
+        )
+        == flow.code_verifier
+    )
 
 
 def test_google_callback_rejects_state_from_another_browser(mu_app, monkeypatch):

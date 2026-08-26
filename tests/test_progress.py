@@ -1,3 +1,5 @@
+import pytest
+
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from resume_agent.progress import (
     read_all,
     read_progress,
 )
+from resume_agent.security.paths import PathEscapeError
 
 
 def test_read_progress_missing_returns_none(tmp_path):
@@ -31,10 +34,18 @@ def test_atomic_write_retries_transient_windows_replace_error(monkeypatch, tmp_p
     monkeypatch.setattr("resume_agent.progress.os.replace", flaky_replace)
     monkeypatch.setattr("resume_agent.progress.time.sleep", lambda _seconds: None)
 
-    atomic_write_text(target, '{"state": "done"}')
+    atomic_write_text(target, '{"state": "done"}', root=tmp_path)
 
     assert target.read_text(encoding="utf-8") == '{"state": "done"}'
     assert calls["n"] == 2
+
+
+def test_atomic_write_rejects_a_path_outside_its_owning_root(tmp_path):
+    outside = tmp_path / "outside.json"
+
+    with pytest.raises(PathEscapeError):
+        atomic_write_text(outside, '{"unsafe": true}', root=tmp_path / "progress")
+    assert not outside.exists()
 
 
 def test_read_progress_retries_transient_oserror(monkeypatch, tmp_path):
@@ -137,6 +148,18 @@ def test_clear_progress_removes_file(tmp_path):
     assert read_progress("pull", tmp_path) is not None
     clear_progress("pull", tmp_path)
     assert read_progress("pull", tmp_path) is None
+
+
+def test_progress_paths_reject_traversal_without_touching_a_neighbor(tmp_path):
+    root = tmp_path / "progress"
+    outside = tmp_path / "outside.json"
+    outside.write_text('{"keep": true}', encoding="utf-8")
+
+    assert read_progress("../outside", root) is None
+    clear_progress("../outside", root)
+    assert outside.read_text(encoding="utf-8") == '{"keep": true}'
+    with pytest.raises(PathEscapeError):
+        ProgressReporter("../outside", root)
 
 
 def test_progress_stats_computes_percentage_and_eta():

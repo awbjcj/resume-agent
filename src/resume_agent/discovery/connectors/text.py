@@ -24,24 +24,68 @@ _MATERIAL_ICON_TOKENS = frozenset(
         "work",
     }
 )
-_ESCAPED_ICON_TOKEN = re.compile(
-    r"(?<!\S)\\_([a-z][a-z0-9]*(?:\\_[a-z0-9]+)*)\\_(?=\s|$|[,.])"
-)
-_PLAIN_ICON_TOKEN = re.compile(r"(?<!\S)_([a-z][a-z0-9]*(?:_[a-z0-9]+)*)_(?=\s|$|[,.])")
 _ESCAPED_STRONG = re.compile(r"\\\*\\\*([^*\n]+?)\\\*\\\*")
 
 
-def _drop_icon_token(match: re.Match[str]) -> str:
-    token = match.group(1).replace("\\_", "_").lower()
-    return "" if token in _MATERIAL_ICON_TOKENS else match.group(0)
+def _is_icon_character(value: str) -> bool:
+    return "a" <= value <= "z" or "0" <= value <= "9"
+
+
+def _icon_token_at(text: str, start: int, *, escaped: bool) -> tuple[int, str] | None:
+    """Return one source-chrome icon token without regex backtracking.
+
+    Google/Material icons are emitted as ``_place_`` or ``\\_place\\_``. The
+    former regular expressions had bounded-looking, but nested, repetitions
+    that static analysis correctly treats as a potential ReDoS risk on fetched
+    job descriptions. This finite scanner preserves the accepted token grammar
+    while consuming each character at most once.
+    """
+
+    delimiter = "\\_" if escaped else "_"
+    if not text.startswith(delimiter, start) or (start and not text[start - 1].isspace()):
+        return None
+    cursor = start + len(delimiter)
+    if cursor >= len(text) or not ("a" <= text[cursor] <= "z"):
+        return None
+    token_start = cursor
+    cursor += 1
+    while cursor < len(text) and _is_icon_character(text[cursor]):
+        cursor += 1
+
+    while text.startswith(delimiter, cursor):
+        delimiter_start = cursor
+        cursor += len(delimiter)
+        if cursor == len(text) or text[cursor].isspace() or text[cursor] in ",.":
+            token = text[token_start:delimiter_start].replace("\\_", "_").lower()
+            return cursor, token
+        if cursor >= len(text) or not _is_icon_character(text[cursor]):
+            return None
+        while cursor < len(text) and _is_icon_character(text[cursor]):
+            cursor += 1
+    return None
+
+
+def _drop_material_icon_tokens(text: str, *, escaped: bool) -> str:
+    kept: list[str] = []
+    cursor = 0
+    while cursor < len(text):
+        token = _icon_token_at(text, cursor, escaped=escaped)
+        if token is not None:
+            end, name = token
+            if name in _MATERIAL_ICON_TOKENS:
+                cursor = end
+                continue
+        kept.append(text[cursor])
+        cursor += 1
+    return "".join(kept)
 
 
 def clean_job_description_text(text: str) -> str:
     """Remove source chrome tokens that leak into fetched job descriptions."""
     if not text:
         return ""
-    cleaned = _ESCAPED_ICON_TOKEN.sub(_drop_icon_token, text)
-    cleaned = _PLAIN_ICON_TOKEN.sub(_drop_icon_token, cleaned)
+    cleaned = _drop_material_icon_tokens(text, escaped=True)
+    cleaned = _drop_material_icon_tokens(cleaned, escaped=False)
     cleaned = _ESCAPED_STRONG.sub(r"\1", cleaned)
     cleaned = re.sub(r"[ \t]+([,.;:])", r"\1", cleaned)
     lines = (re.sub(r"[ \t]{2,}", " ", line).strip() for line in cleaned.splitlines())

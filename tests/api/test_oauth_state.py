@@ -1,3 +1,5 @@
+import pytest
+
 from resume_agent.api import auth
 from resume_agent.config import Settings
 
@@ -43,3 +45,15 @@ def test_oauth_pkce_cookie_is_bound_to_state_and_rejects_tampering():
         )
         is None
     )
+
+
+def test_oauth_cookie_encoding_is_header_safe_and_fails_closed():
+    state = auth.issue_oauth_state(SETTINGS, mode="login", now=1000.0)
+    pkce = auth.issue_oauth_pkce_cookie(SETTINGS, state, "v" * 64)
+
+    assert auth._decode_oauth_cookie_value(auth._encode_oauth_cookie_value(state)) == state
+    assert auth._decode_oauth_cookie_value(auth._encode_oauth_cookie_value(pkce)) == pkce
+    assert auth._decode_oauth_cookie_value("state:raw") is None
+    assert auth._decode_oauth_cookie_value("unsafe\r\nSet-Cookie") is None
+    with pytest.raises(ValueError, match="PKCE verifier"):
+        auth.issue_oauth_pkce_cookie(SETTINGS, state, "too-short")

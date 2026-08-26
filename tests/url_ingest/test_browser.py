@@ -169,6 +169,7 @@ def test_render_pages_captures_final_url_and_isolates_failures(monkeypatch):
     result = pages["https://www.adzuna.com/land/ad/1"]
     assert result.final_url == "https://www.dice.com/job-detail/1"
     assert result.rendered is True
+    # codeql[py/incomplete-url-substring-sanitization] -- Assertion only; no URL is constructed or trusted.
     assert "dice.com" in result.html
     # one page per distinct url (dedup), each closed; context closed.
     assert len(context.pages) == 2

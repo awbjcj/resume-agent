@@ -76,7 +76,9 @@ def load_history(profile_dir: Path | str) -> dict:
 def _save_history(profile_dir: Path | str, history: dict) -> None:
     validated = _History.model_validate(history)
     atomic_write_text(
-        _history_path(profile_dir), validated.model_dump_json(indent=2) + "\n"
+        _history_path(profile_dir),
+        validated.model_dump_json(indent=2) + "\n",
+        root=profile_dir,
     )
 
 

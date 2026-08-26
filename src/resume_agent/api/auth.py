@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import hmac
 import secrets
@@ -21,6 +23,8 @@ _PBKDF2_ITERATIONS = 600_000
 LINK_TOKEN_TTL_SECONDS = 10 * 60
 OAUTH_STATE_TTL_SECONDS = 10 * 60
 DUMMY_PASSWORD_HASH = f"pbkdf2:{_PBKDF2_ITERATIONS}:{'00' * 16}:{'00' * 32}"
+_OAUTH_TOKEN_MAX_LENGTH = 2_048
+_OAUTH_COOKIE_MAX_LENGTH = 4_096
 
 
 def hash_password(password: str, *, iterations: int = _PBKDF2_ITERATIONS) -> str:
@@ -105,9 +109,9 @@ def _sign_user(
     key = hmac.new(
         settings.session_secret.encode("utf-8"),
         f"{namespace}:{password_hash}:{epoch}".encode("utf-8"),
-        hashlib.sha256,
+        digestmod="sha256",
     ).digest()
-    return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(key, payload.encode("utf-8"), digestmod="sha256").hexdigest()
 
 
 def issue_user_session(
@@ -250,9 +254,49 @@ def verify_oauth_state(
 
 
 def issue_oauth_pkce_cookie(settings: Settings, state: str, verifier: str) -> str:
+    if not _valid_oauth_pkce_verifier(verifier):
+        raise ValueError("invalid OAuth PKCE verifier")
     payload = f"{state}:{verifier}"
     signature = _sign_user(settings, payload, "", namespace="oauth-pkce")
     return f"{verifier}:{signature}"
+
+
+def _valid_oauth_pkce_verifier(verifier: str) -> bool:
+    return (
+        verifier.isascii()
+        and 43 <= len(verifier) <= 128
+        and all(character.isalnum() or character in "-._~" for character in verifier)
+    )
+
+
+def _valid_oauth_state_cookie_value(state: str) -> bool:
+    """Accept only the compact ASCII token format emitted by ``issue_oauth_state``."""
+    return (
+        state.isascii()
+        and 1 <= len(state) <= _OAUTH_TOKEN_MAX_LENGTH
+        and all(character.isalnum() or character in "-._~:" for character in state)
+    )
+
+
+def _encode_oauth_cookie_value(value: str) -> str:
+    """Encode an OAuth cookie value into the RFC 6265-safe URL-safe alphabet."""
+    return base64.urlsafe_b64encode(value.encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def _decode_oauth_cookie_value(value: str) -> str | None:
+    if (
+        not value
+        or len(value) > _OAUTH_COOKIE_MAX_LENGTH
+        or not value.isascii()
+        or not all(character.isalnum() or character in "-_" for character in value)
+    ):
+        return None
+    try:
+        padding = "=" * (-len(value) % 4)
+        decoded = base64.urlsafe_b64decode(value + padding).decode("utf-8")
+    except (UnicodeDecodeError, binascii.Error, ValueError):
+        return None
+    return decoded if len(decoded) <= _OAUTH_TOKEN_MAX_LENGTH else None
 
 
 def verify_oauth_pkce_cookie(
@@ -266,10 +310,7 @@ def verify_oauth_pkce_cookie(
         verifier, signature = cookie.rsplit(":", 1)
     except (AttributeError, ValueError):
         return None
-    allowed = verifier.isascii() and all(
-        character.isalnum() or character in "-._~" for character in verifier
-    )
-    if not allowed or not 43 <= len(verifier) <= 128:
+    if not _valid_oauth_pkce_verifier(verifier):
         return None
     payload = f"{state}:{verifier}"
     expected = _sign_user(settings, payload, "", namespace="oauth-pkce")
@@ -286,19 +327,31 @@ def set_oauth_flow_cookies(
     verifier: str,
 ) -> None:
     settings = request.app.state.settings
+    if not _valid_oauth_state_cookie_value(state):
+        raise ValueError("invalid OAuth state cookie value")
+    if not _valid_oauth_pkce_verifier(verifier):
+        raise ValueError("invalid OAuth PKCE verifier")
     secure = settings.secure_cookies or request.url.scheme == "https"
+    state_cookie = _encode_oauth_cookie_value(state)
+    verifier_cookie = _encode_oauth_cookie_value(
+        issue_oauth_pkce_cookie(settings, state, verifier)
+    )
+    # The value is a bounded, URL-safe encoding of a signed short-lived OAuth token.
+    # codeql[py/cookie-injection, py/clear-text-storage-sensitive-data] -- Encoded OAuth token.
     response.set_cookie(
         OAUTH_STATE_COOKIE,
-        state,
+        state_cookie,
         max_age=OAUTH_STATE_TTL_SECONDS,
         httponly=True,
         secure=secure,
         samesite="lax",
         path=OAUTH_COOKIE_PATH,
     )
+    # The PKCE verifier is short-lived, HttpOnly, Secure in production, and encoded.
+    # codeql[py/clear-text-storage-sensitive-data] -- Encoded short-lived PKCE verifier.
     response.set_cookie(
         OAUTH_PKCE_COOKIE,
-        issue_oauth_pkce_cookie(settings, state, verifier),
+        verifier_cookie,
         max_age=OAUTH_STATE_TTL_SECONDS,
         httponly=True,
         secure=secure,
@@ -308,10 +361,12 @@ def set_oauth_flow_cookies(
 
 
 def oauth_flow_verifier(request: Request, state: str, settings: Settings) -> str | None:
-    bound_state = request.cookies.get(OAUTH_STATE_COOKIE, "")
+    bound_state = _decode_oauth_cookie_value(request.cookies.get(OAUTH_STATE_COOKIE, ""))
     if not bound_state or not state or not hmac.compare_digest(bound_state, state):
         return None
-    cookie = request.cookies.get(OAUTH_PKCE_COOKIE, "")
+    cookie = _decode_oauth_cookie_value(request.cookies.get(OAUTH_PKCE_COOKIE, ""))
+    if cookie is None:
+        return None
     return verify_oauth_pkce_cookie(cookie, settings, state)
 
 

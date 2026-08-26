@@ -16,6 +16,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from resume_agent.security.paths import confined_path
+
 ALLOWED_SUFFIXES = {".pdf", ".docx", ".txt", ".md"}
 ALLOWED_DOC_TYPES = {"resume", "transcript", "portfolio", "other"}
 MAX_SIZE_BYTES = 15 * 1024 * 1024
@@ -41,11 +43,17 @@ def _safe_name(filename: str) -> str:
 
 class DocumentStore:
     def __init__(self, root: Path | str) -> None:
-        self.root = Path(root)
+        self.root = Path(root).resolve()
 
     @property
     def _manifest_path(self) -> Path:
-        return self.root / "manifest.json"
+        return confined_path(self.root, "manifest.json")
+
+    def _document_dir(self, doc_id: str) -> Path:
+        return confined_path(self.root, doc_id)
+
+    def _document_path(self, doc_id: str, filename: str) -> Path:
+        return confined_path(self._document_dir(doc_id), filename)
 
     def _read_manifest(self) -> list[dict]:
         if not self._manifest_path.exists():
@@ -67,9 +75,9 @@ class DocumentStore:
         if len(content) > MAX_SIZE_BYTES:
             raise DocumentError("File exceeds the 15 MB limit")
         doc_id = uuid.uuid4().hex[:12]
-        target_dir = self.root / doc_id
+        target_dir = self._document_dir(doc_id)
         target_dir.mkdir(parents=True, exist_ok=True)
-        (target_dir / name).write_bytes(content)  # file first…
+        self._document_path(doc_id, name).write_bytes(content)  # file first…
         record = DocumentRecord(
             id=doc_id, filename=name, doc_type=doc_type, size_bytes=len(content),
             uploaded_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -88,7 +96,7 @@ class DocumentStore:
         if len(kept) == len(rows):
             return False
         self._write_manifest(kept)
-        target = self.root / doc_id
+        target = self._document_dir(doc_id)
         if target.is_dir():
             for child in target.iterdir():
                 child.unlink(missing_ok=True)
@@ -102,4 +110,4 @@ class DocumentStore:
         # uploaded_at has second precision, so ties are possible; break ties by
         # manifest order (later appends win) instead of silently keeping the first.
         _, newest = max(enumerate(resumes), key=lambda pair: (pair[1]["uploaded_at"], pair[0]))
-        return self.root / newest["id"] / newest["filename"]
+        return self._document_path(newest["id"], newest["filename"])

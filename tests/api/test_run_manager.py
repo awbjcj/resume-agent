@@ -760,3 +760,17 @@ def test_concurrent_acks_stamp_exactly_once(tmp_path):
     updated = mgr.get(run_id)
     assert updated is not None
     assert updated.announced_at is not None
+
+
+def test_run_manager_rejects_traversal_ids_without_touching_outside_files(tmp_path):
+    root = tmp_path / "runs"
+    outside = tmp_path / "outside.stream.ndjson"
+    outside.write_text("keep", encoding="utf-8")
+    mgr = RunManager(root=root, executor=InlineExecutor())
+
+    assert mgr.get("../outside") is None
+    assert mgr.request_cancel("../outside") is False
+    mgr.clear("../outside")
+    assert outside.read_text(encoding="utf-8") == "keep"
+    with pytest.raises(ValueError, match="invalid run id"):
+        mgr.stream_path("../outside")

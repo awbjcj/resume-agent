@@ -61,7 +61,7 @@ def test_read_invalid_json_names_the_label(store, tmp_path):
     bad = tmp_path / "session-bad.json"
     bad.write_text("{not json", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid probe session"):
-        store.read(bad)
+        store.read(tmp_path, bad)
 
 
 def test_list_sorts_and_filters_archived(store, tmp_path):

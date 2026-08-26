@@ -25,6 +25,7 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.progress import atomic_write_text
+from resume_agent.security.paths import confined_path
 
 logger = logging.getLogger(__name__)
 
@@ -73,14 +74,16 @@ class SessionStore(Generic[M]):
     def path(self, root: Path | str, session_id: str) -> Path:
         if not valid_session_id(session_id):
             raise ValueError(f"unknown session: {session_id}")
-        return Path(root) / f"session-{session_id}.json"
+        return confined_path(root, f"session-{session_id}.json")
 
-    def read(self, path: Path) -> dict:
+    def read(self, root: Path | str, path: Path) -> dict:
+        """Read a session file only after re-confining it to its owning root."""
+        safe_path = confined_path(root, path.name)
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = json.loads(safe_path.read_text(encoding="utf-8"))
             return self.model.model_validate(raw).model_dump(mode="json")
         except (OSError, ValueError, json.JSONDecodeError) as exc:
-            raise ValueError(f"invalid {self.label} session: {path}") from exc
+            raise ValueError(f"invalid {self.label} session: {safe_path}") from exc
 
     def write(self, root: Path | str, session: dict) -> None:
         validated = self.model.model_validate(session)
@@ -90,6 +93,7 @@ class SessionStore(Generic[M]):
         atomic_write_text(
             self.path(root, session_id),
             validated.model_dump_json(indent=2) + "\n",
+            root=root,
         )
 
     def list(self, root: Path | str, *, include_archived: bool = False) -> list[dict]:
@@ -109,7 +113,7 @@ class SessionStore(Generic[M]):
         sessions = []
         for path in base.glob("session-*.json"):
             try:
-                sessions.append(self.read(path))
+                sessions.append(self.read(base, path))
             except ValueError:
                 logger.warning("Skipping unreadable %s session: %s", self.label, path)
         if not include_archived:
@@ -120,7 +124,7 @@ class SessionStore(Generic[M]):
         path = self.path(root, session_id)
         if not path.exists():
             raise ValueError(f"unknown session: {session_id}")
-        return self.read(path)
+        return self.read(root, path)
 
     def active(self, root: Path | str) -> list[dict]:
         return [row for row in self.list(root) if row["status"] == "active"]

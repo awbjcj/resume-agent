@@ -11,6 +11,7 @@ import httpx
 
 from resume_agent.discovery.connectors.text import html_to_text
 from resume_agent.profile.corpus import SourceDoc, SourceMode, add_source
+from resume_agent.security.paths import confined_path
 from resume_agent.security.outbound import Resolver, fetch_public_text, resolve_host
 
 _SLUG = re.compile(r"[^a-z0-9]+")
@@ -31,7 +32,7 @@ def _stage_and_add(
     anchor: str | None = None,
 ) -> SourceDoc:
     with tempfile.TemporaryDirectory() as scratch:
-        staged = Path(scratch) / filename
+        staged = confined_path(scratch, filename)
         staged.write_text(body, encoding="utf-8", newline="\n")
         return add_source(profile_dir, staged, mode=mode, anchor=anchor)
 

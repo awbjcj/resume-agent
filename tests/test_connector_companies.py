@@ -107,6 +107,7 @@ def test_undetectable_url_recorded_and_isolated(monkeypatch):
     conn = CompaniesConnector(["https://mystery.example", "https://careers.acme.com"])
     result = conn.fetch(SearchConfig(keywords=["engineer"]))
     assert {j.title for j in result.jobs} == {"AI Engineer"}
+    # codeql[py/incomplete-url-substring-sanitization] -- Assertion only; no URL is constructed or trusted.
     assert "https://mystery.example" in result.failures
     assert "no known ATS" in result.failures["https://mystery.example"]
 
@@ -149,6 +150,7 @@ def test_companies_unsupported_ats_recorded(monkeypatch):
     )
     conn = CompaniesConnector(["https://careers.x.com"])
     result = conn.fetch(SearchConfig())
+    # codeql[py/incomplete-url-substring-sanitization] -- Assertion only; no URL is constructed or trusted.
     assert "https://careers.x.com" in result.failures
     assert "not yet supported" in result.failures["https://careers.x.com"]
 

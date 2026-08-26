@@ -34,6 +34,8 @@ from resume_agent.profile.synthesis import (
     asynthesize_document,
     fragment_to_facts,
 )
+from resume_agent.security.paths import confined_path
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 CacheStatus = Literal["cached", "stale", "source-changed", "missing"]
 
@@ -46,12 +48,16 @@ class FragmentResult:
 
 
 def _paths(profile_dir: str | Path, doc_id: str) -> tuple[Path, Path]:
-    root = Path(profile_dir) / FRAGMENTS_DIRNAME
-    return root / f"{doc_id}.json", root / f"{doc_id}.meta.json"
+    root = resolve_tenant_path(profile_dir) / FRAGMENTS_DIRNAME
+    return (
+        confined_path(root, f"{doc_id}.json"),
+        confined_path(root, f"{doc_id}.meta.json"),
+    )
 
 
 def evidence_path(profile_dir: str | Path, doc_id: str) -> Path:
-    return Path(profile_dir) / FRAGMENTS_DIRNAME / f"{doc_id}.evidence.json"
+    root = resolve_tenant_path(profile_dir) / FRAGMENTS_DIRNAME
+    return confined_path(root, f"{doc_id}.evidence.json")
 
 
 def load_fragment(profile_dir: str | Path, doc_id: str) -> ProfileFacts | None:

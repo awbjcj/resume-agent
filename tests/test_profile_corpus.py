@@ -13,6 +13,7 @@ from resume_agent.profile.corpus import (
     update_source,
     frontmatter_repo_url,
 )
+from resume_agent.security.paths import PathEscapeError
 
 
 def _make_doc(tmp_path, name="resume.txt", content="Ada Lovelace"):
@@ -30,6 +31,22 @@ def test_add_source_registers_and_copies(tmp_path):
     assert manifest.docs[0].primary is True
     assert doc.id.startswith("resume-")
     assert doc_path(profile_dir, doc).read_text(encoding="utf-8") == "Ada Lovelace"
+
+
+def test_doc_path_confines_manifest_filenames(tmp_path):
+    profile_dir = tmp_path / "profile"
+    outside = tmp_path / "outside.txt"
+    outside.write_text("keep", encoding="utf-8")
+    untrusted = SourceDoc(
+        id="resume-unsafe",
+        filename="../outside.txt",
+        sha256="0" * 64,
+        added_at="2026-01-01T00:00:00+00:00",
+    )
+
+    with pytest.raises(PathEscapeError):
+        doc_path(profile_dir, untrusted)
+    assert outside.read_text(encoding="utf-8") == "keep"
 
 
 def test_add_source_same_content_is_noop(tmp_path):

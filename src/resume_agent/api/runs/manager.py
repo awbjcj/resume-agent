@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import contextvars
+import re
 import threading
 import time
 import uuid
@@ -39,6 +40,7 @@ from resume_agent.progress import (
     clear_progress,
     read_progress,
 )
+from resume_agent.security.paths import confined_path
 from resume_agent.tenancy.context import current_context
 
 RunFn = Callable[[ProgressReporter], object]
@@ -47,6 +49,12 @@ RunFn = Callable[[ProgressReporter], object]
 #: the latest attempt per artifact is ever rehydrated, so a superseded failure
 #: cannot come back and offer a retry the user has already moved past.
 _REVISION_META_KEYS = {"revise": "versionId", "coverLetterRevise": "coverLetterId"}
+_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
+
+
+def valid_run_id(run_id: str) -> bool:
+    """Whether a run identifier is safe to use in a workspace filename."""
+    return bool(_RUN_ID.fullmatch(run_id))
 
 
 def _revision_key(snapshot: RunSnapshot) -> tuple[str, object] | None:
@@ -250,6 +258,8 @@ class RunManager:
         Returns False if the run is unknown or already terminal (nothing to
         cancel); True once flagged. The worker stops at its next checkpoint.
         """
+        if not valid_run_id(run_id):
+            return False
         record = self._read_record(run_id)
         snapshot = parse_run_snapshot(run_id, record)
         if snapshot is None or snapshot.state in TERMINAL_RUN_STATES:
@@ -487,31 +497,40 @@ class RunManager:
                 self._reset_in_progress.discard(user_id)
 
     def _root_for(self, run_id: str) -> Path:
+        if not valid_run_id(run_id):
+            raise ValueError(f"invalid run id: {run_id}")
         with self._singleton_lock:
             root = self._run_roots.get(run_id)
             roots = tuple(self._roots)
         if root is not None:
             return root
         for candidate in roots:
-            if (candidate / f"{run_id}.json").is_file():
+            if confined_path(candidate, f"{run_id}.json").is_file():
                 with self._singleton_lock:
                     self._run_roots[run_id] = candidate
                 return candidate
         return self.root
 
+    def _run_path(self, run_id: str, suffix: str) -> Path:
+        return confined_path(self._root_for(run_id), f"{run_id}{suffix}")
+
     def _read_record(self, run_id: str) -> dict | None:
+        if not valid_run_id(run_id):
+            return None
         return read_progress(run_id, root=self._root_for(run_id))
 
     def trace_path(self, run_id: str) -> Path:
         """Return the agent-run trace path beside this run's progress record."""
-        return self._root_for(run_id) / f"{run_id}.agents.ndjson"
+        return self._run_path(run_id, ".agents.ndjson")
 
     def stream_path(self, run_id: str) -> Path:
         """Return the event-log path beside this run's progress record."""
-        return self._root_for(run_id) / f"{run_id}.stream.ndjson"
+        return self._run_path(run_id, ".stream.ndjson")
 
     def notifier(self, run_id: str) -> StreamNotifier:
         """Return the process-local wakeup fanout for a run stream."""
+        if not valid_run_id(run_id):
+            raise ValueError(f"invalid run id: {run_id}")
         with self._singleton_lock:
             return self._stream_notifiers.setdefault(run_id, StreamNotifier())
 
@@ -534,6 +553,8 @@ class RunManager:
                 self._stream_notifiers.pop(run_id, None)
 
     def get(self, run_id: str) -> RunSnapshot | None:
+        if not valid_run_id(run_id):
+            return None
         return parse_run_snapshot(run_id, self._read_record(run_id))
 
     def mark_announced(self, run_id: str, *, now: str | None = None) -> bool:
@@ -549,6 +570,8 @@ class RunManager:
         ``_singleton_lock`` is an RLock, so the nested ``get``/``_write`` calls
         are deliberate, not an oversight.
         """
+        if not valid_run_id(run_id):
+            return False
         with self._singleton_lock:
             snapshot = self.get(run_id)
             if snapshot is None or snapshot.state not in TERMINAL_RUN_STATES:
@@ -685,9 +708,11 @@ class RunManager:
         return recovered
 
     def clear(self, run_id: str) -> None:
+        if not valid_run_id(run_id):
+            return
         root = self._root_for(run_id)
         clear_progress(run_id, root=root)
-        (root / f"{run_id}.stream.ndjson").unlink(missing_ok=True)
+        self.stream_path(run_id).unlink(missing_ok=True)
         with self._singleton_lock:
             self._run_roots.pop(run_id, None)
 
@@ -709,7 +734,10 @@ class RunManager:
                 try:
                     if path.stat().st_mtime < cutoff:
                         path.unlink(missing_ok=True)
-                        (root / f"{path.stem}.stream.ndjson").unlink(missing_ok=True)
+                        if valid_run_id(path.stem):
+                            confined_path(root, f"{path.stem}.stream.ndjson").unlink(
+                                missing_ok=True
+                            )
                         with self._singleton_lock:
                             self._run_roots.pop(path.stem, None)
                         removed += 1
@@ -726,7 +754,9 @@ class RunManager:
 
     def _write(self, run_id: str, record: dict) -> None:
         atomic_write_text(
-            self._root_for(run_id) / f"{run_id}.json", json.dumps(record, indent=2)
+            self._run_path(run_id, ".json"),
+            json.dumps(record, indent=2),
+            root=self._root_for(run_id),
         )
         # Terminal transitions (done, error, cancelled) are written here rather
         # than through the reporter, so they need their own wakeup or a client

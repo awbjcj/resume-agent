@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from resume_agent.security.paths import confined_path
 from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.paths import resolve_tenant_path
 
@@ -50,10 +51,10 @@ def validate_custom_stem(stem: str) -> str:
 def custom_template_path(stem: str) -> Path:
     safe_stem = validate_custom_stem(stem)
     directory = resolve_tenant_path(CUSTOM_TEMPLATES_DIR).resolve()
-    path = (directory / f"{safe_stem}.typ").resolve()
-    if not path.is_relative_to(directory):
-        raise TemplateNotFoundError("Custom template path escapes the workspace.")
-    return path
+    try:
+        return confined_path(directory, f"{safe_stem}.typ")
+    except ValueError as exc:
+        raise TemplateNotFoundError("Custom template path escapes the workspace.") from exc
 
 
 def _custom_info(stem: str, path: Path) -> TemplateInfo:

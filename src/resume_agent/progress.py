@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from resume_agent.security.paths import confined_path
+
 PROGRESS_ROOT = Path("data/progress")
 
 #: Where the API persists one JSON record per background run (run_id-keyed).
@@ -35,10 +37,10 @@ TERMINAL_TTL_SECONDS = 60
 
 
 def _path(process: str, root: Path | str = PROGRESS_ROOT) -> Path:
-    return Path(root) / f"{process}.json"
+    return confined_path(root, f"{process}.json")
 
 
-def atomic_write_text(path: Path, text: str) -> None:
+def atomic_write_text(path: Path, text: str, *, root: Path | str) -> None:
     """Write ``text`` to ``path`` so a concurrent reader never sees a torn file.
 
     ``Path.write_text`` truncates-then-writes, so a reader polling mid-write can
@@ -46,8 +48,10 @@ def atomic_write_text(path: Path, text: str) -> None:
     ``run_events`` consumer) then has to treat as a missing record. Writing to a
     sibling temp file and :func:`os.replace`-ing it in is atomic on POSIX and
     Windows, so readers always see either the previous or the next *complete*
-    record.
+    record. ``root`` is required so the temporary-file and replace capability
+    cannot be redirected outside the owning workspace.
     """
+    path = confined_path(root, Path(path).resolve())
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
     try:
@@ -92,7 +96,10 @@ def read_progress(process: str, root: Path | str = PROGRESS_ROOT) -> dict | None
       rather than report the run missing. Reporting it missing is what made a live
       SSE/GET run-lookup gate 404 a perfectly healthy run.
     """
-    p = _path(process, root)
+    try:
+        p = _path(process, root)
+    except ValueError:
+        return None
     for attempt in range(_READ_RETRIES):
         if not p.exists():
             return None
@@ -119,7 +126,10 @@ def read_all(root: Path | str = PROGRESS_ROOT) -> dict[str, dict]:
 
 def clear_progress(process: str, root: Path | str = PROGRESS_ROOT) -> None:
     """Remove a process's record (used to reset a stale bar)."""
-    _path(process, root).unlink(missing_ok=True)
+    try:
+        _path(process, root).unlink(missing_ok=True)
+    except ValueError:
+        return
 
 
 class ProgressReporter:
@@ -133,6 +143,7 @@ class ProgressReporter:
     """
 
     def __init__(self, process: str, root: Path | str = PROGRESS_ROOT) -> None:
+        _path(process, root)
         self.process = process
         self.root = Path(root)
         self._record: dict = {}
@@ -216,7 +227,11 @@ class ProgressReporter:
             return
         self._last_write = now
         self._record["updated_at"] = _now_iso()
-        atomic_write_text(_path(self.process, self.root), json.dumps(self._record, indent=2))
+        atomic_write_text(
+            _path(self.process, self.root),
+            json.dumps(self._record, indent=2),
+            root=self.root,
+        )
 
 
 @dataclass

@@ -64,8 +64,6 @@ _CITY_COUNTRY_ALIASES: dict[str, tuple[str, str]] = {
     "singapore": ("Singapore", "SG"),
 }
 
-_ZIP_RE = re.compile(r"\s+\d{5}(?:-\d{4})?$")
-_LOCATION_SEPARATOR_RE = re.compile(r"\s*(?:\||;|//)\s*")
 _REMOTE_RE = re.compile(r"\bremote\b", re.IGNORECASE)
 # A workplace type or office qualifier tacked onto the end of a location label.
 # Deliberately does not include "|", which `split_locations` has already
@@ -83,6 +81,43 @@ def _key(raw: str | None) -> str:
     return " ".join(raw.lower().split()) if raw else ""
 
 
+def _strip_trailing_us_zip(value: str) -> str:
+    """Remove a trailing ZIP or ZIP+4 without regex work on untrusted text."""
+    candidate = value.strip()
+    zip_start: int | None = None
+    if (
+        len(candidate) >= 10
+        and candidate[-5] == "-"
+        and candidate[-10:-5].isdecimal()
+        and candidate[-4:].isdecimal()
+    ):
+        zip_start = len(candidate) - 10
+    elif len(candidate) >= 5 and candidate[-5:].isdecimal():
+        zip_start = len(candidate) - 5
+    if zip_start is None or zip_start == 0 or not candidate[zip_start - 1].isspace():
+        return candidate
+    return candidate[:zip_start].rstrip()
+
+
+def _split_location_separators(value: str) -> list[str]:
+    """Split ``|``, ``;``, and ``//`` alternatives in linear time."""
+    values: list[str] = []
+    start = 0
+    cursor = 0
+    while cursor < len(value):
+        separator_length = (
+            2 if value.startswith("//", cursor) else 1 if value[cursor] in "|;" else 0
+        )
+        if separator_length:
+            values.append(value[start:cursor])
+            cursor += separator_length
+            start = cursor
+            continue
+        cursor += 1
+    values.append(value[start:])
+    return values
+
+
 def _clean_region(raw: str | None) -> str | None:
     """Light pass-through cleanup for a non-US region: no canonical table exists.
 
@@ -92,7 +127,7 @@ def _clean_region(raw: str | None) -> str | None:
     """
     if raw is None:
         return None
-    candidate = _ZIP_RE.sub("", raw.strip()).strip()
+    candidate = _strip_trailing_us_zip(raw)
     candidate = " ".join(candidate.split())
     return candidate or None
 
@@ -126,7 +161,7 @@ def _region_to_usps(raw: str | None) -> str | None:
         return None
     if "," in candidate:
         candidate = candidate.rsplit(",", 1)[-1]
-    candidate = _ZIP_RE.sub("", candidate).strip()
+    candidate = _strip_trailing_us_zip(candidate)
     key = _key(candidate)
     for probe in (key, key.rstrip(".")):
         if probe.upper() in _USPS_CODES:
@@ -181,7 +216,7 @@ def split_locations(raw: str | None) -> list[str]:
         return []
     values: list[str] = []
     seen: set[str] = set()
-    for candidate in _LOCATION_SEPARATOR_RE.split(raw):
+    for candidate in _split_location_separators(raw):
         value = " ".join(candidate.split())
         key = value.casefold()
         if not value or key in seen:

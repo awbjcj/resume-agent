@@ -92,6 +92,7 @@ def test_failed_send_logs_the_smtp_cause(
     logged = caplog.text
     assert "535" in logged
     assert "Username and Password not accepted" in logged
+    # codeql[py/incomplete-url-substring-sanitization] -- Assertion only; no URL is constructed or trusted.
     assert "smtp.example.com" in logged
     assert "user@example.com" in logged
 

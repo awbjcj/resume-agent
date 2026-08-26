@@ -25,7 +25,10 @@ class NullBreachChecker:
 
 class HibpBreachChecker:
     def is_breached(self, password: str) -> bool:
-        digest = hashlib.sha1(password.encode()).hexdigest().upper()
+        password_bytes = password.encode()
+        # HIBP's k-anonymity range protocol requires SHA-1; this is not a password verifier.
+        # codeql[py/weak-sensitive-data-hashing] -- Required HIBP range-query protocol.
+        digest = hashlib.sha1(password_bytes, usedforsecurity=False).hexdigest().upper()
         try:
             response = httpx.get(
                 f"https://api.pwnedpasswords.com/range/{digest[:5]}",
