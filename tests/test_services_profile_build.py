@@ -1,3 +1,5 @@
+import pytest
+
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.profile.build import BuildReport
 from resume_agent.profile.manual_skills import (
@@ -170,3 +172,96 @@ def test_run_corpus_build_validates_repo_limit(tmp_path):
             assert "limit" in str(error)
         else:
             raise AssertionError("invalid github limit was accepted")
+
+
+def test_run_corpus_build_does_not_publish_facts_when_classification_fails(
+    tmp_path, monkeypatch
+):
+    profile_dir = tmp_path / "data" / "profile"
+    facts_out = profile_dir / "facts.json"
+    matrix_out = profile_dir / "matrix.json"
+    profile_dir.mkdir(parents=True)
+    facts_out.write_text("old facts\n", encoding="utf-8")
+    matrix_out.write_text("old matrix\n", encoding="utf-8")
+    fresh = ProfileFacts(
+        contact=Contact(name="New"),
+        skills={"Languages": [Skill(name="Python")]},
+    )
+    monkeypatch.setattr(
+        "resume_agent.profile.build.build_corpus_profile",
+        lambda *_a, **_k: (fresh, BuildReport()),
+    )
+    for target in (
+        "resume_agent.profile.inference.build_inference_agent",
+        "resume_agent.profile.merge.build_bullet_dedup_agent",
+        "resume_agent.profile.synthesis.build_synthesis_agent",
+        "resume_agent.profile.synthesis.build_entailment_agent",
+        "resume_agent.profile.project_extractor.build_project_extractor_agent",
+        "resume_agent.profile.aspect_classifier.build_aspect_classifier_agent",
+    ):
+        monkeypatch.setattr(target, lambda: object())
+    monkeypatch.setattr(
+        "resume_agent.services.match_gap.refresh_clusters",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("classification failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="classification failed"):
+        run_corpus_build(
+            profile_dir=profile_dir,
+            github_username=None,
+            facts_out=facts_out,
+        )
+
+    assert facts_out.read_text(encoding="utf-8") == "old facts\n"
+    assert matrix_out.read_text(encoding="utf-8") == "old matrix\n"
+
+
+def test_run_corpus_build_rolls_back_facts_when_matrix_publication_fails(
+    tmp_path, monkeypatch
+):
+    profile_dir = tmp_path / "data" / "profile"
+    facts_out = profile_dir / "facts.json"
+    matrix_out = profile_dir / "matrix.json"
+    profile_dir.mkdir(parents=True)
+    facts_out.write_text("old facts\n", encoding="utf-8")
+    matrix_out.write_text("old matrix\n", encoding="utf-8")
+    save_cluster_map(
+        ClusterMap(
+            aliases={"python": "python"},
+            domain_of={"python": "languages"},
+            domain_label={"languages": "Languages"},
+            category_of={"languages": "languages"},
+        ),
+        profile_dir / "cluster_map.json",
+    )
+    fresh = ProfileFacts(
+        contact=Contact(name="New"),
+        skills={"Languages": [Skill(name="Python")]},
+    )
+    monkeypatch.setattr(
+        "resume_agent.profile.build.build_corpus_profile",
+        lambda *_a, **_k: (fresh, BuildReport()),
+    )
+    for target in (
+        "resume_agent.profile.inference.build_inference_agent",
+        "resume_agent.profile.merge.build_bullet_dedup_agent",
+        "resume_agent.profile.synthesis.build_synthesis_agent",
+        "resume_agent.profile.synthesis.build_entailment_agent",
+        "resume_agent.profile.project_extractor.build_project_extractor_agent",
+        "resume_agent.profile.aspect_classifier.build_aspect_classifier_agent",
+    ):
+        monkeypatch.setattr(target, lambda: object())
+    monkeypatch.setattr(
+        "resume_agent.profile.matrix.save_matrix",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("matrix write failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="matrix write failed"):
+        run_corpus_build(
+            profile_dir=profile_dir,
+            github_username=None,
+            facts_out=facts_out,
+        )
+
+    assert facts_out.read_text(encoding="utf-8") == "old facts\n"
+    assert matrix_out.read_text(encoding="utf-8") == "old matrix\n"

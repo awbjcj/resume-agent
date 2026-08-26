@@ -41,6 +41,7 @@ from resume_agent.taxonomy.state import (
 from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.match_gap import normalize_skill
 from resume_agent.tracking.match_gap import collect_target_skill_tokens
+from resume_agent.tracking.canonicalize import build_classification_agents
 
 # Domains that exist only to guarantee every demanded skill has a home.  The
 # prefix is a naming convention, not a protected kind: maintenance is expected
@@ -161,8 +162,8 @@ def _invalidate_changed_domain_suggestions(
 def refresh_clusters(
     session: Session | None,
     *,
-    canonicalizer: Runner,
-    themer: Runner,
+    canonicalizer: Runner | None = None,
+    themer: Runner | None = None,
     path: str | Path,
     reporter: ProgressReporter | None = None,
     batch_size: int | None = None,
@@ -191,6 +192,15 @@ def refresh_clusters(
         raise ValueError("concurrency must be at least 1")
     if reconcile_size < 1:
         raise ValueError("reconcile_batch_size must be at least 1")
+    if canonicalizer is None and themer is None and escalation_themer is None:
+        agents = build_classification_agents()
+        canonicalizer = agents.canonicalizer
+        themer = agents.themer
+        escalation_themer = agents.escalation_themer
+    elif canonicalizer is None or themer is None:
+        raise ValueError("canonicalizer and themer must be provided together")
+    assert canonicalizer is not None
+    assert themer is not None
 
     correction_file = (
         corrections_path

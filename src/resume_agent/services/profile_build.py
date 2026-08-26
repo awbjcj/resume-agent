@@ -2,11 +2,65 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
+from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.store import save_facts
 from resume_agent.tenancy.limits import enforce_active_budget
 from resume_agent.tenancy.paths import resolve_tenant_path
+
+if TYPE_CHECKING:
+    from resume_agent.profile.matrix import SkillMatrix
+
+
+def _restore_publication_file(path: Path, previous: bytes | None) -> None:
+    if previous is None:
+        path.unlink(missing_ok=True)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            delete=False,
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".rollback",
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(previous)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _publish_profile_artifacts(
+    facts: ProfileFacts,
+    matrix: SkillMatrix,
+    *,
+    facts_path: Path,
+    matrix_path: Path,
+    matrix_writer: Callable[[SkillMatrix, str | Path], None],
+) -> None:
+    """Publish facts and their derived matrix as one rollback-safe operation."""
+
+    paths = (facts_path, matrix_path)
+    previous = {path: path.read_bytes() if path.exists() else None for path in paths}
+    try:
+        save_facts(facts, facts_path)
+        matrix_writer(matrix, matrix_path)
+    except BaseException:
+        for path in paths:
+            _restore_publication_file(path, previous[path])
+        raise
 
 
 def run_corpus_build(
@@ -45,12 +99,10 @@ def run_corpus_build(
         build_synthesis_agent,
     )
     from resume_agent.taxonomy import groups as skill_groups
+    from resume_agent.taxonomy.corrections import corrections_file_path
+    from resume_agent.taxonomy.custody import TaxonomyCustody
     from resume_agent.taxonomy.state import mark_legacy_group_map_imported
     from resume_agent.services.match_gap import refresh_clusters
-    from resume_agent.tracking.canonicalize import (
-        build_incremental_canonicalizer_agent,
-        build_incremental_themer_agent,
-    )
 
     if reporter is not None:
         reporter.begin(3, "Extracting and merging source documents")
@@ -72,11 +124,11 @@ def run_corpus_build(
         facts, replay_warnings = apply_manual_skills(facts, manual_ledger)
         report.warnings.extend(replay_warnings)
         if reporter is not None:
-            reporter.step(1, label="Saving facts.json")
-        save_facts(facts, str(facts_out))
+            reporter.step(1, label="Prepared profile facts")
         if reporter is not None:
             reporter.step(2, label="Classifying the shared skill taxonomy")
         cluster_path = Path(profile_dir) / "cluster_map.json"
+        correction_path = resolve_tenant_path(corrections_file_path())
         # Everything before classification uses one coherent taxonomy read.
         pre = build_effective_taxonomy(profile_dir)
         preliminary = build_matrix(facts, pre)
@@ -101,19 +153,25 @@ def run_corpus_build(
         if missing:
             refresh_clusters(
                 None,
-                canonicalizer=build_incremental_canonicalizer_agent(),
-                themer=build_incremental_themer_agent(),
                 path=cluster_path,
                 demanded_tokens=missing,
                 category_hints=legacy_hints,
+                corrections_path=correction_path,
             )
-        mark_legacy_group_map_imported(cluster_path, taxonomy_path)
+        with TaxonomyCustody(cluster_path, correction_path).mutation():
+            mark_legacy_group_map_imported(cluster_path, taxonomy_path)
         # Classification and the legacy-import marker may both have mutated
         # persisted taxonomy artifacts, so the final matrix must rebind.
         post = build_effective_taxonomy(profile_dir)
         matrix = build_matrix(facts, post)
         decorate_matrix_groups(matrix, profile_dir, post)
-        save_matrix(matrix, Path(facts_out).with_name("matrix.json"))
+        _publish_profile_artifacts(
+            facts,
+            matrix,
+            facts_path=Path(facts_out),
+            matrix_path=Path(facts_out).with_name("matrix.json"),
+            matrix_writer=save_matrix,
+        )
     if reporter is not None:
         reporter.step(3, label="Saved matrix.json")
     return {

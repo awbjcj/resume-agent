@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from typing import Callable, Literal
 
 from agno.agent import Agent
@@ -338,6 +339,25 @@ def build_escalation_themer_agent() -> Runner:
             use_json_mode=use_json_mode_for(model, IncrementalSkillDomains),
             **retry_kwargs(),
         )
+    )
+
+
+@dataclass(frozen=True)
+class ClassificationAgents:
+    """The model policy for one production taxonomy classification run."""
+
+    canonicalizer: Runner
+    themer: Runner
+    escalation_themer: Runner
+
+
+def build_classification_agents() -> ClassificationAgents:
+    """Build the complete taxonomy runner bundle from one policy boundary."""
+
+    return ClassificationAgents(
+        canonicalizer=build_incremental_canonicalizer_agent(),
+        themer=build_incremental_themer_agent(),
+        escalation_themer=build_escalation_themer_agent(),
     )
 
 

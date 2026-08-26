@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 
 import resume_agent.tracking.canonicalize as canonicalize_module
+
 from resume_agent.tracking.canonicalize import (
+    build_classification_agents,
     IncrementalDomainGroup,
     IncrementalSkillDomains,
     SkillClusters,
@@ -10,6 +12,24 @@ from resume_agent.tracking.canonicalize import (
     build_skill_canonicalizer,
     clusters_to_mapping,
 )
+
+
+def test_classification_agent_policy_builds_every_phase_runner(monkeypatch):
+    monkeypatch.setattr(
+        canonicalize_module, "build_incremental_canonicalizer_agent", lambda: "canon"
+    )
+    monkeypatch.setattr(
+        canonicalize_module, "build_incremental_themer_agent", lambda: "theme"
+    )
+    monkeypatch.setattr(
+        canonicalize_module, "build_escalation_themer_agent", lambda: "escalate"
+    )
+
+    agents = build_classification_agents()
+
+    assert agents.canonicalizer == "canon"
+    assert agents.themer == "theme"
+    assert agents.escalation_themer == "escalate"
 
 
 def test_clusters_to_mapping_uses_first_member_as_canonical():

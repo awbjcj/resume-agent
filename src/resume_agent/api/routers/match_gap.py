@@ -122,11 +122,6 @@ def refresh_match_gap_clusters(
 
     def work(reporter):
         from resume_agent.services.match_gap import refresh_clusters
-        from resume_agent.tracking.canonicalize import (
-            build_escalation_themer_agent,
-            build_incremental_canonicalizer_agent,
-            build_incremental_themer_agent,
-        )
 
         facts_path = resolve_tenant_path(_FACTS_PATH)
         overrides = load_overrides(facts_path.with_name("overrides.yaml"))
@@ -141,14 +136,11 @@ def refresh_match_gap_clusters(
         with open_session(engine) as session:
             result = refresh_clusters(
                 session,
-                canonicalizer=build_incremental_canonicalizer_agent(),
-                themer=build_incremental_themer_agent(),
                 path=resolve_tenant_path(_CLUSTER_PATH),
                 reporter=reporter,
                 extra_tokens=extra_tokens,
                 corrections_path=resolve_tenant_path(corrections_file_path()),
                 skill_keys=scoped_keys,
-                escalation_themer=build_escalation_themer_agent(),
             )
         result["matrixRegenerated"] = _regenerate_bound_matrix(facts, facts_path)
         return result
