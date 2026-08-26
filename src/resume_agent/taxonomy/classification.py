@@ -38,6 +38,10 @@ class ClassificationFailure:
     # a refusal must not be -- and the message text cannot carry the difference
     # because it is the raised exception's own text whenever one was raised.
     kind: Literal["call", "output"] = "output"
+    # Initial canonical failures remain backlog work. Reconcile omissions are
+    # observable refinement gaps, but each omitted head is already a valid
+    # canonical and must not be demoted back into the backlog.
+    retryable: bool = True
 
 
 @dataclass(frozen=True)
@@ -395,14 +399,17 @@ async def classify_incrementally(
         batch: list[str], existing_canonicals: list[str], *, use_candidates: bool
     ):
         nonlocal prompt_bytes
+        available = set(existing_canonicals)
         candidate_canonicals = (
             sorted(
                 {
                     candidate
                     for token in batch
-                    for candidate in candidate_context.canonical_candidates.get(
-                        token, ()
+                    for candidate in (
+                        *candidate_context.canonical_candidates.get(token, ()),
+                        *candidate_context.peer_candidates.get(token, ()),
                     )
+                    if candidate in available
                 }
             )
             if use_candidates and candidate_context is not None
@@ -511,6 +518,7 @@ async def classify_incrementally(
                         "canonicalize",
                         tuple(sorted(reconciled.failed_tokens)),
                         "reconcile left new canonicals unmerged; kept as-is",
+                        retryable=False,
                     )
                 )
             if reporter is not None:

@@ -221,6 +221,37 @@ def test_model_call_failure_is_never_placed_by_the_floor(tmp_path):
     assert second["failedDomainTokens"] == 0
 
 
+def test_incomplete_canonical_output_stays_in_the_backlog(tmp_path):
+    engine = _engine_with_target_skills("Rust")
+    path = tmp_path / "clusters.json"
+    incomplete = _AsyncCanonicalizer(lambda _new, _current: [])
+
+    with get_session(engine) as session:
+        first = refresh_clusters(
+            session,
+            canonicalizer=incomplete,
+            themer=_AsyncThemer(),
+            path=path,
+        )
+
+    assert load_cluster_map(path) == ClusterMap.empty()
+    assert first["failedCanonicalTokens"] == 1
+    assert load_taxonomy_state(path).grouping_status["rust"].phase == "canonicalize"
+
+    recovered = _AsyncCanonicalizer()
+    with get_session(engine) as session:
+        second = refresh_clusters(
+            session,
+            canonicalizer=recovered,
+            themer=_AsyncThemer(),
+            path=path,
+        )
+
+    assert recovered.calls > 0
+    assert load_cluster_map(path).domain_of == {"rust": "languages"}
+    assert second["remainingUnassigned"] == 0
+
+
 def test_refresh_clusters_serializes_concurrent_calls(tmp_path, monkeypatch):
     engine = _engine_with_target_skills("Python")
     first_entered = threading.Event()

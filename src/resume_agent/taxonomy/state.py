@@ -62,6 +62,7 @@ class GroupingStatus(ExtensibleModel):
 
     state: Literal["uncertain", "failed"] = "uncertain"
     reason: str
+    phase: Literal["canonicalize", "domain"] = "domain"
     last_attempted_at: str = Field(default_factory=_utcnow)
 
 

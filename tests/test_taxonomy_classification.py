@@ -14,6 +14,7 @@ from resume_agent.taxonomy.classification import (
     classify_incrementally,
 )
 from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.embeddings import CandidateContext
 from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.canonicalize import (
     IncrementalDomainGroup,
@@ -254,6 +255,28 @@ def test_reconcile_shards_large_new_head_sets_instead_of_one_call():
     reconcile_calls = canonicalizer.calls[1:]
     assert len(reconcile_calls) == 3
     assert all(len(call["new"]) <= 4 for call in reconcile_calls)
+
+
+def test_reconcile_uses_new_peer_candidates_with_embedding_context():
+    def respond(new, existing):
+        if new == ["kube"] and "k8s" in existing:
+            return [["k8s", "kube"]]
+        return [[token] for token in new]
+
+    outcome = _classify(
+        demanded={"k8s", "kube"},
+        canonicalizer=_Canonicalizer(respond),
+        batch_size=1,
+        reconcile_batch_size=1,
+        candidate_context=CandidateContext(
+            mode="embedding",
+            canonical_candidates={"k8s": (), "kube": ()},
+            domain_candidates={"k8s": (), "kube": ()},
+            peer_candidates={"k8s": ("kube",), "kube": ("k8s",)},
+        ),
+    )
+
+    assert outcome.additions.aliases == {"k8s": "k8s", "kube": "k8s"}
 
 
 def test_existing_unthemed_canonical_is_themed_without_canonical_call():

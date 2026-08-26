@@ -249,7 +249,11 @@ def refresh_clusters(
         # A token that already failed a pass skips straight to escalation: a
         # replay of the identical batch, prompt, and gates is exactly why
         # clicking Regroup twice used to change nothing.
-        attempted = set(taxonomy_state.grouping_status)
+        attempted = {
+            token
+            for token, status in taxonomy_state.grouping_status.items()
+            if status.phase == "domain"
+        }
         first_pass = {
             token
             for token in target_raw
@@ -297,8 +301,17 @@ def refresh_clusters(
                 enforce_candidates=enforce_candidates,
             )
             after_first = merge_cluster_map(existing, first.additions)
+            canonical_failed = {
+                normalized
+                for failure in first.failures
+                if failure.phase == "canonicalize" and failure.retryable
+                for token in failure.tokens
+                if (normalized := normalize_skill(token))
+            }
             pending = sorted(
-                _unassigned(after_first, target_raw) - set(first.not_skills)
+                _unassigned(after_first, target_raw)
+                - set(first.not_skills)
+                - canonical_failed
             )
             # Escalation is the expensive path, so it is bounded per run.  What
             # the bound defers is not "unplaceable" -- it simply has not been
@@ -361,11 +374,18 @@ def refresh_clusters(
             for token in failure.tokens
             if (normalized := normalize_skill(token))
         }
+        canonical_failed = {
+            normalized
+            for failure in all_failures
+            if failure.phase == "canonicalize" and failure.retryable
+            for token in failure.tokens
+            if (normalized := normalize_skill(token))
+        }
         merged, floor_placed = _apply_placement_floor(
             merged,
             target_raw=target_raw,
             not_skills=not_skills,
-            call_failed=call_failed | deferred,
+            call_failed=call_failed | canonical_failed | deferred,
             hints={
                 **outcome.fallback_categories,
                 **(escalated.fallback_categories if escalated else {}),
@@ -419,7 +439,9 @@ def refresh_clusters(
                 )
                 if canonical not in final.domain_of:
                     statuses[canonical] = GroupingStatus(
-                        state=failure_state, reason=failure.message
+                        state=failure_state,
+                        reason=failure.message,
+                        phase=failure.phase,
                     )
         for token in requested_canonicals - assigned - retired_canonicals:
             statuses.setdefault(
