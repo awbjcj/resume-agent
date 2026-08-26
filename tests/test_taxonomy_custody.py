@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import multiprocessing
 import threading
 import time
 
@@ -13,6 +14,30 @@ from resume_agent.taxonomy.corrections import (
 from resume_agent.taxonomy.custody import TaxonomyCustody
 from resume_agent.taxonomy.custody import TaxonomyConflictError
 from resume_agent.taxonomy.state import taxonomy_state_path
+
+
+def _hold_cross_process_mutation(
+    cluster_path: str,
+    corrections_path: str,
+    entered,
+    release,
+) -> None:
+    custody = TaxonomyCustody(cluster_path, corrections_path)
+    with custody.mutation():
+        entered.set()
+        release.wait(timeout=10)
+
+
+def _enter_cross_process_mutation(
+    cluster_path: str,
+    corrections_path: str,
+    ready,
+    acquired,
+) -> None:
+    custody = TaxonomyCustody(cluster_path, corrections_path)
+    ready.set()
+    with custody.mutation():
+        acquired.set()
 
 
 def test_read_returns_one_correction_applied_snapshot(tmp_path):
@@ -81,6 +106,46 @@ def test_same_workspace_mutations_serialize(tmp_path):
     thread.join(timeout=1)
     follower.join(timeout=1)
     assert acquired.is_set()
+
+
+def test_same_workspace_mutations_serialize_across_processes(tmp_path):
+    context = multiprocessing.get_context("spawn")
+    cluster_path = str(tmp_path / "one" / "cluster_map.json")
+    corrections_path = str(tmp_path / "one" / "taxonomy_corrections.json")
+    entered = context.Event()
+    release = context.Event()
+    ready = context.Event()
+    acquired = context.Event()
+    holder = context.Process(
+        target=_hold_cross_process_mutation,
+        args=(cluster_path, corrections_path, entered, release),
+    )
+    follower = context.Process(
+        target=_enter_cross_process_mutation,
+        args=(cluster_path, corrections_path, ready, acquired),
+    )
+
+    holder.start()
+    try:
+        assert entered.wait(timeout=5)
+        follower.start()
+        assert ready.wait(timeout=5)
+        assert not acquired.wait(timeout=0.2)
+        release.set()
+        assert acquired.wait(timeout=5)
+    finally:
+        release.set()
+        holder.join(timeout=5)
+        follower.join(timeout=5)
+        if holder.is_alive():
+            holder.terminate()
+            holder.join(timeout=2)
+        if follower.is_alive():
+            follower.terminate()
+            follower.join(timeout=2)
+
+    assert holder.exitcode == 0
+    assert follower.exitcode == 0
 
 
 def test_different_workspaces_do_not_serialize(tmp_path):

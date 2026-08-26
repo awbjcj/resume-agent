@@ -12,6 +12,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator, TypeVar
 
+from filelock import FileLock
+
 from resume_agent.rollback import rollback_scope
 from resume_agent.taxonomy.clusters import (
     ClusterMap,
@@ -37,6 +39,9 @@ _WORKSPACE_LOCKS: weakref.WeakValueDictionary[Path, threading.RLock] = (
     weakref.WeakValueDictionary()
 )
 _ARTIFACT_LOCKS: weakref.WeakValueDictionary[Path, threading.RLock] = (
+    weakref.WeakValueDictionary()
+)
+_PROCESS_LOCKS: weakref.WeakValueDictionary[Path, FileLock] = (
     weakref.WeakValueDictionary()
 )
 T = TypeVar("T")
@@ -69,6 +74,16 @@ def _workspace_artifact_lock(path: str | Path) -> threading.RLock:
     key = _identity(path)
     with _LOCKS_GUARD:
         return _ARTIFACT_LOCKS.setdefault(key, threading.RLock())
+
+
+def _workspace_process_lock(path: str | Path) -> FileLock:
+    key = _identity(path)
+    lock_path = key.with_name(f".{key.name}.lock")
+    with _LOCKS_GUARD:
+        return _PROCESS_LOCKS.setdefault(
+            key,
+            FileLock(lock_path, is_singleton=True),
+        )
 
 
 @dataclass(frozen=True)
@@ -120,6 +135,16 @@ class TaxonomyCustody:
         self.corrections_path = Path(corrections_path).resolve()
         self._operation_lock = workspace_taxonomy_lock(self.cluster_path)
         self._artifact_lock = _workspace_artifact_lock(self.cluster_path)
+        self._process_lock = _workspace_process_lock(self.cluster_path)
+
+    @contextmanager
+    def _artifacts(self) -> Iterator[None]:
+        """Hold the in-process and on-disk guards for one artifact transaction."""
+
+        with self._artifact_lock:
+            self.cluster_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._process_lock:
+                yield
 
     @contextmanager
     def operation(self) -> Iterator[None]:
@@ -132,9 +157,10 @@ class TaxonomyCustody:
     def mutation(self) -> Iterator[None]:
         """Serialize a complete mutation of this Workspace's artifact set."""
 
-        with self._operation_lock, self._artifact_lock:
-            self._read_unlocked(strict_generated=True)
-            yield
+        with self._operation_lock:
+            with self._artifacts():
+                self._read_unlocked(strict_generated=True)
+                yield
 
     def _read_unlocked(self, *, strict_generated: bool) -> TaxonomySnapshot:
         generated = (
@@ -168,13 +194,13 @@ class TaxonomyCustody:
     def read(self) -> TaxonomySnapshot:
         """Read generated data, user intent, and lifecycle state coherently."""
 
-        with self._artifact_lock:
+        with self._artifacts():
             return self._read_unlocked(strict_generated=False)
 
     def read_for_mutation(self) -> TaxonomySnapshot:
         """Read a validated mutation base without accepting corrupt data as empty."""
 
-        with self._artifact_lock:
+        with self._artifacts():
             return self._read_unlocked(strict_generated=True)
 
     def commit(
@@ -184,16 +210,18 @@ class TaxonomyCustody:
     ) -> T:
         """Apply one short commit only if every persisted input is unchanged."""
 
-        with self._operation_lock, self._artifact_lock:
-            current = self._read_unlocked(strict_generated=True)
-            if current.revision != expected.revision:
-                raise TaxonomyConflictError(
-                    "taxonomy changed during classification; retry from the latest revision"
+        with self._operation_lock:
+            with self._artifacts():
+                current = self._read_unlocked(strict_generated=True)
+                if current.revision != expected.revision:
+                    raise TaxonomyConflictError(
+                        "taxonomy changed during classification; "
+                        "retry from the latest revision"
+                    )
+                paths = (
+                    self.cluster_path,
+                    self.corrections_path,
+                    taxonomy_state_path(self.cluster_path),
                 )
-            paths = (
-                self.cluster_path,
-                self.corrections_path,
-                taxonomy_state_path(self.cluster_path),
-            )
-            with rollback_scope(paths):
-                return write(current)
+                with rollback_scope(paths):
+                    return write(current)

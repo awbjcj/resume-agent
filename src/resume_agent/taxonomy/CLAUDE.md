@@ -77,11 +77,10 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   which re-reads under both locks, raises `TaxonomyConflictError` if the
   revision moved, and rolls every artifact back (via `rollback.rollback_scope`)
   if `write` raises. `mutation()` remains the short-operation shorthand that
-  takes both locks at once. Two limits are deliberate and unclosed: the locks
-  are in-process, so `commit`'s revision check is not a guard against a second
-  **process** (a multi-worker deploy needs an on-disk lock); and because every
-  in-process writer serializes on the operation lock, `TaxonomyConflictError`
-  is currently unreachable in a single-process deployment and has no handler.
+  takes both locks at once. The artifact critical section also takes a
+  per-workspace on-disk lock, so multi-worker reads and commits are coherent:
+  long model work may overlap across processes, but the first commit wins and a
+  stale sibling receives `TaxonomyConflictError` from the revision check.
 - **A mutation base is loaded strictly; a read is not.** The lenient loaders
   (`load_cluster_map`, `load_taxonomy_corrections`, `load_taxonomy_state`)
   return empty on corruption, which is right for display and catastrophic for a
