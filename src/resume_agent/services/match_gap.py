@@ -268,6 +268,9 @@ def refresh_clusters(
                     tokens=first_pass,
                     existing=existing,
                     provider=embedding_provider,
+                    checkpoint=(
+                        reporter.checkpoint if reporter is not None else None
+                    ),
                 )
             )
         # Retrieval may only veto reuse it did not surface when it is actually

@@ -1,6 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.embeddings import (
     EmbeddingUnavailable,
@@ -72,6 +74,60 @@ def test_embedding_cache_batches_hits_and_invalidates_descriptors(tmp_path):
     assert embedding_cache_path(tmp_path / "cluster_map.json").exists()
 
 
+def test_embedding_cache_prunes_stale_records_in_managed_namespaces(tmp_path):
+    provider = _EmbeddingProvider()
+    cluster_path = tmp_path / "cluster_map.json"
+
+    asyncio.run(
+        embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors={"query:a": "alpha", "query:b": "beta"},
+            provider=provider,
+            managed_namespaces=frozenset({"query"}),
+        )
+    )
+    asyncio.run(
+        embed_descriptors(
+            cluster_path=cluster_path,
+            descriptors={"query:b": "beta", "query:c": "gamma"},
+            provider=provider,
+            managed_namespaces=frozenset({"query"}),
+        )
+    )
+
+    import json
+
+    payload = json.loads(embedding_cache_path(cluster_path).read_text(encoding="utf-8"))
+    assert set(payload["records"]) == {"query:b", "query:c"}
+
+
+def test_candidate_context_scans_aliases_a_constant_number_of_times(tmp_path):
+    class _CountingAliases(dict[str, str]):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.items_calls = 0
+
+        def items(self):
+            self.items_calls += 1
+            return super().items()
+
+    aliases = _CountingAliases(
+        {f"skill-{index}": f"skill-{index}" for index in range(8_000)}
+    )
+    existing = ClusterMap(aliases=aliases)
+
+    asyncio.run(
+        build_candidate_context(
+            cluster_path=tmp_path / "cluster_map.json",
+            tokens={"new skill"},
+            existing=existing,
+            provider=_UnavailableProvider(),
+        )
+    )
+
+    assert aliases.items_calls <= 4
+
+
 def test_embedding_cache_never_sends_more_than_256_descriptors(tmp_path):
     provider = _EmbeddingProvider()
     descriptors = {f"skill-{index}": f"descriptor {index}" for index in range(300)}
@@ -87,6 +143,21 @@ def test_embedding_cache_never_sends_more_than_256_descriptors(tmp_path):
     )
 
     assert [len(call) for call in provider.calls] == [256, 44]
+
+
+def test_embedding_fanout_honours_run_cancellation(tmp_path):
+    def cancelled():
+        raise RuntimeError("cancelled")
+
+    with pytest.raises(RuntimeError, match="cancelled"):
+        asyncio.run(
+            embed_descriptors(
+                cluster_path=tmp_path / "cluster_map.json",
+                descriptors={"query:a": "alpha"},
+                provider=_EmbeddingProvider(),
+                checkpoint=cancelled,
+            )
+        )
 
 
 def test_embeddings_rank_bounded_candidates_and_fall_back_to_lexical(tmp_path):

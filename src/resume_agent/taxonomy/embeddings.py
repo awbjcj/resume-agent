@@ -10,10 +10,16 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import json
 import math
 import os
 import struct
+import sys
 import tempfile
+import threading
+import weakref
+from array import array
+from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -152,14 +158,30 @@ def _encode_vector(vector: Sequence[float]) -> str:
     return base64.b64encode(packed).decode("ascii")
 
 
-def _decode_vector(record: _EmbeddingRecord) -> tuple[float, ...] | None:
+def _decode_vector(record: _EmbeddingRecord) -> array[float] | None:
     try:
         raw = base64.b64decode(record.vector_base64, validate=True)
         if len(raw) != record.dimensions * 4 or record.dimensions < 1:
             return None
-        return struct.unpack(f"<{record.dimensions}f", raw)
-    except (ValueError, struct.error):
+        decoded = array("f")
+        decoded.frombytes(raw)
+        if sys.byteorder != "little":
+            decoded.byteswap()
+        return decoded
+    except (ValueError, EOFError):
         return None
+
+
+_CACHE_LOCKS_GUARD = threading.Lock()
+_CACHE_LOCKS: weakref.WeakValueDictionary[Path, threading.RLock] = (
+    weakref.WeakValueDictionary()
+)
+
+
+def _cache_lock(path: Path) -> threading.RLock:
+    key = path.resolve()
+    with _CACHE_LOCKS_GUARD:
+        return _CACHE_LOCKS.setdefault(key, threading.RLock())
 
 
 def _load_cache(path: Path, model_id: str) -> _EmbeddingCacheFile:
@@ -203,7 +225,7 @@ def _save_cache(path: Path, cache: _EmbeddingCacheFile) -> None:
 class EmbeddingResult:
     """Whatever could be embedded, plus why anything else could not."""
 
-    vectors: dict[str, tuple[float, ...]]
+    vectors: dict[str, Sequence[float]]
     requested: int
     failed: int
     reason: str = ""
@@ -220,6 +242,8 @@ async def embed_descriptors(
     provider: EmbeddingProvider,
     batch_size: int = EMBEDDING_BATCH_SIZE,
     concurrency: int = EMBEDDING_CONCURRENCY,
+    managed_namespaces: frozenset[str] = frozenset(),
+    checkpoint=None,
 ) -> EmbeddingResult:
     """Embed changed descriptors concurrently and keep every batch that lands.
 
@@ -240,8 +264,10 @@ async def embed_descriptors(
     # remains a safe boundary even outside Settings validation.
     batch_size = min(batch_size, EMBEDDING_BATCH_SIZE)
     cache_path = embedding_cache_path(cluster_path)
-    cache = _load_cache(cache_path, provider.model_id)
-    result: dict[str, tuple[float, ...]] = {}
+    lock = _cache_lock(cache_path)
+    with lock:
+        cache = _load_cache(cache_path, provider.model_id)
+    result: dict[str, Sequence[float]] = {}
     missing: list[tuple[str, str]] = []
     for key, text in descriptors.items():
         digest = _descriptor_hash(text)
@@ -273,26 +299,41 @@ async def embed_descriptors(
 
     from resume_agent.concurrency import gather_isolated
 
-    outcomes = await gather_isolated(shards, embed_shard)
+    outcomes = await gather_isolated(shards, embed_shard, checkpoint=checkpoint)
     failed = 0
-    landed = False
+    landed: dict[str, _EmbeddingRecord] = {}
     reasons: list[str] = []
     for shard, outcome in zip(shards, outcomes, strict=True):
         if not outcome.ok or outcome.value is None:
             failed += len(shard)
             reasons.append(str(outcome.error or "embedding batch failed"))
             continue
-        landed = True
         for (key, text), vector in zip(shard, outcome.value, strict=True):
-            cache.records[key] = _EmbeddingRecord(
+            record = _EmbeddingRecord(
                 descriptor_sha256=_descriptor_hash(text),
                 dimensions=len(vector),
                 vector_base64=_encode_vector(vector),
             )
-            result[key] = tuple(float(value) for value in vector)
-    if landed:
-        # Persist whatever arrived so the next run starts strictly closer.
-        _save_cache(cache_path, cache)
+            landed[key] = record
+            result[key] = array("f", (float(value) for value in vector))
+    active = set(descriptors)
+    if landed or managed_namespaces:
+        # Provider work happens outside the file critical section. Re-read and
+        # merge under the lock so concurrent Workspaces never lose a sibling's
+        # successful shard. Managed namespaces also drop query/domain records
+        # that no longer describe the active taxonomy.
+        with lock:
+            latest = _load_cache(cache_path, provider.model_id)
+            stale = [
+                key
+                for key in latest.records
+                if key.partition(":")[0] in managed_namespaces and key not in active
+            ]
+            for key in stale:
+                latest.records.pop(key, None)
+            latest.records.update(landed)
+            if landed or stale:
+                _save_cache(cache_path, latest)
     return EmbeddingResult(
         vectors=result,
         requested=len(descriptors),
@@ -318,7 +359,7 @@ async def cached_embeddings(
     )
     if not result.vectors and result.failed:
         raise EmbeddingUnavailable(result.reason)
-    return result.vectors
+    return {key: tuple(vector) for key, vector in result.vectors.items()}
 
 
 def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
@@ -468,6 +509,151 @@ def domain_lexical_parts(domain_id: str, cmap: ClusterMap) -> tuple[str, str]:
 
 
 @dataclass(frozen=True)
+class CandidateIndex:
+    """Revision-scoped retrieval data derived once from a Cluster map.
+
+    Reverse aliases, domain membership, descriptors, and lexical corpora used
+    to be rebuilt by independently scanning the full taxonomy for every query.
+    Keeping them behind this module concentrates both ranking knowledge and the
+    scale characteristic callers rely on.
+    """
+
+    revision: str
+    canonical_ids: tuple[str, ...]
+    domain_ids: tuple[str, ...]
+    aliases_by_canonical: Mapping[str, tuple[str, ...]]
+    members_by_domain: Mapping[str, tuple[str, ...]]
+    canonical_descriptors: Mapping[str, str]
+    domain_descriptors: Mapping[str, str]
+    canonical_lexical_parts: Mapping[str, tuple[str, str]]
+    domain_lexical_parts: Mapping[str, tuple[str, str]]
+    canonical_corpus: _LexicalCorpus
+    domain_corpus: _LexicalCorpus
+
+    @classmethod
+    def build(cls, cmap: ClusterMap, revision: str) -> CandidateIndex:
+        aliases: dict[str, list[str]] = defaultdict(list)
+        for alias, canonical in cmap.aliases.items():
+            aliases[canonical].append(alias)
+        aliases_by_canonical = {
+            canonical: tuple(sorted(forms)) for canonical, forms in aliases.items()
+        }
+
+        members: dict[str, list[str]] = defaultdict(list)
+        for token, domain_id in cmap.domain_of.items():
+            members[domain_id].append(token)
+        members_by_domain = {
+            domain_id: tuple(sorted(tokens)) for domain_id, tokens in members.items()
+        }
+
+        canonical_ids = tuple(
+            sorted(set(cmap.aliases.values()) | set(cmap.domain_of))
+        )
+        domain_ids = tuple(
+            sorted(set(cmap.domain_of.values()) | set(cmap.domain_label))
+        )
+
+        def describe_skill(token: str) -> str:
+            aliases_text = ", ".join(aliases_by_canonical.get(token, ())[:12])
+            return f"technical skill: {token}" + (
+                f"; aliases: {aliases_text}" if aliases_text else ""
+            )
+
+        def describe_domain(domain_id: str) -> str:
+            category = cmap.category_of.get(domain_id, "other")
+            label = cmap.domain_label.get(domain_id, domain_id)
+            member_text = ", ".join(members_by_domain.get(domain_id, ())[:24])
+            return (
+                f"skill taxonomy category: {category}; domain: {label}; "
+                f"members: {member_text}"
+            )
+
+        canonical_descriptors = {
+            token: describe_skill(token) for token in canonical_ids
+        }
+        domain_descriptors = {
+            domain_id: describe_domain(domain_id) for domain_id in domain_ids
+        }
+        canonical_parts = {
+            token: (token, ", ".join(aliases_by_canonical.get(token, ())[:12]))
+            for token in canonical_ids
+        }
+        domain_parts = {
+            domain_id: (
+                (
+                    f"{cmap.domain_label.get(domain_id, domain_id)} "
+                    f"{SKILL_GROUPS.get(cmap.category_of.get(domain_id, 'other'), cmap.category_of.get(domain_id, 'other'))}"
+                ),
+                ", ".join(members_by_domain.get(domain_id, ())[:24]),
+            )
+            for domain_id in domain_ids
+        }
+        return cls(
+            revision=revision,
+            canonical_ids=canonical_ids,
+            domain_ids=domain_ids,
+            aliases_by_canonical=aliases_by_canonical,
+            members_by_domain=members_by_domain,
+            canonical_descriptors=canonical_descriptors,
+            domain_descriptors=domain_descriptors,
+            canonical_lexical_parts=canonical_parts,
+            domain_lexical_parts=domain_parts,
+            canonical_corpus=_LexicalCorpus(canonical_parts),
+            domain_corpus=_LexicalCorpus(domain_parts),
+        )
+
+    def skill_descriptor(self, token: str) -> str:
+        cached = self.canonical_descriptors.get(token)
+        if cached is not None:
+            return cached
+        aliases_text = ", ".join(self.aliases_by_canonical.get(token, ())[:12])
+        return f"technical skill: {token}" + (
+            f"; aliases: {aliases_text}" if aliases_text else ""
+        )
+
+    def skill_lexical_parts(self, token: str) -> tuple[str, str]:
+        return self.canonical_lexical_parts.get(
+            token,
+            (token, ", ".join(self.aliases_by_canonical.get(token, ())[:12])),
+        )
+
+
+_INDEX_CACHE_LIMIT = 8
+_INDEX_CACHE_LOCK = threading.Lock()
+_INDEX_CACHE: OrderedDict[str, CandidateIndex] = OrderedDict()
+
+
+def _index_revision(cmap: ClusterMap) -> str:
+    payload = json.dumps(
+        {
+            "aliases": cmap.aliases,
+            "domain_of": cmap.domain_of,
+            "domain_label": cmap.domain_label,
+            "category_of": cmap.category_of,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def candidate_index(cmap: ClusterMap, revision: str | None = None) -> CandidateIndex:
+    revision = revision or _index_revision(cmap)
+    with _INDEX_CACHE_LOCK:
+        cached = _INDEX_CACHE.get(revision)
+        if cached is not None:
+            _INDEX_CACHE.move_to_end(revision)
+            return cached
+    built = CandidateIndex.build(cmap, revision)
+    with _INDEX_CACHE_LOCK:
+        cached = _INDEX_CACHE.setdefault(revision, built)
+        _INDEX_CACHE.move_to_end(revision)
+        while len(_INDEX_CACHE) > _INDEX_CACHE_LIMIT:
+            _INDEX_CACHE.popitem(last=False)
+        return cached
+
+
+@dataclass(frozen=True)
 class CandidateContext:
     mode: str
     canonical_candidates: dict[str, tuple[str, ...]]
@@ -495,6 +681,8 @@ async def build_candidate_context(
     tokens: set[str],
     existing: ClusterMap,
     provider: EmbeddingProvider | None = None,
+    revision: str | None = None,
+    checkpoint=None,
 ) -> CandidateContext:
     """Return bounded synonym/domain/peer candidates with a lexical fallback."""
 
@@ -502,16 +690,13 @@ async def build_candidate_context(
     # Older maps may contain a canonical domain assignment without an explicit
     # identity alias.  It is still a legitimate synonym candidate, so derive
     # the candidate universe from both axes of the canonical tree.
-    canonical_ids = sorted(set(existing.aliases.values()) | set(existing.domain_of))
-    domain_ids = sorted(set(existing.domain_of.values()) | set(existing.domain_label))
-    canonical_descriptors = {
-        token: skill_descriptor(token, existing.aliases) for token in canonical_ids
-    }
-    domain_descriptors = {
-        domain_id: domain_descriptor(domain_id, existing) for domain_id in domain_ids
-    }
+    index = candidate_index(existing, revision)
+    canonical_ids = index.canonical_ids
+    domain_ids = index.domain_ids
+    canonical_descriptors = index.canonical_descriptors
+    domain_descriptors = index.domain_descriptors
     new_descriptors = {
-        token: skill_descriptor(token, existing.aliases) for token in normalized
+        token: index.skill_descriptor(token) for token in normalized
     }
     resolved_provider = provider or _provider_from_settings()
     vectors: dict[str, tuple[float, ...]] = {}
@@ -528,6 +713,8 @@ async def build_candidate_context(
             descriptors=descriptors,
             provider=resolved_provider,
             batch_size=get_settings().skill_embedding_batch_size,
+            managed_namespaces=frozenset({"skill", "domain", "query"}),
+            checkpoint=checkpoint,
         )
         vectors = outcome.vectors
         if outcome.complete:
@@ -552,17 +739,10 @@ async def build_candidate_context(
     }
     # One corpus per axis, built once.  Peers exclude the query at rank time
     # rather than rebuilding an n-1 corpus for every one of n tokens.
-    canonical_corpus = _LexicalCorpus(
-        {token: skill_lexical_parts(token, existing.aliases) for token in canonical_ids}
-    )
-    domain_corpus = _LexicalCorpus(
-        {
-            domain_id: domain_lexical_parts(domain_id, existing)
-            for domain_id in domain_ids
-        }
-    )
+    canonical_corpus = index.canonical_corpus
+    domain_corpus = index.domain_corpus
     peer_corpus = _LexicalCorpus(
-        {token: skill_lexical_parts(token, existing.aliases) for token in normalized}
+        {token: index.skill_lexical_parts(token) for token in normalized}
     )
     canonical_candidates: dict[str, tuple[str, ...]] = {}
     domain_candidates: dict[str, tuple[str, ...]] = {}
@@ -617,10 +797,9 @@ async def domain_neighbor_candidates(
 ) -> tuple[str, dict[str, tuple[str, ...]]]:
     """Retrieve bounded semantic neighbours for maintenance planning."""
 
-    domain_ids = sorted(set(cmap.domain_of.values()) | set(cmap.domain_label))
-    descriptors = {
-        domain_id: domain_descriptor(domain_id, cmap) for domain_id in domain_ids
-    }
+    index = candidate_index(cmap)
+    domain_ids = index.domain_ids
+    descriptors = index.domain_descriptors
     resolved_provider = provider or _provider_from_settings()
     vectors: dict[str, tuple[float, ...]] = {}
     mode = "lexical"
@@ -633,6 +812,7 @@ async def domain_neighbor_candidates(
             },
             provider=resolved_provider,
             batch_size=get_settings().skill_embedding_batch_size,
+            managed_namespaces=frozenset({"maintenance-domain"}),
         )
         vectors = outcome.vectors
         mode = (
@@ -645,12 +825,10 @@ async def domain_neighbor_candidates(
         for key in domain_ids
         if f"maintenance-domain:{key}" in vectors
     }
-    corpus = _LexicalCorpus(
-        {domain_id: domain_lexical_parts(domain_id, cmap) for domain_id in domain_ids}
-    )
+    corpus = index.domain_corpus
     result: dict[str, tuple[str, ...]] = {}
     for domain_id in domain_ids:
-        identity, _support = domain_lexical_parts(domain_id, cmap)
+        identity, _support = index.domain_lexical_parts[domain_id]
         result[domain_id] = tuple(
             _rank(
                 _terms(identity),
