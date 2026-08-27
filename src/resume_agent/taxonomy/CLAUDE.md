@@ -135,6 +135,52 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   `Settings.taxonomy_escalation_max_skills` (300); the remainder escalates next
   run, so progress is monotonic. `failedCanonicalTokens`/`failedDomainTokens`
   count **distinct tokens** across both passes, never token-attempts.
+  A canonicalize-phase failure is no longer permanent backlog. The pass now
+  repairs its own residue in geometrically shrinking rounds (`batch_size` →
+  `batch_size // 4` → `1`, the singleton round bounded by
+  `Settings.taxonomy_canonical_repair_max_singletons`), because re-asking the
+  same tokens at the same size reproduces the same omission — `_shard` sorts
+  alphabetically, so the retry was byte-identical to the attempt that failed.
+  At one token per call a cross-cluster duplicate and a multi-existing-member
+  violation are both structurally impossible, so only an outright non-answer
+  survives. Whatever does survive is filed as **its own canonical** and
+  recorded `retryable=False`, exactly as reconcile already does for unmerged
+  heads. That flag is the whole integration: `_retryable_canonical_tokens`
+  stops matching, so `_apply_placement_floor` may file it, and
+  `refresh_clusters` needed no change. The cost is a possible unmerged synonym,
+  which is visible and fixable through Merge skill; the previous behaviour was
+  an invisible skill, which was not. Only `kind="output"` failures are repaired
+  or backstopped — an outage carries no judgment to honour, and an
+  identity-aliased token still passes through reconcile, which gets one more
+  free chance to merge it correctly.
+- **The canonicalizer runs on the mid tier, not premium.** It used to run on
+  `premium_model` while the harder domain judgment ran on `mid_model` —
+  inverted, and premium was not buying completeness: every one of the 446
+  failure records on the reference workspace was an incomplete premium
+  partition. Repair rounds and the identity backstop now absorb coverage loss
+  that used to be permanent, so the cheaper tier's downside is bounded.
+  Escalation keeps `premium_model`; the ambiguous tail is where it earns its
+  cost. Watch the ratio of `canonicalRepaired` to `canonicalIdentityFiled` on a
+  run record — a large `canonicalIdentityFiled` means the repair rounds stopped
+  pulling their weight, and the tier is the first thing to reconsider. Repair
+  rounds catch *omissions*; nothing catches a confidently *wrong* merge, which
+  is the known risk this tier change accepts.
+- **The Message Batches API was evaluated and rejected — on latency and seam
+  cost, not on ignorance.** It cannot reach these call sites without bypassing
+  agno (`acall` → `AgentRunner.arun` → `Agent(output_schema=...)`; batches need
+  raw `client.messages.batches.create`), which would mean re-implementing
+  structured-output binding, `SpendGate.open` gating, `SpendGate.settle` usage
+  recording, and the `is_transient` predicate outside the `build_model` seam,
+  and forking provider support since the seam covers four vendors and Batches
+  is Anthropic-only. The pipeline is also only partly batchable — reconcile is
+  strictly sequential by design — so it would take three dispatches of up to an
+  hour each and turn an interactive Regroup into an overnight job. And the
+  money is not there: a regroup is a sub-dollar operation, so halving it does
+  not pay for a second dispatch architecture. **The trigger to revisit is rate
+  limiting, not cost:** if regroups start failing with `kind="call"` 429s, the
+  Batches API's separate and much higher throughput ceiling becomes the actual
+  reason to adopt it. Full evaluation:
+  `docs/superpowers/specs/2026-08-27-taxonomy-canonicalize-repair-design.md`.
 - **Every demanded skill ends a refresh with a home, except after an outage.**
   `_apply_placement_floor` files whatever survives both passes into
   `general-<category>` (`Settings.taxonomy_placement_floor`), preferring the
@@ -149,10 +195,15 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   `"output"`) carries that distinction, because the message is the raised
   exception's own text and the old `"model call failed" in message` check
   therefore never matched a real outage. Second, a token that failed
-  **canonicalization** and is still `retryable` — output failures included,
-  since a token with no settled canonical form has nothing to file. Only the
-  reconcile-omission failure is `retryable=False`: each omitted head is already
-  a valid canonical, so it is a refinement gap, not backlog.
+  **canonicalization** and is still `retryable` — since a token with no settled
+  canonical form has nothing to file. Two canonicalize failures are
+  `retryable=False` and therefore *do* reach the floor, both for the same
+  reason — the token already has a valid canonical, so the gap is a refinement
+  miss rather than backlog: the reconcile omission (each omitted head is
+  already a canonical from its own batch) and the repair backstop (the token
+  was filed as its own canonical after every shrinking round declined it). A
+  retryable canonicalize failure now means only one thing: an outage
+  (`kind="call"`).
 - **`not_skills` is a terminal disposition, and it is reversible.** The domain
   classifier may return tokens that name no skill (`8+ years of machine learning
 experience`); they land in `TaxonomyState.retired_skills`, are subtracted from
