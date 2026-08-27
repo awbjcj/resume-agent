@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping
 
@@ -454,19 +455,28 @@ async def classify_incrementally(
     async def run_canonical_round(batches: list[list[str]], label: str) -> set[str]:
         """Run one canonicalize fan-out; return the tokens it left uncovered."""
         nonlocal canonical_call_failed
+        # ``reporter`` is captured from the enclosing function, and a narrowing
+        # of a captured name does not reach inside a lambda across that extra
+        # scope boundary.  Bind it to a local the callbacks close over instead,
+        # so they capture a value that is provably non-optional.
+        on_complete: Callable[[int], None] | None = None
+        checkpoint: Callable[[], None] | None = None
         if reporter is not None:
-            reporter.begin(len(batches), label)
+            progress = reporter
+            progress.begin(len(batches), label)
+
+            def report_step(completed: int) -> None:
+                progress.step(completed, label=label)
+
+            on_complete = report_step
+            checkpoint = progress.checkpoint
         results = await gather_isolated(
             batches,
             lambda batch: canonicalize(
                 batch, sorted(stable_canonicals), use_candidates=True
             ),
-            on_complete=(
-                (lambda completed: reporter.step(completed, label=label))
-                if reporter is not None
-                else None
-            ),
-            checkpoint=reporter.checkpoint if reporter is not None else None,
+            on_complete=on_complete,
+            checkpoint=checkpoint,
         )
         uncovered: set[str] = set()
         for batch, result in zip(batches, results, strict=True):
