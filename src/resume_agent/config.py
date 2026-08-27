@@ -129,6 +129,15 @@ class Settings(BaseSettings):
     # path, so it is bounded per run; anything past the bound keeps its recorded
     # status and escalates on the next run, which still converges.
     taxonomy_escalation_max_skills: int = Field(default=300, ge=0, le=5000)
+    # Bounds the terminal singleton repair round.  In the normal case it is
+    # never reached -- that round only ever sees the residue of a residue.  It
+    # exists for the systematic-failure case (a bad prompt edit, a schema
+    # mismatch) where every token fails every round and would otherwise
+    # dispatch one call per token.  Overflow goes to the identity backstop,
+    # which is safe by construction.
+    taxonomy_canonical_repair_max_singletons: int = Field(
+        default=500, ge=0, le=5000
+    )
     # Every demanded skill ends a refresh with a home.  Disable only to restore
     # the historical behaviour where an uncertain skill stays unassigned.
     taxonomy_placement_floor: bool = True

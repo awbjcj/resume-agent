@@ -102,6 +102,135 @@ def _classify(*, demanded, existing=None, canonicalizer=None, themer=None, **kwa
     )
 
 
+class _OmittingCanonicalizer:
+    """Covers a batch fully only when it holds ``full_at`` tokens or fewer.
+
+    Reproduces the live failure: the model answers, and the answer partitions
+    only part of the batch it was given.  With ``full_at=1`` only the singleton
+    repair round can close the residue, which is exactly the property the
+    geometric shrink is supposed to buy.
+    """
+
+    def __init__(self, full_at: int = 1):
+        self.full_at = full_at
+        self.batch_sizes: list[int] = []
+
+    async def arun(self, prompt):
+        payload = json.loads(prompt)
+        new = payload["new"]
+        self.batch_sizes.append(len(new))
+        covered = new if len(new) <= self.full_at else new[: len(new) // 2]
+        return SimpleNamespace(
+            content=SkillClusters(clusters=[[token] for token in covered])
+        )
+
+    def run(self, prompt):
+        raise AssertionError("async path expected")
+
+
+def test_repair_rounds_recover_tokens_the_first_partition_omitted():
+    canonicalizer = _OmittingCanonicalizer(full_at=1)
+    demanded = {f"skill {index}" for index in range(8)}
+
+    outcome = _classify(
+        demanded=demanded, canonicalizer=canonicalizer, batch_size=8
+    )
+
+    # Every demanded token ends the pass with a canonical.
+    assert set(outcome.additions.aliases) == demanded
+    # Repair, not the backstop, is what recovered them.
+    assert outcome.metrics.canonical_identity_filed == 0
+    assert outcome.metrics.canonical_repaired == 8 - 4
+    assert outcome.metrics.canonical_repair_rounds >= 1
+    # The rounds shrink: 8, then 2, then 1.
+    assert canonicalizer.batch_sizes[0] == 8
+    assert min(canonicalizer.batch_sizes) == 1
+    # No retryable canonicalize failure survives for a recovered token.
+    recovered = {
+        token
+        for failure in outcome.failures
+        if failure.phase == "canonicalize" and failure.retryable
+        for token in failure.tokens
+    }
+    assert recovered == set()
+
+
+class _RefusingCanonicalizer:
+    """Answers every batch, and covers nothing.  The permanent-omission case."""
+
+    async def arun(self, prompt):
+        return SimpleNamespace(content=SkillClusters(clusters=[]))
+
+    def run(self, prompt):
+        raise AssertionError("async path expected")
+
+
+class _FailingCanonicalizer:
+    """The provider call itself fails -- an outage, not a refusal."""
+
+    async def arun(self, prompt):
+        raise RuntimeError("provider down")
+
+    def run(self, prompt):
+        raise AssertionError("async path expected")
+
+
+def test_a_token_no_round_can_place_becomes_its_own_canonical():
+    outcome = _classify(
+        demanded={"quantum widgetry"},
+        canonicalizer=_RefusingCanonicalizer(),
+        batch_size=8,
+    )
+
+    # It has a canonical, so the domain phase can see it at all.
+    assert outcome.additions.aliases["quantum widgetry"] == "quantum widgetry"
+    assert outcome.metrics.canonical_identity_filed == 1
+    # retryable=False is the whole integration: it stops
+    # `_retryable_canonical_tokens` from withholding the token from the floor.
+    # Match on the message, not just on `retryable=False` -- an identity-aliased
+    # token also lands in `new_heads`, so the reconcile pass emits its own
+    # non-retryable "kept as-is" failure for the same token.  That second
+    # record is correct and expected; it is reconcile getting one more free
+    # chance to merge the token before the domain phase runs.
+    backstopped = [
+        failure
+        for failure in outcome.failures
+        if failure.phase == "canonicalize"
+        and "kept as its own canonical" in failure.message
+    ]
+    assert len(backstopped) == 1
+    assert backstopped[0].tokens == ("quantum widgetry",)
+    assert backstopped[0].kind == "output"
+    assert backstopped[0].retryable is False
+
+
+def test_an_outage_is_never_backstopped():
+    outcome = _classify(
+        demanded={"rust"}, canonicalizer=_FailingCanonicalizer(), batch_size=8
+    )
+
+    # Filing a skill because a request failed would make an outage permanent.
+    assert "rust" not in outcome.additions.aliases
+    assert outcome.metrics.canonical_identity_filed == 0
+    assert [failure.kind for failure in outcome.failures] == ["call"] * len(
+        outcome.failures
+    )
+    assert all(failure.retryable for failure in outcome.failures)
+
+
+def test_the_singleton_bound_sends_its_overflow_to_the_backstop():
+    outcome = _classify(
+        demanded={"alpha", "beta"},
+        canonicalizer=_RefusingCanonicalizer(),
+        batch_size=8,
+        repair_max_singletons=1,
+    )
+
+    # Both still end up with a home; the bound caps dispatch, not coverage.
+    assert set(outcome.additions.aliases) == {"alpha", "beta"}
+    assert outcome.metrics.canonical_identity_filed == 2
+
+
 def test_warm_complete_map_makes_no_model_calls():
     canonicalizer = _Canonicalizer()
     themer = _Themer()
@@ -191,7 +320,15 @@ def test_ambiguous_existing_canonicals_reject_the_new_token():
         canonicalizer=canonicalizer,
     )
 
-    assert "k8s" not in outcome.additions.aliases
+    # The ambiguous cluster is still refused as a merge -- that is the point of
+    # the rejection rule and it is unchanged.  What changed is where a refused
+    # token lands: it is now kept as its own canonical rather than left with no
+    # alias at all.  An aliasless token never reaches the domain phase and the
+    # placement floor is forbidden to file it, which is how a refusal used to
+    # become permanent invisibility.
+    assert outcome.additions.aliases["k8s"] == "k8s"
+    assert outcome.additions.aliases["k8s"] not in {"kubernetes", "containers"}
+    assert outcome.metrics.canonical_identity_filed == 1
 
 
 def test_reconcile_call_failure_is_fatal():

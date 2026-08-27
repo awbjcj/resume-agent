@@ -255,7 +255,16 @@ def test_model_call_failure_is_never_placed_by_the_floor(tmp_path):
     assert second["failedDomainTokens"] == 0
 
 
-def test_incomplete_canonical_output_stays_in_the_backlog(tmp_path):
+def test_incomplete_canonical_output_is_kept_as_its_own_canonical(tmp_path):
+    """An answer that covers nothing no longer leaves the token invisible.
+
+    This used to assert the map stayed empty and the token stayed in the
+    backlog.  That was the bug: with no alias the token never reached the
+    domain phase, `_retryable_canonical_tokens` forbade the placement floor
+    from filing it, and `attempted` (gated on phase == "domain") sent it back
+    through an identical pass one forever.  It now ends the run with a home.
+    """
+
     engine = _engine_with_target_skills("Rust")
     path = tmp_path / "clusters.json"
     incomplete = _AsyncCanonicalizer(lambda _new, _current: [])
@@ -268,22 +277,50 @@ def test_incomplete_canonical_output_stays_in_the_backlog(tmp_path):
             path=path,
         )
 
-    assert load_cluster_map(path) == ClusterMap.empty()
+    saved = load_cluster_map(path)
+    # Kept as its own canonical -- never merged into anything on a non-answer.
+    assert saved.aliases["rust"] == "rust"
+    assert saved.domain_of["rust"] == "languages"
+    assert first["remainingUnassigned"] == 0
+    # The gap is still reported; it is simply no longer retryable backlog.
     assert first["failedCanonicalTokens"] == 1
-    assert load_taxonomy_state(path).grouping_status["rust"].phase == "canonicalize"
+    # Placed, so no status is owed.
+    assert "rust" not in load_taxonomy_state(path).grouping_status
 
-    recovered = _AsyncCanonicalizer()
+
+def test_a_backstopped_token_reaches_the_placement_floor(tmp_path):
+    """The floor may file it because the backstop marked it retryable=False.
+
+    Before the backstop this token had no alias at all, so the domain phase
+    never saw it and `_retryable_canonical_tokens` withheld it from the floor
+    -- the two conditions that made it permanently invisible.
+    """
+
+    class _RefusingCanonicalizer:
+        calls = 0
+
+        async def arun(self, prompt):
+            return SimpleNamespace(content=SkillClusters(clusters=[]))
+
+        def run(self, prompt):
+            raise AssertionError("async path expected")
+
+    engine = _engine_with_target_skills("Quantum Widgetry")
+    path = tmp_path / "cluster_map.json"
+
     with get_session(engine) as session:
-        second = refresh_clusters(
+        result = refresh_clusters(
             session,
-            canonicalizer=recovered,
-            themer=_AsyncThemer(),
+            canonicalizer=_RefusingCanonicalizer(),
+            themer=_AsyncThemer(lambda _new, _categories: []),
+            escalation_themer=_AsyncThemer(lambda _new, _categories: []),
             path=path,
         )
 
-    assert recovered.calls > 0
-    assert load_cluster_map(path).domain_of == {"rust": "languages"}
-    assert second["remainingUnassigned"] == 0
+    placed = load_cluster_map(path).domain_of
+    assert "quantum widgetry" in placed
+    assert placed["quantum widgetry"].startswith("general-")
+    assert result["placedByFallback"] == 1
 
 
 def test_refresh_clusters_serializes_concurrent_calls(tmp_path, monkeypatch):

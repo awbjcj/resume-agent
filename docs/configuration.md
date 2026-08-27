@@ -117,6 +117,7 @@ units and rollout behavior.
 | `SKILL_EMBEDDING_BATCH_SIZE` | `256` | Embedding request/cache batch size; integer from 1 through 256. |
 | `TAXONOMY_MAINTENANCE_MAX_CHURN` | `0.2` | Maximum maintenance churn ratio; number from 0.01 through 1.0. |
 | `TAXONOMY_ESCALATION_MAX_SKILLS` | `300` | Maximum unresolved skills escalated per run; integer from 0 through 5000. |
+| `TAXONOMY_CANONICAL_REPAIR_MAX_SINGLETONS` | `500` | Maximum one-token calls the terminal canonicalize repair round may dispatch per run; overflow is kept as its own canonical. Integer from 0 through 5000. |
 | `TAXONOMY_PLACEMENT_FLOOR` | `true` | Places eligible unresolved skills into deterministic general categories; `false` restores historical unassigned behavior. |
 
 

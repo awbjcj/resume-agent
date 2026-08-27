@@ -52,6 +52,14 @@ class ClassificationMetrics:
     max_in_flight: int
     elapsed_ms: int
     embedding_mode: str = "none"
+    # How the canonicalize pass actually closed its backlog.  ``repaired`` is
+    # what the shrinking rounds recovered; ``identity_filed`` is what no round
+    # could place and the backstop had to keep as its own canonical.  The ratio
+    # between them is the measurement of the dedup quality this design trades
+    # away for guaranteed termination.
+    canonical_repair_rounds: int = 0
+    canonical_repaired: int = 0
+    canonical_identity_filed: int = 0
 
 
 @dataclass(frozen=True)
@@ -371,6 +379,7 @@ async def classify_incrementally(
     min_new_domain_members: int = 1,
     category_hints: Mapping[str, str] | None = None,
     enforce_candidates: bool = True,
+    repair_max_singletons: int = 500,
 ) -> ClassificationOutcome:
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
@@ -434,26 +443,33 @@ async def classify_incrementally(
         )
 
     aliases: dict[str, str] = {}
-    if alias_batches:
+    canonical_repair_rounds = 0
+    canonical_repaired = 0
+    canonical_identity_filed = 0
+    # Tokens whose provider CALL failed.  An outage carries no judgment, so it
+    # is never repaired and never backstopped -- it keeps its retryable status
+    # and is re-attempted on the next run.
+    canonical_call_failed: set[str] = set()
+
+    async def run_canonical_round(batches: list[list[str]], label: str) -> set[str]:
+        """Run one canonicalize fan-out; return the tokens it left uncovered."""
+        nonlocal canonical_call_failed
         if reporter is not None:
-            reporter.begin(len(alias_batches), "Canonicalizing skills")
-        canonical_results = await gather_isolated(
-            alias_batches,
+            reporter.begin(len(batches), label)
+        results = await gather_isolated(
+            batches,
             lambda batch: canonicalize(
                 batch, sorted(stable_canonicals), use_candidates=True
             ),
             on_complete=(
-                (
-                    lambda completed: reporter.step(
-                        completed, label="Canonicalizing skills"
-                    )
-                )
+                (lambda completed: reporter.step(completed, label=label))
                 if reporter is not None
                 else None
             ),
             checkpoint=reporter.checkpoint if reporter is not None else None,
         )
-        for batch, result in zip(alias_batches, canonical_results, strict=True):
+        uncovered: set[str] = set()
+        for batch, result in zip(batches, results, strict=True):
             if not result.ok or result.value is None:
                 failures.append(
                     ClassificationFailure(
@@ -463,16 +479,59 @@ async def classify_incrementally(
                         kind="call",
                     )
                 )
+                canonical_call_failed |= set(batch)
                 continue
             aliases.update(result.value.aliases)
-            if result.value.failed_tokens:
-                failures.append(
-                    ClassificationFailure(
-                        "canonicalize",
-                        tuple(sorted(result.value.failed_tokens)),
-                        "invalid or incomplete model output",
-                    )
+            uncovered |= set(result.value.failed_tokens)
+        return uncovered
+
+    if alias_batches:
+        residue = await run_canonical_round(alias_batches, "Canonicalizing skills")
+        first_residue = set(residue)
+        # Geometric shrink.  Coverage of an exhaustive partition degrades with
+        # batch size, so re-asking the SAME tokens at the SAME size reproduces
+        # the same omission -- that identical-replay property is the bug.  The
+        # terminal singleton round is the point: with one token per call, a
+        # cross-cluster duplicate and a multi-existing-member violation are both
+        # structurally impossible, so ``_project_aliases`` can only reject an
+        # outright non-answer.
+        for repair_size in (max(1, batch_size // 4), 1):
+            if not residue:
+                break
+            targets = sorted(residue)
+            if repair_size == 1:
+                targets = targets[:repair_max_singletons]
+            overflow = residue - set(targets)
+            residue = (
+                await run_canonical_round(
+                    _shard(set(targets), repair_size), "Repairing skill canonicals"
                 )
+                | overflow
+            )
+            canonical_repair_rounds += 1
+        residue -= canonical_call_failed
+        canonical_repaired = len(first_residue - residue - canonical_call_failed)
+        if residue:
+            # Two rounds and a singleton attempt have now declined to cluster
+            # these.  A token that is its own canonical is always structurally
+            # valid -- the reconcile pass reaches exactly this conclusion for
+            # its own unmerged heads -- so the only thing given up is a
+            # possible synonym merge, which the Merge skill dialog can restore.
+            # Leaving them aliasless instead is what made them invisible
+            # forever: no alias means no domain phase, and ``retryable=True``
+            # means the placement floor is forbidden to file them either.
+            backstopped = sorted(residue)
+            for token in backstopped:
+                aliases.setdefault(token, token)
+            canonical_identity_filed = len(backstopped)
+            failures.append(
+                ClassificationFailure(
+                    "canonicalize",
+                    tuple(backstopped),
+                    "canonicalization incomplete; kept as its own canonical",
+                    retryable=False,
+                )
+            )
 
     new_heads = set(aliases.values()) - stable_canonicals
     if new_heads:
@@ -725,6 +784,9 @@ async def classify_incrementally(
         embedding_mode=candidate_context.mode
         if candidate_context is not None
         else "none",
+        canonical_repair_rounds=canonical_repair_rounds,
+        canonical_repaired=canonical_repaired,
+        canonical_identity_filed=canonical_identity_filed,
     )
     return ClassificationOutcome(
         additions=ClusterMap(
