@@ -85,41 +85,43 @@ function SourceRow({
         </div>
       </div>
       <Badge variant={source.pullable ? "outline" : "secondary"}>{source.kind}</Badge>
-      <LimitInput key={source.limit ?? "none"} source={source} />
-      <Switch
-        size="sm"
-        aria-label={`Enable ${source.displayName}`}
-        checked={source.enabled}
-        onCheckedChange={(enabled) => setEnabled.mutate({ id: source.id, enabled })}
-      />
-      <Button
-        size="sm"
-        variant="secondary"
-        aria-label={`Pull ${source.displayName}`}
-        disabled={pullDisabled}
-        onClick={() =>
-          launch(
-            "pull",
-            () => launchers.pullSources([source.id]),
-            ["shortlist", "pipeline", "triage", "sources"],
-          )
-        }
-      >
-        <Play className="size-3.5" aria-hidden="true" />
-        Pull
-      </Button>
-      {source.type === "board" ? (
+      <div className="col-span-3 flex min-w-0 flex-wrap items-center justify-end gap-2 border-t pt-2 lg:contents">
+        <LimitInput key={source.limit ?? "none"} source={source} />
+        <Switch
+          size="sm"
+          aria-label={`Enable ${source.displayName}`}
+          checked={source.enabled}
+          onCheckedChange={(enabled) => setEnabled.mutate({ id: source.id, enabled })}
+        />
         <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={`Remove ${source.displayName}`}
-          onClick={() => removeSource.mutate(source.id)}
+          size="sm"
+          variant="secondary"
+          aria-label={`Pull ${source.displayName}`}
+          disabled={pullDisabled}
+          onClick={() =>
+            launch(
+              "pull",
+              () => launchers.pullSources([source.id]),
+              ["shortlist", "pipeline", "triage", "sources"],
+            )
+          }
         >
-          <Trash2 className="size-4" aria-hidden="true" />
+          <Play className="size-3.5" aria-hidden="true" />
+          Pull
         </Button>
-      ) : (
-        <span className="hidden size-9 lg:block" aria-hidden="true" />
-      )}
+        {source.type === "board" ? (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={`Remove ${source.displayName}`}
+            onClick={() => removeSource.mutate(source.id)}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+          </Button>
+        ) : (
+          <span className="hidden size-9 lg:block" aria-hidden="true" />
+        )}
+      </div>
     </li>
   );
 }

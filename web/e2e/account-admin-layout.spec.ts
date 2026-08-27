@@ -134,6 +134,19 @@ test("cost quotas keeps one sidebar destination active and contains narrow layou
   const createRateBox = await page.getByRole("button", { name: "Create immutable version" }).boundingBox();
   expect(createRateBox?.x).toBeGreaterThan(rateReasonBox?.x ?? 0);
 
+  await page.getByRole("switch", { name: "Optional cache and tool rates" }).click();
+  const optionalRateFields = [
+    page.getByLabel("Cache read (USD / 1M)"),
+    page.getByLabel("Cache write (USD / 1M)"),
+    page.getByLabel("Tool fee (USD / unit)"),
+  ];
+  const optionalRateBoxes = await Promise.all(optionalRateFields.map((field) => field.boundingBox()));
+  const expandedReasonBox = await rateReason.boundingBox();
+  for (const box of optionalRateBoxes) {
+    expect(Math.abs((box?.y ?? 0) - (expandedReasonBox?.y ?? 0))).toBeLessThanOrEqual(1);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 

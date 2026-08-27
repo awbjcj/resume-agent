@@ -126,12 +126,12 @@ export function PersonalTokensCard() {
           {tokens.data.tokens.length ? (
             <ul className="flex flex-col divide-y rounded-lg border">
               {tokens.data.tokens.map((token) => (
-                <li className="flex items-center gap-3 px-4 py-3.5 text-sm" key={token.id}>
+                <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-3.5 text-sm sm:flex" key={token.id}>
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                     <KeyRound aria-hidden="true" />
                   </div>
                   <span className="min-w-0 flex-1 truncate font-medium">{token.name}</span>
-                  <time className="shrink-0 text-xs text-muted-foreground" dateTime={token.createdAt}>
+                  <time className="col-start-2 shrink-0 text-xs text-muted-foreground" dateTime={token.createdAt}>
                     {new Date(token.createdAt).toLocaleDateString()}
                   </time>
                 </li>
@@ -151,9 +151,9 @@ export function PersonalTokensCard() {
             </Empty>
           )}
         </CardContent>
-        <CardFooter className="justify-between gap-3">
+        <CardFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">Treat tokens like passwords.</p>
-          <Button type="submit" disabled={createToken.isPending}>
+          <Button className="w-full sm:w-auto" type="submit" disabled={createToken.isPending}>
             {createToken.isPending ? (
               <Spinner data-icon="inline-start" />
             ) : (

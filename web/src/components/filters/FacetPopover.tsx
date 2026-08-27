@@ -31,6 +31,7 @@ type FacetPopoverProps = {
   onOpenChange?: (open: boolean) => void;
   getLabel?: (value: string) => string;
   presentation?: "chip" | "field";
+  className?: string;
 };
 
 export function FacetPopover({
@@ -42,6 +43,7 @@ export function FacetPopover({
   onOpenChange,
   getLabel,
   presentation = "chip",
+  className,
 }: FacetPopoverProps) {
   const [query, setQuery] = useState("");
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -93,6 +95,7 @@ export function FacetPopover({
             className={cn(
               presentation === "field" ? "w-full justify-between" : "rounded-full",
               selected.size > 0 && "border-primary text-primary",
+              className,
             )}
           />
         }

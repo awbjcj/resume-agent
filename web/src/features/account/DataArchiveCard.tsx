@@ -100,13 +100,13 @@ export function DataArchiveCard({
           contain workspace credentials and source data.
         </p>
       </CardContent>
-      <CardFooter className="flex-wrap justify-end gap-3">
-        <Button variant="outline" onClick={() => void openDownload(exportPath)}>
+      <CardFooter className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+        <Button className="w-full sm:w-auto" variant="outline" onClick={() => void openDownload(exportPath)}>
           <Download data-icon="inline-start" />
           {exportLabel}
         </Button>
         <AlertDialog>
-          <AlertDialogTrigger render={<Button variant="destructive" />}>
+          <AlertDialogTrigger render={<Button className="w-full sm:w-auto" variant="destructive" />}>
             <Upload data-icon="inline-start" />
             Import archive
           </AlertDialogTrigger>

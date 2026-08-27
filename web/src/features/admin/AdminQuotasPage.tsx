@@ -1475,14 +1475,29 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
         </div>
 
         <div className="rounded-lg border bg-muted/10 p-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div
+            data-testid="rate-options-row"
+            className={cn(
+              "grid gap-3 lg:items-end",
+              showOptionalRates
+                ? "xl:grid-cols-[auto_repeat(3,minmax(7rem,0.55fr))_minmax(10rem,1fr)_auto]"
+                : "lg:grid-cols-[auto_minmax(0,1fr)_auto]",
+            )}
+          >
             <div className="flex min-h-9 shrink-0 items-center gap-3 lg:pb-px">
               <Switch id="optional-rate-fields" checked={showOptionalRates} onCheckedChange={setShowOptionalRates} />
-              <div>
+              <div className="max-w-44">
                 <Label htmlFor="optional-rate-fields" className="text-sm font-medium">Optional cache and tool rates</Label>
                 <p className="mt-1 text-xs text-muted-foreground">Enable only when the provider charges them.</p>
               </div>
             </div>
+            {showOptionalRates ? (
+              <>
+                <Field label="Cache read (USD / 1M)" htmlFor="rate-cache-read" className="min-w-0"><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></Field>
+                <Field label="Cache write (USD / 1M)" htmlFor="rate-cache-write" className="min-w-0"><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></Field>
+                <Field label="Tool fee (USD / unit)" htmlFor="rate-tool-fee" className="min-w-0"><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></Field>
+              </>
+            ) : null}
             <Field label="Reason for this rate version" htmlFor="rate-reason" className="min-w-0 flex-1">
               <Input id="rate-reason" className="h-9" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this pricing version being added?" />
             </Field>
@@ -1490,13 +1505,6 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
               {create.isPending ? "Creating…" : "Create immutable version"}
             </Button>
           </div>
-          {showOptionalRates ? (
-            <div className="mt-3 flex flex-wrap gap-3 border-t pt-3">
-              <Field label="Cache read (USD / 1M)" htmlFor="rate-cache-read" className="w-full sm:w-52"><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></Field>
-              <Field label="Cache write (USD / 1M)" htmlFor="rate-cache-write" className="w-full sm:w-52"><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></Field>
-              <Field label="Tool fee (USD / unit)" htmlFor="rate-tool-fee" className="w-full sm:w-48"><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></Field>
-            </div>
-          ) : null}
         </div>
         {create.isError ? (
           <Alert variant="destructive">

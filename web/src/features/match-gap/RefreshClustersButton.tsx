@@ -38,7 +38,11 @@ export function RefreshClustersButton({
   };
 
   return (
-    <div className="relative flex items-center gap-2">
+    <div
+      role="group"
+      aria-label="Taxonomy actions"
+      className="shell-action-rail relative flex w-full min-w-0 items-center gap-2 pb-0.5 lg:w-auto lg:justify-end"
+    >
       <Button
         variant={unassignedCount > 0 ? "default" : "outline"}
         size="sm"

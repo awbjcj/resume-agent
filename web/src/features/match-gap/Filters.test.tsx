@@ -29,5 +29,7 @@ describe("Filters", () => {
     expect(screen.getByRole("combobox", { name: "Filter by seniority" })).toHaveTextContent(
       "All levels",
     );
+    expect(screen.getByRole("group", { name: "Skill filters" })).toHaveClass("grid-cols-2");
+    expect(screen.getByRole("button", { name: /^Stage/ })).toHaveClass("w-full");
   });
 });

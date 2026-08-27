@@ -17,12 +17,13 @@ export type AdminSection = (typeof ADMIN_SECTIONS)[number]["to"];
 
 export function AdminSectionNav({ current }: { current: AdminSection }) {
   return (
-    <nav aria-label="Administration sections" className="-mt-5 flex flex-wrap gap-2">
+    <nav aria-label="Administration sections" className="shell-action-rail -mt-5 flex flex-nowrap gap-2 pb-1">
       {ADMIN_SECTIONS.map((section) => {
         const isCurrent = section.to === current;
         return (
           <Button
             key={section.to}
+            className="shrink-0"
             nativeButton={false}
             variant={isCurrent ? "secondary" : "outline"}
             size="sm"

@@ -75,7 +75,27 @@ export function SettingsLayout() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <nav aria-label="Settings" className="flex flex-col gap-4">
+            <nav aria-label="Settings">
+              <ul className="shell-action-rail -mx-1 flex gap-1.5 px-1 pb-1 lg:hidden">
+                {SETTINGS_NAV.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.to} className="shrink-0">
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) => cn(
+                          "flex min-h-9 items-center gap-2 rounded-lg border bg-background px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground",
+                          isActive && "border-primary/30 bg-primary/8 font-medium text-foreground",
+                        )}
+                      >
+                        <Icon aria-hidden="true" className="size-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="hidden flex-col gap-4 lg:flex">
               {SETTINGS_GROUPS.map((group) => (
                 <div key={group.label} className="flex flex-col gap-1.5">
                   <div className="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
@@ -105,13 +125,14 @@ export function SettingsLayout() {
                   </ul>
                 </div>
               ))}
+              </div>
             </nav>
           </CardContent>
         </Card>
       </aside>
       <main
         aria-label="Settings panel"
-        className="min-w-0 flex-1 rounded-xl bg-card px-5 py-6 ring-1 ring-foreground/10 sm:px-7 sm:py-8 xl:px-9"
+        className="min-w-0 flex-1 rounded-xl bg-card px-4 py-5 ring-1 ring-foreground/10 sm:px-7 sm:py-8 xl:px-9"
       >
         <Outlet />
       </main>

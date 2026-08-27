@@ -18,10 +18,9 @@ import { TARGET_STATUSES, type Filters as FilterValue } from "./aggregate";
 const ALL = "__all__";
 
 /**
- * One compact row. Every control is h-9 and carries its own visible or
- * accessible name -- stacked field labels doubled the row height and forced
- * the group to wrap onto three lines at ordinary widths, which pushed the
- * dashboard itself below the fold on the page this toolbar is sticky over.
+ * A compact desktop row that becomes a deliberate two-column control grid on
+ * portable widths. Controls keep their own visible or accessible names while
+ * avoiding the unpredictable wrapping of one long flex line.
  */
 export function Filters({
   value,
@@ -49,14 +48,14 @@ export function Filters({
     <div
       role="group"
       aria-label="Skill filters"
-      className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+      className="grid min-w-0 flex-1 grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:items-center"
     >
       <Input
         id="match-gap-q"
         type="search"
         aria-label="Search skills"
         placeholder="Search skills…"
-        className="h-9 w-full min-w-0 bg-background sm:w-44"
+        className="col-span-2 h-9 w-full min-w-0 bg-background sm:col-span-1 lg:w-44"
         value={value.q}
         onChange={(event) => onChange({ ...value, q: event.target.value })}
       />
@@ -71,7 +70,7 @@ export function Filters({
         <SelectTrigger
           id="match-gap-company"
           size="compact"
-          className="w-36 min-w-0 bg-background"
+          className="w-full min-w-0 bg-background lg:w-36"
           aria-label="Filter by company"
         >
           <SelectValue />
@@ -101,7 +100,7 @@ export function Filters({
         <SelectTrigger
           id="match-gap-seniority"
           size="compact"
-          className="w-32 min-w-0 bg-background"
+          className="w-full min-w-0 bg-background lg:w-32"
           aria-label="Filter by seniority"
         >
           <SelectValue />
@@ -123,6 +122,8 @@ export function Filters({
 
       <FacetPopover
         label="Stage"
+        presentation="field"
+        className="w-full lg:w-auto lg:rounded-full"
         counts={{
           ...Object.fromEntries(TARGET_STATUSES.map((status) => [status, 0])),
           ...statusCounts,
@@ -132,7 +133,7 @@ export function Filters({
         getLabel={pipelineStageLabel}
       />
 
-      <div className="flex h-9 items-center gap-2 whitespace-nowrap">
+      <div className="flex h-9 items-center justify-between gap-2 rounded-lg border bg-background px-3 whitespace-nowrap lg:justify-start lg:border-0 lg:bg-transparent lg:px-0">
         <Switch
           id="match-gap-gaps-only"
           checked={value.gapsOnly}
@@ -144,6 +145,7 @@ export function Filters({
       </div>
 
       <ToggleGroup
+        className="col-span-2 grid grid-cols-2 lg:flex"
         aria-label="Demand weighting"
         value={[value.weighting]}
         onValueChange={(next) => {

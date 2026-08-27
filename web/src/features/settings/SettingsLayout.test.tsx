@@ -16,7 +16,7 @@ describe("SettingsLayout", () => {
       </MemoryRouter>,
     );
     for (const item of SETTINGS_NAV) {
-      expect(screen.getByRole("link", { name: item.label })).toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: item.label })).toHaveLength(2);
     }
     for (const group of SETTINGS_GROUPS) {
       expect(screen.getByText(group.label)).toBeInTheDocument();

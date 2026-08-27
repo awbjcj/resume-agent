@@ -222,7 +222,7 @@ export function AppLayout() {
         </header>
         <RunPanel />
         <ActiveInterviewBanner />
-        <main className="flex-1 px-5 py-6 md:px-8 lg:px-10 2xl:px-12">
+        <main className="flex-1 px-4 py-5 sm:px-5 sm:py-6 md:px-8 lg:px-10 2xl:px-12">
           <div className="mx-auto w-full max-w-[1680px]">
             <Outlet />
           </div>

@@ -57,20 +57,20 @@ export function SecretsForm({
             )}
             <Field>
               <div className="flex flex-wrap items-center gap-3">
-                <FieldLabel className="min-w-44">{label}</FieldLabel>
+                <FieldLabel className="min-w-0 sm:min-w-44">{label}</FieldLabel>
                 {s.isSet ? (
                   <Badge variant="secondary">Set{s.hint ? ` · ••••${s.hint}` : ""}</Badge>
                 ) : (
                   <Badge variant="outline">Not set</Badge>
                 )}
-                <div className="ml-auto flex gap-2">
+                <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
                   {editing !== s.key && (
-                    <Button variant="outline" size="sm" onClick={() => startEdit(s.key)}>
+                    <Button className="min-w-0 flex-1 sm:flex-none" variant="outline" size="sm" onClick={() => startEdit(s.key)}>
                       {s.isSet ? `Replace ${label}` : `Add ${label}`}
                     </Button>
                   )}
                   {s.isSet && (
-                    <Button variant="outline" size="sm" disabled={saving}
+                    <Button className="min-w-0 flex-1 sm:flex-none" variant="outline" size="sm" disabled={saving}
                       aria-label={`Clear ${label}`}
                       onClick={() => onSave({ [s.key]: null })}>
                       Clear {label}
@@ -80,7 +80,7 @@ export function SecretsForm({
               </div>
               {description && <FieldDescription>{description}</FieldDescription>}
               {editing === s.key && (
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                   <Input
                     type={SECRET_PLAIN_TEXT_KEYS.has(s.key) ? "text" : "password"}
                     aria-label={`${label} new value`}
@@ -88,11 +88,11 @@ export function SecretsForm({
                     onChange={(e) => setDraft(e.target.value)}
                     autoComplete="off"
                   />
-                  <Button disabled={saving || draft === ""}
+                  <Button className="w-full sm:w-auto" disabled={saving || draft === ""}
                     onClick={() => { onSave({ [s.key]: draft }); setEditing(null); }}>
                     Save key
                   </Button>
-                  <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+                  <Button className="w-full sm:w-auto" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
                 </div>
               )}
             </Field>

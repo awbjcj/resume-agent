@@ -133,7 +133,7 @@ export function MatchGapContainer() {
         <div className="space-y-6">
           <section
             aria-label="Dashboard controls"
-            className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card/95 p-4 backdrop-blur"
+            className="flex flex-col items-stretch gap-3 rounded-lg border bg-card/95 p-3 backdrop-blur sm:p-4 lg:sticky lg:top-20 lg:z-20 2xl:flex-row 2xl:items-center 2xl:justify-between"
           >
             <Filters
               value={filters}
@@ -177,7 +177,7 @@ export function MatchGapContainer() {
           ) : (
             <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
               <Tabs value={activeView} onValueChange={setActiveView} className="min-w-0">
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
                   <TabsList aria-label="Skill demand view">
                     <TabsTrigger value="map">
                       <NetworkIcon data-icon="inline-start" />
