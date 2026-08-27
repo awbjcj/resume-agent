@@ -668,6 +668,43 @@ def test_a_skill_that_failed_before_goes_straight_to_escalation(tmp_path):
     assert "python" not in load_taxonomy_state(path).grouping_status
 
 
+def test_the_deferred_backlog_is_reported_separately_from_uncertainty(
+    tmp_path, monkeypatch
+):
+    """"Deferred" and "uncertain" are different futures and must read that way.
+
+    The cap already deferred work correctly; it just never said so, so a user
+    could not tell monotonic progress from a permanent plateau.
+    """
+
+    from resume_agent.config import env_settings
+
+    monkeypatch.setenv("TAXONOMY_ESCALATION_MAX_SKILLS", "1")
+    env_settings.cache_clear()
+
+    engine = _engine_with_target_skills("Alpha Skill", "Beta Skill")
+    path = tmp_path / "cluster_map.json"
+
+    try:
+        with get_session(engine) as session:
+            result = refresh_clusters(
+                session,
+                canonicalizer=_AsyncCanonicalizer(),
+                themer=_AsyncThemer(lambda _new, _categories: []),
+                escalation_themer=_AsyncThemer(_languages),
+                path=path,
+            )
+    finally:
+        env_settings.cache_clear()
+
+    assert result["deferredSkills"] == 1
+    # The deferred token is not double-counted as a domain-phase verdict.
+    assert result["uncertainDomainSkills"] == 0
+    assert result["uncertainCanonicalSkills"] == 0
+    # The pre-existing total is untouched, so old consumers keep working.
+    assert result["uncertainSkills"] == 1
+
+
 def test_the_escalation_cap_defers_instead_of_flooring(tmp_path, monkeypatch):
     """What the per-run bound skips has not been judged, so it must not be filed.
 

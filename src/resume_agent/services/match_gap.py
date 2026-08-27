@@ -395,6 +395,9 @@ def refresh_clusters(
                 min_new_domain_members=2,
                 category_hints=category_hints,
                 enforce_candidates=enforce_candidates,
+                repair_max_singletons=(
+                    settings.taxonomy_canonical_repair_max_singletons
+                ),
             )
             after_first = merge_cluster_map(existing, first.additions)
             canonical_failed = _retryable_canonical_tokens(first.failures)
@@ -430,6 +433,9 @@ def refresh_clusters(
                 allow_category_growth=True,
                 min_new_domain_members=1,
                 category_hints=category_hints,
+                repair_max_singletons=(
+                    settings.taxonomy_canonical_repair_max_singletons
+                ),
             )
             return (
                 first,
@@ -557,6 +563,27 @@ def refresh_clusters(
         aliases_merged = sum(
             final.aliases.get(token, token) != token for token in target_raw
         )
+    # "Deferred" means the escalation cap postponed it, not that anything
+    # judged it -- it escalates first on the next run.  Collapsing it into
+    # "uncertain" is what made monotonic progress read as a plateau.
+    deferred_canonicals = deferred & requested_canonicals
+    uncertain_domain = len(
+        [
+            token
+            for token, status in statuses.items()
+            if status.state == "uncertain"
+            and status.phase == "domain"
+            and token not in deferred_canonicals
+        ]
+    )
+    uncertain_canonical = len(
+        [
+            token
+            for token, status in statuses.items()
+            if status.state == "uncertain" and status.phase == "canonicalize"
+        ]
+    )
+    escalated_metrics = escalated.metrics if escalated else None
     model_elapsed_ms = outcome.metrics.elapsed_ms + (
         escalated.metrics.elapsed_ms if escalated else 0
     )
@@ -618,6 +645,15 @@ def refresh_clusters(
         "uncertainSkills": len(
             [status for status in statuses.values() if status.state == "uncertain"]
         ),
+        "deferredSkills": len(deferred_canonicals),
+        "uncertainDomainSkills": uncertain_domain,
+        "uncertainCanonicalSkills": uncertain_canonical,
+        "canonicalRepairRounds": outcome.metrics.canonical_repair_rounds
+        + (escalated_metrics.canonical_repair_rounds if escalated_metrics else 0),
+        "canonicalRepaired": outcome.metrics.canonical_repaired
+        + (escalated_metrics.canonical_repaired if escalated_metrics else 0),
+        "canonicalIdentityFiled": outcome.metrics.canonical_identity_filed
+        + (escalated_metrics.canonical_identity_filed if escalated_metrics else 0),
         "failedSkills": len(
             [status for status in statuses.values() if status.state == "failed"]
         ),
