@@ -34,6 +34,28 @@ class CLCaseResult:
     final_quality: int
     usage: UsageTotals
 
+    def __init__(
+        self,
+        *,
+        case_id: str,
+        letter: CoverLetterContent,
+        revise_rounds: int,
+        trap_ok: bool,
+        provenance_ok: bool,
+        judge: JudgeVerdict,
+        final_quality: int,
+        usage: UsageTotals,
+    ) -> None:
+        """Construct a result with an explicit signature for static analyzers."""
+        self.case_id = case_id
+        self.letter = letter
+        self.revise_rounds = revise_rounds
+        self.trap_ok = trap_ok
+        self.provenance_ok = provenance_ok
+        self.judge = judge
+        self.final_quality = final_quality
+        self.usage = usage
+
 
 def run_cl_case(
     case: EvalCase,

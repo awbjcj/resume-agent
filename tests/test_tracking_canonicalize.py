@@ -91,7 +91,9 @@ class _FakeRunner:
         self._clusters = clusters
 
     def run(self, prompt):
-        return _FakeResult(SkillClusters(clusters=self._clusters))
+        return _FakeResult(
+            SkillClusters.model_validate({"clusters": self._clusters})
+        )
 
     async def arun(self, prompt):
         return self.run(prompt)

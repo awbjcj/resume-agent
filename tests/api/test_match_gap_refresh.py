@@ -38,7 +38,9 @@ class _AsyncCanonicalizer:
             self.wait.wait(timeout=2)
         payload = json.loads(prompt)
         return SimpleNamespace(
-            content=SkillClusters(clusters=[[token] for token in payload["new"]])
+            content=SkillClusters.model_validate(
+                {"clusters": [[token] for token in payload["new"]]}
+            )
         )
 
     def run(self, prompt):

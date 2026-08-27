@@ -58,7 +58,9 @@ class _AsyncCanonicalizer:
         response = self.respond(payload["new"], payload["existing_canonicals"])
         if isinstance(response, Exception):
             raise response
-        return SimpleNamespace(content=SkillClusters(clusters=response))
+        return SimpleNamespace(
+            content=SkillClusters.model_validate({"clusters": response})
+        )
 
     def run(self, prompt):
         raise AssertionError("async path expected")
@@ -300,7 +302,9 @@ def test_a_backstopped_token_reaches_the_placement_floor(tmp_path):
         calls = 0
 
         async def arun(self, prompt):
-            return SimpleNamespace(content=SkillClusters(clusters=[]))
+            return SimpleNamespace(
+                content=SkillClusters.model_validate({"clusters": []})
+            )
 
         def run(self, prompt):
             raise AssertionError("async path expected")

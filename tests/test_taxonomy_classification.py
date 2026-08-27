@@ -55,7 +55,9 @@ class _Canonicalizer:
         response = self.respond(payload["new"], payload["existing_canonicals"])
         if isinstance(response, Exception):
             raise response
-        return SimpleNamespace(content=SkillClusters(clusters=response))
+        return SimpleNamespace(
+            content=SkillClusters.model_validate({"clusters": response})
+        )
 
     def run(self, prompt):
         raise AssertionError("async path expected")
@@ -121,7 +123,9 @@ class _OmittingCanonicalizer:
         self.batch_sizes.append(len(new))
         covered = new if len(new) <= self.full_at else new[: len(new) // 2]
         return SimpleNamespace(
-            content=SkillClusters(clusters=[[token] for token in covered])
+            content=SkillClusters.model_validate(
+                {"clusters": [[token] for token in covered]}
+            )
         )
 
     def run(self, prompt):
@@ -159,7 +163,9 @@ class _RefusingCanonicalizer:
     """Answers every batch, and covers nothing.  The permanent-omission case."""
 
     async def arun(self, prompt):
-        return SimpleNamespace(content=SkillClusters(clusters=[]))
+        return SimpleNamespace(
+            content=SkillClusters.model_validate({"clusters": []})
+        )
 
     def run(self, prompt):
         raise AssertionError("async path expected")
