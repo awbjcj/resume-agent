@@ -278,9 +278,15 @@ def build_skill_themer(agent: Runner | None = None) -> Themer:
 
 def build_incremental_canonicalizer_agent() -> Runner:
     settings = get_settings()
+    # Mid tier, not premium.  Synonym clustering was the one *premium* call in
+    # the pass while the harder domain judgment ran on mid -- inverted, and
+    # premium was demonstrably not producing complete partitions.  Repair rounds
+    # and the identity backstop now absorb coverage loss that used to be
+    # permanent, so the cheaper tier's downside is bounded.  Escalation keeps
+    # premium.
     model = build_model(
-        settings.premium_model,
-        cache_system_prompt=prompt_cache_for(settings.premium_model),
+        settings.mid_model,
+        cache_system_prompt=prompt_cache_for(settings.mid_model),
     )
     return AgentRunner(
         Agent(

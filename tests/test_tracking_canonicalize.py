@@ -193,7 +193,13 @@ def test_incremental_builders_use_expected_models_and_retry_policy(monkeypatch):
     build_incremental_canonicalizer_agent()
     build_incremental_themer_agent()
 
-    assert [entry["model"] for entry in captured] == ["premium", "mid"]
+    # The canonicalizer used to run on the PREMIUM tier while the harder domain
+    # judgment ran on mid -- inverted, and premium was not buying completeness
+    # anyway (every live failure was an incomplete premium partition).  Repair
+    # rounds and the identity backstop now absorb coverage loss that used to be
+    # permanent, so the cheaper tier's downside is bounded.  Escalation keeps
+    # premium; the ambiguous tail is where it earns its cost.
+    assert [entry["model"] for entry in captured] == ["mid", "mid"]
     assert captured[0]["output_schema"] is SkillClusters
     assert captured[1]["output_schema"] is IncrementalSkillDomains
     assert all(entry["retries"] == 3 for entry in captured)
