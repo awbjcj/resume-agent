@@ -317,11 +317,15 @@ describe("AdminQuotasPage", () => {
     await user.click(screen.getByRole("switch", { name: "Optional cache and tool rates" }));
 
     const row = screen.getByTestId("rate-options-row");
+    expect(row).toHaveClass("flex-nowrap", "w-max");
     expect(within(row).getByLabelText("Cache read (USD / 1M)")).toBeInTheDocument();
     expect(within(row).getByLabelText("Cache write (USD / 1M)")).toBeInTheDocument();
     expect(within(row).getByLabelText("Tool fee (USD / unit)")).toBeInTheDocument();
     expect(within(row).getByLabelText("Reason for this rate version")).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Create immutable version" })).toBeInTheDocument();
+    expect(
+      within(row).getByText("Optional cache and tool rates").closest(".whitespace-nowrap"),
+    ).toBeInTheDocument();
   });
 
   it("has no automated accessibility violations in the default console", async () => {

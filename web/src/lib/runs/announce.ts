@@ -121,8 +121,15 @@ function announceOne(run: RunRecord): void {
       return;
     }
     const [assigned, aliases, domains, uncertain, failed, skipped] = fields;
+    // Read separately and default to 0: a run recorded before this key existed
+    // must still produce the detailed toast rather than falling back to the
+    // generic one. "Deferred" is not a verdict -- the escalation cap simply
+    // has not reached these yet, and they go first on the next run. Folding
+    // them into "uncertain" is what made convergence look like a plateau.
+    const deferred = numberField(result, "deferredSkills", "deferred_skills") ?? 0;
+    const deferredNote = deferred > 0 ? ` · ${deferred} deferred to next run` : "";
     toast.success(
-      `Regroup complete: ${assigned} assigned · ${aliases} aliases merged · ${domains} domains created · ${uncertain} uncertain · ${failed} failed · ${skipped} skipped.`,
+      `Regroup complete: ${assigned} assigned · ${aliases} aliases merged · ${domains} domains created · ${uncertain} uncertain${deferredNote} · ${failed} failed · ${skipped} skipped.`,
     );
     return;
   }

@@ -86,6 +86,48 @@ it("renders accurate cover-letter and redo completion summaries", () => {
   );
 });
 
+it("tells the user a deferred backlog will be picked up next run", () => {
+  announceCompletions([
+    run({
+      kind: "refreshClusters",
+      result: {
+        assignedSkills: 300,
+        aliasesMerged: 12,
+        domainsCreated: 4,
+        uncertainSkills: 900,
+        deferredSkills: 880,
+        failedSkills: 0,
+        skippedStaleSkills: 0,
+      },
+    }),
+  ]);
+
+  expect(toast.success).toHaveBeenCalledWith(
+    "Regroup complete: 300 assigned · 12 aliases merged · 4 domains created · 900 uncertain · 880 deferred to next run · 0 failed · 0 skipped.",
+  );
+});
+
+it("omits the deferred clause when nothing was deferred", () => {
+  announceCompletions([
+    run({
+      kind: "refreshClusters",
+      result: {
+        assignedSkills: 5,
+        aliasesMerged: 0,
+        domainsCreated: 1,
+        uncertainSkills: 0,
+        deferredSkills: 0,
+        failedSkills: 0,
+        skippedStaleSkills: 0,
+      },
+    }),
+  ]);
+
+  expect(toast.success).toHaveBeenCalledWith(
+    "Regroup complete: 5 assigned · 0 aliases merged · 1 domains created · 0 uncertain · 0 failed · 0 skipped.",
+  );
+});
+
 it("uses honest generic summaries when specialized result detail is malformed", () => {
   announceCompletions([
     run({ kind: "refreshClusters", result: {} }),

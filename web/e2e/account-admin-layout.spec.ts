@@ -148,6 +148,21 @@ test("cost quotas keeps one sidebar destination active and contains narrow layou
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
+  const rateOptionsRow = page.getByTestId("rate-options-row");
+  await expect(rateOptionsRow).toHaveCSS("flex-wrap", "nowrap");
+  const portableRateBoxes = await Promise.all(
+    [...optionalRateFields, rateReason].map((field) => field.boundingBox()),
+  );
+  const portableRateY = portableRateBoxes[0]?.y ?? 0;
+  for (const box of portableRateBoxes.slice(1)) {
+    expect(Math.abs((box?.y ?? 0) - portableRateY)).toBeLessThanOrEqual(1);
+  }
+  const rateOptionsRail = rateOptionsRow.locator("..");
+  const rateOptionsWidths = await rateOptionsRail.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(rateOptionsWidths.scrollWidth).toBeGreaterThan(rateOptionsWidths.clientWidth);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.getByRole("tab", { name: "Tiers" }).click();
