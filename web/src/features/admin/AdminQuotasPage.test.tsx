@@ -18,6 +18,57 @@ const previewBodies: Array<Record<string, unknown>> = [];
 const tierBodies: Array<Record<string, unknown>> = [];
 const tierPatches: Array<{ tierId: string; body: Record<string, unknown> }> = [];
 
+const RATE_CARDS = [
+  {
+    id: "openai-sol-current",
+    provider: "openai",
+    model: "gpt-5.6-sol",
+    contextMinTokens: 0,
+    contextMaxTokens: null,
+    inputMicrosPerMillion: 4_000_000,
+    cacheReadMicrosPerMillion: 400_000,
+    cacheWriteMicrosPerMillion: 5_000_000,
+    outputMicrosPerMillion: 20_000_000,
+    toolMicrosPerUnit: 10_000,
+    ratePeriod: null,
+    effectiveFrom: "2026-08-27T00:00:00Z",
+    effectiveTo: null,
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+  },
+  {
+    id: "openai-sol-historical",
+    provider: "openai",
+    model: "gpt-5.6-sol",
+    contextMinTokens: 0,
+    contextMaxTokens: null,
+    inputMicrosPerMillion: 3_500_000,
+    cacheReadMicrosPerMillion: 350_000,
+    cacheWriteMicrosPerMillion: 4_000_000,
+    outputMicrosPerMillion: 18_000_000,
+    toolMicrosPerUnit: 10_000,
+    ratePeriod: null,
+    effectiveFrom: "2026-08-01T00:00:00Z",
+    effectiveTo: "2026-08-27T00:00:00Z",
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+  },
+  {
+    id: "deepseek-flash-off-peak",
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    contextMinTokens: 0,
+    contextMaxTokens: null,
+    inputMicrosPerMillion: 220_000,
+    cacheReadMicrosPerMillion: 7_000,
+    cacheWriteMicrosPerMillion: null,
+    outputMicrosPerMillion: 660_000,
+    toolMicrosPerUnit: null,
+    ratePeriod: "off_peak",
+    effectiveFrom: "2026-08-16T16:00:00Z",
+    effectiveTo: null,
+    sourceUrl: "https://api-docs.deepseek.com/quick_start/pricing",
+  },
+];
+
 function handlers() {
   return [
     http.get("/api/auth/me", () => HttpResponse.json({ username: "owner", role: "admin", authRequired: true, needsEmail: false, emailVerified: true, googleLinked: false })),
@@ -28,7 +79,7 @@ function handlers() {
     ]))),
     http.get("/api/admin/quota-accounts", () => HttpResponse.json(page([{ userId: "alice0000000", username: "alice", disabled: false, tierId: "FREE", allowanceMicros: 1000000, overrideMicros: null, spentMicros: 250000, recurringRemainingMicros: 750000, creditBalanceMicros: 50000, remainingMicros: 800000, overageMicros: 0, periodStart: "2026-07-30T00:00:00Z", periodEnd: "2026-08-06T00:00:00Z", status: "ACTIVE", sharedCostMicros: 250000, byokCostMicros: 40000, totalTokens: 12345 }]))),
     http.get("/api/admin/quota-accounts/:userId/ledger", () => HttpResponse.json(page([]))),
-    http.get("/api/admin/llm-rates", () => HttpResponse.json(page([]))),
+    http.get("/api/admin/llm-rates", () => HttpResponse.json(page(RATE_CARDS))),
     http.get("/api/admin/quota-operations", () => HttpResponse.json(page([]))),
     http.post("/api/admin/quota-tiers", async ({ request }) => {
       const body = await request.json() as Record<string, unknown>;
@@ -221,6 +272,40 @@ describe("AdminQuotasPage", () => {
       actionType: "GRANT_CREDIT",
       amountMicros: 2500000,
     });
+  });
+
+  it("groups model versions newest-first and ranks model groups by sortable columns", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Cost quotas" });
+
+    await user.click(screen.getByRole("tab", { name: "Rate cards" }));
+    expect(await screen.findByRole("heading", { name: "Effective rate cards" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Rate card color legend")).toHaveTextContent("Economical");
+    expect(screen.getByLabelText("Rate card color legend")).toHaveTextContent("Premium");
+
+    const table = screen.getByRole("table", { name: "Effective rate versions" });
+    const solCell = within(table).getByText("gpt-5.6-sol").closest("td");
+    expect(solCell).toHaveAttribute("rowspan", "2");
+    expect(solCell).toHaveAttribute("data-rate-cost-band", "premium");
+    expect(within(solCell!).getByText("Premium")).toBeInTheDocument();
+    expect(solCell!.querySelector('span[aria-hidden="true"]')).toHaveClass("bg-ready");
+
+    const solRows = table.querySelectorAll('tr[data-model="gpt-5.6-sol"]');
+    expect(solRows).toHaveLength(2);
+    expect(solRows[0]).toHaveAttribute("data-effective-from", "2026-08-27T00:00:00Z");
+    expect(solRows[1]).toHaveAttribute("data-effective-from", "2026-08-01T00:00:00Z");
+    expect(within(solRows[0] as HTMLElement).getByText("$4.00")).toBeInTheDocument();
+    expect(within(solRows[0] as HTMLElement).getByText("$20.00")).toBeInTheDocument();
+
+    const flashCell = within(table).getByText("deepseek-v4-flash").closest("td");
+    expect(flashCell).toHaveAttribute("data-rate-cost-band", "economical");
+    expect(within(flashCell!).getByText("Economical")).toBeInTheDocument();
+    expect(flashCell!.querySelector('span[aria-hidden="true"]')).toHaveClass("bg-chart-2");
+
+    await user.click(screen.getByRole("button", { name: "Input rate" }));
+    const rankedModels = [...table.querySelectorAll("td[data-rate-cost-band] .font-mono")].map((node) => node.textContent);
+    expect(rankedModels).toEqual(["deepseek-v4-flash", "gpt-5.6-sol"]);
   });
 
   it("has no automated accessibility violations in the default console", async () => {

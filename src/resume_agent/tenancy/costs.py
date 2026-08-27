@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from weakref import WeakKeyDictionary
 
 from sqlalchemy import or_, select
@@ -18,6 +18,11 @@ RATE_PERIOD_PEAK = "peak"
 RATE_PERIOD_OFF_PEAK = "off_peak"
 # DeepSeek's published peak windows, half-open [start, end) in UTC hours.
 _PEAK_HOUR_BANDS = ((1, 4), (6, 10))
+# From 2026-08-29 00:00 Beijing time, DeepSeek charges its off-peak rate for
+# the entire Saturday/Sunday Beijing-time weekend. Keep the cutoff so that
+# historical usage before the provider change retains the earlier daily bands.
+_DEEPSEEK_WEEKEND_OFF_PEAK_FROM = datetime(2026, 8, 28, 16, tzinfo=timezone.utc)
+_BEIJING_TIMEZONE = timezone(timedelta(hours=8))
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,12 @@ def normalize_provider(value: str) -> str:
 
 def _rate_period(moment: datetime) -> str:
     """The time-of-day band ``moment`` falls in, for period-restricted rates."""
+    beijing_time = moment.astimezone(_BEIJING_TIMEZONE)
+    if (
+        moment >= _DEEPSEEK_WEEKEND_OFF_PEAK_FROM
+        and beijing_time.weekday() >= 5
+    ):
+        return RATE_PERIOD_OFF_PEAK
     hour = moment.astimezone(timezone.utc).hour
     if any(start <= hour < end for start, end in _PEAK_HOUR_BANDS):
         return RATE_PERIOD_PEAK
@@ -256,6 +267,10 @@ def seed_llm_rates(engine: Engine) -> None:
     # must resolve to a separately versioned rate rather than retroactively
     # repricing events from July.
     openai_price_update = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    # GPT-5.6 Sol's current published Standard rate was rechecked on
+    # 2026-08-27. Keep the former Sol rate for historical usage, then make the
+    # new rate effective from this catalog refresh rather than rewriting it.
+    openai_sol_price_update = datetime(2026, 8, 27, tzinfo=timezone.utc)
     gemini_price_update = datetime(2026, 8, 15, tzinfo=timezone.utc)
     # Google publishes both Flash models' current rate as promotional "through
     # 2026-12-31", doubling on 2027-01-01. Seeding only the promo left the
@@ -266,6 +281,7 @@ def seed_llm_rates(engine: Engine) -> None:
     sonnet_intro_end = datetime(2026, 9, 1, tzinfo=timezone.utc)
     deepseek_price_update = datetime(2026, 8, 16, 16, 0, tzinfo=timezone.utc)
     openai = "https://developers.openai.com/api/docs/pricing"
+    openai_sol = "https://developers.openai.com/api/docs/models/gpt-5.6-sol"
     anthropic = "https://platform.claude.com/docs/en/about-claude/pricing"
     gemini = "https://ai.google.dev/gemini-api/docs/pricing"
     deepseek = "https://api-docs.deepseek.com/quick_start/pricing"
@@ -473,6 +489,54 @@ def seed_llm_rates(engine: Engine) -> None:
             current_rate.output_micros_per_million = _micros_per_million(output_rate)
             current_rate.tool_micros_per_unit = 10_000
             current_rate.source_url = openai
+
+        # OpenAI reduced GPT-5.6 Sol's Standard price to $4/M uncached input,
+        # $0.40/M cached input, and $20/M output. Cache writes remain 1.25x
+        # the uncached input rate, or $5/M. Leave Terra and Luna untouched:
+        # their current prices are already represented by the 2026-08-01 rows.
+        previous_sol_rate = (
+            session.execute(
+                select(LlmRate).where(
+                    LlmRate.provider == "openai",
+                    LlmRate.model == "gpt-5.6-sol",
+                    LlmRate.context_min_tokens == 0,
+                    LlmRate.effective_from == openai_price_update,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if previous_sol_rate is not None:
+            previous_sol_rate.effective_to = openai_sol_price_update
+        sol_key = ("openai", "gpt-5.6-sol", 0, stamp(openai_sol_price_update))
+        current_sol_rate = None
+        if sol_key in existing:
+            current_sol_rate = (
+                session.execute(
+                    select(LlmRate).where(
+                        LlmRate.provider == "openai",
+                        LlmRate.model == "gpt-5.6-sol",
+                        LlmRate.context_min_tokens == 0,
+                        LlmRate.effective_from == openai_sol_price_update,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+        if current_sol_rate is None:
+            current_sol_rate = LlmRate(
+                id=uuid.uuid4().hex,
+                provider="openai",
+                model="gpt-5.6-sol",
+                effective_from=openai_sol_price_update,
+            )
+            session.add(current_sol_rate)
+        current_sol_rate.input_micros_per_million = _micros_per_million(4)
+        current_sol_rate.cache_read_micros_per_million = _micros_per_million(0.4)
+        current_sol_rate.cache_write_micros_per_million = _micros_per_million(5)
+        current_sol_rate.output_micros_per_million = _micros_per_million(20)
+        current_sol_rate.tool_micros_per_unit = 10_000
+        current_sol_rate.source_url = openai_sol
 
         # Google changed Gemini 3.6 Flash's standard pricing on 2026-08-15.
         # Keep the former rate for historical usage, then add the current row

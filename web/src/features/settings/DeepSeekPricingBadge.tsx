@@ -12,7 +12,7 @@ import {
 export function DeepSeekPricingBadge() {
   const status = useDeepSeekPricingStatus();
   if (!status) return null;
-  const { period, changesAt, now } = status;
+  const { period, changesAt, now, weekendOffPeak } = status;
   const isPeak = period === "peak";
   const countdown = formatCountdown(changesAt.getTime() - now.getTime());
 
@@ -39,10 +39,11 @@ export function DeepSeekPricingBadge() {
         }
       />
       <TooltipContent side="top">
-        {isPeak
-          ? `Billing peak rates now — pricier until ${formatUtcClock(changesAt)} UTC.`
-          : `Billing off-peak rates now — cheaper until ${formatUtcClock(changesAt)} UTC.`}{" "}
-        Peak hours: 01:00–04:00 and 06:00–10:00 UTC.
+        {weekendOffPeak
+          ? "Weekend billing is off-peak all day. Weekday peak hours are 01:00–04:00 and 06:00–10:00 UTC."
+          : isPeak
+            ? `Billing peak rates now — pricier until ${formatUtcClock(changesAt)} UTC.`
+            : `Billing off-peak rates now — cheaper until ${formatUtcClock(changesAt)} UTC. Weekday peak hours: 01:00–04:00 and 06:00–10:00 UTC.`}
       </TooltipContent>
     </Tooltip>
   );

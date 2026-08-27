@@ -9,10 +9,14 @@ const PEAK_HOUR_BANDS: readonly [number, number][] = [
   [6, 10],
 ];
 // tenancy/costs.py::seed_llm_rates's deepseek_price_update — the moment
-// DeepSeek's flat rate is replaced by this peak/off-peak schedule. Before
-// it, there is nothing time-varying to show.
+// DeepSeek's flat rate is replaced by this peak/off-peak schedule. Before it,
+// there is nothing time-varying to show.
 const CUTOVER_UTC = new Date("2026-08-16T16:00:00Z");
-const BOUNDARY_HOURS = [...new Set(PEAK_HOUR_BANDS.flat())].sort((a, b) => a - b);
+// From Saturday 2026-08-29 00:00 Beijing time, all Saturday/Sunday requests are
+// billed at the off-peak rate. The conversion is fixed at UTC+8: Beijing has
+// no daylight-saving transition to account for.
+const WEEKEND_OFF_PEAK_FROM_UTC = new Date("2026-08-28T16:00:00Z");
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1_000;
 
 export type RatePeriod = "peak" | "off_peak";
 
@@ -24,32 +28,53 @@ export type DeepSeekPricingStatus = {
    * from this rather than calling Date.now() itself, which would make the
    * component impure. */
   now: Date;
+  /** True when the Beijing-time weekend keeps the entire day off-peak. */
+  weekendOffPeak: boolean;
 };
 
 function isPeakHour(hour: number): boolean {
   return PEAK_HOUR_BANDS.some(([start, end]) => hour >= start && hour < end);
 }
 
+function isBeijingWeekend(now: Date): boolean {
+  const beijing = new Date(now.getTime() + BEIJING_OFFSET_MS);
+  const day = beijing.getUTCDay();
+  return day === 0 || day === 6;
+}
+
+function usesWeekendOffPeak(now: Date): boolean {
+  return now >= WEEKEND_OFF_PEAK_FROM_UTC && isBeijingWeekend(now);
+}
+
+function periodAt(now: Date): RatePeriod {
+  if (usesWeekendOffPeak(now)) return "off_peak";
+  return isPeakHour(now.getUTCHours()) ? "peak" : "off_peak";
+}
+
 function nextBoundary(now: Date): Date {
-  const hour = now.getUTCHours();
+  const currentPeriod = periodAt(now);
   const changesAt = new Date(now);
   changesAt.setUTCMinutes(0, 0, 0);
-  const laterToday = BOUNDARY_HOURS.find((h) => h > hour);
-  if (laterToday !== undefined) {
-    changesAt.setUTCHours(laterToday);
-  } else {
-    changesAt.setUTCDate(changesAt.getUTCDate() + 1);
-    changesAt.setUTCHours(BOUNDARY_HOURS[0]);
+  changesAt.setUTCHours(changesAt.getUTCHours() + 1);
+
+  // The schedule only changes on an hour boundary. Scanning a little over a
+  // week covers every weekday/weekend transition without hard-coding a local
+  // date calculation that could drift from the pricing rules above.
+  for (let hour = 0; hour < 8 * 24; hour += 1) {
+    if (periodAt(changesAt) !== currentPeriod) return changesAt;
+    changesAt.setUTCHours(changesAt.getUTCHours() + 1);
   }
+
   return changesAt;
 }
 
 export function getDeepSeekPricingStatus(now: Date): DeepSeekPricingStatus | null {
   if (now < CUTOVER_UTC) return null;
   return {
-    period: isPeakHour(now.getUTCHours()) ? "peak" : "off_peak",
+    period: periodAt(now),
     changesAt: nextBoundary(now),
     now,
+    weekendOffPeak: usesWeekendOffPeak(now),
   };
 }
 

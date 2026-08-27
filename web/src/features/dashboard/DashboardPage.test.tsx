@@ -56,6 +56,9 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Pipeline stages")).toBeInTheDocument();
     expect(screen.getByText(/recent runs/i)).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /daily shortcuts/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /profile skills/i })).toHaveAttribute("href", "/profile?tab=skills");
+    expect(screen.getByRole("link", { name: /sources/i })).toHaveAttribute("href", "/settings/sources");
   });
 
   it("guides a fresh install with the getting-started checklist, not the drained-funnel card", async () => {

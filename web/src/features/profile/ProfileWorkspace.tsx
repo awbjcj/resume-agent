@@ -1,6 +1,7 @@
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useState } from "react";
 import { ArrowRight, FileText, Sparkles, Wrench } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 import { PageHeader } from "@/components/PageHeader";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -40,6 +41,7 @@ function factsStatusText(builtAt: string | null | undefined): string {
  * are split into tabs so nothing is stacked on one endless page.
  */
 export function ProfileWorkspace() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data } = useConfig("/api/config/profile");
   const save = useSaveConfig("/api/config/profile");
   const { draft, setDraft, dirty, reset } = useDraft(data as ProfileDoc | undefined);
@@ -51,6 +53,14 @@ export function ProfileWorkspace() {
   const [denyText, setDenyText] = useState("");
   const [limitText, setLimitText] = useState("");
   const [textSeed, setTextSeed] = useState<string | null>(null);
+  const activeTab = searchParams.get("tab") === "skills" ? "skills" : "documents";
+
+  const setActiveTab = (value: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === "skills") next.set("tab", "skills");
+    else next.delete("tab");
+    setSearchParams(next, { replace: true });
+  };
 
   const nextSeed = data ? JSON.stringify(data) : null;
   if (data && textSeed !== nextSeed) {
@@ -103,7 +113,7 @@ export function ProfileWorkspace() {
         </CardHeader>
       </Card>
 
-      <Tabs defaultValue="documents">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="documents">
             <FileText data-icon="inline-start" aria-hidden="true" />

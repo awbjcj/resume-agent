@@ -81,10 +81,10 @@ def test_seeded_rate_prices_cache_and_reasoning_without_double_charge(tmp_path):
 
 def test_seeded_model_prices_use_current_openai_deepseek_and_gemini_rates(tmp_path):
     engine = _engine(tmp_path)
-    current = datetime(2026, 8, 15, tzinfo=UTC)
+    current = datetime(2026, 8, 27, tzinfo=UTC)
 
     expected_openai = {
-        "gpt-5.6-sol": (5_000_000, 500_000, 6_250_000, 30_000_000),
+        "gpt-5.6-sol": (4_000_000, 400_000, 5_000_000, 20_000_000),
         "gpt-5.6-terra": (2_000_000, 200_000, 2_500_000, 12_000_000),
         "gpt-5.6-luna": (200_000, 20_000, 250_000, 1_200_000),
     }
@@ -99,8 +99,8 @@ def test_seeded_model_prices_use_current_openai_deepseek_and_gemini_rates(tmp_pa
         ) == expected
 
     expected_deepseek = {
-        "deepseek-v4-flash": (140_000, 2_800, 280_000),
-        "deepseek-v4-pro": (435_000, 3_625, 870_000),
+        "deepseek-v4-flash": (220_000, 7_000, 660_000),
+        "deepseek-v4-pro": (660_000, 22_000, 1_980_000),
     }
     for model, expected in expected_deepseek.items():
         rate = find_rate(engine, "deepseek", model, now=current)
@@ -180,6 +180,47 @@ def test_deepseek_peak_windows_are_half_open(tmp_path):
         assert rate.rate_period == "peak", hour
 
 
+def test_deepseek_weekends_are_off_peak_in_beijing_time_after_rule_change(tmp_path):
+    engine = _engine(tmp_path)
+
+    # The weekend rule begins at 2026-08-29 00:00 Beijing time. The preceding
+    # Saturday still used the prior daily peak window, preserving history.
+    legacy_saturday = find_rate(
+        engine,
+        "deepseek",
+        "deepseek-v4-flash",
+        now=datetime(2026, 8, 22, 2, 0, tzinfo=UTC),
+    )
+    assert legacy_saturday is not None
+    assert legacy_saturday.rate_period == "peak"
+
+    # 02:00 and 07:00 UTC are weekday peak hours, but they are Saturday morning
+    # and afternoon in Beijing, so both use the all-day off-peak price.
+    for hour in (2, 7):
+        weekend_rate = find_rate(
+            engine,
+            "deepseek",
+            "deepseek-v4-flash",
+            now=datetime(2026, 8, 29, hour, 0, tzinfo=UTC),
+        )
+        assert weekend_rate is not None
+        assert weekend_rate.rate_period == "off_peak"
+        assert (
+            weekend_rate.input_micros_per_million,
+            weekend_rate.cache_read_micros_per_million,
+            weekend_rate.output_micros_per_million,
+        ) == (220_000, 7_000, 660_000)
+
+    weekday_rate = find_rate(
+        engine,
+        "deepseek",
+        "deepseek-v4-flash",
+        now=datetime(2026, 8, 31, 2, 0, tzinfo=UTC),
+    )
+    assert weekday_rate is not None
+    assert weekday_rate.rate_period == "peak"
+
+
 def test_embedding_rate_is_seeded_for_shared_key_metering(tmp_path):
     engine = _engine(tmp_path)
     priced = calculate_cost(
@@ -210,6 +251,27 @@ def test_openai_price_version_preserves_previous_gpt_5_6_rate(tmp_path):
 
     assert before_update.total_micros == 17_500_000
     assert after_update.total_micros == 14_000_000
+    assert before_update.rate_id != after_update.rate_id
+
+
+def test_openai_sol_price_version_preserves_the_pre_reduction_rate(tmp_path):
+    engine = _engine(tmp_path)
+    usage = MeteredUsage(
+        provider="openai",
+        model="gpt-5.6-sol",
+        input_tokens=1_000_000,
+        output_tokens=1_000_000,
+    )
+
+    before_update = calculate_cost(
+        engine, usage, now=datetime(2026, 8, 26, 23, 59, tzinfo=UTC)
+    )
+    after_update = calculate_cost(
+        engine, usage, now=datetime(2026, 8, 27, tzinfo=UTC)
+    )
+
+    assert before_update.total_micros == 35_000_000
+    assert after_update.total_micros == 24_000_000
     assert before_update.rate_id != after_update.rate_id
 
 

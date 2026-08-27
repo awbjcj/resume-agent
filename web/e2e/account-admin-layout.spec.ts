@@ -110,10 +110,11 @@ test("cost quotas keeps one sidebar destination active and contains narrow layou
   await expect(balanceFilter).toHaveCSS("height", "36px");
 
   await page.getByRole("tab", { name: "Tiers" }).click();
+  await page.getByRole("button", { name: "New tier" }).click();
   const tierName = page.getByLabel("Tier name");
-  const tierReason = page.getByLabel("Audit reason for the next tier action");
-  const tierCadence = page.getByRole("combobox", { name: "New tier cadence unit" });
-  const tierCount = page.getByRole("combobox", { name: "New tier cadence count" });
+  const tierReason = page.getByLabel("Reason for this new tier");
+  const tierCadence = page.getByRole("combobox", { name: "New tier cycle period" });
+  const tierCount = page.getByRole("combobox", { name: "New tier cycle count" });
   for (const control of [tierName, tierReason, tierCadence, tierCount]) {
     await expect(control).toHaveCSS("height", "36px");
   }

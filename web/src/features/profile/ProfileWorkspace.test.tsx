@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import { withQueryClient } from "@/test/utils";
@@ -52,9 +53,18 @@ vi.mock("@/features/settings/use-setup-status", () => ({
 }));
 
 describe("ProfileWorkspace", () => {
+  function renderWorkspace(initialEntry = "/profile") {
+    return render(
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <ProfileWorkspace />
+      </MemoryRouter>,
+      { wrapper: withQueryClient },
+    );
+  }
+
   it("keeps the coach hero visible and refreshes queries after a profile rebuild", async () => {
     const user = userEvent.setup();
-    render(<ProfileWorkspace />, { wrapper: withQueryClient });
+    renderWorkspace();
 
     // coach is a persistent hero action, not tucked in a tab
     expect(screen.getByRole("link", { name: /open coach/i })).toHaveAttribute("href", "/coach");
@@ -72,7 +82,7 @@ describe("ProfileWorkspace", () => {
 
   it("edits repo harvest controls on Documents and mounts grouped skills on Skills", async () => {
     const user = userEvent.setup();
-    render(<ProfileWorkspace />, { wrapper: withQueryClient });
+    renderWorkspace();
 
     // Documents tab is active by default
     await user.type(screen.getByLabelText(/always include repositories/i), "important, fork");
@@ -93,5 +103,12 @@ describe("ProfileWorkspace", () => {
     expect(screen.queryByTestId("skill-groups")).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: /skills/i }));
     expect(await screen.findByTestId("skill-groups")).toBeInTheDocument();
+  });
+
+  it("opens the skills tab from a dashboard deep link", async () => {
+    renderWorkspace("/profile?tab=skills");
+
+    expect(await screen.findByTestId("skill-groups")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /skills/i })).toHaveAttribute("data-active");
   });
 });

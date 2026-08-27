@@ -17,6 +17,7 @@ describe("getDeepSeekPricingStatus", () => {
       period: "off_peak",
       changesAt: new Date("2026-08-17T01:00:00Z"),
       now,
+      weekendOffPeak: false,
     });
   });
 
@@ -26,6 +27,7 @@ describe("getDeepSeekPricingStatus", () => {
       period: "peak",
       changesAt: new Date("2026-08-17T04:00:00Z"),
       now,
+      weekendOffPeak: false,
     });
   });
 
@@ -35,6 +37,7 @@ describe("getDeepSeekPricingStatus", () => {
       period: "off_peak",
       changesAt: new Date("2026-08-17T06:00:00Z"),
       now,
+      weekendOffPeak: false,
     });
   });
 
@@ -44,6 +47,7 @@ describe("getDeepSeekPricingStatus", () => {
       period: "peak",
       changesAt: new Date("2026-08-17T10:00:00Z"),
       now,
+      weekendOffPeak: false,
     });
   });
 
@@ -53,6 +57,17 @@ describe("getDeepSeekPricingStatus", () => {
       period: "off_peak",
       changesAt: new Date("2026-08-18T01:00:00Z"),
       now,
+      weekendOffPeak: false,
+    });
+  });
+
+  it("keeps Beijing-time weekends off-peak, including normal weekday peak hours", () => {
+    const now = new Date("2026-08-30T02:30:00Z"); // Sunday 10:30 in Beijing
+    expect(getDeepSeekPricingStatus(now)).toEqual({
+      period: "off_peak",
+      changesAt: new Date("2026-08-31T01:00:00Z"),
+      now,
+      weekendOffPeak: true,
     });
   });
 });

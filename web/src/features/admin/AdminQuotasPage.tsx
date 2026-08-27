@@ -2,6 +2,9 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Archive,
   Banknote,
   CircleUserRound,
@@ -225,6 +228,217 @@ function Metric({
         <span className="mt-1 block text-xs text-muted-foreground">{detail}</span>
       </dd>
     </div>
+  );
+}
+
+type RateCostBand = "economical" | "standard" | "premium";
+
+const ECONOMICAL_RATE_LIMIT_MICROS = 5_000_000;
+const PREMIUM_RATE_LIMIT_MICROS = 20_000_000;
+
+const RATE_COST_BAND_STYLES: Record<RateCostBand, {
+  label: string;
+  detail: string;
+  rail: string;
+  badge: string;
+}> = {
+  economical: {
+    label: "Economical",
+    detail: "Up to $5 / 1M",
+    rail: "bg-chart-2",
+    badge: "border-chart-2/30 bg-chart-2/10 text-chart-2",
+  },
+  standard: {
+    label: "Standard",
+    detail: "$5–$20 / 1M",
+    rail: "bg-primary",
+    badge: "border-primary/30 bg-primary/10 text-primary",
+  },
+  premium: {
+    label: "Premium",
+    detail: "Over $20 / 1M",
+    rail: "bg-ready",
+    badge: "border-ready/30 bg-ready/10 text-ready",
+  },
+};
+
+function rateCostBand(rate: LlmRate): RateCostBand {
+  // Compare the two non-cache token prices so the visual band stays useful
+  // across providers with different cache and tool pricing contracts.
+  const referenceMicros = rate.inputMicrosPerMillion + rate.outputMicrosPerMillion;
+  if (referenceMicros <= ECONOMICAL_RATE_LIMIT_MICROS) return "economical";
+  if (referenceMicros > PREMIUM_RATE_LIMIT_MICROS) return "premium";
+  return "standard";
+}
+
+function rateVersionStatus(rate: LlmRate): "Active" | "Scheduled" | "Historical" {
+  const now = Date.now();
+  if (new Date(rate.effectiveFrom).getTime() > now) return "Scheduled";
+  if (rate.effectiveTo && new Date(rate.effectiveTo).getTime() <= now) return "Historical";
+  return "Active";
+}
+
+type RateSortKey = "model" | "context" | "input" | "cache" | "output" | "tool" | "hours" | "effective";
+type SortDirection = "asc" | "desc";
+type RateGroup = { key: string; provider: string; model: string; versions: LlmRate[] };
+
+const RATE_SORT_LABELS: Record<RateSortKey, string> = {
+  model: "Provider and model",
+  context: "Context band",
+  input: "Input rate",
+  cache: "Cache rate",
+  output: "Output rate",
+  tool: "Tool fee",
+  hours: "Billing hours",
+  effective: "Effective date",
+};
+
+function compareNullable(a: number | null, b: number | null, direction: SortDirection): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return (a - b) * (direction === "asc" ? 1 : -1);
+}
+
+function latestVersion(group: RateGroup): LlmRate {
+  return group.versions[0];
+}
+
+function compareRateGroups(a: RateGroup, b: RateGroup, key: RateSortKey, direction: SortDirection): number {
+  const left = latestVersion(a);
+  const right = latestVersion(b);
+  const multiplier = direction === "asc" ? 1 : -1;
+  let result = 0;
+
+  if (key === "model") result = `${a.provider} ${a.model}`.localeCompare(`${b.provider} ${b.model}`);
+  if (key === "context") result = left.contextMinTokens - right.contextMinTokens;
+  if (key === "input") result = left.inputMicrosPerMillion - right.inputMicrosPerMillion;
+  if (key === "cache") return compareNullable(left.cacheReadMicrosPerMillion, right.cacheReadMicrosPerMillion, direction) || a.model.localeCompare(b.model);
+  if (key === "output") result = left.outputMicrosPerMillion - right.outputMicrosPerMillion;
+  if (key === "tool") return compareNullable(left.toolMicrosPerUnit, right.toolMicrosPerUnit, direction) || a.model.localeCompare(b.model);
+  if (key === "hours") result = (left.ratePeriod ?? "all").localeCompare(right.ratePeriod ?? "all");
+  if (key === "effective") result = new Date(left.effectiveFrom).getTime() - new Date(right.effectiveFrom).getTime();
+
+  return result * multiplier || a.model.localeCompare(b.model);
+}
+
+function SortableRateHead({
+  sortKey,
+  activeKey,
+  direction,
+  onSort,
+}: {
+  sortKey: RateSortKey;
+  activeKey: RateSortKey;
+  direction: SortDirection;
+  onSort: (key: RateSortKey) => void;
+}) {
+  const active = activeKey === sortKey;
+  const Icon = active ? (direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+  return (
+    <TableHead aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        className="-mx-1 inline-flex h-8 items-center gap-1 rounded-md px-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        onClick={() => onSort(sortKey)}
+      >
+        {RATE_SORT_LABELS[sortKey]}
+        <Icon className={cn("size-3.5", active ? "text-primary" : "text-muted-foreground/60")} aria-hidden="true" />
+      </button>
+    </TableHead>
+  );
+}
+
+function RateVersionsTable({ rates }: { rates: LlmRate[] }) {
+  const [sortKey, setSortKey] = useState<RateSortKey>("effective");
+  const [direction, setDirection] = useState<SortDirection>("desc");
+  const groups = useMemo(() => {
+    const grouped = new Map<string, RateGroup>();
+    for (const rate of rates) {
+      const key = `${rate.provider}\u0000${rate.model}`;
+      const group = grouped.get(key) ?? { key, provider: rate.provider, model: rate.model, versions: [] };
+      group.versions.push(rate);
+      grouped.set(key, group);
+    }
+    return [...grouped.values()]
+      .map((group) => ({
+        ...group,
+        versions: [...group.versions].sort(
+          (a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime(),
+        ),
+      }))
+      .sort((a, b) => compareRateGroups(a, b, sortKey, direction));
+  }, [direction, rates, sortKey]);
+
+  const onSort = (nextKey: RateSortKey) => {
+    if (nextKey === sortKey) {
+      setDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(nextKey);
+    setDirection(nextKey === "effective" ? "desc" : "asc");
+  };
+
+  return (
+    <Table containerClassName="overflow-visible" className="min-w-[1120px]" aria-label="Effective rate versions">
+      <TableHeader className="sticky top-0 z-[1] bg-card shadow-[0_1px_0_hsl(var(--border))]">
+        <TableRow>
+          <SortableRateHead sortKey="model" activeKey={sortKey} direction={direction} onSort={onSort} />
+          <SortableRateHead sortKey="context" activeKey={sortKey} direction={direction} onSort={onSort} />
+          <SortableRateHead sortKey="input" activeKey={sortKey} direction={direction} onSort={onSort} />
+          <SortableRateHead sortKey="cache" activeKey={sortKey} direction={direction} onSort={onSort} />
+          <SortableRateHead sortKey="output" activeKey={sortKey} direction={direction} onSort={onSort} />
+          <SortableRateHead sortKey="tool" activeKey={sortKey} direction={direction} onSort={onSort} />
+          <SortableRateHead sortKey="hours" activeKey={sortKey} direction={direction} onSort={onSort} />
+          <SortableRateHead sortKey="effective" activeKey={sortKey} direction={direction} onSort={onSort} />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {groups.flatMap((group) => group.versions.map((rate, versionIndex) => {
+          const band = rateCostBand(latestVersion(group));
+          const tone = RATE_COST_BAND_STYLES[band];
+          const status = rateVersionStatus(rate);
+          return (
+            <TableRow
+              key={rate.id}
+              data-model={group.model}
+              data-effective-from={rate.effectiveFrom}
+              className={cn(versionIndex === 0 && "border-t-2 border-t-border", versionIndex > 0 && "bg-muted/[0.16]")}
+            >
+              {versionIndex === 0 ? (
+                <TableCell rowSpan={group.versions.length} data-rate-cost-band={band} className="relative min-w-56 border-r align-top pl-5">
+                  <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1", tone.rail)} />
+                  <div className="font-mono text-sm font-semibold">{group.model}</div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xs capitalize text-muted-foreground">{group.provider}</span>
+                    <Badge variant="outline" className={cn("h-5 px-1.5 text-[0.65rem]", tone.badge)}>{tone.label}</Badge>
+                  </div>
+                  {group.versions.length > 1 ? (
+                    <div className="mt-2 text-[0.68rem] text-muted-foreground">{group.versions.length} versions · newest first</div>
+                  ) : null}
+                </TableCell>
+              ) : null}
+              <TableCell className="font-mono">{tokens(rate.contextMinTokens)}–{rate.contextMaxTokens == null ? "∞" : tokens(rate.contextMaxTokens)}</TableCell>
+              <TableCell className="font-mono tabular-nums">{usd(rate.inputMicrosPerMillion)}</TableCell>
+              <TableCell className="font-mono tabular-nums">{optionalUsd(rate.cacheReadMicrosPerMillion)} / {optionalUsd(rate.cacheWriteMicrosPerMillion)}</TableCell>
+              <TableCell className="font-mono tabular-nums">{usd(rate.outputMicrosPerMillion)}</TableCell>
+              <TableCell className="font-mono tabular-nums">{optionalUsd(rate.toolMicrosPerUnit)}</TableCell>
+              <TableCell className="capitalize">{rate.ratePeriod ? rate.ratePeriod.replace("_", "-") : "Every hour"}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{new Date(rate.effectiveFrom).toLocaleDateString()}</span>
+                  <Badge variant="outline" className="h-5 px-1.5 text-[0.65rem]">{status}</Badge>
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {rate.effectiveTo ? `until ${new Date(rate.effectiveTo).toLocaleDateString()}` : "No end date"}
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        }))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -1261,29 +1475,28 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
         </div>
 
         <div className="rounded-lg border bg-muted/10 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <Label htmlFor="optional-rate-fields" className="text-sm font-medium">Optional cache and tool rates</Label>
-              <p className="mt-1 text-xs text-muted-foreground">Leave these blank when the provider does not charge them.</p>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+            <div className="flex min-h-9 shrink-0 items-center gap-3 lg:pb-px">
+              <Switch id="optional-rate-fields" checked={showOptionalRates} onCheckedChange={setShowOptionalRates} />
+              <div>
+                <Label htmlFor="optional-rate-fields" className="text-sm font-medium">Optional cache and tool rates</Label>
+                <p className="mt-1 text-xs text-muted-foreground">Enable only when the provider charges them.</p>
+              </div>
             </div>
-            <Switch id="optional-rate-fields" checked={showOptionalRates} onCheckedChange={setShowOptionalRates} />
+            <Field label="Reason for this rate version" htmlFor="rate-reason" className="min-w-0 flex-1">
+              <Input id="rate-reason" className="h-9" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this pricing version being added?" />
+            </Field>
+            <Button className="shrink-0" size="sm" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
+              {create.isPending ? "Creating…" : "Create immutable version"}
+            </Button>
           </div>
           {showOptionalRates ? (
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-wrap gap-3 border-t pt-3">
               <Field label="Cache read (USD / 1M)" htmlFor="rate-cache-read" className="w-full sm:w-52"><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></Field>
               <Field label="Cache write (USD / 1M)" htmlFor="rate-cache-write" className="w-full sm:w-52"><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></Field>
               <Field label="Tool fee (USD / unit)" htmlFor="rate-tool-fee" className="w-full sm:w-48"><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></Field>
             </div>
           ) : null}
-        </div>
-
-        <div className="flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-end lg:justify-between">
-          <Field label="Reason for this rate version" htmlFor="rate-reason" className="w-full lg:max-w-2xl">
-            <Input id="rate-reason" className="h-9" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this pricing version being added?" />
-          </Field>
-          <Button size="sm" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
-            {create.isPending ? "Creating…" : "Create immutable version"}
-          </Button>
         </div>
         {create.isError ? (
           <Alert variant="destructive">
@@ -1474,28 +1687,24 @@ export function AdminQuotasPage() {
           {!rates.isError ? (
             <Card>
               <CardHeader>
-                <CardTitle><h2 className="text-base">Effective rate versions</h2></CardTitle>
-                <CardDescription>Exact provider, model, context band, rate period, and effective window determine coverage.</CardDescription>
+                <CardTitle><h2 className="text-base">Effective rate cards</h2></CardTitle>
+                <CardDescription>Models are grouped into one block and their immutable versions stay newest-first. Sort any column to rank model groups by the latest version.</CardDescription>
               </CardHeader>
-              <CardContent className="overflow-x-auto p-0">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Provider / model</TableHead><TableHead>Context band</TableHead><TableHead>Input</TableHead><TableHead>Cache read / write</TableHead><TableHead>Output</TableHead><TableHead>Tool fee</TableHead><TableHead>Hours</TableHead><TableHead>Effective</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {(rates.data?.data ?? []).map((rate) => (
-                      <TableRow key={rate.id}>
-                        <TableCell><div className="font-medium">{rate.provider}</div><div className="font-mono text-xs text-muted-foreground">{rate.model}</div></TableCell>
-                        <TableCell className="font-mono">{tokens(rate.contextMinTokens)}–{rate.contextMaxTokens == null ? "∞" : tokens(rate.contextMaxTokens)}</TableCell>
-                        <TableCell className="font-mono">{usd(rate.inputMicrosPerMillion)}</TableCell>
-                        <TableCell className="font-mono">{optionalUsd(rate.cacheReadMicrosPerMillion)} / {optionalUsd(rate.cacheWriteMicrosPerMillion)}</TableCell>
-                        <TableCell className="font-mono">{usd(rate.outputMicrosPerMillion)}</TableCell>
-                        <TableCell className="font-mono">{optionalUsd(rate.toolMicrosPerUnit)}</TableCell>
-                        <TableCell>{rate.ratePeriod ? rate.ratePeriod.replace("_", "-") : "Every hour"}</TableCell>
-                        <TableCell className="font-mono"><div>{new Date(rate.effectiveFrom).toLocaleDateString()}</div><div className="text-xs text-muted-foreground">{rate.effectiveTo ? `to ${new Date(rate.effectiveTo).toLocaleDateString()}` : "active"}</div></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {rates.data?.data.length === 0 ? <div className="px-6 py-12 text-center text-sm text-muted-foreground">No rate cards found.</div> : null}
+              <CardContent className="p-0">
+                <div className="flex flex-wrap gap-x-4 gap-y-2 border-y bg-muted/15 px-4 py-2.5 text-xs text-muted-foreground" aria-label="Rate card color legend">
+                  {(Object.entries(RATE_COST_BAND_STYLES) as [RateCostBand, typeof RATE_COST_BAND_STYLES[RateCostBand]][]).map(([band, tone]) => (
+                    <span key={band} className="inline-flex items-center gap-1.5">
+                      <i aria-hidden="true" className={cn("size-2 rounded-full", tone.rail)} />
+                      <span className="font-medium text-foreground">{tone.label}</span>
+                      <span>{tone.detail}</span>
+                    </span>
+                  ))}
+                </div>
+                {(rates.data?.data ?? []).length > 0 ? (
+                  <div className="max-h-[44rem] overflow-auto">
+                    <RateVersionsTable rates={rates.data?.data ?? []} />
+                  </div>
+                ) : <div className="py-10 text-center text-sm text-muted-foreground">No rate cards found.</div>}
               </CardContent>
             </Card>
           ) : null}

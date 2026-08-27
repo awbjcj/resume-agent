@@ -8,6 +8,7 @@ import { AttentionCard } from "./AttentionCard";
 import { DeskHealth } from "./DeskHealth";
 import { InProgressCard } from "./InProgressCard";
 import { RecentRuns } from "./RecentRuns";
+import { QuickAccess } from "./QuickAccess";
 import { StageRail } from "./StageRail";
 import { useDashboardSummary } from "./use-dashboard-summary";
 
@@ -39,6 +40,7 @@ export function DashboardPage() {
         title={heroTitle(waiting)}
         sub="Pull fresh listings, triage the queue, and ship tailored resumes."
       />
+      <QuickAccess summary={summary} />
       <GettingStartedChecklist />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="stagger-children flex min-w-0 flex-col gap-6">
