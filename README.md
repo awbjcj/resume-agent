@@ -18,6 +18,21 @@ invent.
 
 ---
 
+## Screenshots
+
+_Sample data — not a real job search._
+
+| | |
+| --- | --- |
+| **Dashboard** — daily operations at a glance | **Shortlist** — the cost gate: approve only what's worth tailoring |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Shortlist](docs/screenshots/shortlist.png) |
+| **Pipeline** — every job by stage, with tailoring status | **Triage** — clear the raw/rejected backlog fast |
+| ![Pipeline](docs/screenshots/pipeline.png) | ![Triage](docs/screenshots/triage.png) |
+| **Analytics** — which sources and fit-score bands actually convert | **Match-gap** — skills target jobs demand that your profile doesn't show |
+| ![Analytics](docs/screenshots/analytics.png) | ![Match-gap](docs/screenshots/match-gap.png) |
+
+---
+
 ## How it works
 
 Jobs flow through a funnel. Each stage has one command that advances it, and two

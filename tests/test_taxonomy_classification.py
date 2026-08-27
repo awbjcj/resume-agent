@@ -181,6 +181,16 @@ class _FailingCanonicalizer:
         raise AssertionError("async path expected")
 
 
+class _ErrorStatusCanonicalizer:
+    """Represents agno's non-throwing provider-error result shape."""
+
+    async def arun(self, prompt):
+        return SimpleNamespace(content="provider rejected request", status="ERROR")
+
+    def run(self, prompt):
+        raise AssertionError("async path expected")
+
+
 def test_a_token_no_round_can_place_becomes_its_own_canonical():
     outcome = _classify(
         demanded={"quantum widgetry"},
@@ -224,6 +234,22 @@ def test_an_outage_is_never_backstopped():
     assert all(failure.retryable for failure in outcome.failures)
 
 
+def test_error_status_is_never_repaired_or_backstopped():
+    outcome = _classify(
+        demanded={"rust"},
+        canonicalizer=_ErrorStatusCanonicalizer(),
+        batch_size=1,
+        repair_max_singletons=1,
+    )
+
+    assert outcome.additions.aliases == {}
+    assert outcome.metrics.canonical_repair_rounds == 0
+    assert outcome.metrics.canonical_identity_filed == 0
+    assert [(failure.kind, failure.retryable) for failure in outcome.failures] == [
+        ("call", True)
+    ]
+
+
 def test_the_singleton_bound_sends_its_overflow_to_the_backstop():
     outcome = _classify(
         demanded={"alpha", "beta"},
@@ -235,6 +261,17 @@ def test_the_singleton_bound_sends_its_overflow_to_the_backstop():
     # Both still end up with a home; the bound caps dispatch, not coverage.
     assert set(outcome.additions.aliases) == {"alpha", "beta"}
     assert outcome.metrics.canonical_identity_filed == 2
+
+
+def test_singleton_repair_runs_once_when_batch_size_is_one():
+    outcome = _classify(
+        demanded={"alpha"},
+        canonicalizer=_RefusingCanonicalizer(),
+        batch_size=1,
+        repair_max_singletons=1,
+    )
+
+    assert outcome.metrics.canonical_repair_rounds == 1
 
 
 def test_warm_complete_map_makes_no_model_calls():

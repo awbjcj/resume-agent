@@ -437,6 +437,9 @@ async def classify_incrementally(
             on_acquire=meter.acquire,
             on_release=meter.release,
         )
+        status = getattr(response, "status", None)
+        if str(getattr(status, "value", status) or "").casefold() == "error":
+            raise RuntimeError(str(getattr(response, "content", "") or "model call failed"))
         return _project_aliases(
             response.content,
             batch=set(batch),
@@ -505,7 +508,10 @@ async def classify_incrementally(
         # cross-cluster duplicate and a multi-existing-member violation are both
         # structurally impossible, so ``_project_aliases`` can only reject an
         # outright non-answer.
-        for repair_size in (max(1, batch_size // 4), 1):
+        repair_sizes = [max(1, batch_size // 4)]
+        if repair_sizes[0] != 1:
+            repair_sizes.append(1)
+        for repair_size in repair_sizes:
             if not residue:
                 break
             targets = sorted(residue)

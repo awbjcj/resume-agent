@@ -1417,14 +1417,14 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
   });
 
   return (
-    <Card className="min-w-0 overflow-hidden">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle><h2 className="text-base">Create future rate version</h2></CardTitle>
         <CardDescription>
           Start with the provider and model already billed by the app. Historical rows remain immutable.
         </CardDescription>
       </CardHeader>
-      <CardContent className="min-w-0 space-y-4">
+      <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Provider" htmlFor="rate-provider" className="w-full sm:w-40">
             <Select value={provider} onValueChange={(value) => changeProvider(value as (typeof PROVIDERS)[number])}>
@@ -1474,26 +1474,31 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
           </Field>
         </div>
 
-        <div className="shell-action-rail w-full min-w-0 max-w-full rounded-lg border bg-muted/10">
+        <div className="rounded-lg border bg-muted/10 p-3">
           <div
             data-testid="rate-options-row"
-            className="flex w-max min-w-full flex-nowrap items-end gap-3 p-3"
+            className={cn(
+              "grid gap-3 lg:items-end",
+              showOptionalRates
+                ? "xl:grid-cols-[auto_repeat(3,minmax(7rem,0.55fr))_minmax(10rem,1fr)_auto]"
+                : "lg:grid-cols-[auto_minmax(0,1fr)_auto]",
+            )}
           >
-            <div className="flex min-h-9 w-56 flex-none items-center gap-3 whitespace-nowrap pb-px">
+            <div className="flex min-h-9 shrink-0 items-center gap-3 lg:pb-px">
               <Switch id="optional-rate-fields" checked={showOptionalRates} onCheckedChange={setShowOptionalRates} />
-              <div>
+              <div className="max-w-44">
                 <Label htmlFor="optional-rate-fields" className="text-sm font-medium">Optional cache and tool rates</Label>
                 <p className="mt-1 text-xs text-muted-foreground">Enable only when the provider charges them.</p>
               </div>
             </div>
             {showOptionalRates ? (
               <>
-                <Field label="Cache read (USD / 1M)" htmlFor="rate-cache-read" className="w-44 flex-none [&_label]:whitespace-nowrap"><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></Field>
-                <Field label="Cache write (USD / 1M)" htmlFor="rate-cache-write" className="w-44 flex-none [&_label]:whitespace-nowrap"><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></Field>
-                <Field label="Tool fee (USD / unit)" htmlFor="rate-tool-fee" className="w-44 flex-none [&_label]:whitespace-nowrap"><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></Field>
+                <Field label="Cache read (USD / 1M)" htmlFor="rate-cache-read" className="min-w-0"><Input id="rate-cache-read" className="h-9" inputMode="decimal" value={cacheRead} onChange={(event) => setCacheRead(event.target.value)} /></Field>
+                <Field label="Cache write (USD / 1M)" htmlFor="rate-cache-write" className="min-w-0"><Input id="rate-cache-write" className="h-9" inputMode="decimal" value={cacheWrite} onChange={(event) => setCacheWrite(event.target.value)} /></Field>
+                <Field label="Tool fee (USD / unit)" htmlFor="rate-tool-fee" className="min-w-0"><Input id="rate-tool-fee" className="h-9" inputMode="decimal" value={toolFee} onChange={(event) => setToolFee(event.target.value)} /></Field>
               </>
             ) : null}
-            <Field label="Reason for this rate version" htmlFor="rate-reason" className="w-80 flex-none [&_label]:whitespace-nowrap">
+            <Field label="Reason for this rate version" htmlFor="rate-reason" className="min-w-0 flex-1">
               <Input id="rate-reason" className="h-9" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this pricing version being added?" />
             </Field>
             <Button className="shrink-0" size="sm" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
@@ -1601,7 +1606,7 @@ export function AdminQuotasPage() {
         </div>
       </section>
 
-      <Tabs defaultValue="members" className="min-w-0">
+      <Tabs defaultValue="members">
         <div className="overflow-x-auto border-b">
           <TabsList className="h-11 gap-5" variant="line" aria-label="Quota console sections">
             <TabsTrigger className="px-1" value="members"><Users /> Members</TabsTrigger>
@@ -1682,7 +1687,7 @@ export function AdminQuotasPage() {
 
         <TabsContent value="tiers"><TierPanel tiers={tiers.data.data} accounts={accounts.data.data} /></TabsContent>
 
-        <TabsContent value="rates" className="min-w-0 space-y-5 pt-4">
+        <TabsContent value="rates" className="space-y-5 pt-4">
           <RateCreator rates={rates.data?.data ?? []} />
           {rates.isError ? (
             <Alert variant="destructive"><AlertTitle>Rate cards unavailable</AlertTitle><AlertDescription>{rates.error.message}</AlertDescription></Alert>

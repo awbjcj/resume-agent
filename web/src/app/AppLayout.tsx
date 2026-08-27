@@ -189,7 +189,7 @@ export function AppLayout() {
           </div>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="min-w-0">
+      <SidebarInset>
         {/* `app-chrome` is the hook that makes this translucent layer become an
             opaque surface under prefers-reduced-transparency / prefers-contrast
             (see index.css) — blur is a material here, not decoration. */}

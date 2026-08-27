@@ -62,6 +62,7 @@ into this one.
 | Career Lab                                                                        | `src/resume_agent/career_lab/CLAUDE.md`           |
 | Gmail integration                                                                 | `src/resume_agent/gmail/CLAUDE.md`                |
 | Services layer: settings bundle                                                   | `src/resume_agent/services/CLAUDE.md`             |
+| Agent-quality evals: how to run them, what the numbers mean                       | `evals/README.md`                                 |
 
 ## Core invariants (never break these)
 
