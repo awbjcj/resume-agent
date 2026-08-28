@@ -183,7 +183,7 @@ describe("InterviewPage", () => {
       .spyOn(HTMLMediaElement.prototype, "play")
       .mockResolvedValue(undefined);
     const fetchAudio = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(new Blob(["mp3"], { type: "audio/mpeg" }), { status: 200 }),
+      { ok: true, blob: vi.fn().mockResolvedValue(new Blob(["mp3"], { type: "audio/mpeg" })) } as unknown as Response,
     );
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
