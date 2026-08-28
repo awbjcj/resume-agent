@@ -1883,6 +1883,7 @@ def tool_kwargs() -> dict[str, Any]:
 
 _TRANSCRIBE_PROVIDERS = ("gemini", "openai")
 _SPEECH_PROVIDERS = ("openai",)
+_OPENAI_API_BASE_URL = "https://api.openai.com/v1"
 _SPEECH_INSTRUCTIONS = (
     "Speak as a professional interviewer. Read the supplied text exactly without "
     "adding or omitting words."
@@ -1989,11 +1990,12 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
 
 
 def speech_available() -> bool:
-    """Whether the configured speech model has a supported provider and funding."""
+    """Whether the configured speech model has a direct OpenAI credential."""
 
-    model_id = get_settings().speech_model
+    settings = get_settings()
+    model_id = settings.speech_model
     provider, _ = split_provider(model_id)
-    return provider in _SPEECH_PROVIDERS and model_access_available(model_id)
+    return provider in _SPEECH_PROVIDERS and bool(settings.openai_api_key.strip())
 
 
 def synthesize_speech(
@@ -2017,8 +2019,8 @@ def synthesize_speech(
     provider, model = split_provider(resolved)
     if provider not in _SPEECH_PROVIDERS:
         raise ValueError(f"provider {provider!r} does not support speech synthesis")
-    route = resolve_route(resolved)
-    if not route.api_key:
+    api_key = settings.openai_api_key.strip()
+    if not api_key:
         raise ValueError(f"no API key configured for speech provider {provider!r}")
 
     from resume_agent.tenancy.limits import enforce_agent_budget
@@ -2028,11 +2030,11 @@ def synthesize_speech(
     )
     from openai import OpenAI
 
-    client_kwargs: dict[str, Any] = {"api_key": route.api_key}
-    gateway = _provider_gateway_base_url(provider, route.base_url)
-    if gateway:
-        client_kwargs["base_url"] = gateway
-    client = OpenAI(**client_kwargs)
+    # Speech is deliberately not subscription-routed. The configured gateway
+    # implements text endpoints but not POST /v1/audio/speech. Passing the
+    # official endpoint explicitly also prevents the OpenAI SDK from silently
+    # inheriting a deployment-wide OPENAI_BASE_URL gateway override.
+    client = OpenAI(api_key=api_key, base_url=_OPENAI_API_BASE_URL)
     response = client.audio.speech.create(
         model=model,
         voice=voice or settings.speech_voice,

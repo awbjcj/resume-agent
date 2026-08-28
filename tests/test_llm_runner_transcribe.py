@@ -35,21 +35,29 @@ def test_speech_rejects_non_openai_provider(monkeypatch):
 def test_speech_requires_key(monkeypatch):
     monkeypatch.setattr(
         llm_runner,
-        "resolve_route",
-        lambda model_id: SimpleNamespace(api_key="", base_url=None),
+        "get_settings",
+        lambda: SimpleNamespace(
+            speech_model="openai:gpt-4o-mini-tts",
+            speech_voice="marin",
+            openai_api_key="",
+        ),
     )
     with pytest.raises(ValueError, match="no API key"):
         llm_runner.synthesize_speech("hello", model_id="openai:gpt-4o-mini-tts")
 
 
-def test_speech_availability_requires_funded_model_access(monkeypatch):
-    monkeypatch.setattr(llm_runner, "model_access_available", lambda model_id: True)
+def test_speech_availability_requires_direct_openai_key(monkeypatch):
+    settings = SimpleNamespace(
+        speech_model="openai:gpt-4o-mini-tts",
+        openai_api_key="speech-key",
+    )
+    monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
     assert llm_runner.speech_available() is True
-    monkeypatch.setattr(llm_runner, "model_access_available", lambda model_id: False)
+    settings.openai_api_key = ""
     assert llm_runner.speech_available() is False
 
 
-def test_speech_uses_resolved_route_and_returns_mp3(monkeypatch):
+def test_speech_uses_direct_openai_client_and_returns_mp3(monkeypatch):
     import openai
 
     seen: dict[str, object] = {}
@@ -67,9 +75,14 @@ def test_speech_uses_resolved_route_and_returns_mp3(monkeypatch):
     monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
     monkeypatch.setattr(
         llm_runner,
-        "resolve_route",
-        lambda model_id: SimpleNamespace(api_key="speech-key", base_url="https://gateway.test"),
+        "get_settings",
+        lambda: SimpleNamespace(
+            speech_model="openai:gpt-4o-mini-tts",
+            speech_voice="marin",
+            openai_api_key="speech-key",
+        ),
     )
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
     monkeypatch.setattr(
         "resume_agent.tenancy.limits.enforce_agent_budget", lambda _agent: None
     )
@@ -81,7 +94,7 @@ def test_speech_uses_resolved_route_and_returns_mp3(monkeypatch):
     ) == b"mp3-bytes"
     assert seen["client"] == {
         "api_key": "speech-key",
-        "base_url": "https://gateway.test/v1",
+        "base_url": "https://api.openai.com/v1",
     }
     assert seen["request"] == {
         "model": "gpt-4o-mini-tts",

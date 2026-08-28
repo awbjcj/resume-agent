@@ -23,7 +23,7 @@ present.
 | Variable | Default | Accepted values and purpose |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | empty | Shared Anthropic credential. Bare model IDs route to Anthropic. |
-| `OPENAI_API_KEY` | empty | Shared OpenAI credential for `openai:` model IDs and optional embeddings. |
+| `OPENAI_API_KEY` | empty | Shared OpenAI credential for `openai:` model IDs, optional embeddings, and direct text-to-speech. TTS never uses the subscription gateway. |
 | `GEMINI_API_KEY` | empty | Shared Google Gemini credential for `gemini:` model IDs. |
 | `DEEPSEEK_API_KEY` | empty | Shared DeepSeek credential for `deepseek:` model IDs. |
 | `SUB2API_BASE_URL` | empty | Subscription-gateway origin shared by all routed providers; empty disables gateway routing unless a provider is pinned to `subscription`. |
