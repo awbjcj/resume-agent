@@ -170,7 +170,7 @@ describe("RegisterPage", () => {
     expect(await screen.findByText("Verify route")).toBeInTheDocument();
   });
 
-  it("prefills a Google identity and still requires the emailed code", async () => {
+  it("prefills a Google identity while keeping email registration available", async () => {
     let sent: { email?: string; displayName?: string | null } = {};
     server.use(
       http.post("/api/auth/register", async ({ request }) => {
@@ -198,6 +198,7 @@ describe("RegisterPage", () => {
     // Scoped by text, not by role: the password strength meter is a second
     // role="status" live region on this page.
     expect(screen.getByText(/no account matches/i)).toBeInTheDocument();
+    expect(screen.getByText(/won.t need a password/i)).toBeInTheDocument();
     await user.type(screen.getByLabelText(/^password$/i), "long-safe-password-42");
     await user.type(screen.getByLabelText(/invite code/i), "inv_example");
     await user.click(screen.getByRole("button", { name: /create account/i }));

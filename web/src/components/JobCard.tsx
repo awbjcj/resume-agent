@@ -56,7 +56,7 @@ export function JobCard({
         <button
           type="button"
           onClick={onOpen}
-          className="group flex flex-1 gap-3 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40 sm:gap-4"
+          className="group flex min-w-0 flex-1 gap-3 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40 sm:gap-4"
         >
           <FitMeter score={row.fitScore} />
           <div className="min-w-0 flex-1">

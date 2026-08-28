@@ -18,6 +18,9 @@ const CALLBACK_ERRORS: Record<string, string> = {
     "Google hasn’t verified that email address, so it can’t be linked to an account.",
   invite_invalid:
     "That invitation code is invalid, expired, or already used. Ask your administrator for a new one.",
+  registration_closed:
+    "New account registration is currently closed. Contact your administrator for access.",
+  rate_limited: "Too many accounts were created recently. Please try again later.",
   conflict: "Your account couldn’t be created. Please try again.",
 };
 

@@ -41,6 +41,11 @@ export function LoginPage() {
     >
       {calloutError ? <AuthNotice tone="error">{calloutError}</AuthNotice> : null}
       <form onSubmit={submit}>
+        <GoogleButton mode="login" />
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Sign in with your Google account — no password required.
+        </p>
+        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or use email and password<span className="h-px flex-1 bg-border" /></div>
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="login-email">Email</FieldLabel>
@@ -59,8 +64,6 @@ export function LoginPage() {
           {login.isPending ? <Spinner data-icon="inline-start" /> : null}
           {login.isPending ? "Signing in…" : "Sign in"}
         </Button>
-        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
-        <GoogleButton mode="login" />
       </form>
     </AuthLayout>
   );

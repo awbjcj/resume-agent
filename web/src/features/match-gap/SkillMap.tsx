@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomTransform } from "d3-zoom";
 import { ArrowLeftIcon, Maximize2Icon, MinusIcon, PlusIcon } from "lucide-react";
@@ -82,12 +82,14 @@ export function SkillMap({
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => {
-      const width = Math.max(320, Math.round(entry.contentRect.width));
-      setContainerWidth(width);
-    });
+    const measure = (width: number) => setContainerWidth(Math.max(320, Math.round(width)));
+    // Measure synchronously on mount instead of waiting for the observer's
+    // first (async) callback, so a narrow viewport never renders one frame
+    // of the DEFAULT_WIDTH desktop layout before snapping to the real size.
+    measure(containerRef.current.getBoundingClientRect().width);
+    const observer = new ResizeObserver(([entry]) => measure(entry.contentRect.width));
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);

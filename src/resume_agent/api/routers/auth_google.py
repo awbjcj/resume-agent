@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import RedirectResponse
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, or_, select, text
 from sqlalchemy.orm import Session
 
 from resume_agent.api import attempts, auth
@@ -68,7 +68,7 @@ def _build_flow(
             "web": {
                 "client_id": settings.google_oauth_client_id,
                 "client_secret": settings.google_oauth_client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "auth_uri": "https://accounts.google.com/o/oauth2/v2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
         },
@@ -271,9 +271,26 @@ def google_callback(
     display_name = str(claims.get("name") or "").strip()[:64]
     if not subject or not email:
         return _failure(request, "/login?error=exchange_failed")
-    if parsed.mode == "register" and not attempts.consume_global_signup(
-        engine,
-        limit=settings.global_daily_signup_limit,
+    # A login-mode request may become a first-time signup when registration is
+    # open. Only spend the global signup budget when neither Google identity nor
+    # verified email currently belongs to an account; returning users must never
+    # be locked out because the signup budget is exhausted.
+    with Session(engine) as lookup:
+        known_user = lookup.execute(
+            select(User.id).where(
+                or_(User.google_sub == subject, User.email == email)
+            )
+        ).scalars().first()
+    may_create = parsed.mode == "register" or settings.registration_mode == "open"
+    if known_user is None and may_create and not verified:
+        return _failure(request, "/register?error=unverified_google")
+    if (
+        known_user is None
+        and may_create
+        and not attempts.consume_global_signup(
+            engine,
+            limit=settings.global_daily_signup_limit,
+        )
     ):
         return _failure(request, "/register?error=rate_limited")
 
@@ -320,7 +337,7 @@ def google_callback(
             )
             return _sign_in(request, settings, by_email)
 
-        if parsed.mode != "register":
+        if parsed.mode != "register" and settings.registration_mode != "open":
             session.rollback()
             logger.info("Google sign-in matched no account; routing to signup")
             return _finish(_signup_target(email, display_name))

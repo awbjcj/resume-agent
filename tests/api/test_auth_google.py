@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from resume_agent.api import auth
 from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, OAuthFlow, User
+from resume_agent.tenancy.system_db import InviteCode, LoginAttempt, OAuthFlow, User
 
 
 CLIENT = {"google_oauth_client_id": "cid", "google_oauth_client_secret": "secret"}
@@ -225,6 +225,39 @@ def test_google_start_participates_in_the_ip_budget(mu_app, monkeypatch):
         assert client.get("/api/auth/google/start").status_code == 429
 
 
+def test_google_login_for_existing_user_ignores_exhausted_signup_budget(
+    mu_app, monkeypatch
+):
+    _configure(mu_app)
+    mu_app.state.settings = mu_app.state.settings.model_copy(
+        update={"global_daily_signup_limit": 1}
+    )
+    _fake_google(
+        monkeypatch,
+        {"sub": "returning-google", "email": "owner@example.com"},
+    )
+    with TestClient(mu_app) as client:
+        with Session(mu_app.state.system_engine) as session:
+            owner = (
+                session.execute(select(User).where(User.username == "owner"))
+                .scalars()
+                .one()
+            )
+            owner.google_sub = "returning-google"
+            session.add(
+                LoginAttempt(
+                    scope="signup_global",
+                    identifier="global",
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
+            session.commit()
+
+        response = _callback(client, mu_app, mode="register")
+
+    assert response.headers["location"] == "/"
+
+
 def test_google_email_link_is_strict_and_monotonic(mu_app, monkeypatch):
     _configure(mu_app)
     _fake_google(
@@ -325,6 +358,74 @@ def test_google_login_without_an_account_prefills_registration(mu_app, monkeypat
     with Session(mu_app.state.system_engine) as session:
         assert (
             session.execute(select(User).where(User.google_sub == "google-stranger"))
+            .scalars()
+            .first()
+            is None
+        )
+
+
+def test_google_login_creates_passwordless_account_when_registration_is_open(
+    mu_app, monkeypatch
+):
+    _configure(mu_app)
+    mu_app.state.settings = mu_app.state.settings.model_copy(
+        update={"registration_mode": "open"}
+    )
+    _fake_google(
+        monkeypatch,
+        {
+            "sub": "google-open-signup",
+            "email": "new-open@example.com",
+            "email_verified": True,
+            "name": "Open User",
+        },
+    )
+
+    with TestClient(mu_app) as client:
+        response = _callback(client, mu_app, mode="login")
+        assert response.headers["location"] == "/"
+        me = client.get("/api/auth/me")
+
+    assert me.status_code == 200
+    assert me.json()["email"] == "new-open@example.com"
+    with Session(mu_app.state.system_engine) as session:
+        user = (
+            session.execute(
+                select(User).where(User.google_sub == "google-open-signup")
+            )
+            .scalars()
+            .one()
+        )
+        assert user.password_hash == ""
+        assert user.email_verified_at is not None
+    assert (mu_app.state.data_dir / "users" / user.id).is_dir()
+
+
+def test_google_login_does_not_create_open_account_for_unverified_email(
+    mu_app, monkeypatch
+):
+    _configure(mu_app)
+    mu_app.state.settings = mu_app.state.settings.model_copy(
+        update={"registration_mode": "open"}
+    )
+    _fake_google(
+        monkeypatch,
+        {
+            "sub": "google-unverified-open",
+            "email": "unverified-open@example.com",
+            "email_verified": "true",
+        },
+    )
+
+    with TestClient(mu_app) as client:
+        response = _callback(client, mu_app, mode="login")
+
+    assert response.headers["location"] == "/register?error=unverified_google"
+    with Session(mu_app.state.system_engine) as session:
+        assert (
+            session.execute(
+                select(User).where(User.google_sub == "google-unverified-open")
+            )
             .scalars()
             .first()
             is None
