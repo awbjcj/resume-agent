@@ -5,15 +5,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
+import re
 from typing import Literal
+import uuid
 
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.career_skills.models import SkillUse
 from resume_agent.sessions.store import SessionModel, SessionStore, now_iso, valid_session_id
+from resume_agent.security.paths import confined_path
 
 STYLE_EXTRA_CAP = 2_000
+_AUDIO_REF = re.compile(r"[a-f0-9]{32}\Z")
 
 
 class InterviewStyle(ExtensibleModel):
@@ -24,6 +28,7 @@ class InterviewStyle(ExtensibleModel):
     difficulty: Literal["easy", "standard", "hard"] = "standard"
     question_count: int = Field(default=8, ge=4, le=12)
     extra: str = Field(default="", max_length=STYLE_EXTRA_CAP)
+    response_mode: Literal["text", "audio_preferred"] = "text"
 
 
 class InterviewContext(ExtensibleModel):
@@ -50,6 +55,8 @@ class InterviewTurnRecord(ExtensibleModel):
     is_followup: bool = False
     at: str = ""
     notice: str = ""
+    audio_status: Literal["none", "ready", "failed"] = "none"
+    audio_ref: str = ""
 
 
 class QuestionReview(ExtensibleModel):
@@ -187,6 +194,93 @@ def mutate_session(
     return _STORE.mutate(interview_dir, session_id, fn)
 
 
+def _audio_path(interview_dir: Path | str, audio_ref: str) -> Path:
+    if not _AUDIO_REF.fullmatch(audio_ref):
+        raise ValueError("audio unavailable")
+    audio_root = confined_path(interview_dir, "audio")
+    return confined_path(audio_root, f"{audio_ref}.mp3")
+
+
+def attach_turn_audio(
+    interview_dir: Path | str,
+    session_id: str,
+    turn_index: int,
+    audio: bytes,
+) -> Path:
+    """Atomically attach synthesized MP3 bytes to one interviewer turn."""
+
+    if not audio:
+        raise ValueError("audio is empty")
+    root = Path(interview_dir)
+    with interview_lock():
+        session = load_session(root, session_id)
+        if turn_index < 0 or turn_index >= len(session["turns"]):
+            raise ValueError("unknown interview turn")
+        turn = session["turns"][turn_index]
+        if turn["role"] != "interviewer":
+            raise ValueError("audio is only available for interviewer turns")
+
+        audio_ref = uuid.uuid4().hex
+        target = _audio_path(root, audio_ref)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        staged = confined_path(target.parent, f".{audio_ref}-{uuid.uuid4().hex}.tmp")
+        old_ref = turn.get("audio_ref", "")
+        try:
+            staged.write_bytes(audio)
+            staged.replace(target)
+            turn["audio_ref"] = audio_ref
+            turn["audio_status"] = "ready"
+            _write(root, session)
+        except BaseException:
+            staged.unlink(missing_ok=True)
+            target.unlink(missing_ok=True)
+            raise
+        if old_ref:
+            _audio_path(root, old_ref).unlink(missing_ok=True)
+        return target
+
+
+def mark_turn_audio_failed(
+    interview_dir: Path | str, session_id: str, turn_index: int
+) -> None:
+    """Record a non-fatal synthesis failure so clients reveal the transcript."""
+
+    def apply(session: dict) -> None:
+        if turn_index < 0 or turn_index >= len(session["turns"]):
+            raise ValueError("unknown interview turn")
+        turn = session["turns"][turn_index]
+        if turn["role"] != "interviewer":
+            raise ValueError("audio is only available for interviewer turns")
+        turn["audio_status"] = "failed"
+        turn["audio_ref"] = ""
+
+    mutate_session(interview_dir, session_id, apply)
+
+
+def turn_audio_path(
+    interview_dir: Path | str, session_id: str, turn_index: int
+) -> Path:
+    """Resolve a ready audio artifact after validating session and turn custody."""
+
+    session = load_session(interview_dir, session_id)
+    if turn_index < 0 or turn_index >= len(session["turns"]):
+        raise ValueError("unknown interview turn")
+    turn = session["turns"][turn_index]
+    if turn.get("audio_status") != "ready" or not turn.get("audio_ref"):
+        raise ValueError("audio unavailable")
+    path = _audio_path(interview_dir, turn["audio_ref"])
+    if not path.is_file():
+        raise ValueError("audio unavailable")
+    return path
+
+
+def _delete_audio_artifacts(interview_dir: Path | str, session: dict) -> None:
+    for turn in session.get("turns", []):
+        audio_ref = turn.get("audio_ref", "")
+        if audio_ref:
+            _audio_path(interview_dir, audio_ref).unlink(missing_ok=True)
+
+
 def apply_answer_delta(
     interview_dir: Path | str,
     session_id: str,
@@ -265,7 +359,10 @@ def unarchive_session(interview_dir: Path | str, session_id: str) -> dict:
 
 def delete_session(interview_dir: Path | str, session_id: str) -> None:
     """Permanently remove a session; deleting an active session abandons it."""
-    _STORE.delete(interview_dir, session_id)
+    with interview_lock():
+        session = load_session(interview_dir, session_id)
+        _STORE.delete(interview_dir, session_id)
+        _delete_audio_artifacts(interview_dir, session)
 
 
 def rename_session(interview_dir: Path | str, session_id: str, title: str) -> dict:
@@ -274,4 +371,12 @@ def rename_session(interview_dir: Path | str, session_id: str, title: str) -> di
 
 def delete_sessions_for_job(interview_dir: Path | str, job_id: int) -> int:
     """Remove all interview session files for a deleted job. Returns count removed."""
-    return _STORE.delete_where(interview_dir, lambda row: row["job_id"] == job_id)
+    removed = 0
+    with interview_lock():
+        for session in list_sessions(interview_dir, include_archived=True):
+            if session["job_id"] != job_id:
+                continue
+            _STORE.delete(interview_dir, session["session_id"])
+            _delete_audio_artifacts(interview_dir, session)
+            removed += 1
+    return removed

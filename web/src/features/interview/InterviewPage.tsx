@@ -206,16 +206,35 @@ export function InterviewPage() {
 
   const ended = active.status === "ended";
   const canAnswer = active.status === "active" && !active.concluded;
+  const audioPreferred = active.style.responseMode === "audio_preferred";
   const durableTurns = active.turns?.length ?? 0;
   const chatMessages: ChatThreadMessage[] = (() => {
-    const durable = (active.turns ?? []).map((turn, index) => {
+    let latestReadyAudio = -1;
+    for (const [index, turn] of (active.turns ?? []).entries()) {
+      if (turn.role === "interviewer" && turn.audioStatus === "ready" && turn.audioUrl) {
+        latestReadyAudio = index;
+      }
+    }
+    const durable: ChatThreadMessage[] = (active.turns ?? []).map((turn, index) => {
       const notice = (turn as typeof turn & { notice?: string }).notice;
       const role: "assistant" | "user" = turn.role === "interviewer" ? "assistant" : "user";
+      const audioReady = audioPreferred && role === "assistant" &&
+        turn.audioStatus === "ready" && Boolean(turn.audioUrl);
+      const audioFailed = audioPreferred && role === "assistant" && turn.audioStatus === "failed";
       return {
         id: `${turn.at}-${index}`,
         role,
         parts: [
-          { kind: "text" as const, text: turn.text },
+          ...(audioReady ? [{
+            kind: "audio" as const,
+            url: turn.audioUrl as string,
+            transcript: turn.text,
+            autoPlay: index === latestReadyAudio,
+          }] : [{ kind: "text" as const, text: turn.text }]),
+          ...(audioFailed ? [{
+            kind: "notice" as const,
+            message: "Audio could not be generated, so the transcript is shown.",
+          }] : []),
           ...(notice ? [{ kind: "notice" as const, message: notice }] : []),
         ],
       };
@@ -224,7 +243,11 @@ export function InterviewPage() {
     return [...durable, { id: "pending-user", role: "user" as const, parts: [{ kind: "text" as const, text: pending.text }] }];
   })();
   const durableAdvanced = durableTurns > attachedBaseline;
-  const streamingParts = attachedRunId && !durableAdvanced ? stream.parts : null;
+  const streamingParts = attachedRunId && !durableAdvanced
+    ? audioPreferred
+      ? stream.parts.filter((part) => part.kind !== "text" && part.kind !== "reasoning")
+      : stream.parts
+    : null;
   const visibleError = stream.error || runError;
 
   return (
@@ -301,10 +324,10 @@ export function InterviewPage() {
               assistantName="Interviewer"
               assistantIcon={<MessagesSquare className="size-4" aria-hidden="true" />}
             />
-            {sending && !stream.parts.length ? (
+            {sending && (audioPreferred || !stream.parts.length) ? (
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Spinner />
-                <span>The interviewer is thinking…</span>
+                <span>{audioPreferred ? "Preparing interviewer audio…" : "The interviewer is thinking…"}</span>
               </div>
             ) : null}
           </div>

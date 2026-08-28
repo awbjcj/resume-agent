@@ -273,6 +273,14 @@ export function CoachPage() {
   const streamingParts = attachedRunId && !durableAdvanced ? stream.parts : null;
   const busy = send.isPending || runState === "running" || stream.status === "streaming";
   const visibleError = stream.error || runError;
+  const latestQuestion = [...(active?.turns ?? [])].reverse().find(
+    (turn) => turn.role === "coach" && turn.kind === "question",
+  );
+  const currentQuestion = active?.topics?.some(
+    (topic) => topic.id === latestQuestion?.topicId && topic.status === "open",
+  )
+    ? latestQuestion
+    : undefined;
 
   return (
     <div className={cn("flex flex-col gap-8", CHAT_PAGE_WIDTH)}>
@@ -440,7 +448,11 @@ export function CoachPage() {
             </CardContent>
           </Card>
           <aside className="min-w-0 xl:sticky xl:top-4">
-            <AgendaRail topics={active.topics ?? []} />
+            <AgendaRail
+              topics={active.topics ?? []}
+              currentTopicId={currentQuestion?.topicId}
+              currentQuestion={currentQuestion?.text}
+            />
           </aside>
         </div>
       )}

@@ -16,6 +16,7 @@ from resume_agent.interview.store import (
     InterviewStyle,
     InterviewTurnRecord,
     PlanItem,
+    attach_turn_audio,
     create_session,
     end_with_debrief,
 )
@@ -326,6 +327,29 @@ def test_interview_archive_filters_unarchive_and_delete(tmp_path):
         )
         assert client.delete(f"/api/interview/sessions/{session_id}").status_code == 204
         assert client.delete(f"/api/interview/sessions/{session_id}").status_code == 404
+
+
+def test_interview_audio_availability_and_protected_turn_delivery(monkeypatch, tmp_path):
+    client = _client(tmp_path)
+    monkeypatch.setattr("resume_agent.llm_runner.speech_available", lambda: True)
+    with client:
+        assert client.get("/api/interview/audio/availability").json() == {
+            "available": True
+        }
+        interview_dir = tmp_path / "data" / "interview"
+        session_id = _write_active_session(interview_dir, 1, "audio01")
+        attach_turn_audio(interview_dir, session_id, 0, b"fake-mp3")
+
+        response = client.get(
+            f"/api/interview/sessions/{session_id}/turns/0/audio"
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("audio/mpeg")
+        assert response.content == b"fake-mp3"
+        assert (
+            client.get(f"/api/interview/sessions/{session_id}/turns/9/audio").status_code
+            == 404
+        )
 
 
 def test_interview_archive_rejects_active_and_invalid_status_filter(tmp_path):

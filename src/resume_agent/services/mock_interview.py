@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
+from resume_agent import llm_runner
 from resume_agent.career_skills.models import AgentFamily, SkillUse
 from resume_agent.career_skills.provenance import append_skill_use
 from resume_agent.career_skills.registry import CareerSkillRegistry
@@ -30,10 +32,12 @@ from resume_agent.interview.store import (
     InterviewDebrief,
     InterviewStyle,
     apply_answer_delta,
+    attach_turn_audio,
     create_session,
     end_with_debrief,
     list_sessions,
     load_session,
+    mark_turn_audio_failed,
 )
 from resume_agent.llm_runner import Runner, UnparsedAgentOutput, expect_text
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
@@ -111,7 +115,11 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
         )
 
 
-def _turn_view(turn: dict) -> dict:
+SpeechSynthesizer = Callable[[str], bytes]
+
+
+def _turn_view(turn: dict, *, session_id: str, turn_index: int) -> dict:
+    ready = turn.get("audio_status") == "ready" and bool(turn.get("audio_ref"))
     return {
         "role": turn["role"],
         "text": turn["text"],
@@ -119,6 +127,12 @@ def _turn_view(turn: dict) -> dict:
         "isFollowup": turn["is_followup"],
         "at": turn["at"],
         "notice": turn.get("notice", ""),
+        "audioStatus": turn.get("audio_status", "none"),
+        "audioUrl": (
+            f"/api/interview/sessions/{session_id}/turns/{turn_index}/audio"
+            if ready
+            else None
+        ),
     }
 
 
@@ -187,6 +201,7 @@ def _view(session: dict) -> dict:
             "difficulty": session["style"]["difficulty"],
             "questionCount": session["style"]["question_count"],
             "extra": session["style"]["extra"],
+            "responseMode": session["style"].get("response_mode", "text"),
         },
         "progress": {
             "asked": sum(1 for item in session["plan"] if item["status"] in {"asked", "done"}),
@@ -205,7 +220,10 @@ def _view(session: dict) -> dict:
             if ended
             else None
         ),
-        "turns": [_turn_view(turn) for turn in session["turns"]],
+        "turns": [
+            _turn_view(turn, session_id=session["session_id"], turn_index=index)
+            for index, turn in enumerate(session["turns"])
+        ],
         "debrief": _debrief_view(session.get("debrief")),
     }
 
@@ -251,6 +269,26 @@ def sessions_view(
 
 
 
+def _synthesize_turn(
+    interview_dir: Path | str,
+    session_id: str,
+    turn_index: int,
+    text: str,
+    synthesizer: SpeechSynthesizer | None,
+) -> None:
+    try:
+        audio = (synthesizer or llm_runner.synthesize_speech)(text)
+        attach_turn_audio(interview_dir, session_id, turn_index, audio)
+    except Exception:
+        logger.warning(
+            "Interview speech synthesis failed for session %s turn %s",
+            session_id,
+            turn_index,
+            exc_info=True,
+        )
+        mark_turn_audio_failed(interview_dir, session_id, turn_index)
+
+
 def run_opening_turn(
     reporter,
     *,
@@ -262,6 +300,7 @@ def run_opening_turn(
     interviewer_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
     sink: StreamSink | None = None,
+    speech_synthesizer: SpeechSynthesizer | None = None,
 ) -> dict:
     root = Path(interview_dir)
     parsed_style = InterviewStyle.model_validate(style)
@@ -318,6 +357,8 @@ def run_opening_turn(
         opening_turn=opening_turn,
         skill_uses=skill_uses,
     )
+    if parsed_style.response_mode == "audio_preferred":
+        _synthesize_turn(root, session_id, 0, opening_turn.text, speech_synthesizer)
     return session_view(root, session_id)
 
 
@@ -330,6 +371,7 @@ def run_answer_turn(
     interviewer_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
     sink: StreamSink | None = None,
+    speech_synthesizer: SpeechSynthesizer | None = None,
 ) -> dict:
     root = Path(interview_dir)
     text = message.strip()
@@ -392,7 +434,7 @@ def run_answer_turn(
             for use in append_skill_use(None, interviewer, "turn")
         ]
     reporter.step(1)
-    apply_answer_delta(
+    updated = apply_answer_delta(
         root,
         session_id,
         answer_text=text,
@@ -400,6 +442,14 @@ def run_answer_turn(
         concluded=validated.concluded,
         skill_uses=skill_uses,
     )
+    if style.response_mode == "audio_preferred":
+        _synthesize_turn(
+            root,
+            session_id,
+            len(updated["turns"]) - 1,
+            validated.turn.text,
+            speech_synthesizer,
+        )
     if validated.notice:
         output_sink.emit(Notice(validated.notice))
     return session_view(root, session_id)

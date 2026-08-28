@@ -16,6 +16,15 @@ export type InterviewDebrief = components["schemas"]["InterviewDebriefOut"];
 type RunOut = components["schemas"]["RunOut"];
 type RunDone = (run: RunRecord) => void;
 
+export function useInterviewAudioAvailability() {
+  return useQuery({
+    queryKey: ["interview-audio-availability"],
+    queryFn: () =>
+      unwrap(api.GET("/api/interview/audio/availability")),
+    staleTime: 60_000,
+  });
+}
+
 function seedRun(run: RunOut, onDone?: RunDone): void {
   useRunStore.getState().upsert({
     runId: run.runId,

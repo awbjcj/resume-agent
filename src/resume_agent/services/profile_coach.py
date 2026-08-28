@@ -41,7 +41,12 @@ from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
 from resume_agent.profile.store import load_facts
 from resume_agent.services.profile_build import run_corpus_build
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
-from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
+from resume_agent.sessions.turns import (
+    TurnRejected,
+    format_with_retry,
+    persona_output,
+    user_visible_prose,
+)
 
 _MAX_MESSAGE_CHARS = 100_000
 _EMPTY_SESSION_RECAP = (
@@ -57,10 +62,16 @@ def _camel_action(action: dict) -> dict:
 
 
 def _camel_turn(turn: dict) -> dict:
+    text = turn["text"]
+    if turn["role"] == "coach":
+        # Older sessions may contain output from a provider that malformed the
+        # metadata sentinel. Keep those transcripts clean on read as well as
+        # preventing new leaks in the streaming path.
+        text = user_visible_prose(text)
     return {
         "role": turn["role"],
         "kind": turn["kind"],
-        "text": turn["text"],
+        "text": text,
         "topicId": turn["topic_id"],
         "at": turn["at"],
         "notice": turn.get("notice", ""),
@@ -102,7 +113,11 @@ def session_view(profile_dir: Path | str, session_id: str) -> dict:
             }
             for draft in session["draft_notes"]
         ],
-        "recap": session["recap"],
+        "recap": (
+            user_visible_prose(session["recap"])
+            if session["recap"] is not None
+            else None
+        ),
         "impact": session["impact"],
     }
 
@@ -192,10 +207,11 @@ def run_opening_turn(
         partial(normalize_opening, seeded=seeded),
         label="COACH NOTES",
     )
-    if prose:
-        validated.coach_turn = validated.coach_turn.model_copy(
-            update={"text": prose}
-        )
+    validated.coach_turn = validated.coach_turn.model_copy(
+        update={
+            "text": user_visible_prose(prose or validated.coach_turn.text),
+        }
+    )
     reporter.step(1)
     session_id = uuid.uuid4().hex
     create_session(root, session_id, topics, validated.coach_turn)
@@ -252,10 +268,11 @@ def run_message_turn(
         if isinstance(exc, UnparsedAgentOutput):
             logger.warning("Coach formatter returned unusable output: %s", exc)
         validated = _degraded_turn(session, fallback_text)
-    if prose:
-        validated.coach_turn = validated.coach_turn.model_copy(
-            update={"text": prose}
-        )
+    validated.coach_turn = validated.coach_turn.model_copy(
+        update={
+            "text": user_visible_prose(prose or validated.coach_turn.text),
+        }
+    )
     reporter.step(1)
     apply_turn_delta(
         root,
@@ -408,6 +425,7 @@ def run_recap_turn(
         notice = "Some recap details could not be read."
     if prose:
         recap = prose
+    recap = user_visible_prose(recap)
     reporter.step(1)
     end_session(root, session_id, recap, notice=notice)
     if notice:

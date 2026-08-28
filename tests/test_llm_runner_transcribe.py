@@ -1,4 +1,6 @@
-"""Provider routing and availability for the audio transcription seam."""
+"""Provider routing and availability for the audio transcription and speech seams."""
+
+from types import SimpleNamespace
 
 import pytest
 
@@ -24,6 +26,72 @@ def test_availability_follows_key_and_provider(monkeypatch):
     assert llm_runner.transcription_available() is False
 
 
+def test_speech_rejects_non_openai_provider(monkeypatch):
+    monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model_id: "key")
+    with pytest.raises(ValueError, match="does not support speech synthesis"):
+        llm_runner.synthesize_speech("hello", model_id="gemini:gemini-3.5-flash-lite")
+
+
+def test_speech_requires_key(monkeypatch):
+    monkeypatch.setattr(
+        llm_runner,
+        "resolve_route",
+        lambda model_id: SimpleNamespace(api_key="", base_url=None),
+    )
+    with pytest.raises(ValueError, match="no API key"):
+        llm_runner.synthesize_speech("hello", model_id="openai:gpt-4o-mini-tts")
+
+
+def test_speech_availability_requires_funded_model_access(monkeypatch):
+    monkeypatch.setattr(llm_runner, "model_access_available", lambda model_id: True)
+    assert llm_runner.speech_available() is True
+    monkeypatch.setattr(llm_runner, "model_access_available", lambda model_id: False)
+    assert llm_runner.speech_available() is False
+
+
+def test_speech_uses_resolved_route_and_returns_mp3(monkeypatch):
+    import openai
+
+    seen: dict[str, object] = {}
+
+    class FakeSpeech:
+        def create(self, **kwargs):
+            seen["request"] = kwargs
+            return SimpleNamespace(read=lambda: b"mp3-bytes")
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            seen["client"] = kwargs
+            self.audio = SimpleNamespace(speech=FakeSpeech())
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    monkeypatch.setattr(
+        llm_runner,
+        "resolve_route",
+        lambda model_id: SimpleNamespace(api_key="speech-key", base_url="https://gateway.test"),
+    )
+    monkeypatch.setattr(
+        "resume_agent.tenancy.limits.enforce_agent_budget", lambda _agent: None
+    )
+
+    assert llm_runner.synthesize_speech(
+        "Read this exactly.",
+        model_id="openai:gpt-4o-mini-tts",
+        voice="marin",
+    ) == b"mp3-bytes"
+    assert seen["client"] == {
+        "api_key": "speech-key",
+        "base_url": "https://gateway.test/v1",
+    }
+    assert seen["request"] == {
+        "model": "gpt-4o-mini-tts",
+        "voice": "marin",
+        "input": "Read this exactly.",
+        "instructions": "Speak as a professional interviewer. Read the supplied text exactly without adding or omitting words.",
+        "response_format": "mp3",
+    }
+
+
 def test_every_model_default_is_a_catalogued_id():
     # `gemini-2.5-flash` was retired by the provider ("no longer available to
     # new users") and every transcription 404'd, deterministically. It was the
@@ -37,3 +105,4 @@ def test_every_model_default_is_a_catalogued_id():
     for field in ("cheap_model", "mid_model", "premium_model", "transcribe_model"):
         default = Settings.model_fields[field].default
         assert catalog_entry(default) is not None, f"{field}={default} is not catalogued"
+    assert Settings.model_fields["speech_model"].default == "openai:gpt-4o-mini-tts"

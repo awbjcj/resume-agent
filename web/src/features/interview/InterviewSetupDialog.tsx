@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { components } from "@/lib/api/schema";
 import type { RunRecord } from "@/lib/runs/store";
 
-import { useStartInterview } from "./use-interview";
+import { useInterviewAudioAvailability, useStartInterview } from "./use-interview";
 
 type ResumeVersion = components["schemas"]["ResumeVersionOut"];
 
@@ -65,6 +65,7 @@ export function InterviewSetupDialog({
 }) {
   const navigate = useNavigate();
   const start = useStartInterview();
+  const audioAvailability = useInterviewAudioAvailability();
   const newestVersionId = useMemo(
     () => versions.reduce((newest, version) => Math.max(newest, version.id), 0),
     [versions],
@@ -73,6 +74,7 @@ export function InterviewSetupDialog({
   const [demeanor, setDemeanor] = useState("neutral");
   const [difficulty, setDifficulty] = useState("standard");
   const [questionCount, setQuestionCount] = useState(8);
+  const [responseMode, setResponseMode] = useState<"text" | "audio_preferred">("text");
   const [resumeVersionId, setResumeVersionId] = useState(newestVersionId);
   const [extra, setExtra] = useState("");
 
@@ -82,7 +84,7 @@ export function InterviewSetupDialog({
       await start.mutateAsync({
         jobId,
         resumeVersionId: resumeVersionId || newestVersionId,
-        style: { stage, demeanor, difficulty, questionCount, extra: extra.trim() },
+        style: { stage, demeanor, difficulty, questionCount, extra: extra.trim(), responseMode },
         onDone: (completed: RunRecord) => {
           if (completed.status === "succeeded") {
             const result = completed.result as { sessionId?: string } | null;
@@ -162,6 +164,45 @@ export function InterviewSetupDialog({
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+          <Field className="sm:col-span-2">
+            <FieldLabel>Interviewer responses</FieldLabel>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex cursor-pointer gap-3 rounded-xl border bg-background p-3.5 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/[0.05]">
+                <input
+                  className="mt-1 accent-primary"
+                  type="radio"
+                  name="interview-response-mode"
+                  value="text"
+                  checked={responseMode === "text"}
+                  onChange={() => setResponseMode("text")}
+                />
+                <span>
+                  <span className="block text-sm font-medium">Text</span>
+                  <span className="block text-xs leading-5 text-muted-foreground">Read each interviewer response.</span>
+                </span>
+              </label>
+              <label className="flex gap-3 rounded-xl border bg-background p-3.5 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/[0.05] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55">
+                <input
+                  className="mt-1 accent-primary"
+                  type="radio"
+                  name="interview-response-mode"
+                  value="audio_preferred"
+                  checked={responseMode === "audio_preferred"}
+                  disabled={audioAvailability.isPending || audioAvailability.data?.available !== true}
+                  onChange={() => setResponseMode("audio_preferred")}
+                />
+                <span>
+                  <span className="block text-sm font-medium">Audio preferred</span>
+                  <span className="block text-xs leading-5 text-muted-foreground">Listen first, with interviewer text hidden until you reveal it.</span>
+                </span>
+              </label>
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {audioAvailability.data?.available === false
+                ? "Configure an OpenAI speech model and API key to enable audio."
+                : "Audio preferred uses an AI-generated voice. You can replay it or show the text at any time."}
+            </p>
           </Field>
           <Field className="sm:col-span-2">
             <FieldLabel htmlFor="interview-version">Resume version</FieldLabel>

@@ -61,7 +61,7 @@ function activeSession(overrides = {}) {
     endedAt: null,
     status: "active",
     concluded: false,
-    style: { stage: "technical", demeanor: "neutral", difficulty: "standard", questionCount: 4, extra: "" },
+    style: { stage: "technical", demeanor: "neutral", difficulty: "standard", questionCount: 4, extra: "", responseMode: "text" },
     progress: { asked: 2, total: 4 },
     plan: null,
     turns: [{ role: "interviewer", text: "Tell me about yourself.", questionId: "q1", isFollowup: false, at: "" }],
@@ -145,6 +145,104 @@ describe("InterviewPage", () => {
     });
     expect(await screen.findByText("Next question")).toBeInTheDocument();
     expect(screen.queryByText("hidden")).not.toBeInTheDocument();
+  });
+
+  it("auto-plays audio-preferred interviewer turns with hidden, revealable text", async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockResolvedValue(undefined);
+    const fetchAudio = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Blob(["mp3"], { type: "audio/mpeg" }), { status: 200 }),
+    );
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:interview-audio"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    mocks.session.mockReturnValue({
+      data: activeSession({
+        style: { ...activeSession().style, responseMode: "audio_preferred" },
+        turns: [{
+          role: "interviewer",
+          text: "Tell me about yourself.",
+          questionId: "q1",
+          isFollowup: false,
+          at: "t1",
+          audioStatus: "ready",
+          audioUrl: "/api/interview/sessions/s1/turns/0/audio",
+        }],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.queryByText("Tell me about yourself.")).not.toBeInTheDocument();
+    await waitFor(() => expect(play).toHaveBeenCalledOnce());
+    expect(fetchAudio).toHaveBeenCalledWith(
+      "/api/interview/sessions/s1/turns/0/audio",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /show text/i }));
+    expect(screen.getByText("Tell me about yourself.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /replay/i }));
+    expect(play).toHaveBeenCalledTimes(2);
+
+    play.mockRestore();
+    fetchAudio.mockRestore();
+  });
+
+  it("reveals interviewer text when speech generation failed", () => {
+    mocks.session.mockReturnValue({
+      data: activeSession({
+        style: { ...activeSession().style, responseMode: "audio_preferred" },
+        turns: [{
+          role: "interviewer",
+          text: "Fallback question",
+          questionId: "q1",
+          isFollowup: false,
+          at: "t1",
+          audioStatus: "failed",
+          audioUrl: null,
+        }],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Fallback question")).toBeInTheDocument();
+    expect(screen.getByText(/audio could not be generated/i)).toBeInTheDocument();
+  });
+
+  it("keeps streamed interviewer prose hidden while audio is being prepared", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ runId: "run-audio" });
+    mocks.send.mockReturnValue({ mutateAsync, isPending: false });
+    mocks.session.mockReturnValue({
+      data: activeSession({
+        style: { ...activeSession().style, responseMode: "audio_preferred" },
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderPage();
+    await userEvent.type(screen.getByRole("textbox", { name: /answer/i }), "My answer");
+    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    act(() => {
+      FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "Hidden next question" } });
+    });
+
+    expect(screen.queryByText("Hidden next question")).not.toBeInTheDocument();
+    expect(screen.getByText(/preparing interviewer audio/i)).toBeInTheDocument();
   });
 
   it("shows a debrief call-to-action when the interview is concluded", async () => {

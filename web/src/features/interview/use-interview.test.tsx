@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   useArchiveInterviewSession,
+  useInterviewAudioAvailability,
   useInterviewSessions,
   useSendInterviewAnswer,
   useStartInterview,
@@ -63,6 +64,7 @@ describe("interview hooks", () => {
       difficulty: "standard",
       questionCount: 4,
       extra: "",
+      responseMode: "text" as const,
     };
 
     await act(async () => {
@@ -129,5 +131,17 @@ describe("interview hooks", () => {
     expect(mocks.get).toHaveBeenCalledWith("/api/interview/sessions", {
       params: { query: { includeArchived: true } },
     });
+  });
+
+  it("checks whether interviewer audio is available", async () => {
+    mocks.unwrap.mockResolvedValueOnce({ available: true });
+    const { wrapper } = wrap();
+    const { result } = renderHook(() => useInterviewAudioAvailability(), { wrapper });
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(mocks.get).toHaveBeenCalledWith("/api/interview/audio/availability");
   });
 });

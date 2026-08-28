@@ -1882,6 +1882,11 @@ def tool_kwargs() -> dict[str, Any]:
 
 
 _TRANSCRIBE_PROVIDERS = ("gemini", "openai")
+_SPEECH_PROVIDERS = ("openai",)
+_SPEECH_INSTRUCTIONS = (
+    "Speak as a professional interviewer. Read the supplied text exactly without "
+    "adding or omitting words."
+)
 _TRANSCRIBE_PROMPT = (
     "Transcribe this audio verbatim. Return only the spoken words as plain text, "
     "with normal punctuation and no commentary."
@@ -1981,3 +1986,58 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
         )
     )
     return result.text.strip()
+
+
+def speech_available() -> bool:
+    """Whether the configured speech model has a supported provider and funding."""
+
+    model_id = get_settings().speech_model
+    provider, _ = split_provider(model_id)
+    return provider in _SPEECH_PROVIDERS and model_access_available(model_id)
+
+
+def synthesize_speech(
+    text: str,
+    *,
+    model_id: str | None = None,
+    voice: str | None = None,
+) -> bytes:
+    """Render canonical interviewer text as MP3 through the configured TTS model.
+
+    Speech is deliberately downstream of the Agno interviewer. The interviewer
+    remains provider-neutral and its validated text remains the durable source
+    of truth; this seam only reads that text aloud.
+    """
+
+    cleaned = text.strip()
+    if not cleaned:
+        raise ValueError("speech text is empty")
+    settings = get_settings()
+    resolved = model_id or settings.speech_model
+    provider, model = split_provider(resolved)
+    if provider not in _SPEECH_PROVIDERS:
+        raise ValueError(f"provider {provider!r} does not support speech synthesis")
+    route = resolve_route(resolved)
+    if not route.api_key:
+        raise ValueError(f"no API key configured for speech provider {provider!r}")
+
+    from resume_agent.tenancy.limits import enforce_agent_budget
+
+    enforce_agent_budget(
+        SimpleNamespace(model=SimpleNamespace(id=model, provider=provider))
+    )
+    from openai import OpenAI
+
+    client_kwargs: dict[str, Any] = {"api_key": route.api_key}
+    gateway = _provider_gateway_base_url(provider, route.base_url)
+    if gateway:
+        client_kwargs["base_url"] = gateway
+    client = OpenAI(**client_kwargs)
+    response = client.audio.speech.create(
+        model=model,
+        voice=voice or settings.speech_voice,
+        input=cleaned,
+        instructions=_SPEECH_INSTRUCTIONS,
+        response_format="mp3",
+    )
+    return bytes(response.read())

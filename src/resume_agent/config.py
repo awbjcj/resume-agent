@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     mid_reasoning_effort: str | None = None
     premium_reasoning_effort: str | None = None
     transcribe_model: str = "gemini:gemini-3.5-flash-lite"
+    speech_model: str = "openai:gpt-4o-mini-tts"
+    speech_voice: str = "marin"
     api_token: str = (
         ""  # when non-empty, the API requires Authorization: Bearer <token>
     )

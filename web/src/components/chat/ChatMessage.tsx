@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import type { ChatThreadMessage } from "./ChatThread";
 import { AgentActivity } from "./AgentActivity";
+import { AudioPart } from "./parts/AudioPart";
 import { NoticePart } from "./parts/NoticePart";
 import { TextPart } from "./parts/TextPart";
 
@@ -16,6 +17,12 @@ function samePart(left: ChatPart, right: ChatPart): boolean {
   }
   if (left.kind === "notice") {
     return right.kind === "notice" && left.message === right.message;
+  }
+  if (left.kind === "audio") {
+    return right.kind === "audio" &&
+      left.url === right.url &&
+      left.transcript === right.transcript &&
+      left.autoPlay === right.autoPlay;
   }
   return right.kind === "tool" &&
     left.callId === right.callId &&
@@ -60,11 +67,15 @@ export const ChatMessage = memo(function ChatMessage({
       continue;
     }
     const key = `${message.id}-${index}`;
-    rendered.push(part.kind === "text" ? (
-      <TextPart key={key} text={part.text} caret={streaming && index === visible.length - 1} />
-    ) : (
-      <NoticePart key={key} message={part.message} />
-    ));
+    if (part.kind === "text") {
+      rendered.push(
+        <TextPart key={key} text={part.text} caret={streaming && index === visible.length - 1} />,
+      );
+    } else if (part.kind === "audio") {
+      rendered.push(<AudioPart key={key} part={part} />);
+    } else {
+      rendered.push(<NoticePart key={key} message={part.message} />);
+    }
     index += 1;
   }
   const avatar = (

@@ -37,6 +37,12 @@ export type StreamEvent =
 
 export type ChatPart =
   | { kind: "text"; text: string }
+  | {
+      kind: "audio";
+      url: string;
+      transcript: string;
+      autoPlay: boolean;
+    }
   | { kind: "reasoning"; text: string }
   | {
       kind: "tool";

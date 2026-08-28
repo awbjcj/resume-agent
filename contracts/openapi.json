@@ -3685,6 +3685,19 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "InterviewAudioAvailabilityOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "InterviewAudioAvailabilityOut",
+        "type": "object"
+      },
       "InterviewDebriefOut": {
         "properties": {
           "improvements": {
@@ -4039,6 +4052,15 @@
             "title": "Questioncount",
             "type": "integer"
           },
+          "responseMode": {
+            "default": "text",
+            "enum": [
+              "text",
+              "audio_preferred"
+            ],
+            "title": "Responsemode",
+            "type": "string"
+          },
           "stage": {
             "default": "hiring_manager",
             "title": "Stage",
@@ -4054,6 +4076,27 @@
             "default": "",
             "title": "At",
             "type": "string"
+          },
+          "audioStatus": {
+            "default": "none",
+            "enum": [
+              "none",
+              "ready",
+              "failed"
+            ],
+            "title": "Audiostatus",
+            "type": "string"
+          },
+          "audioUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audiourl"
           },
           "isFollowup": {
             "default": false,
@@ -17368,6 +17411,52 @@
         "summary": "Health"
       }
     },
+    "/api/interview/audio/availability": {
+      "get": {
+        "operationId": "interview_audio_availability_api_interview_audio_availability_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewAudioAvailabilityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Interview Audio Availability"
+      }
+    },
     "/api/interview/sessions": {
       "get": {
         "operationId": "list_interview_sessions_api_interview_sessions_get",
@@ -17851,6 +17940,66 @@
           }
         },
         "summary": "Send Answer"
+      }
+    },
+    "/api/interview/sessions/{session_id}/turns/{turn_index}/audio": {
+      "get": {
+        "operationId": "get_interview_turn_audio_api_interview_sessions__session_id__turns__turn_index__audio_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turn_index",
+            "required": true,
+            "schema": {
+              "title": "Turn Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "audio/mpeg": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Interview Turn Audio"
       }
     },
     "/api/interview/sessions/{session_id}/unarchive": {

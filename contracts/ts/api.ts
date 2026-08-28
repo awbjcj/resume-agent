@@ -1406,6 +1406,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/interview/audio/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Audio Availability */
+        get: operations["interview_audio_availability_api_interview_audio_availability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/interview/sessions": {
         parameters: {
             query?: never;
@@ -1488,6 +1505,23 @@ export interface paths {
         put?: never;
         /** Send Answer */
         post: operations["send_answer_api_interview_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview/sessions/{session_id}/turns/{turn_index}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Interview Turn Audio */
+        get: operations["get_interview_turn_audio_api_interview_sessions__session_id__turns__turn_index__audio_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4548,6 +4582,11 @@ export interface components {
              */
             status: string;
         };
+        /** InterviewAudioAvailabilityOut */
+        InterviewAudioAvailabilityOut: {
+            /** Available */
+            available: boolean;
+        };
         /** InterviewDebriefOut */
         InterviewDebriefOut: {
             /** Improvements */
@@ -4706,6 +4745,12 @@ export interface components {
              */
             questionCount: number;
             /**
+             * Responsemode
+             * @default text
+             * @enum {string}
+             */
+            responseMode: "text" | "audio_preferred";
+            /**
              * Stage
              * @default hiring_manager
              */
@@ -4718,6 +4763,14 @@ export interface components {
              * @default
              */
             at: string;
+            /**
+             * Audiostatus
+             * @default none
+             * @enum {string}
+             */
+            audioStatus: "none" | "ready" | "failed";
+            /** Audiourl */
+            audioUrl?: string | null;
             /**
              * Isfollowup
              * @default false
@@ -10877,6 +10930,37 @@ export interface operations {
             };
         };
     };
+    interview_audio_availability_api_interview_audio_availability_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewAudioAvailabilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_interview_sessions_api_interview_sessions_get: {
         parameters: {
             query?: {
@@ -11138,6 +11222,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_interview_turn_audio_api_interview_sessions__session_id__turns__turn_index__audio_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+                turn_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": unknown;
                 };
             };
             /** @description Validation Error */

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import FileResponse
 from sqlmodel import Session
 
 from resume_agent.api.deps import (
@@ -19,6 +20,7 @@ from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.interview import (
     InterviewMessageIn,
+    InterviewAudioAvailabilityOut,
     InterviewSessionOut,
     InterviewSessionPatchIn,
     InterviewSessionsOut,
@@ -32,8 +34,9 @@ from resume_agent.interview.store import (
     delete_session,
     rename_session,
     unarchive_session,
+    turn_audio_path,
 )
-from resume_agent.llm_runner import missing_model_keys
+from resume_agent import llm_runner
 from resume_agent.services.mock_interview import (
     run_answer_turn,
     run_debrief_turn,
@@ -45,7 +48,7 @@ from resume_agent.tracking.tables import Job, ResumeVersion
 
 router = APIRouter()
 def _guard_keys(settings: Settings) -> None:
-    missing = missing_model_keys(settings)
+    missing = llm_runner.missing_model_keys(settings)
     if missing:
         raise ApiException(
             400,
@@ -77,7 +80,7 @@ def _submit(
 
 def _value_error(exc: ValueError) -> ApiException:
     message = str(exc)
-    if "unknown" in message:
+    if "unknown" in message or "audio unavailable" in message:
         return ApiException(404, "NOT_FOUND", message)
     if any(
         token in message
@@ -102,6 +105,15 @@ def start_interview(
     db: Session = Depends(get_session),
 ):
     _guard_keys(settings)
+    if (
+        payload.style.response_mode == "audio_preferred"
+        and not llm_runner.speech_available()
+    ):
+        raise ApiException(
+            400,
+            "SPEECH_UNAVAILABLE",
+            "Audio-preferred interviews need a configured OpenAI speech model and API key",
+        )
     interview_dir = get_interview_dir(request)
     existing = active_session_for_job(interview_dir, payload.job_id)
     if existing is not None:
@@ -138,6 +150,26 @@ def start_interview(
         singleton=f"mock-interview-open:{payload.job_id}",
         meta={"stream": True, "jobId": payload.job_id},
     )
+
+
+@router.get(
+    "/interview/audio/availability", response_model=InterviewAudioAvailabilityOut
+)
+def interview_audio_availability():
+    return InterviewAudioAvailabilityOut(available=llm_runner.speech_available())
+
+
+@router.get(
+    "/interview/sessions/{session_id}/turns/{turn_index}/audio",
+    response_class=FileResponse,
+    responses={200: {"content": {"audio/mpeg": {}}}},
+)
+def get_interview_turn_audio(session_id: str, turn_index: int, request: Request):
+    try:
+        path = turn_audio_path(get_interview_dir(request), session_id, turn_index)
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+    return FileResponse(path, media_type="audio/mpeg")
 
 
 @router.post(

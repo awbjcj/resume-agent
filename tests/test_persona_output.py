@@ -110,6 +110,21 @@ def test_marker_wrapped_in_markdown_emphasis_is_still_the_marker():
     assert "action" not in sink.text
 
 
+def test_marker_missing_its_leading_rule_is_hidden_across_stream_deltas():
+    # DeepSeek can emit the requested token as `METADATA---\` instead of the
+    # exact sentinel. Stream it one character at a time to prove that no prefix
+    # of the malformed marker is flushed before the boundary is complete.
+    sink, reporter = _Sink(), _Reporter()
+    body = "Clear question.\nMETADATA---\\\naction: ask\ntopic_id: t1"
+    agent = _Agent([*_deltas(*body), Completed(object())])
+
+    prose, full = persona_output(agent, "p", sink, reporter, source="coach notes")
+
+    assert prose == "Clear question."
+    assert sink.text == prose
+    assert "topic_id: t1" in full
+
+
 def test_metadata_block_without_a_sentinel_is_still_hidden_from_the_user():
     # The degradation rule (missing sentinel -> show everything) is only safe
     # when there is nothing to hide. A model that emits the block but forgets
@@ -159,6 +174,16 @@ def test_bare_horizontal_rule_is_never_mistaken_for_the_marker():
     # reply mid-turn.
     sink, reporter = _Sink(), _Reporter()
     body = "Here is the agenda.\n\n---\n\nWhich project moved a number?"
+    agent = _Agent([*_deltas(body), Completed(object())])
+
+    prose, _ = persona_output(agent, "p", sink, reporter, source="coach notes")
+
+    assert prose == body
+
+
+def test_plain_metadata_heading_is_not_mistaken_for_the_marker():
+    sink, reporter = _Sink(), _Reporter()
+    body = "Metadata\n\nWhich field should we verify?"
     agent = _Agent([*_deltas(body), Completed(object())])
 
     prose, _ = persona_output(agent, "p", sink, reporter, source="coach notes")

@@ -13,6 +13,7 @@ from resume_agent.interview.store import (
     active_session_for_job,
     active_sessions,
     archive_session,
+    attach_turn_audio,
     apply_answer_delta,
     create_session,
     delete_session,
@@ -176,8 +177,12 @@ def test_archive_unarchive_and_delete_session(tmp_path):
     with pytest.raises(ValueError, match="not archived"):
         unarchive_session(tmp_path, sid)
 
+    audio_path = attach_turn_audio(tmp_path, sid, 0, b"mp3")
+    assert audio_path.read_bytes() == b"mp3"
+
     delete_session(tmp_path, sid)
     assert list_sessions(tmp_path, include_archived=True) == []
+    assert not audio_path.exists()
     with pytest.raises(ValueError, match="unknown session"):
         delete_session(tmp_path, sid)
 

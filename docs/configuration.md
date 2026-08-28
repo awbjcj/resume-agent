@@ -42,6 +42,8 @@ present.
 | `MID_REASONING_EFFORT` | unset | Optional provider-specific reasoning setting for the mid tier. |
 | `PREMIUM_REASONING_EFFORT` | unset | Optional provider-specific reasoning setting for the premium tier. |
 | `TRANSCRIBE_MODEL` | `gemini:gemini-3.5-flash-lite` | Model used by audio transcription. |
+| `SPEECH_MODEL` | `openai:gpt-4o-mini-tts` | Text-to-speech model used by audio-preferred mock interviews. |
+| `SPEECH_VOICE` | `marin` | Voice used for generated interviewer speech. |
 | `PROMPT_CACHE_ENABLED` | `true` | Enables supported providers' static system-prompt cache. |
 | `LLM_CONCURRENCY` | `8` | Maximum LLM fan-out; integer at least 1. |
 | `LLM_RETRIES` | `2` | Structured/provider retry count; non-negative integer. |

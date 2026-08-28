@@ -19,14 +19,22 @@ logger = logging.getLogger(__name__)
 
 DELIMITER = "---METADATA---"
 
+_MARKER_DECORATION = r"[*_`~ \t]"
+
 # A model that bolds the sentinel, pads it, or draws longer rules is still
 # emitting it, and reading those as prose dumps the formatter payload into the
 # chat window. The METADATA token is mandatory: DeepSeek writes a bare `---`
 # horizontal rule as a section break between the agenda and its question, so
-# matching the rules alone would truncate a reply mid-turn.
+# matching the rules alone would truncate a reply mid-turn. A missing leading
+# rule is accepted only when the trailing rule is still present; this covers
+# the observed `METADATA---` provider deviation without treating a plain
+# "Metadata" heading as a private boundary.
 _MARKER = re.compile(
-    r"[*_`~ \t]{0,4}-{3,6}[ \t]{0,2}METADATA[ \t]{0,2}-{3,6}[*_`~ \t]{0,4}",
-    re.IGNORECASE,
+    rf"^{_MARKER_DECORATION}{{0,4}}(?:"
+    rf"-{{3,6}}[ \t]{{0,2}}METADATA[ \t]{{0,2}}-{{3,6}}|"
+    rf"METADATA[ \t]{{0,2}}-{{3,6}})"
+    rf"{_MARKER_DECORATION}{{0,4}}[\\]?[ \t]*(?=\r?$)",
+    re.IGNORECASE | re.MULTILINE,
 )
 # When the sentinel never arrives, the metadata block is its own boundary: it
 # opens with one of the schemas' keys alone on a line. Without this the
@@ -64,7 +72,7 @@ _ROW_START = rf"\n[ \t]*\n(?=(?:{'|'.join(_ROW_VERBS)})[ \t]*\|)"
 # Case-sensitive on its own: the row verbs are a deliberate uppercase shape,
 # and folding them would cut a reply at a sentence starting with "Avoid ...".
 _BOUNDARY = re.compile(
-    f"(?i:{_MARKER.pattern}|{_BLOCK_START})|{_ROW_START}",
+    f"(?im:{_MARKER.pattern}|{_BLOCK_START})|{_ROW_START}",
 )
 
 # The longest string the boundary can match. The emitter must hold back at
@@ -77,12 +85,12 @@ MARKER_MAX_LEN = max(
     2 + max(len(verb) for verb in _ROW_VERBS) + 1,
 )
 
-_MARKER_DECORATION = r"[*_`~ \t]"
 _MARKER_PREFIX = re.compile(
     rf"(?:{_MARKER_DECORATION}{{0,4}}|"
     rf"{_MARKER_DECORATION}{{0,4}}-{{1,6}}|"
     rf"{_MARKER_DECORATION}{{0,4}}-{{3,6}}[ \t]{{0,2}}(?:M|ME|MET|META|METAD|METADA|METADAT|METADATA)?|"
-    rf"{_MARKER_DECORATION}{{0,4}}-{{3,6}}[ \t]{{0,2}}METADATA[ \t]{{0,2}}-{{0,6}}{_MARKER_DECORATION}{{0,4}})\Z",
+    rf"{_MARKER_DECORATION}{{0,4}}-{{3,6}}[ \t]{{0,2}}METADATA[ \t]{{0,2}}-{{0,6}}{_MARKER_DECORATION}{{0,4}}|"
+    rf"{_MARKER_DECORATION}{{0,4}}(?:M|ME|MET|META|METAD|METADA|METADAT|METADATA[ \t]{{0,2}}-{{0,6}}){_MARKER_DECORATION}{{0,4}}[\\]?)\Z",
     re.IGNORECASE,
 )
 
@@ -126,6 +134,14 @@ def _safe_prefix_len(pending: str) -> int:
     return len(pending)
 
 
+def user_visible_prose(text: str) -> str:
+    """Remove persona formatter payloads from text that may reach the UI."""
+    boundary = _BOUNDARY.search(text)
+    if boundary is None:
+        return text
+    return text[: boundary.start()].rstrip("\r\n")
+
+
 class ProseEmitter:
     """Expose prose while retaining the complete persona output for formatting."""
 
@@ -146,8 +162,7 @@ class ProseEmitter:
         self._pending += text
         marker = _BOUNDARY.search(self._pending)
         if marker is not None:
-            visible = self._pending[: marker.start()]
-            visible = visible.rstrip("\r\n")
+            visible = user_visible_prose(self._pending)
             self._flush(visible)
             self._pending = ""
             self._marker_found = True

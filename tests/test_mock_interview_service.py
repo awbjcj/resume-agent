@@ -128,8 +128,15 @@ def engine(tmp_path):
     return engine
 
 
-def _style():
-    return {"stage": "technical", "demeanor": "neutral", "difficulty": "standard", "question_count": 4, "extra": ""}
+def _style(response_mode="text"):
+    return {
+        "stage": "technical",
+        "demeanor": "neutral",
+        "difficulty": "standard",
+        "question_count": 4,
+        "extra": "",
+        "response_mode": response_mode,
+    }
 
 
 def _open(tmp_path, engine):
@@ -160,6 +167,64 @@ def test_opening_creates_session_and_hides_plan(tmp_path, engine):
     assert view["plan"] is None  # hidden while active
     assert view["progress"] == {"asked": 1, "total": 2}
     assert view["turns"][0]["role"] == "interviewer"
+
+
+def test_audio_preferred_opening_persists_synthesized_audio(tmp_path, engine):
+    job_id, version_id = _ids
+    opening = OpeningInterview(
+        message="Welcome. Walk me through your Python background.",
+        plan=[NewPlanItem(competency="Python", question_type="role_specific")],
+    )
+
+    view = run_opening_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        engine=engine,
+        job_id=job_id,
+        resume_version_id=version_id,
+        style=_style("audio_preferred"),
+        interviewer_agent=FakeRunner(["notes"]),
+        formatter_agent=FakeRunner([opening]),
+        speech_synthesizer=lambda text: b"spoken:" + text.encode(),
+    )
+
+    turn = view["turns"][0]
+    assert view["style"]["responseMode"] == "audio_preferred"
+    assert turn["audioStatus"] == "ready"
+    assert turn["audioUrl"].endswith("/turns/0/audio")
+    from resume_agent.interview.store import turn_audio_path
+
+    assert turn_audio_path(tmp_path, view["sessionId"], 0).read_bytes().startswith(
+        b"spoken:Welcome"
+    )
+
+
+def test_audio_synthesis_failure_keeps_opening_turn_and_reveals_fallback(tmp_path, engine):
+    job_id, version_id = _ids
+    opening = OpeningInterview(
+        message="Welcome. Tell me about yourself.",
+        plan=[NewPlanItem(competency="Python", question_type="role_specific")],
+    )
+
+    def fail(_text: str) -> bytes:
+        raise RuntimeError("provider offline")
+
+    view = run_opening_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        engine=engine,
+        job_id=job_id,
+        resume_version_id=version_id,
+        style=_style("audio_preferred"),
+        interviewer_agent=FakeRunner(["notes"]),
+        formatter_agent=FakeRunner([opening]),
+        speech_synthesizer=fail,
+    )
+
+    assert view["status"] == "active"
+    assert view["turns"][0]["text"] == "Welcome. Tell me about yourself."
+    assert view["turns"][0]["audioStatus"] == "failed"
+    assert view["turns"][0]["audioUrl"] is None
 
 
 def test_opening_instruction_keeps_plan_out_of_candidate_chat(tmp_path, engine):

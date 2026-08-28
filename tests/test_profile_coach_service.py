@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from resume_agent.profile.coach import CoachTurn, DraftNote, NewTopic, OpeningTurn
-from resume_agent.profile.coach_store import load_session
+from resume_agent.profile.coach_store import load_session, mutate_session
 from resume_agent.services.profile_coach import (
     approve_draft,
     discard_draft,
@@ -231,6 +231,22 @@ def test_message_streams_prose_and_stores_the_same_text(tmp_path):
     assert any(isinstance(event, ToolStarted) for event in sink.events)
     assert not any(isinstance(event, Completed) for event in sink.events)
     assert coach.prompts[0].index("TRANSCRIPT:") < coach.prompts[0].index("AGENDA:")
+
+
+def test_session_view_hides_metadata_from_an_existing_coach_turn(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+
+    def contaminate(session):
+        session["turns"][0]["text"] = (
+            "What changed after launch?\nMETADATA---\\\naction: ask\ntopic_id: t1"
+        )
+
+    mutate_session(tmp_path, sid, contaminate)
+
+    assert session_view(tmp_path, sid)["turns"][0]["text"] == (
+        "What changed after launch?"
+    )
+    assert "action: ask" in load_session(tmp_path, sid)["turns"][0]["text"]
 
 
 def test_partial_stream_failure_leaves_session_byte_equivalent(tmp_path):

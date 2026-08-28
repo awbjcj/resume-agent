@@ -132,8 +132,9 @@ describe("CoachPage", () => {
     render(<CoachPage />);
 
     expect(screen.getByRole("heading", { name: "Profile coach" })).toBeInTheDocument();
-    expect(screen.getByText("What changed after you shipped it?")).toBeInTheDocument();
-    expect(screen.getByText("Missing outcome")).toBeInTheDocument();
+    expect(screen.getAllByText("What changed after you shipped it?")).toHaveLength(2);
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.getByText(/Missing outcome/)).toBeInTheDocument();
     expect(screen.getByText("Improved delivery")).toBeInTheDocument();
   });
 

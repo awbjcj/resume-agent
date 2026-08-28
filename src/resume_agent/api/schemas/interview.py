@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from resume_agent.api.schemas.base import CamelModel
@@ -13,6 +15,7 @@ class InterviewStyleIn(CamelModel):
     difficulty: str = "standard"
     question_count: int = Field(default=8, ge=4, le=12)
     extra: str = Field(default="", max_length=2_000)
+    response_mode: Literal["text", "audio_preferred"] = "text"
 
 
 class InterviewStartIn(CamelModel):
@@ -32,6 +35,12 @@ class InterviewTurnOut(CamelModel):
     is_followup: bool = False
     at: str = ""
     notice: str = ""
+    audio_status: Literal["none", "ready", "failed"] = "none"
+    audio_url: str | None = None
+
+
+class InterviewAudioAvailabilityOut(CamelModel):
+    available: bool
 
 
 class PlanItemOut(CamelModel):
