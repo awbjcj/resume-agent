@@ -55,6 +55,7 @@ _BLOCK_KEYS = (
     "research_actions",
     "question_id",
     "follow_up",
+    "hints",
     "plan",
 )
 _BLOCK_START = rf"\n[ \t]*\n(?=(?:{'|'.join(_BLOCK_KEYS)})[ \t]*:)"

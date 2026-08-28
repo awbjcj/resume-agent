@@ -55,6 +55,7 @@ class InterviewTurnRecord(ExtensibleModel):
     is_followup: bool = False
     at: str = ""
     notice: str = ""
+    hints: list[str] = Field(default_factory=list)
     audio_status: Literal["none", "ready", "failed"] = "none"
     audio_ref: str = ""
 

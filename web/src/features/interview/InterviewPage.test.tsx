@@ -99,6 +99,37 @@ describe("InterviewPage", () => {
     expect(screen.getByText(/Question 2 of 4/)).toBeInTheDocument();
   });
 
+  it("keeps answer hints folded until the candidate expands them", async () => {
+    mocks.session.mockReturnValue({
+      data: activeSession({
+        turns: [{
+          role: "interviewer",
+          text: "Tell me about a difficult trade-off.",
+          questionId: "q1",
+          isFollowup: false,
+          at: "t1",
+          hints: [
+            "Set the context and constraints.",
+            "Explain the alternatives you evaluated.",
+            "Close with the outcome.",
+          ],
+        }],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: /answer hints/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Set the context and constraints.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /answer hints/i }));
+    expect(screen.getByText("Set the context and constraints.")).toBeInTheDocument();
+    expect(screen.getByText("Explain the alternatives you evaluated.")).toBeInTheDocument();
+    expect(screen.getByText("Close with the outcome.")).toBeInTheDocument();
+  });
+
   it("shows the sessions rail and selects the active session by default", () => {
     mocks.sessions.mockReturnValue({
       data: { sessions: [{ ...activeSession(), askedCount: 2, questionCount: 4, overallScore: null, archivedAt: null }] },
@@ -173,6 +204,7 @@ describe("InterviewPage", () => {
           at: "t1",
           audioStatus: "ready",
           audioUrl: "/api/interview/sessions/s1/turns/0/audio",
+          hints: ["Connect your background to the role.", "Choose one concrete example."],
         }],
       }),
       isLoading: false,
@@ -183,6 +215,8 @@ describe("InterviewPage", () => {
     renderPage();
 
     expect(screen.queryByText("Tell me about yourself.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /answer hints/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Connect your background to the role.")).not.toBeInTheDocument();
     await waitFor(() => expect(play).toHaveBeenCalledOnce());
     expect(fetchAudio).toHaveBeenCalledWith(
       "/api/interview/sessions/s1/turns/0/audio",

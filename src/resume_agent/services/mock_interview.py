@@ -48,6 +48,10 @@ _EMPTY_DEBRIEF_SUMMARY = (
     "You ended this interview before answering any questions, so there was nothing "
     "to score. Start a new session whenever you're ready to practice."
 )
+_DEGRADED_HINTS = [
+    "Use one specific example and make your individual contribution clear.",
+    "Structure the response around context, actions, and a measurable result.",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +93,7 @@ _OPENING_INSTRUCTION = (
     "<your in-character greeting and first question>\n"
     "---METADATA---\n"
     "action: ask\nquestion_id: q1\nfollow_up: false\n"
+    "hints:\n- <concise suggestion>\n- <concise suggestion>\n"
     "plan:\n1. <competency> | <question_type>\n2. ..."
 )
 
@@ -127,6 +132,7 @@ def _turn_view(turn: dict, *, session_id: str, turn_index: int) -> dict:
         "isFollowup": turn["is_followup"],
         "at": turn["at"],
         "notice": turn.get("notice", ""),
+        "hints": turn.get("hints", []),
         "audioStatus": turn.get("audio_status", "none"),
         "audioUrl": (
             f"/api/interview/sessions/{session_id}/turns/{turn_index}/audio"
@@ -471,6 +477,7 @@ def _degraded_turn(session: dict, prose: str):
             question_id=question_id,
             is_followup=True,
             notice=notice,
+            hints=_DEGRADED_HINTS,
         ),
         notice=notice,
     )

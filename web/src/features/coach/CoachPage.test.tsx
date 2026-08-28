@@ -136,6 +136,7 @@ describe("CoachPage", () => {
     expect(screen.getByText("In progress")).toBeInTheDocument();
     expect(screen.getByText(/Missing outcome/)).toBeInTheDocument();
     expect(screen.getByText("Improved delivery")).toBeInTheDocument();
+    expect(screen.getByText("Active · 1 topic · 0 saved")).toBeInTheDocument();
   });
 
   it("uses the shared guided starting state when there is no active session", () => {

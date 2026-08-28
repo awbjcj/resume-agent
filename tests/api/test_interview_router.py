@@ -100,6 +100,7 @@ def _fake_agents(monkeypatch):
             return FakeRunner([
                 OpeningInterview(
                     message="Welcome. Tell me about yourself.",
+                    hints=["Use a concrete example.", "Connect it to the role."],
                     plan=[
                         NewPlanItem(competency="Python", question_type="role_specific"),
                         NewPlanItem(competency="Ownership", question_type="behavioral"),

@@ -43,6 +43,7 @@ export type ChatPart =
       transcript: string;
       autoPlay: boolean;
     }
+  | { kind: "hints"; hints: string[] }
   | { kind: "reasoning"; text: string }
   | {
       kind: "tool";

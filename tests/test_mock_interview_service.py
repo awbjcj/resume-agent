@@ -25,6 +25,7 @@ from resume_agent.sessions.stream import Completed, Notice, TextDelta, ToolStart
 from resume_agent.tracking.tables import Job, ResumeVersion
 
 _ids: tuple[int, int] = (0, 0)
+_HINTS = ["Use a concrete example.", "Connect the result to the role."]
 
 
 class FakeRunner:
@@ -93,6 +94,9 @@ class PromptFollowingOpeningRunner(FakeRunner):
                 "action: ask\n"
                 "question_id: q1\n"
                 "follow_up: false\n"
+                "hints:\n"
+                "- Ground your answer in one relevant project.\n"
+                "- Explain your individual contribution.\n"
                 "plan:\n"
                 "1. Python | role_specific\n"
                 "2. Ownership | behavioral"
@@ -143,6 +147,7 @@ def _open(tmp_path, engine):
     job_id, version_id = _ids
     opening = OpeningInterview(
         message="Welcome. Walk me through your Python background.",
+        hints=_HINTS,
         plan=[
             NewPlanItem(competency="Python", question_type="role_specific"),
             NewPlanItem(competency="Ownership", question_type="behavioral"),
@@ -167,12 +172,14 @@ def test_opening_creates_session_and_hides_plan(tmp_path, engine):
     assert view["plan"] is None  # hidden while active
     assert view["progress"] == {"asked": 1, "total": 2}
     assert view["turns"][0]["role"] == "interviewer"
+    assert view["turns"][0]["hints"] == _HINTS
 
 
 def test_audio_preferred_opening_persists_synthesized_audio(tmp_path, engine):
     job_id, version_id = _ids
     opening = OpeningInterview(
         message="Welcome. Walk me through your Python background.",
+        hints=_HINTS,
         plan=[NewPlanItem(competency="Python", question_type="role_specific")],
     )
 
@@ -203,6 +210,7 @@ def test_audio_synthesis_failure_keeps_opening_turn_and_reveals_fallback(tmp_pat
     job_id, version_id = _ids
     opening = OpeningInterview(
         message="Welcome. Tell me about yourself.",
+        hints=_HINTS,
         plan=[NewPlanItem(competency="Python", question_type="role_specific")],
     )
 
@@ -232,6 +240,7 @@ def test_opening_instruction_keeps_plan_out_of_candidate_chat(tmp_path, engine):
     sink = RecordingSink()
     opening = OpeningInterview(
         message="ignored",
+        hints=_HINTS,
         plan=[
             NewPlanItem(competency="Python", question_type="role_specific"),
             NewPlanItem(competency="Ownership", question_type="behavioral"),
@@ -265,7 +274,7 @@ def test_full_interview_flow(tmp_path, engine):
         message="I shipped a FastAPI service.",
         interviewer_agent=FakeRunner(["notes"]),
         formatter_agent=FakeRunner(
-            [InterviewTurn(message="Tell me about a project you owned end to end.", action="ask", question_id="q2")]
+            [InterviewTurn(message="Tell me about a project you owned end to end.", action="ask", question_id="q2", hints=_HINTS)]
         ),
     )
     run_answer_turn(
@@ -312,7 +321,7 @@ def test_answer_streams_and_stores_interviewer_prose(tmp_path, engine):
         message="I shipped a FastAPI service.",
         interviewer_agent=interviewer,
         formatter_agent=FakeRunner(
-            [InterviewTurn(message="ignored", action="ask", question_id="q2")]
+            [InterviewTurn(message="ignored", action="ask", question_id="q2", hints=_HINTS)]
         ),
         sink=sink,
     )
@@ -342,6 +351,7 @@ def test_streamed_question_survives_structural_formatter_failure(tmp_path, engin
 
     assert view["turns"][-1]["text"] == "Tell me about ownership."
     assert "plan was unchanged" in view["turns"][-1]["notice"]
+    assert len(view["turns"][-1]["hints"]) == 2
     assert any(isinstance(event, Notice) for event in sink.events)
 
 
@@ -480,6 +490,7 @@ def test_opening_prompt_forces_extractable_plan(tmp_path, engine):
 
     opening = OpeningInterview(
         message="Welcome.",
+        hints=_HINTS,
         plan=[NewPlanItem(competency="Python", question_type="role_specific")],
     )
     run_opening_turn(
@@ -494,6 +505,7 @@ def test_opening_prompt_forces_extractable_plan(tmp_path, engine):
     )
     interviewer_prompt = seen[0]
     assert "---METADATA---" in interviewer_prompt
+    assert "hints:" in interviewer_prompt
     assert "plan:" in interviewer_prompt
     assert "competency | question_type" in interviewer_prompt
 

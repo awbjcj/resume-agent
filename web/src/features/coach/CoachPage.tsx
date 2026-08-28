@@ -240,10 +240,12 @@ export function CoachPage() {
   const savedDrafts = active?.draftNotes?.filter((note) => note.status === "saved") ?? [];
   const historyItems: ChatSessionHistoryItem[] = (sessions.data?.sessions ?? []).map((row) => {
     const date = new Date(row.startedAt).toLocaleDateString();
+    const topicLabel = `${row.topicCount} topic${row.topicCount === 1 ? "" : "s"}`;
+    const savedLabel = `${row.savedNoteCount} saved`;
     return {
       id: row.sessionId,
       title: row.sessionTitle || `Coaching · ${date}`,
-      detail: `${row.status === "active" ? "Coaching now" : "Completed"} · ${row.topicCount} topics · ${row.savedNoteCount} saved notes · ${date}`,
+      detail: `${row.status === "active" ? "Active" : "Complete"} · ${topicLabel} · ${savedLabel}`,
       status: row.status === "active" ? "active" : "ended",
       archived: Boolean(row.archivedAt),
     };
@@ -467,6 +469,7 @@ export function CoachPage() {
         isLoading={sessions.isPending}
         isError={sessions.isError}
         onRetry={() => void sessions.refetch()}
+        description="Resume or manage a coaching session."
         emptyMessage="No coaching sessions yet. Start one when you are ready to uncover stronger evidence."
         createLabel="New coaching session"
         createDisabled={starting || start.isPending}

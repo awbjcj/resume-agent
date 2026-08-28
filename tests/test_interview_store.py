@@ -38,7 +38,10 @@ def _make(tmp_path, session_id="abc123", job_id=7):
             PlanItem(id="q2", competency="Python", question_type="role_specific"),
         ],
         opening_turn=InterviewTurnRecord(
-            role="interviewer", text="Tell me about yourself.", question_id="q1"
+            role="interviewer",
+            text="Tell me about yourself.",
+            question_id="q1",
+            hints=["Connect your experience to the role.", "Choose a relevant example."],
         ),
     )
     return session_id
@@ -50,6 +53,7 @@ def test_create_marks_opening_question_asked(tmp_path):
     assert session["status"] == "active"
     assert session["job_id"] == 7
     assert session["turns"][0]["role"] == "interviewer"
+    assert len(session["turns"][0]["hints"]) == 2
     assert {p["id"]: p["status"] for p in session["plan"]} == {"q1": "asked", "q2": "pending"}
     assert session["concluded"] is False
 

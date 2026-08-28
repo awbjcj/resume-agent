@@ -33,12 +33,27 @@ def _session(plan_statuses, turns=()):
 def test_normalize_opening_caps_plan_and_defaults_question():
     turn = OpeningInterview(
         message="Welcome! Tell me about yourself.",
+        hints=["Connect your background to the role.", "Choose two relevant strengths."],
         plan=[NewPlanItem(competency=f"skill {i}", question_type="behavioral") for i in range(6)],
     )
     plan, record = normalize_opening(turn, question_count=4)
     assert [item.id for item in plan] == ["q1", "q2", "q3", "q4"]
     assert record.role == "interviewer"
     assert record.question_id == "q1"
+    assert record.hints == turn.hints
+
+
+@pytest.mark.parametrize("hints", [[], ["Only one."], ["One", "Two", "Three", "Four"]])
+def test_normalize_opening_requires_two_or_three_answer_hints(hints):
+    with pytest.raises(TurnRejected, match="2-3 answer hints"):
+        normalize_opening(
+            OpeningInterview(
+                message="Welcome! Tell me about yourself.",
+                hints=hints,
+                plan=[NewPlanItem(competency="fit", question_type="behavioral")],
+            ),
+            question_count=4,
+        )
 
 
 def test_interviewer_persona_defines_visible_prose_metadata_boundary():
@@ -129,6 +144,28 @@ def test_normalize_turn_conclude():
     )
     assert validated.concluded is True
     assert validated.turn.question_id == ""
+    assert validated.turn.hints == []
+
+
+def test_normalize_turn_preserves_two_or_three_answer_hints():
+    validated = normalize_turn(
+        InterviewTurn(
+            message="Tell me about a difficult trade-off.",
+            action="ask",
+            question_id="q2",
+            hints=[
+                "Set the context and constraints.",
+                "Explain the alternatives you evaluated.",
+                "Close with the outcome and what you learned.",
+            ],
+        ),
+        _session({"q1": "done", "q2": "pending"}),
+    )
+    assert validated.turn.hints == [
+        "Set the context and constraints.",
+        "Explain the alternatives you evaluated.",
+        "Close with the outcome and what you learned.",
+    ]
 
 
 def test_normalize_debrief_rejects_unasked_review_and_bad_score():

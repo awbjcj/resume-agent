@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { ChatThreadMessage } from "./ChatThread";
 import { AgentActivity } from "./AgentActivity";
 import { AudioPart } from "./parts/AudioPart";
+import { HintsPart } from "./parts/HintsPart";
 import { NoticePart } from "./parts/NoticePart";
 import { TextPart } from "./parts/TextPart";
 
@@ -23,6 +24,11 @@ function samePart(left: ChatPart, right: ChatPart): boolean {
       left.url === right.url &&
       left.transcript === right.transcript &&
       left.autoPlay === right.autoPlay;
+  }
+  if (left.kind === "hints") {
+    return right.kind === "hints" &&
+      left.hints.length === right.hints.length &&
+      left.hints.every((hint, index) => hint === right.hints[index]);
   }
   return right.kind === "tool" &&
     left.callId === right.callId &&
@@ -73,6 +79,8 @@ export const ChatMessage = memo(function ChatMessage({
       );
     } else if (part.kind === "audio") {
       rendered.push(<AudioPart key={key} part={part} />);
+    } else if (part.kind === "hints") {
+      rendered.push(<HintsPart key={key} hints={part.hints} />);
     } else {
       rendered.push(<NoticePart key={key} message={part.message} />);
     }

@@ -217,6 +217,7 @@ export function InterviewPage() {
     }
     const durable: ChatThreadMessage[] = (active.turns ?? []).map((turn, index) => {
       const notice = (turn as typeof turn & { notice?: string }).notice;
+      const hints = turn.hints ?? [];
       const role: "assistant" | "user" = turn.role === "interviewer" ? "assistant" : "user";
       const audioReady = audioPreferred && role === "assistant" &&
         turn.audioStatus === "ready" && Boolean(turn.audioUrl);
@@ -231,6 +232,9 @@ export function InterviewPage() {
             transcript: turn.text,
             autoPlay: index === latestReadyAudio,
           }] : [{ kind: "text" as const, text: turn.text }]),
+          ...(role === "assistant" && hints.length
+            ? [{ kind: "hints" as const, hints }]
+            : []),
           ...(audioFailed ? [{
             kind: "notice" as const,
             message: "Audio could not be generated, so the transcript is shown.",

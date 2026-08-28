@@ -4771,6 +4771,8 @@ export interface components {
             audioStatus: "none" | "ready" | "failed";
             /** Audiourl */
             audioUrl?: string | null;
+            /** Hints */
+            hints?: string[];
             /**
              * Isfollowup
              * @default false

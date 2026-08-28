@@ -4098,6 +4098,13 @@
             ],
             "title": "Audiourl"
           },
+          "hints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hints",
+            "type": "array"
+          },
           "isFollowup": {
             "default": false,
             "title": "Isfollowup",

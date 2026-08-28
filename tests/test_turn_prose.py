@@ -111,6 +111,21 @@ def test_full_output_preserves_delimiter_and_metadata_for_formatter():
     assert "we cut p99" in full
 
 
+def test_answer_hints_are_a_boundary_without_the_sentinel():
+    sink = _Recorder()
+    emitter = ProseEmitter(sink)
+
+    emitter.feed(
+        "Tell me about a difficult trade-off.\n\n"
+        "hints:\n- Set the context.\n- Explain the alternatives."
+    )
+    prose, full = emitter.finish()
+
+    assert prose == "Tell me about a difficult trade-off."
+    assert "Set the context" not in sink.text
+    assert "hints:" in full
+
+
 def test_scout_metadata_rows_are_a_boundary_without_the_sentinel():
     # The Scout's metadata block is a `PROPOSE | ... | ...` table, not the
     # `key: value` lines the block guard was written for, so a model that omits
