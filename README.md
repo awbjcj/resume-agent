@@ -16,20 +16,8 @@ The guiding rule is **fact-lock**: every bullet on a tailored resume must trace
 back to a fact you actually provided. The agents rewrite and reframe; they never
 invent.
 
----
-
-## Screenshots
-
-_Sample data — not a real job search._
-
-| | |
-| --- | --- |
-| **Dashboard** — daily operations at a glance | **Shortlist** — the cost gate: approve only what's worth tailoring |
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Shortlist](docs/screenshots/shortlist.png) |
-| **Pipeline** — every job by stage, with tailoring status | **Triage** — clear the raw/rejected backlog fast |
-| ![Pipeline](docs/screenshots/pipeline.png) | ![Triage](docs/screenshots/triage.png) |
-| **Analytics** — which sources and fit-score bands actually convert | **Match-gap** — skills target jobs demand that your profile doesn't show |
-| ![Analytics](docs/screenshots/analytics.png) | ![Match-gap](docs/screenshots/match-gap.png) |
+_Screenshots below are from a throwaway demo workspace with invented companies
+and jobs — not a real job search._
 
 ---
 
@@ -64,6 +52,50 @@ points where _you_ (not the agent) make the call.
 | **Cover letter** | `cover-letter`               | Drafts a fact-locked cover letter per job, gated by a deterministic provenance check, and renders it to PDF.                                              |
 | **Render**       | `render`                     | A chosen resume version becomes a PDF in `output/`.                                                                                                       |
 | **👤 Track**     | web app / `sync-status`      | Log submission status and notes by hand, or let `sync-status` read Gmail and **propose** status moves for you to apply.                                   |
+
+### What it looks like
+
+Every job in the board opens into one detail view — fit score, requested skills,
+and one tab per stage below:
+
+![Job detail — fit score and skill match](docs/screenshots/job-detail.png)
+
+**Ingest.** `pull` runs the connectors you've enabled; `+ Add URL` and
+`Import file…` (top bar) take one job by hand. Manage boards at
+**Settings → Sources** (`/settings/sources`):
+
+![Sources — connectors and boards feeding the pull pipeline](docs/screenshots/sources.png)
+
+**Discover.** Extraction and filtering land on the **Triage** page
+(`/triage`) — clear the raw/rejected backlog before anything reaches the
+shortlist:
+
+![Triage — clear the raw and rejected backlog](docs/screenshots/triage.png)
+
+**👤 Approve.** The **Shortlist** page (`/shortlist`) is the cost gate —
+review scored jobs and approve only what's worth paying to tailor:
+
+![Shortlist — approve the jobs worth tailoring](docs/screenshots/shortlist.png)
+
+**Tailor.** Open a job → **Resumes** tab to see each round's score,
+fact-check status, and PDF render/revise actions:
+
+![Resumes tab — tailored version, score, and fact-check status](docs/screenshots/resumes-tab.png)
+
+**Cover letter.** Open a job → **Cover letters** tab for the fact-locked
+draft, its provenance check, and a **Generate another** option:
+
+![Cover letters tab — fact-locked draft and revision](docs/screenshots/cover-letters-tab.png)
+
+**Render.** Rendered PDFs show up on the **Pipeline** board (`/pipeline`)
+under their own stage, alongside every other stage in flight:
+
+![Pipeline — every job by stage, including rendered PDFs](docs/screenshots/pipeline.png)
+
+**👤 Track.** Open a job → **Tracking** tab to set the application status
+by hand, or let `sync-status` propose moves from Gmail:
+
+![Tracking tab — application status and notes](docs/screenshots/tracking-tab.png)
 
 ---
 
@@ -140,14 +172,31 @@ the checked-in examples.
 Everything else (the SQLite database, the `output/` and `data/` folders) is
 created automatically on first run.
 
-### Career Lab and historical sponsorship research
+### Career coaching: Profile coach, Mock interviews, and Career Lab
 
-Career Lab is a draft-only workspace available at `/career-lab` in the web
-app, through the `career-lab` CLI command, and through the `/api/career-lab`
-REST resources. It routes each turn to one verified local career skill, keeps
-one active session per workspace, streams recoverable runs, and supports end,
+Three coaching surfaces sit alongside the tailoring pipeline in the sidebar,
+each scoped to a different moment in the job hunt.
+
+**Profile coach** (`/coach`) reviews your current fact-lock profile, asks one
+focused question at a time about outcomes, scope, or project evidence you may
+have left out, and drafts only claims grounded in what you actually answered:
+
+![Profile coach — guided evidence discovery](docs/screenshots/profile-coach.png)
+
+**Mock interviews** (`/interview`) runs a focused rehearsal against a
+specific tailored role, then turns the conversation into a scored debrief you
+can act on:
+
+![Mock interviews — focused rehearsal and scored debrief](docs/screenshots/mock-interview.png)
+
+**Career Lab** (`/career-lab`) is a draft-only workspace also available
+through the `career-lab` CLI command and the `/api/career-lab` REST
+resources. It routes each turn to one verified local career skill, keeps one
+active session per workspace, streams recoverable runs, and supports end,
 archive, unarchive, and delete lifecycle actions. Its outputs are drafts: it
 cannot apply, upload, send, or update a profile.
+
+![Career Lab — one verified skill at a time, output stays a draft](docs/screenshots/career-lab.png)
 
 ```bash
 uv run resume-agent career-lab "Prepare negotiation points" \
@@ -161,7 +210,10 @@ credential-free Streamable HTTP URL in `.env.example`; never configure both.
 Only these read-only MCP tools are exposed: `h1b_get_company_stats`,
 `h1b_search_h1b_jobs`, and `h1b_get_available_data`. Historical filings are
 never treated as confirmation of current sponsorship or current employer
-policy, never flip the posting signal, and never hard-reject a job.
+policy, never flip the posting signal, and never hard-reject a job. Check it
+per job from the **Sponsorship** tab in the job detail view:
+
+![Sponsorship tab — historical H-1B filing evidence for one company](docs/screenshots/sponsorship-tab.png)
 
 For local development, `make dev` starts only the API and Vite frontend, so a
 fresh clone has no sibling-repository dependency. `make full-stack` additionally
@@ -384,7 +436,10 @@ uv run resume-agent discover [--search config/search.yaml] [--facts data/profile
 Compares the `must_have_skills` of every job that survived discovery
 (`shortlisted` / `approved` / `tailored` / `rendered`) against your profile's
 skill names and aliases. Gaps are ranked by how many target jobs demand them.
-This is read-only: it never edits `facts.json`.
+This is read-only: it never edits `facts.json`. The same view is at
+**Match-gap** (`/match-gap`) in the web app:
+
+![Match-gap — skills your target jobs demand that your profile doesn't show](docs/screenshots/match-gap.png)
 
 ```bash
 uv run resume-agent match-gap                 # aggregate, most-demanded first
@@ -441,7 +496,16 @@ uv run resume-agent render 12 [--config config/render.yaml]
 
 Runs the FastAPI backend and React frontend with Shortlist, Pipeline, Triage,
 Analytics, and Match-gap views. Use it to approve shortlisted jobs, inspect
-rendered artifacts, edit application status/notes, and prune stale jobs.
+rendered artifacts, edit application status/notes, and prune stale jobs. It
+opens on the **Dashboard** (`/`) — daily counts by stage and quick links into
+whatever needs attention next:
+
+![Dashboard — daily operations at a glance](docs/screenshots/dashboard.png)
+
+**Analytics** (`/analytics`) shows which sources and fit-score bands actually
+convert to interviews and offers:
+
+![Analytics — conversion funnel by source and fit band](docs/screenshots/analytics.png)
 
 ```bash
 make dev                                # http://localhost:5173

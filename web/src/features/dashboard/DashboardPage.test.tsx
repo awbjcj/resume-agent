@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -56,9 +56,15 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Pipeline stages")).toBeInTheDocument();
     expect(screen.getByText(/recent runs/i)).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: /daily shortcuts/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /profile skills/i })).toHaveAttribute("href", "/profile?tab=skills");
-    expect(screen.getByRole("link", { name: /sources/i })).toHaveAttribute("href", "/settings/sources");
+    const shortcuts = within(screen.getByRole("navigation", { name: /workspace shortcuts/i }));
+    expect(shortcuts.getByRole("link", { name: /sources/i })).toHaveAttribute("href", "/settings/sources");
+    expect(shortcuts.getByRole("link", { name: /search settings/i })).toHaveAttribute("href", "/settings/search");
+    expect(shortcuts.getByRole("link", { name: /review workflow/i })).toHaveAttribute("href", "/settings/review");
+    expect(shortcuts.getByRole("link", { name: /profile skills/i })).toHaveAttribute("href", "/profile?tab=skills");
+    expect(shortcuts.getByRole("link", { name: /api keys/i })).toHaveAttribute("href", "/settings/keys");
+    expect(shortcuts.queryByRole("link", { name: /triage/i })).not.toBeInTheDocument();
+    expect(shortcuts.queryByRole("link", { name: /shortlist/i })).not.toBeInTheDocument();
+    expect(shortcuts.queryByRole("link", { name: /pipeline/i })).not.toBeInTheDocument();
   });
 
   it("guides a fresh install with the getting-started checklist, not the drained-funnel card", async () => {

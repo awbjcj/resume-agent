@@ -1,9 +1,9 @@
 import {
   ArrowUpRight,
-  BriefcaseBusiness,
-  Inbox,
-  Kanban,
-  SlidersHorizontal,
+  FileKey2,
+  PanelsTopLeft,
+  Search,
+  Sparkles,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -11,66 +11,58 @@ import { Link } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
 
-import type { DashboardSummary } from "./use-dashboard-summary";
-
 type Shortcut = {
   to: string;
   label: string;
   detail: string;
   icon: LucideIcon;
-  count?: number;
 };
 
-function shortcuts(summary: DashboardSummary): Shortcut[] {
-  return [
-    {
-      to: "/triage",
-      label: "Triage",
-      detail: "Review new jobs",
-      icon: Inbox,
-      count: summary.queues.triage,
-    },
-    {
-      to: "/shortlist",
-      label: "Shortlist",
-      detail: "Approve best fits",
-      icon: BriefcaseBusiness,
-      count: summary.queues.approve,
-    },
-    {
-      to: "/pipeline",
-      label: "Pipeline",
-      detail: "Track applications",
-      icon: Kanban,
-      count: summary.queues.apply,
-    },
-    {
-      to: "/profile?tab=skills",
-      label: "Profile skills",
-      detail: "Tune skill groups",
-      icon: Wrench,
-    },
-    {
-      to: "/settings/sources",
-      label: "Sources",
-      detail: "Manage job feeds",
-      icon: SlidersHorizontal,
-    },
-  ];
-}
+const SHORTCUTS: Shortcut[] = [
+  {
+    to: "/settings/sources",
+    label: "Sources",
+    detail: "Manage job feeds",
+    icon: PanelsTopLeft,
+  },
+  {
+    to: "/settings/search",
+    label: "Search settings",
+    detail: "Tune discovery filters",
+    icon: Search,
+  },
+  {
+    to: "/settings/review",
+    label: "Review workflow",
+    detail: "Configure tailoring checks",
+    icon: Sparkles,
+  },
+  {
+    to: "/profile?tab=skills",
+    label: "Profile skills",
+    detail: "Tune skill groups",
+    icon: Wrench,
+  },
+  {
+    to: "/settings/keys",
+    label: "API keys",
+    detail: "Connect model providers",
+    icon: FileKey2,
+  },
+];
 
-export function QuickAccess({ summary }: { summary: DashboardSummary }) {
+export function QuickAccess() {
   return (
-    <nav aria-label="Daily shortcuts" className="overflow-hidden rounded-xl border bg-card">
+    <nav aria-label="Workspace shortcuts" className="overflow-hidden rounded-xl border bg-card">
       <div className="flex items-center justify-between gap-4 border-b bg-muted/20 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">Quick access</span>
-          <span className="hidden text-xs text-muted-foreground sm:inline">Your daily work, one click away</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">Workspace controls, one click away</span>
         </div>
         <ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" />
       </div>
       <div className="grid sm:grid-cols-2 xl:grid-cols-5">
-        {shortcuts(summary).map((shortcut) => (
+        {SHORTCUTS.map((shortcut) => (
           <Link
             key={shortcut.to}
             to={shortcut.to}
@@ -85,15 +77,7 @@ export function QuickAccess({ summary }: { summary: DashboardSummary }) {
               <shortcut.icon className="size-4" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                {shortcut.label}
-                {shortcut.count ? (
-                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-mono text-[0.65rem] tabular-nums text-primary">
-                    {shortcut.count}
-                    <span className="sr-only"> waiting</span>
-                  </span>
-                ) : null}
-              </span>
+              <span className="flex items-center gap-2 text-sm font-medium">{shortcut.label}</span>
               <span className="block truncate text-xs text-muted-foreground">{shortcut.detail}</span>
             </span>
             <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden="true" />
