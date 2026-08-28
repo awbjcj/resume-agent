@@ -14,6 +14,7 @@ import pytest
 from resume_agent.config import Settings
 from resume_agent.llm_routing import (
     RouteConfigError,
+    direct_api_base_url,
     effective_mode,
     gateway_origin,
     subscription_configured,
@@ -65,6 +66,43 @@ def test_auto_with_no_gateway_at_all_leaves_every_provider_on_its_api():
         "api",
     ]
     assert gateway_origin(settings) is None
+
+
+def test_direct_openai_and_anthropic_endpoints_are_separate_from_gateway():
+    settings = _settings(
+        openai_base_url="https://direct-openai.example/v1/",
+        anthropic_base_url="https://direct-anthropic.example/",
+        sub2api_base_url=GATEWAY,
+        sub2api_openai_key="oai-sub",
+        sub2api_anthropic_key="ant-sub",
+    )
+
+    assert direct_api_base_url("openai", settings) == "https://direct-openai.example/v1"
+    assert (
+        direct_api_base_url("anthropic", settings) == "https://direct-anthropic.example"
+    )
+    assert gateway_origin(settings) == GATEWAY
+
+
+def test_blank_direct_endpoints_fall_back_to_official_provider_urls():
+    settings = _settings(openai_base_url="", anthropic_base_url="")
+
+    assert direct_api_base_url("openai", settings) == "https://api.openai.com/v1"
+    assert direct_api_base_url("anthropic", settings) == "https://api.anthropic.com"
+
+
+def test_invalid_direct_endpoint_is_rejected():
+    with pytest.raises(RouteConfigError, match="OPENAI_BASE_URL"):
+        direct_api_base_url("openai", _settings(openai_base_url="not-a-url"))
+
+    with pytest.raises(RouteConfigError, match="ANTHROPIC_BASE_URL"):
+        effective_mode(
+            "anthropic",
+            _settings(
+                anthropic_base_url="not-a-url",
+                anthropic_route_mode="api",
+            ),
+        )
 
 
 # -- explicit modes ---------------------------------------------------------

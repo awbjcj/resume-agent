@@ -23,7 +23,9 @@ present.
 | Variable | Default | Accepted values and purpose |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | empty | Shared Anthropic credential. Bare model IDs route to Anthropic. |
-| `OPENAI_API_KEY` | empty | Shared OpenAI credential for `openai:` model IDs, optional embeddings, and direct text-to-speech. TTS never uses the subscription gateway. |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Direct Anthropic API endpoint. Applied explicitly whenever routing selects `api`, so it cannot inherit the Sub2API endpoint. |
+| `OPENAI_API_KEY` | empty | Shared OpenAI credential for `openai:` model IDs, optional embeddings, and direct audio operations. |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Direct OpenAI API endpoint. Applied explicitly whenever routing selects `api`; transcription and TTS always use this endpoint because Sub2API may not implement the audio APIs. |
 | `GEMINI_API_KEY` | empty | Shared Google Gemini credential for `gemini:` model IDs. |
 | `DEEPSEEK_API_KEY` | empty | Shared DeepSeek credential for `deepseek:` model IDs. |
 | `SUB2API_BASE_URL` | empty | Subscription-gateway origin shared by all routed providers; empty disables gateway routing unless a provider is pinned to `subscription`. |
@@ -54,6 +56,13 @@ Model IDs can use `openai:`, `gemini:`, or `deepseek:` prefixes. A bare model
 ID uses Anthropic. Reasoning-effort strings are deliberately provider-specific;
 leave them unset unless the selected provider/model documents support for the
 chosen value.
+
+For OpenAI and Anthropic, every routing decision selects the credential and
+endpoint together. `subscription` uses `SUB2API_<PROVIDER>_KEY` with
+`SUB2API_BASE_URL`; `api` uses the provider's normal `*_API_KEY` with its
+`*_BASE_URL`; and `auto` chooses between those complete pairs based on whether
+the provider has a Sub2API key. SDK process defaults are never allowed to mix
+one route's key with the other route's endpoint.
 
 ## API, storage, and runtime
 

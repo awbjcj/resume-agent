@@ -284,14 +284,26 @@ def test_openai_embedding_provider_records_usage_through_direct_usage_seam(
 
     recorded = []
     monkeypatch.setattr(llm_runner, "model_access_available", lambda _model: True)
-    monkeypatch.setattr(llm_runner, "resolve_api_key", lambda _model: "key")
+    monkeypatch.setattr(
+        llm_runner,
+        "resolve_route",
+        lambda _model: SimpleNamespace(
+            api_key="key", base_url="https://gateway.example"
+        ),
+    )
     monkeypatch.setattr(
         llm_runner,
         "split_provider",
         lambda _model: ("openai", "text-embedding-3-small"),
     )
     monkeypatch.setattr(limits, "enforce_agent_budget", lambda _agent: None)
-    monkeypatch.setattr(openai, "OpenAI", lambda **_kwargs: _Client())
+    seen = {}
+
+    def client(**kwargs):
+        seen.update(kwargs)
+        return _Client()
+
+    monkeypatch.setattr(openai, "OpenAI", client)
     monkeypatch.setattr(usage, "record_direct_usage", recorded.append)
 
     vectors = OpenAIEmbeddingProvider()._embed_sync(["first", "second"])
@@ -300,6 +312,10 @@ def test_openai_embedding_provider_records_usage_through_direct_usage_seam(
     assert recorded[0].provider == "openai"
     assert recorded[0].model == "text-embedding-3-small"
     assert recorded[0].input_tokens == 7
+    assert seen == {
+        "api_key": "key",
+        "base_url": "https://gateway.example/v1",
+    }
 
 
 def test_a_failed_shard_never_discards_the_batches_that_succeeded(tmp_path):

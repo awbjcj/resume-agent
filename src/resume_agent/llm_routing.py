@@ -26,10 +26,12 @@ from urllib.parse import urlsplit
 from resume_agent.config import RouteMode, Settings
 
 __all__ = [
+    "DIRECT_API_BASE_URL_FIELDS",
     "ROUTE_MODE_FIELDS",
     "SUB2API_KEY_FIELDS",
     "EffectiveMode",
     "RouteConfigError",
+    "direct_api_base_url",
     "effective_mode",
     "gateway_origin",
     "route_mode",
@@ -59,6 +61,16 @@ SUB2API_KEY_FIELDS: dict[str, str] = {
     "deepseek": "sub2api_deepseek_key",
 }
 
+DIRECT_API_BASE_URL_FIELDS: dict[str, str] = {
+    "anthropic": "anthropic_base_url",
+    "openai": "openai_base_url",
+}
+
+_DIRECT_API_BASE_URL_DEFAULTS: dict[str, str] = {
+    "anthropic": "https://api.anthropic.com",
+    "openai": "https://api.openai.com/v1",
+}
+
 ROUTE_MODE_FIELDS: dict[str, str] = {
     "anthropic": "anthropic_route_mode",
     "openai": "openai_route_mode",
@@ -66,14 +78,11 @@ ROUTE_MODE_FIELDS: dict[str, str] = {
     "deepseek": "deepseek_route_mode",
 }
 
-def _origin(settings: Settings) -> str:
-    """The configured gateway origin, validated, without a trailing slash.
 
-    Returns ``""`` when unset. A path prefix is allowed (sub2api behind a
-    reverse proxy at ``/sub2api``); credentials, query, and fragment are not,
-    because none of them survive being concatenated with an SDK's own path.
-    """
-    raw = (settings.sub2api_base_url or "").strip().rstrip("/")
+def _validated_base_url(raw_value: str, setting_name: str) -> str:
+    """Return a validated HTTP(S) base URL without a trailing slash."""
+
+    raw = (raw_value or "").strip().rstrip("/")
     if not raw:
         return ""
     parsed = urlsplit(raw)
@@ -86,10 +95,36 @@ def _origin(settings: Settings) -> str:
         or parsed.fragment
     ):
         raise RouteConfigError(
-            "SUB2API_BASE_URL must be an absolute http(s) URL with no "
-            f"credentials, query, or fragment (got {settings.sub2api_base_url!r})"
+            f"{setting_name} must be an absolute http(s) URL with no "
+            f"credentials, query, or fragment (got {raw_value!r})"
         )
     return raw
+
+
+def _origin(settings: Settings) -> str:
+    """The configured gateway origin, validated, without a trailing slash.
+
+    Returns ``""`` when unset. A path prefix is allowed (sub2api behind a
+    reverse proxy at ``/sub2api``); credentials, query, and fragment are not,
+    because none of them survive being concatenated with an SDK's own path.
+    """
+    return _validated_base_url(settings.sub2api_base_url, "SUB2API_BASE_URL")
+
+
+def direct_api_base_url(provider: str, settings: Settings) -> str | None:
+    """The direct provider endpoint, kept separate from the gateway origin.
+
+    OpenAI and Anthropic SDKs also read their base URLs from process environment
+    variables. Returning an explicit value here prevents those implicit SDK
+    defaults from crossing the selected route's key/endpoint boundary.
+    """
+
+    field = DIRECT_API_BASE_URL_FIELDS.get(provider)
+    if field is None:
+        return None
+    configured = str(getattr(settings, field, "") or "")
+    raw = configured or _DIRECT_API_BASE_URL_DEFAULTS[provider]
+    return _validated_base_url(raw, field.upper())
 
 
 def subscription_key(provider: str, settings: Settings) -> str:
@@ -124,6 +159,7 @@ def effective_mode(provider: str, settings: Settings) -> EffectiveMode:
     """
     mode = route_mode(provider, settings)
     if mode == "api":
+        direct_api_base_url(provider, settings)
         return "api"
 
     origin = _origin(settings)
@@ -146,7 +182,10 @@ def effective_mode(provider: str, settings: Settings) -> EffectiveMode:
             f"{SUB2API_KEY_FIELDS[provider].upper()} is set but SUB2API_BASE_URL "
             "is unset, so there is nowhere to send the call"
         )
-    return "subscription" if key else "api"
+    if key:
+        return "subscription"
+    direct_api_base_url(provider, settings)
+    return "api"
 
 
 def gateway_origin(settings: Settings) -> str | None:

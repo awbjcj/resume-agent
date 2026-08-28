@@ -15,6 +15,8 @@ from resume_agent.tenancy.spend import SpendDecision
 from resume_agent.tenancy.workspace import WorkspacePaths
 
 GATEWAY = "https://sub2api.example.com"
+DIRECT_OPENAI = "https://direct-openai.example/v1"
+DIRECT_ANTHROPIC = "https://direct-anthropic.example"
 
 
 def _settings(**overrides) -> Settings:
@@ -50,10 +52,39 @@ def test_build_model_keeps_each_gateway_key_and_endpoint_together():
     gemini = build_model("gemini:gemini-3.6-flash", settings=settings)
     deepseek = build_model("deepseek:deepseek-v4-flash", settings=settings)
 
-    assert (anthropic.api_key, anthropic.client_params["base_url"]) == ("ant-sub", GATEWAY)
+    assert (anthropic.api_key, anthropic.client_params["base_url"]) == (
+        "ant-sub",
+        GATEWAY,
+    )
     assert (openai.api_key, openai.base_url) == ("oai-sub", f"{GATEWAY}/v1")
-    assert (gemini.api_key, gemini.client_params["http_options"]["base_url"]) == ("gem-sub", GATEWAY)
+    assert (gemini.api_key, gemini.client_params["http_options"]["base_url"]) == (
+        "gem-sub",
+        GATEWAY,
+    )
     assert (deepseek.api_key, deepseek.base_url) == ("deep-sub", f"{GATEWAY}/v1")
+
+
+def test_api_mode_keeps_direct_keys_and_endpoints_together():
+    settings = _settings(
+        openai_api_key="oai-direct",
+        openai_base_url=DIRECT_OPENAI,
+        anthropic_api_key="ant-direct",
+        anthropic_base_url=DIRECT_ANTHROPIC,
+        sub2api_base_url=GATEWAY,
+        sub2api_openai_key="oai-sub",
+        sub2api_anthropic_key="ant-sub",
+        openai_route_mode="api",
+        anthropic_route_mode="api",
+    )
+
+    openai = build_model("openai:gpt-5.6-terra", settings=settings)
+    anthropic = build_model("claude-sonnet-5", settings=settings)
+
+    assert (openai.api_key, openai.base_url) == ("oai-direct", DIRECT_OPENAI)
+    assert (anthropic.api_key, anthropic.client_params["base_url"]) == (
+        "ant-direct",
+        DIRECT_ANTHROPIC,
+    )
 
 
 def test_search_builder_uses_the_same_route_as_the_normal_builder():

@@ -78,10 +78,10 @@ class SpendDecision:
     provider: str
     model: str
     reason: str
-    # Non-None only for subscription-routed calls. Carried here rather than
-    # derived separately by ``build_model`` so the endpoint and the credential
-    # can never come from two different evaluations of the same config -- the
-    # same reason key selection and budget share this class (ADR-0009).
+    # The selected route's endpoint. OpenAI and Anthropic direct calls carry an
+    # explicit provider URL; subscription calls carry the gateway origin. It is
+    # resolved beside the credential so the two cannot come from different
+    # evaluations of the same config (ADR-0009).
     base_url: str | None = None
 
 
@@ -120,6 +120,28 @@ def _settings_provider_key(settings: Settings, provider: str) -> str:
         "gemini": settings.gemini_api_key,
         "deepseek": settings.deepseek_api_key,
     }.get(provider, "")
+
+
+def _direct_decision(
+    api_key: str,
+    own_key: bool,
+    provider: str,
+    model: str,
+    reason: str,
+    settings: Settings,
+) -> SpendDecision:
+    """Pair a direct-provider credential with its explicit API endpoint."""
+
+    from resume_agent.llm_routing import direct_api_base_url
+
+    return SpendDecision(
+        api_key=api_key,
+        own_key=own_key,
+        provider=provider,
+        model=model,
+        reason=reason,
+        base_url=direct_api_base_url(provider, settings),
+    )
 
 
 def _subscription_decision(
@@ -335,12 +357,13 @@ class SpendGate:
             if routed is not None:
                 return routed, None
             return (
-                SpendDecision(
-                    api_key=_settings_provider_key(settings, provider),
-                    own_key=False,
-                    provider=provider,
-                    model=model,
-                    reason="settings-key",
+                _direct_decision(
+                    _settings_provider_key(settings, provider),
+                    False,
+                    provider,
+                    model,
+                    "settings-key",
+                    settings,
                 ),
                 None,
             )
@@ -377,9 +400,8 @@ class SpendGate:
         # Ahead of every key source: a routed provider has a different
         # endpoint, so no API key -- platform, user, or settings -- is the
         # right credential for it.
-        routed = _subscription_decision(
-            provider, model, self._settings or context.settings
-        )
+        settings = self._settings or context.settings
+        routed = _subscription_decision(provider, model, settings)
         if routed is not None:
             return _settled(routed)
 
@@ -389,11 +411,14 @@ class SpendGate:
         if not platform_key:
             if user_key:
                 # Bring-your-own-key: no shared budget applies, so no query.
-                return _settled(SpendDecision(user_key, True, provider, model, "byok"))
-            settings = self._settings or context.settings
+                return _settled(
+                    _direct_decision(user_key, True, provider, model, "byok", settings)
+                )
             key = _settings_provider_key(settings, provider)
             if provider in context.own_key_providers:
-                return _settled(SpendDecision(key, True, provider, model, "own-key"))
+                return _settled(
+                    _direct_decision(key, True, provider, model, "own-key", settings)
+                )
             # No own key. Budget still governs the call even with no platform
             # key configured — enforce_agent_budget never had a platform-key
             # precondition, only shared_key_available did, and conflating the
@@ -402,7 +427,7 @@ class SpendGate:
             verdict = _evaluate_shared(context, provider, model, now=now)
             return _CachedDecision(
                 time.monotonic(),
-                SpendDecision(key, False, provider, model, "settings-key"),
+                _direct_decision(key, False, provider, model, "settings-key", settings),
                 verdict.denial,
                 verdict.headroom,
                 verdict.unit,
@@ -412,7 +437,9 @@ class SpendGate:
         if verdict.denial is None:
             return _CachedDecision(
                 time.monotonic(),
-                SpendDecision(platform_key, False, provider, model, "shared"),
+                _direct_decision(
+                    platform_key, False, provider, model, "shared", settings
+                ),
                 None,
                 verdict.headroom,
                 verdict.unit,
@@ -422,14 +449,23 @@ class SpendGate:
             # call proceeds on it and nothing is raised — what resolve_api_key
             # has always done.
             return _settled(
-                SpendDecision(user_key, True, provider, model, "own-key-fallback")
+                _direct_decision(
+                    user_key,
+                    True,
+                    provider,
+                    model,
+                    "own-key-fallback",
+                    settings,
+                )
             )
         # Nothing funds this call. The platform key is still reported so a
         # non-raising caller behaves exactly as before; the error is what the
         # enforcing caller gets.
         return _CachedDecision(
             time.monotonic(),
-            SpendDecision(platform_key, False, provider, model, "unfunded"),
+            _direct_decision(
+                platform_key, False, provider, model, "unfunded", settings
+            ),
             verdict.denial,
             0.0,
             verdict.unit,

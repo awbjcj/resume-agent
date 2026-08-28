@@ -23,7 +23,10 @@ builder imports a concrete agno model class directly.
   when that provider has a subscription key; an explicit `subscription` pin
   fails loudly when incomplete. `build_model` and `build_search_equipped` carry
   the resulting key and endpoint together through the provider SDK's native
-  base-URL spelling. Audio transcription remains on direct provider APIs.
+  base-URL spelling. Direct OpenAI and Anthropic routes explicitly pair
+  `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` with `OPENAI_BASE_URL` /
+  `ANTHROPIC_BASE_URL`; audio transcription and speech remain on those direct
+  provider APIs.
 - **Lazy SDK imports.** `build_model` imports the agno provider class _inside_ its
   branch, so a Claude-only run never imports `openai` or `google-genai`, and a
   missing optional SDK fails only when that provider is actually selected.

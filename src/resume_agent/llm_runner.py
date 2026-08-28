@@ -198,12 +198,12 @@ class AgentRunner:
         if context is not None:
             context.selected_model_own_keys[id(model)] = decision.own_key
         key = decision.api_key or None
-        target_base_url = _gateway_target(model, decision.provider, decision.base_url)
+        target_base_url = _endpoint_target(model, decision.provider, decision.base_url)
         if (
             key == self._applied_key
             and target_base_url == self._applied_base_url
             and getattr(model, "api_key", None) == key
-            and _current_gateway(model, decision.provider) == target_base_url
+            and _current_endpoint(model, decision.provider) == target_base_url
         ):
             return
         if self._inflight:
@@ -212,7 +212,7 @@ class AgentRunner:
             # finds the runner idle, which is the next phase in practice.
             return
         model.api_key = key
-        _apply_gateway(model, decision.provider, decision.base_url)
+        _apply_endpoint(model, decision.provider, decision.base_url)
         # Agno caches clients after first use. Clearing them makes the next
         # request honor the newly selected credential.
         if hasattr(model, "client"):
@@ -991,10 +991,10 @@ def provider_access_available(
     )
 
 
-def _current_gateway(model: Any, provider: str) -> str | None:
+def _current_endpoint(model: Any, provider: str) -> str | None:
     """The base URL ``model`` is currently pointed at, in that SDK's spelling.
 
-    Mirrors ``_gateway_kwargs``: the three providers store it in three places,
+    Mirrors ``_endpoint_kwargs``: the three providers store it in three places,
     so reading it back needs the same three-way split.
     """
     if provider in {"openai", "deepseek"}:
@@ -1008,27 +1008,27 @@ def _current_gateway(model: Any, provider: str) -> str | None:
     return None
 
 
-def _gateway_target(model: Any, provider: str, base_url: str | None) -> str | None:
+def _endpoint_target(model: Any, provider: str, base_url: str | None) -> str | None:
     """What ``model``'s base URL should become for ``base_url``.
 
-    ``base_url=None`` means "off the gateway", which is not the same as "no
-    base URL": the DeepSeek class carries ``api.deepseek.com`` as a field
+    ``base_url=None`` means "use the provider default", which is not the same
+    as "no base URL": the DeepSeek class carries ``api.deepseek.com`` as a field
     default, so clearing it to ``None`` would break the direct path rather than
-    restore it. Resolving that here -- rather than inside ``_apply_gateway``
+    restore it. Resolving that here -- rather than inside ``_apply_endpoint``
     alone -- is what lets the caller compare current against target without
     the unrouted DeepSeek case reporting a change on every single refresh.
     """
-    sdk_base_url = _provider_gateway_base_url(provider, base_url)
+    sdk_base_url = provider_sdk_base_url(provider, base_url)
     if provider in {"openai", "deepseek"}:
         return sdk_base_url or type(model).__dataclass_fields__["base_url"].default
     return sdk_base_url
 
 
-def _apply_gateway(model: Any, provider: str, base_url: str | None) -> None:
+def _apply_endpoint(model: Any, provider: str, base_url: str | None) -> None:
     """Repoint an already-built model, including back to its own default."""
-    sdk_base_url = _provider_gateway_base_url(provider, base_url)
+    sdk_base_url = provider_sdk_base_url(provider, base_url)
     if provider in {"openai", "deepseek"}:
-        model.base_url = _gateway_target(model, provider, base_url)
+        model.base_url = _endpoint_target(model, provider, base_url)
         return
     params = dict(getattr(model, "client_params", None) or {})
     if provider == "anthropic":
@@ -1042,7 +1042,7 @@ def _apply_gateway(model: Any, provider: str, base_url: str | None) -> None:
             params["http_options"] = http_options
         else:
             params.pop("http_options", None)
-    params.update(_gateway_kwargs(provider, base_url).get("client_params", {}))
+    params.update(_endpoint_kwargs(provider, base_url).get("client_params", {}))
     model.client_params = params or None
 
 
@@ -1075,12 +1075,12 @@ def refresh_agent_api_key(agent: object, *, settings: Settings | None = None) ->
     context.selected_model_own_keys[id(model)] = context.selected_own_key_providers[
         provider
     ]
-    if getattr(model, "api_key", None) == selected and _current_gateway(
+    if getattr(model, "api_key", None) == selected and _current_endpoint(
         model, provider
-    ) == _gateway_target(model, provider, route.base_url):
+    ) == _endpoint_target(model, provider, route.base_url):
         return
     model.api_key = selected
-    _apply_gateway(model, provider, route.base_url)
+    _apply_endpoint(model, provider, route.base_url)
     # Agno caches clients after first use. Clearing them makes the next request
     # honor the newly selected credential and endpoint instead of retaining the
     # old client.
@@ -1526,7 +1526,7 @@ def _openai_max_output_tokens(*, reasoning: bool) -> int:
     return 64000 if reasoning else 32000
 
 
-def _gateway_kwargs(provider: str, base_url: str | None) -> dict[str, Any]:
+def _endpoint_kwargs(provider: str, base_url: str | None) -> dict[str, Any]:
     """Spell "send this elsewhere" the way ``provider``'s agno class wants.
 
     The three spellings are not interchangeable, and only one is a real field.
@@ -1544,7 +1544,7 @@ def _gateway_kwargs(provider: str, base_url: str | None) -> dict[str, Any]:
     that dict carries only ``timeout``, which this codebase never sets on a
     Gemini model, so nothing is lost today; it would need merging if one were.
     """
-    sdk_base_url = _provider_gateway_base_url(provider, base_url)
+    sdk_base_url = provider_sdk_base_url(provider, base_url)
     if not sdk_base_url:
         return {}
     if provider in {"openai", "deepseek"}:
@@ -1556,11 +1556,14 @@ def _gateway_kwargs(provider: str, base_url: str | None) -> dict[str, Any]:
     return {}
 
 
-def _provider_gateway_base_url(provider: str, origin: str | None) -> str | None:
-    """Adapt one resolved gateway origin to the selected provider SDK."""
+def provider_sdk_base_url(provider: str, origin: str | None) -> str | None:
+    """Adapt one selected route URL to the provider SDK's spelling."""
     if not origin:
         return None
-    return f"{origin}/v1" if provider in {"openai", "deepseek"} else origin
+    normalized = origin.rstrip("/")
+    if provider in {"openai", "deepseek"} and not normalized.endswith("/v1"):
+        return f"{normalized}/v1"
+    return normalized
 
 
 def _build_openai_responses(
@@ -1572,7 +1575,7 @@ def _build_openai_responses(
     return OpenAIResponses(
         id=split_provider(model_id)[1],
         api_key=api_key,
-        **_gateway_kwargs("openai", base_url),
+        **_endpoint_kwargs("openai", base_url),
         # Agno's reasoning_effort Literal omits valid Responses values.
         reasoning={"effort": effort} if effort is not None else None,
         # Ask for a summary whenever a reasoning config is sent, including at
@@ -1614,7 +1617,7 @@ def _build_deepseek_responses(
         api_key=api_key,
         # Omitted when not routed, so the class default (api.deepseek.com)
         # stands -- passing base_url=None explicitly would null it instead.
-        **_gateway_kwargs("deepseek", base_url),
+        **_endpoint_kwargs("deepseek", base_url),
         reasoning={"effort": effort} if effort is not None else None,
         # Same rule as OpenAI: whenever a reasoning config is sent, ask for a
         # summary, or agno's streaming branch relabels every visible output_text
@@ -1728,7 +1731,7 @@ def _build_model_from_route(
                 id=model,
                 api_key=key,
                 thinking_level=reasoning_effort if reasoning else "low",
-                **_gateway_kwargs("gemini", base_url),
+                **_endpoint_kwargs("gemini", base_url),
             )
         # Pre-3 ids have no thinking_level at all -- sending one is the mirror
         # image of the thinking_budget-on-Gemini-3 failure, and agno forwards any
@@ -1738,7 +1741,7 @@ def _build_model_from_route(
             id=model,
             api_key=key,
             thinking_budget=None if reasoning else 0,
-            **_gateway_kwargs("gemini", base_url),
+            **_endpoint_kwargs("gemini", base_url),
         )
     if provider == "deepseek":
         return _build_deepseek_responses(
@@ -1756,7 +1759,7 @@ def _build_model_from_route(
         max_tokens=_anthropic_max_tokens(model, reasoning=reasoning),
         thinking=thinking,
         output_config=output_config,
-        **_gateway_kwargs("anthropic", base_url),
+        **_endpoint_kwargs("anthropic", base_url),
     )
 
 
@@ -1812,7 +1815,7 @@ def build_search_equipped(
             # therefore returns no callable in the agent tool list.
             "search": True,
             "store": False,
-            **_gateway_kwargs("gemini", base_url),
+            **_endpoint_kwargs("gemini", base_url),
         }
         if model_name.casefold().startswith("gemini-3"):
             kwargs["thinking_level"] = (
@@ -1883,7 +1886,6 @@ def tool_kwargs() -> dict[str, Any]:
 
 _TRANSCRIBE_PROVIDERS = ("gemini", "openai")
 _SPEECH_PROVIDERS = ("openai",)
-_OPENAI_API_BASE_URL = "https://api.openai.com/v1"
 _SPEECH_INSTRUCTIONS = (
     "Speak as a professional interviewer. Read the supplied text exactly without "
     "adding or omitting words."
@@ -1904,9 +1906,12 @@ _OPENAI_AUDIO_NAMES = {
 
 def transcription_available() -> bool:
     """Whether the configured transcribe model's provider has audio support and a key."""
-    model_id = get_settings().transcribe_model
+    settings = get_settings()
+    model_id = settings.transcribe_model
     provider, _ = split_provider(model_id)
-    return provider in _TRANSCRIBE_PROVIDERS and bool(resolve_api_key(model_id))
+    return provider in _TRANSCRIBE_PROVIDERS and bool(
+        _settings_provider_key(settings, provider).strip()
+    )
 
 
 def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> str:
@@ -1915,11 +1920,12 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
     Claude models cannot accept audio; Gemini uses inline-audio generation and
     OpenAI its transcription API. SDK imports are lazy, per branch.
     """
-    resolved = model_id or get_settings().transcribe_model
+    settings = get_settings()
+    resolved = model_id or settings.transcribe_model
     provider, model = split_provider(resolved)
     if provider not in _TRANSCRIBE_PROVIDERS:
         raise ValueError(f"provider {provider!r} does not support audio transcription")
-    key = resolve_api_key(resolved)
+    key = _settings_provider_key(settings, provider).strip()
     if not key:
         raise ValueError(
             f"no API key configured for transcription provider {provider!r}"
@@ -1966,7 +1972,14 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
 
     from openai import OpenAI
 
-    client = OpenAI(api_key=key)
+    from resume_agent.llm_routing import direct_api_base_url
+
+    client = OpenAI(
+        api_key=key,
+        base_url=provider_sdk_base_url(
+            provider, direct_api_base_url(provider, settings)
+        ),
+    )
     buffer = io.BytesIO(audio)
     buffer.name = _OPENAI_AUDIO_NAMES.get(mime_type, "audio.webm")
     result = client.audio.transcriptions.create(model=model, file=buffer)
@@ -2034,7 +2047,14 @@ def synthesize_speech(
     # implements text endpoints but not POST /v1/audio/speech. Passing the
     # official endpoint explicitly also prevents the OpenAI SDK from silently
     # inheriting a deployment-wide OPENAI_BASE_URL gateway override.
-    client = OpenAI(api_key=api_key, base_url=_OPENAI_API_BASE_URL)
+    from resume_agent.llm_routing import direct_api_base_url
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url=provider_sdk_base_url(
+            provider, direct_api_base_url(provider, settings)
+        ),
+    )
     response = client.audio.speech.create(
         model=model,
         voice=voice or settings.speech_voice,

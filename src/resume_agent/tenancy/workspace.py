@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from resume_agent.config import Settings
-from resume_agent.llm_routing import SUB2API_KEY_FIELDS
+from resume_agent.llm_routing import DIRECT_API_BASE_URL_FIELDS, SUB2API_KEY_FIELDS
 from resume_agent.setup.env_writer import parse_env
 
 _PLATFORM_FIELDS = frozenset(
@@ -33,6 +33,10 @@ _PLATFORM_FIELDS = frozenset(
         # _OVERLAY_FIELDS only ever admits plain str fields, and they are not.
         "sub2api_base_url",
         *SUB2API_KEY_FIELDS.values(),
+        # Direct endpoints are also deployment-owned. Allowing a member to
+        # override one would let their workspace send a shared platform key to
+        # an arbitrary host whenever the direct API route is selected.
+        *DIRECT_API_BASE_URL_FIELDS.values(),
     }
 )
 _PROVIDER_FIELDS = {

@@ -5,7 +5,14 @@ from resume_agent.setup.preflight import CheckResult
 
 def _default_anthropic_client(api_key: str):
     import anthropic
-    return anthropic.Anthropic(api_key=api_key)
+
+    from resume_agent.config import get_settings
+    from resume_agent.llm_routing import direct_api_base_url
+
+    return anthropic.Anthropic(
+        api_key=api_key,
+        base_url=direct_api_base_url("anthropic", get_settings()),
+    )
 
 
 def anthropic_ping(

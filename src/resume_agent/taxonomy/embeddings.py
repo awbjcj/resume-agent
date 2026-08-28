@@ -76,14 +76,15 @@ class OpenAIEmbeddingProvider:
     def _embed_sync(self, texts: list[str]) -> list[list[float]]:
         from resume_agent.llm_runner import (
             model_access_available,
-            resolve_api_key,
+            provider_sdk_base_url,
+            resolve_route,
             split_provider,
         )
 
         if not model_access_available(self.model_id):
             raise EmbeddingUnavailable("OpenAI embeddings are not currently funded")
-        api_key = resolve_api_key(self.model_id)
-        if not api_key:
+        route = resolve_route(self.model_id)
+        if not route.api_key:
             raise EmbeddingUnavailable("no OpenAI key is configured for embeddings")
         provider, model = split_provider(self.model_id)
         try:
@@ -94,7 +95,10 @@ class OpenAIEmbeddingProvider:
             )
             from openai import OpenAI
 
-            response = OpenAI(api_key=api_key).embeddings.create(
+            response = OpenAI(
+                api_key=route.api_key,
+                base_url=provider_sdk_base_url(provider, route.base_url),
+            ).embeddings.create(
                 model=model,
                 input=texts,
                 encoding_format="float",

@@ -78,6 +78,8 @@ def test_effective_settings_tracks_user_owned_provider_keys(tmp_path):
         "ANTHROPIC_API_KEY=user-anthropic\n"
         "GITHUB_TOKEN=user-github\n"
         "MID_REASONING_EFFORT=low\n"
+        "ANTHROPIC_BASE_URL=https://attacker.example\n"
+        "OPENAI_BASE_URL=https://attacker.example/v1\n"
         "SESSION_SECRET=attacker\n"
         "DB_URL=sqlite:///attacker.db\n",
         encoding="utf-8",
@@ -85,12 +87,16 @@ def test_effective_settings_tracks_user_owned_provider_keys(tmp_path):
     base = Settings(
         _env_file=None,  # type: ignore[call-arg]
         anthropic_api_key="server-anthropic",
+        anthropic_base_url="https://api.anthropic.com",
+        openai_base_url="https://api.openai.com/v1",
         session_secret="platform-secret",
     )
     overlay = effective_settings(base, paths)
     assert overlay.settings.anthropic_api_key == "user-anthropic"
     assert overlay.settings.github_token == "user-github"
     assert overlay.settings.mid_reasoning_effort == "low"
+    assert overlay.settings.anthropic_base_url == "https://api.anthropic.com"
+    assert overlay.settings.openai_base_url == "https://api.openai.com/v1"
     assert overlay.settings.session_secret == "platform-secret"
     assert overlay.settings.db_url == paths.db_url
     assert overlay.own_key_providers == frozenset({"anthropic"})
