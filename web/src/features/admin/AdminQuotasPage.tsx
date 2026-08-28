@@ -1480,15 +1480,15 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
             className={cn(
               "grid gap-3 lg:items-end",
               showOptionalRates
-                ? "xl:grid-cols-[auto_repeat(3,minmax(7rem,0.55fr))_minmax(10rem,1fr)_auto]"
+                ? "xl:grid-cols-[auto_repeat(3,minmax(6rem,0.4fr))_minmax(8rem,0.7fr)_auto]"
                 : "lg:grid-cols-[auto_minmax(0,1fr)_auto]",
             )}
           >
             <div className="flex min-h-9 shrink-0 items-center gap-3 lg:pb-px">
               <Switch id="optional-rate-fields" checked={showOptionalRates} onCheckedChange={setShowOptionalRates} />
-              <div className="max-w-44">
-                <Label htmlFor="optional-rate-fields" className="text-sm font-medium">Optional cache and tool rates</Label>
-                <p className="mt-1 text-xs text-muted-foreground">Enable only when the provider charges them.</p>
+              <div>
+                <Label htmlFor="optional-rate-fields" className="whitespace-nowrap text-sm font-medium">Optional cache and tool rates</Label>
+                <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">Enable only when the provider charges them.</p>
               </div>
             </div>
             {showOptionalRates ? (

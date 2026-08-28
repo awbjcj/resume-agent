@@ -33,13 +33,13 @@ export function SetupWizard() {
           Exit setup
         </Button>
       </header>
-      <nav aria-label="Setup steps" className="flex items-center gap-2">
+      <nav aria-label="Setup steps" className="-mx-5 flex items-center gap-2 overflow-x-auto px-5 pb-1">
         {STEPS.map((step, i) => (
-          <div key={step.slug} className="flex items-center gap-2">
-            {i > 0 && <div className="h-px w-6 bg-border" aria-hidden="true" />}
+          <div key={step.slug} className="flex shrink-0 items-center gap-2">
+            {i > 0 && <div className="h-px w-6 shrink-0 bg-border" aria-hidden="true" />}
             <NavLink to={`/setup/${step.slug}`}
               className={({ isActive }) =>
-                cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm",
+                cn("flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-sm",
                    isActive && "border-primary font-medium")
               }>
               {status && step.done(status) && (
