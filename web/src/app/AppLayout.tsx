@@ -90,7 +90,10 @@ function NavMenuItem({ item, badge }: { item: NavItem; badge?: number }) {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        className={cn("h-10 rounded-lg px-3 text-[0.95rem]", badged && "pr-9")}
+        className={cn(
+          "h-10 rounded-lg px-3 text-[0.95rem] transition-[background-color,color,box-shadow,transform] duration-150 ease-out-strong active:scale-[0.98] motion-reduce:transform-none",
+          badged && "pr-9",
+        )}
         render={
           <NavLink to={item.to} end={item.end}>
             <item.icon className="size-4" aria-hidden="true" />
@@ -126,68 +129,89 @@ export function AppLayout() {
     ).length,
   };
   return (
-    <SidebarProvider>
-      <Sidebar className="border-r border-sidebar-border/80 bg-sidebar/95">
-        <SidebarHeader className="gap-4 p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <Sparkles className="size-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-primary">
-                Resume Agent
+    <SidebarProvider className="command-shell">
+      <Sidebar className="border-r border-sidebar-border/80 bg-sidebar">
+        <div className="command-panel flex min-h-0 flex-1 flex-col">
+          <SidebarHeader className="relative gap-5 border-b border-sidebar-border/70 p-5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="command-panel-mark flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <Sparkles className="size-4.5" aria-hidden="true" />
               </div>
-              <div className="text-lg font-semibold leading-tight">Command Center</div>
+              <div className="min-w-0">
+                <div className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-primary">
+                  Resume Agent
+                </div>
+                <div className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.025em]">
+                  Command Center
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="rounded-lg border border-sidebar-border bg-sidebar-accent/55 p-3 text-xs leading-relaxed text-sidebar-foreground/75">
-            Review, tailor, and track high-fit jobs from one operational desk.
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          {NAV_GROUPS.map((group, i) => (
-            <SidebarGroup key={group.label ?? `group-${i}`} className="px-3">
-              {group.label && (
-                <SidebarGroupLabel className="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
-                  {group.label}
-                </SidebarGroupLabel>
-              )}
+
+            <div className="command-sidebar-brief rounded-xl border border-sidebar-border/80 p-3.5">
+              <div className="flex items-center gap-2 text-[0.64rem] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55">
+                <Target className="size-3.5 text-sidebar-primary" aria-hidden="true" />
+                Operational flow
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground/72">
+                Move each strong fit from evidence to a finished application.
+              </p>
+              <div className="mt-3 flex items-center gap-1.5 text-[0.66rem] font-medium text-sidebar-foreground/65">
+                <span>Review</span>
+                <span className="h-px flex-1 bg-sidebar-border" />
+                <span>Tailor</span>
+                <span className="h-px flex-1 bg-sidebar-border" />
+                <span>Track</span>
+              </div>
+            </div>
+          </SidebarHeader>
+          <SidebarContent className="py-2">
+            {NAV_GROUPS.map((group, i) => (
+              <SidebarGroup key={group.label ?? `group-${i}`} className="px-3">
+                {group.label && (
+                  <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/48">
+                    {group.label}
+                  </SidebarGroupLabel>
+                )}
+                <SidebarGroupContent>
+                  <SidebarMenu className="gap-1">
+                    {group.items.map((item) => (
+                      <NavMenuItem key={item.to} item={item} badge={navBadges[item.to]} />
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
+            <SidebarGroup className="mt-auto px-3">
+              <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/48">
+                Workspace
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
-                  {group.items.map((item) => (
-                    <NavMenuItem key={item.to} item={item} badge={navBadges[item.to]} />
-                  ))}
+                  <NavMenuItem item={{ to: "/settings", label: "Settings", icon: Settings }} />
+                  <NavMenuItem item={{ to: "/account", label: "Account", icon: CircleUserRound }} />
+                  {me.data?.role === "admin" && (
+                    <>
+                      <NavMenuItem item={{ to: "/admin", label: "Admin", end: true, icon: ShieldCheck }} />
+                      <NavMenuItem item={{ to: "/admin/quotas", label: "Cost quotas", icon: Banknote }} />
+                      <NavMenuItem item={{ to: "/admin/routing", label: "Provider routing", icon: Network }} />
+                    </>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-          ))}
-          <SidebarGroup className="mt-auto px-3">
-            <SidebarGroupLabel className="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
-              Workspace
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                <NavMenuItem item={{ to: "/settings", label: "Settings", icon: Settings }} />
-                <NavMenuItem item={{ to: "/account", label: "Account", icon: CircleUserRound }} />
-                {me.data?.role === "admin" && (
-                  <>
-                    <NavMenuItem item={{ to: "/admin", label: "Admin", end: true, icon: ShieldCheck }} />
-                    <NavMenuItem item={{ to: "/admin/quotas", label: "Cost quotas", icon: Banknote }} />
-                    <NavMenuItem item={{ to: "/admin/routing", label: "Provider routing", icon: Network }} />
-                  </>
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter className="p-5">
-          <div className="rounded-lg border border-sidebar-border p-3">
-            <div className="text-sm font-medium">Daily focus</div>
-            <p className="mt-1 text-xs leading-relaxed text-sidebar-foreground/70">
-              Approve the best fits first, then run tailoring in batches.
-            </p>
-          </div>
-        </SidebarFooter>
+          </SidebarContent>
+          <SidebarFooter className="border-t border-sidebar-border/70 p-4">
+            <div className="rounded-xl border border-sidebar-border/80 bg-sidebar/72 p-3.5 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--sidebar-foreground),transparent_94%)]">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <span className="size-1.5 rounded-full bg-ready shadow-[0_0_0_4px_color-mix(in_oklab,var(--ready),transparent_86%)]" />
+                Daily focus
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-sidebar-foreground/66">
+                Approve the best fits first, then run tailoring in batches.
+              </p>
+            </div>
+          </SidebarFooter>
+        </div>
       </Sidebar>
       <SidebarInset>
         {/* `app-chrome` is the hook that makes this translucent layer become an
