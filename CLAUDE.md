@@ -90,9 +90,11 @@ before changing code near the invariant.
   job, the canonical source mutates the existing `Job` row in place over an
   aggregator; user progress is never touched. → `discovery/CLAUDE.md`
 - **Archive, delete, prune.** `has_progress()` (status in
-  {approved, tailored, rendered} OR any Application/ResumeVersion/CoverLetter)
-  is the single gate for irreversible paths; `delete_job` refuses jobs with
-  progress. → `tracking/CLAUDE.md`
+  {approved, tailored, rendered} OR any ResumeVersion/CoverLetter OR an
+  Application carrying *real investment* — ADR-0013) is the single gate for
+  irreversible paths; `delete_job` refuses jobs with progress. A bare `ready`
+  Application does not count: opening the Tracking tab writes one
+  unconditionally. → `tracking/CLAUDE.md`
 - **Redo — forward-only, never destructive.** `services/redo.py` re-runs any
   stage explicitly; status never regresses, never rejects, never deletes —
   new attempts are appended under an incremented `attempt`. →

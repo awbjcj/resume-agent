@@ -27,7 +27,11 @@ def test_prune_run_archives_junk_expires_old_and_skips_progress():
     with _session() as s:
         rejected = save_job(s, Job(source="m", jd_text="a", status=JobStatus.rejected.value))
         protected = save_job(s, Job(source="m", jd_text="b", status=JobStatus.rejected.value))
-        save_application(s, Application(job_id=_require_id(protected.id)))
+        # ADR-0013: protection comes from real investment, not a bare row —
+        # an empty `ready` application no longer shields a job from pruning.
+        save_application(
+            s, Application(job_id=_require_id(protected.id), status="submitted")
+        )
         old_archived = save_job(s, Job(source="m", jd_text="c", status=JobStatus.raw.value,
                                        archived_at=NOW - timedelta(days=45)))
 

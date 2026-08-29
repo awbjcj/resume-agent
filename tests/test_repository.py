@@ -102,12 +102,20 @@ def test_has_progress_true_for_advanced_status_and_children():
         with_version = save_job(s, Job(source="m", jd_text="c", status=JobStatus.raw.value))
         save_resume_version(s, ResumeVersion(job_id=_require_id(with_version.id), round=1))
         with_app = save_job(s, Job(source="m", jd_text="d", status=JobStatus.raw.value))
-        save_application(s, Application(job_id=_require_id(with_app.id)))
+        save_application(
+            s, Application(job_id=_require_id(with_app.id), status="submitted")
+        )
+        # ADR-0013: a bare `ready` application is not investment. Opening the
+        # Tracking tab writes one unconditionally, so counting it would block
+        # delete_job for a job the user never actually worked on.
+        empty_app = save_job(s, Job(source="m", jd_text="e", status=JobStatus.raw.value))
+        save_application(s, Application(job_id=_require_id(empty_app.id)))
 
         assert has_progress(s, _require_id(raw.id)) is False
         assert has_progress(s, _require_id(approved.id)) is True
         assert has_progress(s, _require_id(with_version.id)) is True
         assert has_progress(s, _require_id(with_app.id)) is True
+        assert has_progress(s, _require_id(empty_app.id)) is False
         assert has_progress(s, 9999) is False
 
 

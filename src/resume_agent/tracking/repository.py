@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, TypeVar, cast
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlmodel import Session, col, select
 
 from resume_agent.tracking.dedup import (
@@ -22,6 +22,7 @@ from resume_agent.tenancy.storage import delete_artifact_pdf
 from resume_agent.tracking.prune_config import PruneConfig
 from resume_agent.tracking.tables import (
     Application,
+    ApplicationEvent,
     ApplicationStatus,
     CoverLetter,
     EmailDraft,
@@ -467,6 +468,29 @@ def delete_job(session: Session, job_id: int) -> bool:
     return True
 
 
+def _application_investment_clause() -> Any:
+    """SQL for "this Application represents work the user would mourn".
+
+    An empty `ready` row is created by merely opening the Tracking tab
+    (`services/board.py::upsert_application` writes unconditionally), so
+    counting bare existence permanently blocked `delete_job` for jobs with
+    zero user investment. See ADR-0013.
+
+    Returned as one expression, not duplicated prose, because `has_progress`
+    and `progressed_job_ids` are the same predicate expressed twice and a
+    silent divergence would mean the batched path deletes what the single
+    path refuses.
+    """
+    notes = cast(Any, Application.notes)
+    return or_(
+        Application.status != ApplicationStatus.ready.value,
+        and_(notes.is_not(None), func.trim(notes) != ""),
+        cast(Any, Application.resume_version_id).is_not(None),
+        cast(Any, Application.cover_letter_id).is_not(None),
+        cast(Any, Application.id).in_(select(ApplicationEvent.application_id)),
+    )
+
+
 def has_progress(session: Session, job_id: int) -> bool:
     """True if a job has user investment that must never be destroyed."""
     job = session.get(Job, job_id)
@@ -474,7 +498,14 @@ def has_progress(session: Session, job_id: int) -> bool:
         return False
     if job.status in _PROGRESS_STATUSES:
         return True
-    for model in (Application, ResumeVersion, CoverLetter):
+    invested_application = session.exec(
+        select(Application).where(
+            Application.job_id == job_id, _application_investment_clause()
+        )
+    ).first()
+    if invested_application is not None:
+        return True
+    for model in (ResumeVersion, CoverLetter):
         if session.exec(select(model).where(model.job_id == job_id)).first() is not None:
             return True
     return False
@@ -488,6 +519,8 @@ def progressed_job_ids(
 
     Mirrors has_progress()'s child-existence check, but batched so a whole-table
     prune scan costs three queries instead of ~4 per job (an N+1 over every job).
+    `Application` additionally carries the ADR-0013 investment clause, shared
+    verbatim with `has_progress` so the two can never disagree.
     """
     if job_ids is not None and not job_ids:
         return set()
@@ -495,6 +528,8 @@ def progressed_job_ids(
     for model in (Application, ResumeVersion, CoverLetter):
         job_id = cast(Any, model.job_id)
         statement = select(job_id)
+        if model is Application:
+            statement = statement.where(_application_investment_clause())
         if job_ids is not None:
             statement = statement.where(job_id.in_(job_ids))
         progressed.update(session.exec(statement).all())

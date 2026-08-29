@@ -8,9 +8,21 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
 `archived_at IS NULL` — including the dedupe lookup (`find_existing`), so an archived
 (trash-binned) duplicate never blocks re-ingesting the same job as a fresh active row.
 `has_progress(session, job_id)` — status in
-{approved, tailored, rendered} OR any Application/ResumeVersion/CoverLetter — is
+{approved, tailored, rendered} OR any ResumeVersion/CoverLetter OR an
+Application carrying real investment — is
 the single gate for irreversible paths. `delete_job` refuses jobs with progress and
-cascades incidental children in FK-safe order otherwise. `prune_run` (config:
+cascades incidental children in FK-safe order otherwise.
+
+**An `Application` alone is not progress (ADR-0013.)** It counts only when
+`status != "ready"`, or notes are non-blank, or it owns any `ApplicationEvent`,
+or a resume/cover-letter pointer is set. `upsert_application` writes a row
+unconditionally, so bare existence meant merely opening the Tracking tab
+locked the job forever. The predicate is one shared SQLAlchemy expression,
+`_application_investment_clause`, used verbatim by both `has_progress` and
+`progressed_job_ids` — they are the same rule expressed twice, and a
+divergence would let the batched path delete what the single path refuses.
+Add any future `Application` child table there and both call sites update at
+once. `prune_run` (config:
 `config/prune.yaml`) archives rejected/low-fit/stale zero-progress jobs, reports
 primary reason counts, then hard-deletes archived zero-progress jobs older than
 `retention_days`. Surfaced via the web Triage page and
