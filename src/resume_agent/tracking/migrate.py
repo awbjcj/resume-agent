@@ -467,3 +467,27 @@ def ensure_application_submitted_events(engine: Engine) -> None:
                     "now": utcnow(),
                 },
             )
+
+
+def ensure_application_event_sequence_override_column(engine: Engine) -> None:
+    """Persist whether an event sequence was explicitly chosen by the user.
+
+    Legacy rows cannot reveal that provenance. Treat their effective value as
+    explicit so a later insert/edit/delete cannot silently destroy ordering a
+    user may have chosen. Users can clear an override explicitly afterward.
+    """
+    cols = _table_columns(engine, "application_events")
+    if cols and "sequence_override" not in cols:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE application_events "
+                    "ADD COLUMN sequence_override INTEGER"
+                )
+            )
+            conn.execute(
+                text(
+                    "UPDATE application_events "
+                    "SET sequence_override = sequence"
+                )
+            )

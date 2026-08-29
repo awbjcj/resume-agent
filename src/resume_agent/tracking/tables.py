@@ -144,6 +144,9 @@ class ApplicationEvent(SQLModel, table=True):
     kind: str = Field(index=True)
     custom_label: str | None = None
     sequence: int = 1
+    # Explicit user choice, kept separately from the effective display order.
+    # NULL means ``sequence`` is maintained chronologically by the service.
+    sequence_override: int | None = None
 
     # UTC. `all_day` distinguishes "applied on the 3rd" from "Zoom at 14:00";
     # `timezone` is an IANA name, not an offset, because DST can shift between

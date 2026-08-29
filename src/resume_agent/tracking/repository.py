@@ -235,6 +235,7 @@ def events_for_application(
                 occurred.is_(None),  # False (0) sorts before True (1)
                 occurred.asc(),
                 cast(Any, ApplicationEvent.created_at).asc(),
+                cast(Any, ApplicationEvent.id).asc(),
             )
         ).all()
     )
@@ -271,7 +272,7 @@ def next_sequence(session: Session, application_id: int, kind: str) -> int:
             ApplicationEvent.kind == kind,
         )
     ).all()
-    return len(existing) + 1
+    return max((event.sequence for event in existing), default=0) + 1
 
 
 def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None:

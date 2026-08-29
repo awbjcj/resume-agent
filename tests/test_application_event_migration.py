@@ -1,9 +1,13 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import text
 from sqlmodel import Session, select
 
 from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.migrate import ensure_application_submitted_events
+from resume_agent.tracking.migrate import (
+    ensure_application_event_sequence_override_column,
+    ensure_application_submitted_events,
+)
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
@@ -69,3 +73,40 @@ def test_init_db_runs_the_backfill():
     init_db(engine)  # second call must backfill and stay idempotent
     with Session(engine) as session:
         assert len(session.exec(select(ApplicationEvent)).all()) == 1
+
+
+def test_adds_nullable_sequence_override_to_a_legacy_event_table():
+    engine = make_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE application_events ("
+                "id INTEGER PRIMARY KEY, sequence INTEGER NOT NULL DEFAULT 1)"
+            )
+        )
+        conn.execute(text("INSERT INTO application_events (id, sequence) VALUES (1, 3), (2, 9)"))
+
+    ensure_application_event_sequence_override_column(engine)
+
+    with engine.begin() as conn:
+        columns = {
+            row[1]: row for row in conn.execute(text("PRAGMA table_info(application_events)"))
+        }
+        migrated = conn.execute(
+            text("SELECT sequence, sequence_override FROM application_events ORDER BY id")
+        ).fetchall()
+        conn.execute(
+            text(
+                "INSERT INTO application_events (id, sequence, sequence_override) "
+                "VALUES (3, 2, NULL)"
+            )
+        )
+    ensure_application_event_sequence_override_column(engine)
+    with engine.begin() as conn:
+        new_row_override = conn.execute(
+            text("SELECT sequence_override FROM application_events WHERE id = 3")
+        ).scalar_one()
+    assert "sequence_override" in columns
+    assert columns["sequence_override"][3] == 0
+    assert migrated == [(3, 3), (9, 9)]
+    assert new_row_override is None

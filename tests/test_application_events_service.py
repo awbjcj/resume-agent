@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 
 import pytest
-from sqlmodel import Session
+from sqlmodel import Session, select
+
+import resume_agent.services.application_events as event_service
 
 from resume_agent.db import init_db, make_engine
 from resume_agent.services.application_events import (
@@ -12,7 +14,7 @@ from resume_agent.services.application_events import (
     update_event,
 )
 from resume_agent.tracking.repository import application_for_job
-from resume_agent.tracking.tables import Job
+from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _job():
@@ -97,6 +99,132 @@ def test_explicit_sequence_overrides_auto_assignment():
         {"kind": "technical_round", "occurred_at": _at(9), "sequence": 3},
     )
     assert event.sequence == 3
+    assert event.sequence_override == 3
+
+
+def test_manual_one_survives_earlier_auto_insert_and_delete():
+    session, job = _job()
+    manual = create_event(
+        session,
+        job.id,
+        {"kind": "technical_round", "occurred_at": _at(10), "sequence": 1},
+    )
+    earlier = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+
+    assert manual.sequence == 1
+    assert earlier.sequence == 2
+    assert delete_event(session, job.id, earlier.id) is True
+    session.refresh(manual)
+    assert manual.sequence == 1
+    assert manual.sequence_override == 1
+
+
+def test_manual_gap_does_not_push_later_auto_rounds_past_the_gap():
+    session, job = _job()
+    manual = create_event(
+        session,
+        job.id,
+        {"kind": "technical_round", "occurred_at": _at(9), "sequence": 9},
+    )
+    first_auto = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(10)}
+    )
+    second_auto = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(11)}
+    )
+
+    assert (manual.sequence, first_auto.sequence, second_auto.sequence) == (9, 1, 2)
+
+
+def test_editing_auto_round_date_and_kind_resequences_both_groups():
+    session, job = _job()
+    first = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+    second = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(10)}
+    )
+    behavioral = create_event(
+        session, job.id, {"kind": "behavioral", "occurred_at": _at(11)}
+    )
+
+    update_event(session, job.id, second.id, {"occurred_at": _at(8)})
+    session.refresh(first)
+    assert (second.sequence, first.sequence) == (1, 2)
+
+    update_event(session, job.id, second.id, {"kind": "behavioral"})
+    session.refresh(first)
+    session.refresh(behavioral)
+    assert first.sequence == 1
+    assert second.sequence == 1
+    assert behavioral.sequence == 2
+
+
+def test_clearing_manual_sequence_restores_automatic_order():
+    session, job = _job()
+    automatic = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(10)}
+    )
+    manual = create_event(
+        session,
+        job.id,
+        {"kind": "technical_round", "occurred_at": _at(9), "sequence": 9},
+    )
+
+    updated = update_event(session, job.id, manual.id, {"sequence": None})
+    session.refresh(automatic)
+
+    assert updated is not None
+    assert updated.sequence_override is None
+    assert (updated.sequence, automatic.sequence) == (1, 2)
+
+
+def test_update_rejects_an_invalid_sequence_at_the_service_boundary():
+    session, job = _job()
+    event = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+
+    with pytest.raises(EventValidationError, match="positive integer"):
+        update_event(session, job.id, event.id, {"sequence": 0})
+
+
+def test_update_warns_when_sequence_override_collides(caplog):
+    session, job = _job()
+    create_event(
+        session,
+        job.id,
+        {"kind": "technical_round", "occurred_at": _at(9), "sequence": 3},
+    )
+    event = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(10)}
+    )
+
+    with caplog.at_level("WARNING"):
+        update_event(session, job.id, event.id, {"sequence": 3})
+
+    assert "Duplicate application event key" in caplog.text
+
+
+def test_update_warns_when_kind_move_collides_with_an_override(caplog):
+    session, job = _job()
+    create_event(
+        session,
+        job.id,
+        {"kind": "behavioral", "occurred_at": _at(9), "sequence": 4},
+    )
+    event = create_event(
+        session,
+        job.id,
+        {"kind": "technical_round", "occurred_at": _at(10), "sequence": 4},
+    )
+
+    with caplog.at_level("WARNING"):
+        update_event(session, job.id, event.id, {"kind": "behavioral"})
+
+    assert "Duplicate application event key" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -167,6 +295,23 @@ def test_delete_does_not_move_status_back():
     assert application_for_job(session, job.id).status == "interview"
 
 
+def test_deleting_an_auto_numbered_round_closes_the_sequence_gap():
+    session, job = _job()
+    first = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+    middle = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(10)}
+    )
+    create_event(session, job.id, {"kind": "technical_round", "occurred_at": _at(11)})
+
+    assert delete_event(session, job.id, middle.id) is True
+
+    rounds = [event for event in list_events(session, job.id) if event.kind == "technical_round"]
+    assert rounds[0].id == first.id
+    assert [event.sequence for event in rounds] == [1, 2]
+
+
 def test_list_events_returns_timeline_order():
     session, job = _job()
     create_event(session, job.id, {"kind": "online_assessment", "occurred_at": _at(9)})
@@ -177,3 +322,22 @@ def test_list_events_returns_timeline_order():
         "application_submitted",
         "online_assessment",
     ]
+
+
+def test_create_event_and_status_advance_commit_atomically(monkeypatch):
+    session, job = _job()
+
+    def fail_advance(*_args):
+        raise RuntimeError("status write failed")
+
+    monkeypatch.setattr(event_service, "_advance", fail_advance)
+    with pytest.raises(RuntimeError, match="status write failed"):
+        create_event(
+            session,
+            job.id,
+            {"kind": "application_submitted", "occurred_at": _at(3)},
+        )
+    session.rollback()
+
+    assert session.exec(select(Application)).all() == []
+    assert session.exec(select(ApplicationEvent)).all() == []
