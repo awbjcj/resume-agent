@@ -13,16 +13,110 @@ const catalogPath = path.join(sourceRoot, "i18n", "auto-catalog.json");
 
 const EXACT_TRANSLATIONS = {
   "100% · done": "100% · 已完成",
+  "Any annual salary": "不限年薪",
+  "Annual bonus": "年度奖金",
+  "Avg fit in view": "当前视图平均匹配度",
+  "Awaiting review": "等待审核",
+  "Base": "基本工资",
+  "Base salary": "基本工资",
+  "Blocking — any claim not traceable to a profile fact fails the round.": "阻断项——任何无法追溯到个人资料事实的表述都将导致本轮不通过。",
+  "Certified filings": "已认证申请",
+  "Choose a member": "选择成员",
+  "Choose a tier": "选择等级",
+  "Confidence": "置信度",
+  "Complete": "已完成",
+  "Collapse": "收起",
+  "Could not add": "无法添加",
+  "Coverage of the job description's stated requirements.": "职位描述中明确要求的覆盖程度。",
+  "Data version": "数据版本",
+  "Deleted {{v0}} cover letter{{v1}}": "已删除 {{v0}} 封求职信",
+  "Deleted {{v0}} version{{v1}}": "已删除 {{v0}} 个简历版本",
+  "Density — cuts padding without cutting evidence.": "信息密度——精简冗余，同时保留证据。",
+  "Depth and credibility of the evidence for this specific role.": "针对该职位的证据深度与可信度。",
+  "Drafting now": "正在起草",
+  "Distinct skills": "不同技能数",
+  "Drafting studio": "起草工作室",
+  "Domain updated": "领域已更新",
+  "Domains merged": "领域已合并",
+  "Equity per year": "年度股权",
+  "Equity / year": "年度股权",
+  "Enter a non-negative annual salary.": "请输入不小于零的年薪。",
+  "Expires": "到期时间",
+  "Expand": "展开",
+  "Filing periods": "申请期间",
+  "Filings": "申请数",
   "Fit >= {{v0}}": "匹配度 ≥ {{v0}}",
   "Fit <= {{v0}}": "匹配度 ≤ {{v0}}",
+  "Fit band": "匹配度区间",
+  "Filtered jobs": "筛选后的职位",
+  "Focused rehearsal": "专注演练",
+  "Generate another": "再生成一封",
+  "Generate cover letter": "生成求职信",
+  "Gmail connected.": "Gmail 已连接。",
+  "Guided discovery": "引导式探索",
+  "Guided evidence discovery": "引导式证据发掘",
   "Job": "职位",
   "job": "职位",
   "Jobs": "职位",
+  "Loaded": "已加载",
+  "Message": "消息",
+  "Matching": "匹配数",
+  "Min salary (USD)": "最低年薪（美元）",
+  "Must": "必须项",
+  "Nice": "加分项",
+  "No date": "无日期",
+  "Not reported": "未报告",
+  "Not shown": "未体现",
+  "Open gaps": "未补足差距",
   "Nothing is waiting on you": "目前没有需要你处理的事项",
   "Per-pull job limit for {{v0}}": "{{v0}} 每次获取的职位上限",
   "Proposal": "建议",
   "Pull jobs": "获取职位",
+  "Question {{v0}} of {{v1}}": "第 {{v0}} 题，共 {{v1}} 题",
+  "Queued": "已排队",
+  "Related experience": "相关经验",
+  "Researching": "研究中",
+  "Retrieved": "获取时间",
+  "Rendered in view": "当前视图已生成",
   "Salary >= {{v0}}": "薪资 ≥ {{v0}}",
+  "Scored {{v0}}/5": "评分 {{v0}}/5",
+  "Share of evidenced must-have requirements actually rendered.": "有证据支持且实际呈现的必备要求占比。",
+  "Signing bonus": "签约奖金",
+  "Signing": "签约奖金",
+  "Skill added": "技能已添加",
+  "Skill moved": "技能已移动",
+  "Skill removed": "技能已移除",
+  "Skills merged": "技能已合并",
+  "Sources tracked": "已跟踪来源",
+  "Sponsorship offered in view": "当前视图提供担保",
+  "Stages active": "活跃阶段数",
+  "Six-second skim: does the top of the page land?": "六秒快速浏览：页面顶部是否抓住重点？",
+  "Supported": "有直接证据",
+  "Select {{v0}} {{v1}}": "选择 {{v0}} {{v1}}",
+  "Tech {{v0}}": "技术面试 {{v0}}",
+  "Tech": "技术",
+  "{{v0}} / {{v1}}": "{{v0}} / {{v1}}",
+  "{{v0}} job{{v1}}": "{{v0}} 个职位",
+  "{{v0}} percent": "百分之 {{v0}}",
+  "{{v0}} turns": "{{v0}} 轮对话",
+  "{{v0}}h": "{{v0}} 小时",
+  "{{v0}}h {{v1}}m": "{{v0}} 小时 {{v1}} 分钟",
+  "{{v0}}m": "{{v0}} 分钟",
+  "· ~{{v0}} left": " · 约剩 {{v0}}",
+  "· {{v0}} skipped": " · 跳过 {{v0}} 个",
+  "({{v0}} pending)": "（{{v0}} 个待处理）",
+  "Bonus": "奖金",
+  "cover letter": "求职信",
+  "done": "已完成",
+  "every {{v0}}": "每 {{v0}}",
+  "every {{v0}} {{v1}}s": "每 {{v0}} {{v1}}",
+  "Keep {{v0}}": "保持 {{v0}}",
+  "Local time {{v0}} {{v1}} does not exist in {{v2}}": "{{v2}} 时区不存在本地时间 {{v0}} {{v1}}",
+  "resume version": "简历版本",
+  "stage": "阶段",
+  "${{v0}}+ / year": "${{v0}}+ / 年",
+  "${{v0}}k+ / year": "${{v0}}k+ / 年",
+  "${{v0}}M+ / year": "${{v0}}M+ / 年",
   "{{v0}} job{{v1}} waiting on you": "有 {{v0}} 个职位等待你处理",
   "{{v0}}…": "{{v0}}…",
 };
@@ -45,17 +139,24 @@ const UI_PROPS = new Set([
   "assistantName",
   "body",
   "cancelLabel",
+  "caption",
   "confirmLabel",
   "description",
   "detail",
   "emptyMessage",
+  "eyebrow",
   "errorMessage",
   "footer",
   "heading",
+  "header",
+  "help",
   "helpText",
   "hint",
   "kicker",
   "label",
+  "message",
+  "note",
+  "noun",
   "placeholder",
   "sub",
   "subtitle",
@@ -64,8 +165,14 @@ const UI_PROPS = new Set([
   "title",
 ]);
 
-const UI_VARIABLE = /(action|caption|description|detail|empty|error|heading|help|hint|label|message|placeholder|status|subtitle|success|text|title)$/i;
-const UI_COLLECTION = /(actions|cards|fields|filters|items|kinds|labels|modalities|nav|options|outcomes|results|rows|scopes|sections|stages|statuses|steps|tabs)$/i;
+const UI_VARIABLE = /(action|badge|caption|date|description|detail|empty|error|eyebrow|fallback|heading|help|hint|label|message|notice|note|placeholder|progress|reason|status|subtitle|success|suffix|summary|text|title)$/i;
+const UI_COLLECTION = /(actions|cards|columns|copy|descriptions|details|errors|fields|filters|items|kinds|labels|messages|meta|modalities|names|nav|options|outcomes|parts|results|rows|scopes|sections|stages|statuses|steps|tabs|titles)$/i;
+
+function variableInit(declaration) {
+  let init = declaration.get("init");
+  while (init.isTSAsExpression() || init.isTSSatisfiesExpression() || init.isTypeCastExpression()) init = init.get("expression");
+  return init;
+}
 
 function filesUnder(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -105,23 +212,164 @@ function propertyName(node) {
 function directVariable(pathRef) {
   const declaration = pathRef.findParent((candidate) => candidate.isVariableDeclarator());
   if (!declaration || declaration.node.id.type !== "Identifier") return null;
-  const init = declaration.get("init");
-  if (init === pathRef) return { name: declaration.node.id.name, array: false };
-  if (pathRef.parentPath?.isArrayExpression() && init === pathRef.parentPath) {
+  const init = variableInit(declaration);
+  if (init.node === pathRef.node) return { name: declaration.node.id.name, array: false };
+  if (pathRef.parentPath?.isArrayExpression() && init.node === pathRef.parentPath.node) {
     return { name: declaration.node.id.name, array: true };
   }
-  let current = pathRef.parentPath;
-  while (current?.isConditionalExpression() || current?.isLogicalExpression()) current = current.parentPath;
-  if (current === init) return { name: declaration.node.id.name, array: false };
+  let current = pathRef;
+  while (current.parentPath?.isConditionalExpression() || current.parentPath?.isLogicalExpression()) current = current.parentPath;
+  if (current?.node === init.node) return { name: declaration.node.id.name, array: false };
   return null;
 }
 
+function uiCollectionValue(pathRef) {
+  const declaration = pathRef.findParent((candidate) => candidate.isVariableDeclarator());
+  if (!declaration || declaration.node.id.type !== "Identifier" || !UI_COLLECTION.test(declaration.node.id.name)) return false;
+  const init = variableInit(declaration);
+  if (!init.isArrayExpression() && !init.isObjectExpression()) return false;
+  let current = pathRef;
+  while (current.parentPath && current.parentPath.node !== init.node && !current.parentPath.isFunction()) {
+    if (current.parentPath.isArrayExpression() && current.parentPath.parentPath?.node === init.node) {
+      return current.listKey === "elements"
+        && (Number(current.key) > 0
+          || /\s|^[A-Z][a-z]/.test(pathRef.isStringLiteral() ? pathRef.node.value : templateSource(pathRef.node)));
+    }
+    current = current.parentPath;
+  }
+  if (current.parentPath?.node !== init.node) return false;
+  if (init.isObjectExpression() && /(COPY|DESCRIPTIONS|ERRORS|LABELS|MESSAGES|NAMES|NOTES|TITLES)$/i.test(declaration.node.id.name)) {
+    return pathRef.parentPath?.isObjectProperty()
+      && pathRef.parentPath.parentPath?.node === init.node
+      && pathRef.parentPath.get("value").node === pathRef.node;
+  }
+  if (init.isObjectExpression()) return false;
+  return current.node === pathRef.node && current.listKey === "elements";
+}
+
 function jsxAttribute(pathRef) {
-  if (pathRef.parentPath?.isJSXAttribute()) return pathRef.parentPath;
-  if (pathRef.parentPath?.isJSXExpressionContainer() && pathRef.parentPath.parentPath?.isJSXAttribute()) {
-    return pathRef.parentPath.parentPath;
+  let current = pathRef;
+  while (current.parentPath) {
+    const parent = current.parentPath;
+    if (parent.isJSXAttribute()) return parent;
+    if (parent.isJSXExpressionContainer() && parent.parentPath?.isJSXAttribute()) return parent.parentPath;
+    if (!isValueWrapper(current, parent)) return null;
+    current = parent;
   }
   return null;
+}
+
+function uiObjectProperty(pathRef) {
+  let current = pathRef;
+  while (current.parentPath) {
+    const parent = current.parentPath;
+    if (parent.isObjectProperty()) return parent.get("value").node === current.node && UI_PROPS.has(propertyName(parent.node));
+    if (!isValueWrapper(current, parent)) return false;
+    current = parent;
+  }
+  return false;
+}
+
+function uiDefaultParameter(pathRef) {
+  const assignment = pathRef.findParent((candidate) => candidate.isAssignmentPattern() || candidate.isFunction());
+  return Boolean(assignment?.isAssignmentPattern()
+    && assignment.node.left.type === "Identifier"
+    && UI_VARIABLE.test(assignment.node.left.name));
+}
+
+function uiSetterCall(pathRef) {
+  const call = pathRef.findParent((candidate) => candidate.isCallExpression() || candidate.isFunction());
+  if (!call?.isCallExpression()) return false;
+  const callee = call.node.callee;
+  if (callee.type === "Identifier") return /^set.*(Error|Message|Notice|Summary)$/.test(callee.name);
+  return callee.type === "MemberExpression"
+    && callee.property.type === "Identifier"
+    && /^(fail|set.*(?:Error|Message|Notice|Summary))$/.test(callee.property.name);
+}
+
+function uiErrorMessage(pathRef) {
+  const creation = pathRef.findParent((candidate) => candidate.isNewExpression() || candidate.isFunction());
+  return Boolean(creation?.isNewExpression()
+    && creation.node.callee.type === "Identifier"
+    && (creation.node.callee.name === "Error" || creation.node.callee.name === "RangeError"));
+}
+
+function uiAttributeFunctionValue(pathRef) {
+  const fn = pathRef.findParent((candidate) => candidate.isArrowFunctionExpression() || candidate.isFunctionExpression() || candidate.isFunctionDeclaration());
+  if (!fn || fn.isFunctionDeclaration()) return false;
+  const attribute = fn.findParent((candidate) => candidate.isJSXAttribute() || candidate.isFunction());
+  if (!attribute?.isJSXAttribute()) return false;
+  const name = jsxAttributeName(attribute.node);
+  if (!name || (name !== "formatter" && !UI_VARIABLE.test(name))) return false;
+  let current = pathRef;
+  while (current.parentPath && current.parentPath !== fn) {
+    const parent = current.parentPath;
+    if (parent.isArrayExpression() || parent.isReturnStatement() || isRenderedBranch(current, parent)) {
+      current = parent;
+      continue;
+    }
+    return false;
+  }
+  return current.parentPath === fn;
+}
+
+function uiRenderedCallbackValue(pathRef) {
+  const fn = pathRef.findParent((candidate) => candidate.isArrowFunctionExpression() || candidate.isFunctionExpression());
+  if (!fn || !outputPosition(fn)) return false;
+  let current = pathRef;
+  while (current.parentPath && current.parentPath !== fn) {
+    const parent = current.parentPath;
+    if (parent.isReturnStatement() || isValueWrapper(current, parent)) {
+      current = parent;
+      continue;
+    }
+    return false;
+  }
+  return current.parentPath === fn;
+}
+
+function uiNamedObjectMap(pathRef) {
+  const property = pathRef.parentPath;
+  const object = property?.parentPath;
+  const declaration = object?.parentPath;
+  return Boolean(property?.isObjectProperty()
+    && property.get("value").node === pathRef.node
+    && object?.isObjectExpression()
+    && declaration?.isVariableDeclarator()
+    && declaration.node.id.type === "Identifier"
+    && (/(COPY|DESCRIPTIONS|ERRORS|LABELS|MESSAGES|NAMES|NOTES|TITLES)$/i.test(declaration.node.id.name)
+      || UI_VARIABLE.test(declaration.node.id.name)));
+}
+
+function uiNamedCall(pathRef) {
+  const call = pathRef.findParent((candidate) => candidate.isCallExpression() || candidate.isFunction());
+  return Boolean(call?.isCallExpression()
+    && call.node.callee.type === "Identifier"
+    && (call.node.callee.name === "label"
+      || call.node.callee.name === "pluralLabel"
+      || /Message$/.test(call.node.callee.name)));
+}
+
+function uiChartName(pathRef) {
+  const attribute = jsxAttribute(pathRef);
+  if (!attribute?.isJSXAttribute() || jsxAttributeName(attribute.node) !== "name") return false;
+  const opening = attribute.parentPath;
+  const elementName = opening?.isJSXOpeningElement() && opening.node.name.type === "JSXIdentifier"
+    ? opening.node.name.name
+    : "";
+  return ["Area", "Bar", "Line", "Pie", "Radar", "RadialBar", "Scatter"].includes(elementName);
+}
+
+function uiJsxCollectionValue(pathRef) {
+  const attribute = pathRef.findParent((candidate) => candidate.isJSXAttribute() || candidate.isFunction());
+  if (!attribute?.isJSXAttribute()) return false;
+  const name = jsxAttributeName(attribute.node);
+  if (name !== "items") return false;
+  const tuple = pathRef.parentPath;
+  return Boolean(tuple?.isArrayExpression()
+    && tuple.parentPath?.isArrayExpression()
+    && pathRef.listKey === "elements"
+    && Number(pathRef.key) === 0);
 }
 
 function namedUiFunction(pathRef) {
@@ -131,7 +379,7 @@ function namedUiFunction(pathRef) {
   if (!name && fn.parentPath?.isVariableDeclarator() && fn.parentPath.node.id.type === "Identifier") {
     name = fn.parentPath.node.id.name;
   }
-  if (!name || !UI_VARIABLE.test(name)) return false;
+  if (!name || (!UI_VARIABLE.test(name) && !/(label|title|formatDate|formatCountdown|recency)/i.test(name))) return false;
   let current = pathRef;
   while (current.parentPath?.isConditionalExpression() || current.parentPath?.isLogicalExpression()) current = current.parentPath;
   if (current.parentPath?.isReturnStatement()) {
@@ -170,34 +418,71 @@ function isToastCall(pathRef) {
 
 function outputPosition(pathRef) {
   let current = pathRef;
-  if (current.parentPath?.isConditionalExpression()) {
-    if (current.key !== "consequent" && current.key !== "alternate") return false;
-    current = current.parentPath;
+  while (current.parentPath) {
+    const parent = current.parentPath;
+    if (parent.isJSXExpressionContainer()) {
+      return Boolean(parent.parentPath?.isJSXElement() || parent.parentPath?.isJSXFragment());
+    }
+    if (!isValueWrapper(current, parent)) return false;
+    current = parent;
   }
-  const container = current.parentPath;
-  return Boolean(
-    container?.isJSXExpressionContainer()
-      && (container.parentPath?.isJSXElement() || container.parentPath?.isJSXFragment()),
-  );
+  return false;
+}
+
+function isValueWrapper(current, parent) {
+  return isRenderedBranch(current, parent)
+    || (parent.isArrayExpression()
+      && (!(current.isStringLiteral?.() || current.isTemplateLiteral?.())
+        || Number(current.key) > 0
+        || /\s|^[A-Z][a-z]/.test(current.isStringLiteral?.() ? current.node.value : templateSource(current.node))))
+    || parent.isTemplateLiteral()
+    || parent.isSpreadElement()
+    || (parent.isCallExpression() && current.key === "callee")
+    || parent.isMemberExpression()
+    || parent.isOptionalMemberExpression?.()
+    || parent.isAwaitExpression()
+    || parent.isUnaryExpression();
+}
+
+function isRenderedBranch(current, parent) {
+  if (parent.isConditionalExpression()) return current.key === "consequent" || current.key === "alternate";
+  if (parent.isLogicalExpression()) return current.key === "right";
+  if (parent.isBinaryExpression()) return parent.node.operator === "+";
+  return parent.isTSAsExpression() || parent.isTSSatisfiesExpression() || parent.isParenthesizedExpression();
+}
+
+function isTranslationKey(pathRef) {
+  const call = pathRef.findParent((candidate) => candidate.isCallExpression() || candidate.isFunction());
+  if (!call?.isCallExpression()) return false;
+  const callee = call.node.callee;
+  return (callee.type === "Identifier" && callee.name === "t")
+    || (callee.type === "MemberExpression" && callee.property.type === "Identifier" && callee.property.name === "t");
 }
 
 export function isLocalizableStringPath(pathRef) {
   if (pathRef.isJSXText()) return isHumanText(pathRef.node.value);
   if (!pathRef.isStringLiteral() && !pathRef.isTemplateLiteral()) return false;
+  if (pathRef.findParent((candidate) => candidate.isTSLiteralType() || candidate.isTSTypeAnnotation() || candidate.isTSUnionType())) return false;
   const value = pathRef.isTemplateLiteral() ? templateSource(pathRef.node) : pathRef.node.value;
   if (!isHumanText(value)) return false;
+  if (pathRef.parentPath?.isMemberExpression() && pathRef.key === "property") return false;
+  if (isTranslationKey(pathRef)) return false;
 
   const parent = pathRef.parentPath;
   const attribute = jsxAttribute(pathRef);
   if (attribute) {
-    return UI_PROPS.has(jsxAttributeName(attribute.node));
+    const name = jsxAttributeName(attribute.node);
+    return Boolean(name && (UI_PROPS.has(name) || UI_VARIABLE.test(name) || uiChartName(pathRef) || uiJsxCollectionValue(pathRef)));
   }
-  if (outputPosition(pathRef) || isToastCall(pathRef) || uiCollectorCall(pathRef)) return true;
-  if (parent?.isObjectProperty() && UI_PROPS.has(propertyName(parent.node))) return true;
+  if (outputPosition(pathRef) || isToastCall(pathRef) || uiCollectorCall(pathRef) || uiSetterCall(pathRef) || uiErrorMessage(pathRef) || uiAttributeFunctionValue(pathRef) || uiRenderedCallbackValue(pathRef) || uiJsxCollectionValue(pathRef) || uiNamedCall(pathRef) || uiChartName(pathRef)) return true;
+  if ((parent?.isObjectProperty() && UI_PROPS.has(propertyName(parent.node))) || uiObjectProperty(pathRef)) return true;
+  if (uiNamedObjectMap(pathRef)) return true;
+  if (uiDefaultParameter(pathRef)) return true;
 
   const variable = directVariable(pathRef);
   if (variable && !variable.array && UI_VARIABLE.test(variable.name)) return true;
   if (variable?.array && UI_COLLECTION.test(variable.name)) return true;
+  if (uiCollectionValue(pathRef)) return true;
   return namedUiFunction(pathRef);
 }
 
@@ -325,8 +610,37 @@ function refineCatalog() {
   console.log(`Refined ${Object.keys(sorted).length} catalog entries.`);
 }
 
+function pruneCatalog() {
+  const pruned = Object.fromEntries(
+    Object.entries(catalog)
+      .filter(([source]) => candidates.has(source))
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+  fs.writeFileSync(catalogPath, `${JSON.stringify(pruned, null, 2)}\n`);
+  console.log(`Pruned catalog to ${Object.keys(pruned).length} current UI entries.`);
+}
+
+function validateCatalog() {
+  const invalid = [];
+  const keys = new Set();
+  for (const [source, entry] of Object.entries(catalog)) {
+    if (!entry || entry.en !== source || typeof entry["zh-CN"] !== "string" || !entry["zh-CN"].trim()) {
+      invalid.push(source);
+      continue;
+    }
+    if (keys.has(entry.key)) invalid.push(source);
+    keys.add(entry.key);
+    const sourceVariables = new Set(source.match(/\{\{v\d+\}\}/g) ?? []);
+    const translatedVariables = entry["zh-CN"].match(/\{\{v\d+\}\}/g) ?? [];
+    if (translatedVariables.some((variable) => !sourceVariables.has(variable))) invalid.push(source);
+  }
+  return [...new Set(invalid)];
+}
+
 if (process.argv.includes("--refine")) {
   refineCatalog();
+} else if (process.argv.includes("--prune")) {
+  pruneCatalog();
 } else if (process.argv.includes("--unclassified")) {
   const unclassified = collectUnclassified();
   process.stdout.write(`${JSON.stringify(Object.fromEntries(unclassified), null, 2)}\n`);
@@ -335,13 +649,17 @@ if (process.argv.includes("--refine")) {
 } else if (process.argv.includes("--json")) {
   process.stdout.write(`${JSON.stringify(Object.fromEntries(candidates), null, 2)}\n`);
 } else {
+  const invalid = validateCatalog();
   if (missing.length) {
     console.error(`Missing ${missing.length} UI translations:`);
     for (const [source, locations] of missing) {
       console.error(`- ${JSON.stringify(source)} (${locations.slice(0, 3).join(", ")})`);
     }
   }
-  if (stale.length) console.warn(`Catalog contains ${stale.length} unused entries.`);
-  if (!missing.length) console.log(`i18n catalog covers ${candidates.size} user-facing literals.`);
-  process.exitCode = missing.length ? 1 : 0;
+  if (stale.length) console.error(`Catalog contains ${stale.length} unused entries.`);
+  if (invalid.length) console.error(`Catalog contains ${invalid.length} invalid entries.`);
+  if (!missing.length && !stale.length && !invalid.length) {
+    console.log(`i18n catalog covers ${candidates.size} user-facing literals.`);
+  }
+  process.exitCode = missing.length || stale.length || invalid.length ? 1 : 0;
 }

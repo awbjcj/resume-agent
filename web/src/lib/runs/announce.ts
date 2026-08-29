@@ -52,7 +52,7 @@ function numberField(value: unknown, ...keys: string[]): number | null {
   return null;
 }
 
-function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+function pluralLabel(count: number, singular: string, pluralForm = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
@@ -80,10 +80,10 @@ function announceOne(run: RunRecord): void {
       (total, count) => total + (count ?? 0),
       0,
     );
-    const jobSummary = plural(jobs.length, "job");
+    const jobSummary = pluralLabel(jobs.length, "job");
     toast.success(
       hasCompleteVersionCounts
-        ? `Tailoring complete: ${jobSummary} tailored, ${plural(versions, "resume version")} created. Open a job's Versions tab to render PDF.`
+        ? `Tailoring complete: ${jobSummary} tailored, ${pluralLabel(versions, "resume version")} created. Open a job's Versions tab to render PDF.`
         : `Tailoring complete: ${jobSummary} tailored. Open a job's Versions tab to render PDF.`,
     );
     return;
@@ -92,7 +92,7 @@ function announceOne(run: RunRecord): void {
     const coverLetters = resultRecord(run)?.coverLetters;
     toast.success(
       Array.isArray(coverLetters)
-        ? `Cover-letter generation complete: ${plural(coverLetters.length, "cover letter")} created.`
+        ? `Cover-letter generation complete: ${pluralLabel(coverLetters.length, "cover letter")} created.`
         : "Cover-letter generation complete.",
     );
     return;
@@ -101,7 +101,7 @@ function announceOne(run: RunRecord): void {
     const outcomes = resultRecord(run)?.outcomes;
     toast.success(
       Array.isArray(outcomes)
-        ? `Pipeline redo complete: ${plural(outcomes.length, "stage")} processed.`
+        ? `Pipeline redo complete: ${pluralLabel(outcomes.length, "stage")} processed.`
         : "Pipeline redo complete.",
     );
     return;

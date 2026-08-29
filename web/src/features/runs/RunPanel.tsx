@@ -19,8 +19,8 @@ function rightLabel(r: RunRecord): string {
   if (r.status === "failed") return "failed";
   if (r.status === "cancelled") return `${Math.round(r.percent)}% · cancelled`;
   if (r.status === "cancelling") return `${Math.round(r.percent)}% · cancelling`;
-  const eta = r.etaText ? ` · ~${r.etaText} left` : "";
-  return `${Math.round(r.percent)}%${eta}`;
+  const etaText = r.etaText ? ` · ~${r.etaText} left` : "";
+  return `${Math.round(r.percent)}%${etaText}`;
 }
 
 export function RunPanel() {

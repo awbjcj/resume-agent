@@ -106,9 +106,9 @@ function RedoDialogBody({
 
   const ordered = STAGES.filter((stage) => selected.has(stage.id)).map((s) => s.id);
   const count = jobIds.length;
-  const jobWord = `${count} job${count === 1 ? "" : "s"}`;
+  const jobCountText = `${count} job${count === 1 ? "" : "s"}`;
   const label = ordered.length
-    ? `${ordered.map((stage) => VERBS[stage]).join(" + ")} ${jobWord}`
+    ? `${ordered.map((stage) => VERBS[stage]).join(" + ")} ${jobCountText}`
     : "Choose a stage";
 
   const toggle = (stage: RedoStage, checked: boolean) =>
@@ -139,7 +139,7 @@ function RedoDialogBody({
       <DialogHeader>
         <DialogTitle>Redo pipeline stages</DialogTitle>
         <DialogDescription>
-          Re-run any stage on {jobWord}, whatever their status. Existing resume
+          Re-run any stage on {jobCountText}, whatever their status. Existing resume
           versions and PDFs are kept.
         </DialogDescription>
       </DialogHeader>

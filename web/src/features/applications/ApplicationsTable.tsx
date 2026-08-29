@@ -83,9 +83,10 @@ export function ApplicationsTable({ table }: { table: ApplicationsTableData }) {
     );
   }
 
+  const technicalStageLabel = (index: number) => `Tech ${index + 1}`;
   const technicalStages = Array.from(
     { length: table.technicalRoundColumns },
-    (_, index) => [`technical_round_${index + 1}`, `Tech ${index + 1}`] as const,
+    (_, index) => [`technical_round_${index + 1}`, technicalStageLabel(index)] as const,
   );
   const stages = [...FIXED_STAGES, ...technicalStages, ...LATE_STAGES];
 

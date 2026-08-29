@@ -1517,7 +1517,7 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
   );
 }
 
-function operationTarget(
+function operationTargetLabel(
   operation: components["schemas"]["QuotaOperationOut"],
   accounts: QuotaAccount[],
   tiers: QuotaTier[],
@@ -1741,7 +1741,7 @@ export function AdminQuotasPage() {
                       {auditRows.map((operation) => (
                         <TableRow key={operation.id}>
                           <TableCell><Badge variant="outline">{operation.actionType.replaceAll("_", " ")}</Badge></TableCell>
-                          <TableCell>{operationTarget(operation, accounts.data.data, tiers.data.data)}</TableCell>
+                          <TableCell>{operationTargetLabel(operation, accounts.data.data, tiers.data.data)}</TableCell>
                           <TableCell className="font-mono">{optionalUsd(operation.amountMicros)}</TableCell>
                           <TableCell>{operation.affectedCount}</TableCell>
                           <TableCell className="max-w-xs">{operation.reason}</TableCell>

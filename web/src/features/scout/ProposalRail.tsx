@@ -63,12 +63,14 @@ export function ProposalRail({ sessionId, proposals, scrapeAvailable, className 
     setBatching(true);
     for (const proposalId of ids) {
       try { await approve.mutateAsync({ sessionId, proposalId }); setAdded((current) => [...current, proposalId]); successes += 1; }
-      catch (caught) { failures[proposalId] = caught instanceof Error ? caught.message : "Could not add"; }
+      catch (caught) { failures[proposalId] = caught instanceof Error ? caught.message : couldNotAddMessage; }
     }
     setErrors(failures);
     setSummary(`${successes} added, ${Object.keys(failures).length} failed`);
     setBatching(false);
   };
+
+  const couldNotAddMessage = "Could not add";
 
   const row = (proposal: ScoutProposal) => <ProposalCard key={proposal.id} sessionId={sessionId} proposal={proposal} scrapeAvailable={scrapeAvailable} error={errors[proposal.id]} locallyAdded={added.includes(proposal.id)} />;
 
