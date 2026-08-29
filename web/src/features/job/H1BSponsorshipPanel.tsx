@@ -11,9 +11,16 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "recharts";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -33,7 +40,12 @@ type Evidence = NonNullable<SponsorshipResult["evidence"]>;
 type EvidenceStatus = Evidence["status"];
 type PeriodStat = NonNullable<Evidence["periods"]>[number];
 
-const ROLLUP = "__rollup__";
+const filingChartConfig = {
+  filingCount: {
+    label: "H-1B filings",
+    color: "var(--chart-1)",
+  },
+} satisfies ChartConfig;
 
 type StatusMeta = {
   label: string;
@@ -108,17 +120,21 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 function EvidenceDetails({
   evidence,
   metrics,
+  activePeriodLabel,
 }: {
   evidence: Evidence;
   metrics: Pick<
     PeriodStat,
     "filingCount" | "certifiedCount" | "deniedCount" | "wageSummary"
   >;
+  activePeriodLabel?: string;
 }) {
   const wageSummary = Object.entries(metrics.wageSummary ?? {});
-  const filingPeriods = evidence.periods?.length
-    ? evidence.periods.map((entry) => periodLabel(entry.period))
-    : evidence.fiscalPeriods;
+  const filingPeriods = activePeriodLabel
+    ? [periodLabel(activePeriodLabel)]
+    : evidence.periods?.length
+      ? evidence.periods.map((entry) => periodLabel(entry.period))
+      : evidence.fiscalPeriods;
   const details: Array<readonly [string, string]> = [
     ["Company", evidence.displayCompany ?? evidence.normalizedCompany],
     [
@@ -191,6 +207,66 @@ function EvidenceDetails({
   );
 }
 
+function SponsorshipTrend({
+  periods,
+  selectedPeriod,
+}: {
+  periods: PeriodStat[];
+  selectedPeriod: string;
+}) {
+  const chartData = periods
+    .slice()
+    .reverse()
+    .map((entry) => ({
+      period: entry.period,
+      label: periodLabel(entry.period),
+      shortLabel: periodLabel(entry.period).replace(/^FY\d{2}(\d{2})\s/, "$1 "),
+      filingCount: entry.filingCount ?? 0,
+    }));
+  const selected = periods.find((entry) => entry.period === selectedPeriod);
+
+  return (
+    <div className="mt-5 rounded-lg border bg-muted/10 p-4">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-semibold">Three-year filing volume</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Quarterly H-1B filings in the server cache.
+          </p>
+        </div>
+        <p className="text-xs font-medium text-foreground">
+          {periodLabel(selectedPeriod)}: {selected?.filingCount ?? 0} filings
+        </p>
+      </div>
+      <ChartContainer
+        config={filingChartConfig}
+        className="h-56 w-full"
+        aria-hidden="true"
+      >
+        <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+          <CartesianGrid vertical={false} />
+          <XAxis dataKey="shortLabel" tickLine={false} axisLine={false} minTickGap={12} />
+          <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={42} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <ReferenceLine
+            x={chartData.find((entry) => entry.period === selectedPeriod)?.shortLabel}
+            stroke="var(--foreground)"
+            strokeDasharray="3 3"
+          />
+          <Bar dataKey="filingCount" fill="var(--color-filingCount)" radius={4} />
+        </BarChart>
+      </ChartContainer>
+      <ul className="sr-only">
+        {chartData.map((entry) => (
+          <li key={entry.period}>
+            {entry.label}: {entry.filingCount} H-1B filings
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function H1BSponsorshipPanel({
   jobId,
   company,
@@ -209,26 +285,22 @@ export function H1BSponsorshipPanel({
   const evidence = result?.evidence ?? null;
   const status = evidence?.status ?? null;
   const periods = evidence?.periods ?? [];
+  const latestPeriod = periods[0]?.period ?? "";
   const [periodSelection, setPeriodSelection] = useState(() => ({
     jobId,
-    period: ROLLUP,
+    period: latestPeriod,
   }));
-  const selectedPeriod = periodSelection.jobId === jobId ? periodSelection.period : ROLLUP;
-  const effectivePeriod =
-    selectedPeriod === ROLLUP || periods.some((entry) => entry.period === selectedPeriod)
-      ? selectedPeriod
-      : ROLLUP;
-  const activePeriod =
-    effectivePeriod === ROLLUP
-      ? undefined
-      : periods.find((entry) => entry.period === effectivePeriod);
+  const selectedPeriod = periodSelection.jobId === jobId ? periodSelection.period : latestPeriod;
+  const effectivePeriod = periods.some((entry) => entry.period === selectedPeriod)
+    ? selectedPeriod
+    : latestPeriod;
+  const activePeriod = periods.find((entry) => entry.period === effectivePeriod);
   const metrics = activePeriod ?? {
     filingCount: evidence?.filingCount ?? null,
     certifiedCount: evidence?.certifiedCount ?? null,
     deniedCount: evidence?.deniedCount ?? null,
     wageSummary: evidence?.wageSummary ?? null,
   };
-  const rollupLabel = `Last ${periods.length} quarter${periods.length === 1 ? "" : "s"} (total)`;
   const meta = status ? STATUS_META[status] : null;
   const disabled = !company?.trim() || checking || result?.capability === "disabled";
   const errorMessage = h1bRun?.error ?? "The manual H-1B check failed.";
@@ -334,19 +406,14 @@ export function H1BSponsorshipPanel({
             <Label htmlFor="h1b-period">Period</Label>
             <Select
               value={effectivePeriod}
-              onValueChange={(value) => setPeriodSelection({ jobId, period: value ?? ROLLUP })}
+              onValueChange={(value) => setPeriodSelection({ jobId, period: value ?? latestPeriod })}
             >
               <SelectTrigger id="h1b-period" className="w-full sm:w-64">
                 <SelectValue>
-                  {(value: string) =>
-                    effectivePeriod === ROLLUP
-                      ? rollupLabel
-                      : periodLabel(String(value))
-                  }
+                  {(value: string) => periodLabel(String(value))}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ROLLUP}>{rollupLabel}</SelectItem>
                 {periods.map((entry) => (
                   <SelectItem key={entry.period} value={entry.period}>
                     {periodLabel(entry.period)}
@@ -358,8 +425,16 @@ export function H1BSponsorshipPanel({
         </div>
       )}
 
+      {evidence && status !== "unavailable" && periods.length > 0 && effectivePeriod && (
+        <SponsorshipTrend periods={periods} selectedPeriod={effectivePeriod} />
+      )}
+
       {evidence && status !== "unavailable" && (
-        <EvidenceDetails evidence={evidence} metrics={metrics} />
+        <EvidenceDetails
+          evidence={evidence}
+          metrics={metrics}
+          activePeriodLabel={activePeriod?.period}
+        />
       )}
 
       {evidence?.status === "unavailable" && message && (

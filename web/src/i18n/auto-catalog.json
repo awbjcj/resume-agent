@@ -3919,6 +3919,11 @@
     "en": "Filing periods",
     "zh-CN": "申请期间"
   },
+  "filings": {
+    "key": "ui_4b3249d71f72",
+    "en": "filings",
+    "zh-CN": "申请数"
+  },
   "Filings": {
     "key": "ui_a863d519e38f",
     "en": "Filings",
@@ -4418,6 +4423,11 @@
     "key": "ui_b0393b21f6fc",
     "en": "H-1B disabled",
     "zh-CN": "H-1B已禁用"
+  },
+  "H-1B filings": {
+    "key": "ui_3f65783b8a94",
+    "en": "H-1B filings",
+    "zh-CN": "H-1B 申请数"
   },
   "H-1B sponsorship check": {
     "key": "ui_8e5c2a8edefb",
@@ -5113,11 +5123,6 @@
     "key": "ui_8130f6bf11a7",
     "en": "Label is required for an Other event.",
     "zh-CN": "其他事件需要标签。"
-  },
-  "Last {{v0}} quarter{{v1}} (total)": {
-    "key": "ui_9a3eacb39f93",
-    "en": "Last {{v0}} quarter{{v1}} (total)",
-    "zh-CN": "最近 {{v0}} 个季度（总计）"
   },
   "Last build:": {
     "key": "ui_4dc7abd9c066",
@@ -7258,6 +7263,11 @@
     "key": "ui_438f8f5cacf3",
     "en": "python, distributed systems…",
     "zh-CN": "python、分布式系统……"
+  },
+  "Quarterly H-1B filings in the server cache.": {
+    "key": "ui_804ec9bd9fa8",
+    "en": "Quarterly H-1B filings in the server cache.",
+    "zh-CN": "服务器缓存中的季度 H-1B 申请数。"
   },
   "Question": {
     "key": "ui_289aff12b042",
@@ -10338,6 +10348,11 @@
     "key": "ui_a06ce9882180",
     "en": "This source could not be verified.",
     "zh-CN": "无法验证此来源。"
+  },
+  "Three-year filing volume": {
+    "key": "ui_e8651fb105d9",
+    "en": "Three-year filing volume",
+    "zh-CN": "三年申请量"
   },
   "Tier": {
     "key": "ui_cb9e8664edea",

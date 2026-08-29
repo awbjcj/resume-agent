@@ -178,7 +178,7 @@ describe("H1BSponsorshipPanel", () => {
     expect(screen.getByText(/research is disabled for this workspace/i)).toBeInTheDocument();
   });
 
-  it("defaults to the rolling total and labels it with the period count", () => {
+  it("defaults to the latest quarter and plots the cached trend", () => {
     render(
       <H1BSponsorshipPanel
         jobId={42}
@@ -188,9 +188,12 @@ describe("H1BSponsorshipPanel", () => {
       { wrapper },
     );
 
-    expect(screen.getByText("Last 2 quarters (total)")).toBeInTheDocument();
-    expect(screen.getByText("14")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /period/i })).toHaveTextContent(
+      "FY2026 Q1",
+    );
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.getByText("Three-year filing volume")).toBeInTheDocument();
+    expect(screen.getByText("FY2025 Q4: 4 H-1B filings")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /period/i })).toHaveClass(
       "w-full",
       "sm:w-64",
@@ -209,14 +212,14 @@ describe("H1BSponsorshipPanel", () => {
     );
 
     await user.click(screen.getByRole("combobox", { name: /period/i }));
-    await user.click(await screen.findByRole("option", { name: /FY2026 Q1/i }));
+    await user.click(await screen.findByRole("option", { name: /FY2025 Q4/i }));
 
-    await waitFor(() => expect(screen.getByText("10")).toBeInTheDocument());
-    expect(screen.queryByText("14")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("4")).toBeInTheDocument());
+    expect(screen.queryByText("10")).not.toBeInTheDocument();
     expect(screen.getByText("Historical filings found")).toBeInTheDocument();
   });
 
-  it("falls back to the rollup when a refetch replaces the selected period", async () => {
+  it("falls back to the newest quarter when a refetch replaces the selected period", async () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <H1BSponsorshipPanel
@@ -248,9 +251,9 @@ describe("H1BSponsorshipPanel", () => {
     );
 
     expect(screen.getByRole("combobox", { name: /period/i })).toHaveTextContent(
-      "Last 1 quarter (total)",
+      "FY2025 Q4",
     );
-    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText("Filings").parentElement).toHaveTextContent("4");
   });
 
   it("resets the period when navigating to another job with an overlapping period", async () => {
@@ -264,7 +267,7 @@ describe("H1BSponsorshipPanel", () => {
       { wrapper },
     );
     await user.click(screen.getByRole("combobox", { name: /period/i }));
-    await user.click(await screen.findByRole("option", { name: /FY2026 Q1/i }));
+    await user.click(await screen.findByRole("option", { name: /FY2025 Q4/i }));
 
     rerender(
       <H1BSponsorshipPanel
@@ -284,9 +287,9 @@ describe("H1BSponsorshipPanel", () => {
     );
 
     expect(screen.getByRole("combobox", { name: /period/i })).toHaveTextContent(
-      "Last 2 quarters (total)",
+      "FY2026 Q1",
     );
-    expect(screen.getByText("20")).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
   });
 
   it("hides the selector when the provider had no quarterly breakdown", () => {
@@ -315,7 +318,7 @@ describe("H1BSponsorshipPanel", () => {
     );
 
     expect(screen.getByText(/may be out of date/i)).toBeInTheDocument();
-    expect(screen.getByText("14")).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /refresh/i })).toBeEnabled();
   });
 
