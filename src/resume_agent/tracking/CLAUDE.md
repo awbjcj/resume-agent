@@ -61,12 +61,22 @@ Redo is the explicit escape hatch for progressed rows, never a mode.
 
 Three invariants, all enforced by `tracking/stages.py::advance`:
 
-- **Never regresses.** Status is a high-water mark. A rendered job stays
+- **Never regresses.** `JobStatus` is a high-water mark. A rendered job stays
   rendered through a re-pull + re-extract + re-tailor.
 - **Never rejects.** `rejected` ranks below `raw`, so the filter and relevance
   gates cannot fire under `never_regress`. Fresh fit scores are still written.
 - **Never deletes.** New `ResumeVersion` rows are appended under an incremented
   `attempt`; `tailor_model` records which model produced them.
+
+**These three describe `JobStatus` only.** `ApplicationStatus` follows a
+different rule — a progression (`ready < submitted < interview < offer`) that
+advances forward only, plus a terminal set (`{rejected, closed}`) reachable
+from *any* progression state including `offer`. A flat high-water mark would
+block `interview -> rejected`, the most common transition in a job hunt, and
+`offer -> rejected`, which is a rescinded offer. The rule lives in
+`tracking/status_rules.py`; see ADR-0012. Do not add ordering comparisons
+against `ApplicationStatus` members — the ordering lives in `PROGRESSION` and
+nowhere else.
 
 `StageScope(job_ids, any_status, never_regress)` is how the funnel stages in
 `discovery/pipeline.py` run over explicit ids. `StageScope()` reproduces the
