@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   BarChart3,
   Briefcase,
@@ -12,6 +13,7 @@ import {
   ShieldCheck,
   Banknote,
   Network,
+  Rows3,
   Compass,
   Sparkles,
   Target,
@@ -43,47 +45,69 @@ import { RunPanel } from "@/features/runs/RunPanel";
 import { useRehydrateRuns } from "@/features/runs/use-rehydrate-runs";
 import { useRunCompletionEffects } from "@/features/runs/use-run-completion-effects";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { NotificationsBell } from "@/features/notifications/NotificationsBell";
 import { LogoutButton } from "@/features/auth/LogoutButton";
 import { useMe } from "@/features/auth/AuthGate";
 
-type NavItem = { to: string; label: string; end?: boolean; icon: LucideIcon };
+type NavLabelKey =
+  | "nav.dashboard"
+  | "nav.profile"
+  | "nav.profileCoach"
+  | "nav.mockInterviews"
+  | "nav.careerLab"
+  | "nav.discoveryScout"
+  | "nav.triage"
+  | "nav.shortlist"
+  | "nav.pipeline"
+  | "nav.matchGap"
+  | "nav.applications"
+  | "nav.analytics"
+  | "nav.settings"
+  | "nav.account"
+  | "nav.admin"
+  | "nav.costQuotas"
+  | "nav.providerRouting";
+type NavGroupKey = "nav.prepare" | "nav.findAndTailor" | "nav.insight";
+type NavItem = { to: string; labelKey: NavLabelKey; end?: boolean; icon: LucideIcon };
 
 // The main nav mirrors the job-hunting arc: prepare your profile, work the
 // funnel in its true order (new jobs → picks → tailoring), then analyse.
 // Dashboard stands alone as the home/overview.
-const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
+const NAV_GROUPS: { labelKey?: NavGroupKey; items: NavItem[] }[] = [
   {
-    items: [{ to: "/", label: "Dashboard", end: true, icon: LayoutDashboard }],
+    items: [{ to: "/", labelKey: "nav.dashboard", end: true, icon: LayoutDashboard }],
   },
   {
-    label: "Prepare",
+    labelKey: "nav.prepare",
     items: [
-      { to: "/profile", label: "Profile", icon: UserRound },
-      { to: "/coach", label: "Profile coach", icon: MessageCircleMore },
-      { to: "/interview", label: "Mock interviews", icon: MessagesSquare },
-      { to: "/career-lab", label: "Career Lab", icon: Sparkles },
+      { to: "/profile", labelKey: "nav.profile", icon: UserRound },
+      { to: "/coach", labelKey: "nav.profileCoach", icon: MessageCircleMore },
+      { to: "/interview", labelKey: "nav.mockInterviews", icon: MessagesSquare },
+      { to: "/career-lab", labelKey: "nav.careerLab", icon: Sparkles },
     ],
   },
   {
-    label: "Find & tailor",
+    labelKey: "nav.findAndTailor",
     items: [
-      { to: "/scout", label: "Discovery Scout", icon: Compass },
-      { to: "/triage", label: "Triage", icon: Inbox },
-      { to: "/shortlist", label: "Shortlist", icon: Briefcase },
-      { to: "/pipeline", label: "Pipeline", icon: Kanban },
+      { to: "/scout", labelKey: "nav.discoveryScout", icon: Compass },
+      { to: "/triage", labelKey: "nav.triage", icon: Inbox },
+      { to: "/shortlist", labelKey: "nav.shortlist", icon: Briefcase },
+      { to: "/pipeline", labelKey: "nav.pipeline", icon: Kanban },
     ],
   },
   {
-    label: "Insight",
+    labelKey: "nav.insight",
     items: [
-      { to: "/match-gap", label: "Match-gap", icon: Target },
-      { to: "/analytics", label: "Analytics", icon: BarChart3 },
+      { to: "/match-gap", labelKey: "nav.matchGap", icon: Target },
+      { to: "/applications", labelKey: "nav.applications", icon: Rows3 },
+      { to: "/analytics", labelKey: "nav.analytics", icon: BarChart3 },
     ],
   },
 ];
 
 function NavMenuItem({ item, badge }: { item: NavItem; badge?: number }) {
+  const { t } = useTranslation();
   // base-ui render prop keeps a single interactive element (the NavLink);
   // NavLink sets aria-current="page" when active.
   const badged = Boolean(badge);
@@ -97,7 +121,7 @@ function NavMenuItem({ item, badge }: { item: NavItem; badge?: number }) {
         render={
           <NavLink to={item.to} end={item.end}>
             <item.icon className="size-4" aria-hidden="true" />
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
           </NavLink>
         }
       />
@@ -107,7 +131,7 @@ function NavMenuItem({ item, badge }: { item: NavItem; badge?: number }) {
         // higher-specificity variant.
         <SidebarMenuBadge className="top-1/2! -translate-y-1/2 bg-primary/15 text-primary">
           {badge}
-          <span className="sr-only"> in progress</span>
+          <span className="sr-only"> {t("nav.inProgress")}</span>
         </SidebarMenuBadge>
       ) : null}
     </SidebarMenuItem>
@@ -115,6 +139,7 @@ function NavMenuItem({ item, badge }: { item: NavItem; badge?: number }) {
 }
 
 export function AppLayout() {
+  const { t } = useTranslation();
   // Registered before the first reconciliation so a completion recovered on
   // load cannot be dispatched to an empty listener set.
   useRunCompletionEffects();
@@ -142,7 +167,7 @@ export function AppLayout() {
                   Resume Agent
                 </div>
                 <div className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.025em]">
-                  Command Center
+                  {t("shell.commandCenter")}
                 </div>
               </div>
             </div>
@@ -150,26 +175,26 @@ export function AppLayout() {
             <div className="command-sidebar-brief rounded-xl border border-sidebar-border/80 p-3.5">
               <div className="flex items-center gap-2 text-[0.64rem] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55">
                 <Target className="size-3.5 text-sidebar-primary" aria-hidden="true" />
-                Operational flow
+                {t("shell.operationalFlow")}
               </div>
               <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground/72">
-                Move each strong fit from evidence to a finished application.
+                {t("shell.operationalFlowBody")}
               </p>
               <div className="mt-3 flex items-center gap-1.5 text-[0.66rem] font-medium text-sidebar-foreground/65">
-                <span>Review</span>
+                <span>{t("shell.review")}</span>
                 <span className="h-px flex-1 bg-sidebar-border" />
-                <span>Tailor</span>
+                <span>{t("shell.tailor")}</span>
                 <span className="h-px flex-1 bg-sidebar-border" />
-                <span>Track</span>
+                <span>{t("shell.track")}</span>
               </div>
             </div>
           </SidebarHeader>
           <SidebarContent className="py-2">
             {NAV_GROUPS.map((group, i) => (
-              <SidebarGroup key={group.label ?? `group-${i}`} className="px-3">
-                {group.label && (
+              <SidebarGroup key={group.labelKey ?? `group-${i}`} className="px-3">
+                {group.labelKey && (
                   <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/48">
-                    {group.label}
+                    {t(group.labelKey)}
                   </SidebarGroupLabel>
                 )}
                 <SidebarGroupContent>
@@ -183,17 +208,17 @@ export function AppLayout() {
             ))}
             <SidebarGroup className="mt-auto px-3">
               <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/48">
-                Workspace
+                {t("nav.workspace")}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
-                  <NavMenuItem item={{ to: "/settings", label: "Settings", icon: Settings }} />
-                  <NavMenuItem item={{ to: "/account", label: "Account", icon: CircleUserRound }} />
+                  <NavMenuItem item={{ to: "/settings", labelKey: "nav.settings", icon: Settings }} />
+                  <NavMenuItem item={{ to: "/account", labelKey: "nav.account", icon: CircleUserRound }} />
                   {me.data?.role === "admin" && (
                     <>
-                      <NavMenuItem item={{ to: "/admin", label: "Admin", end: true, icon: ShieldCheck }} />
-                      <NavMenuItem item={{ to: "/admin/quotas", label: "Cost quotas", icon: Banknote }} />
-                      <NavMenuItem item={{ to: "/admin/routing", label: "Provider routing", icon: Network }} />
+                      <NavMenuItem item={{ to: "/admin", labelKey: "nav.admin", end: true, icon: ShieldCheck }} />
+                      <NavMenuItem item={{ to: "/admin/quotas", labelKey: "nav.costQuotas", icon: Banknote }} />
+                      <NavMenuItem item={{ to: "/admin/routing", labelKey: "nav.providerRouting", icon: Network }} />
                     </>
                   )}
                 </SidebarMenu>
@@ -204,10 +229,10 @@ export function AppLayout() {
             <div className="rounded-xl border border-sidebar-border/80 bg-sidebar/72 p-3.5 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--sidebar-foreground),transparent_94%)]">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <span className="size-1.5 rounded-full bg-ready shadow-[0_0_0_4px_color-mix(in_oklab,var(--ready),transparent_86%)]" />
-                Daily focus
+                {t("shell.dailyFocus")}
               </div>
               <p className="mt-1.5 text-xs leading-relaxed text-sidebar-foreground/66">
-                Approve the best fits first, then run tailoring in batches.
+                {t("shell.dailyFocusBody")}
               </p>
             </div>
           </SidebarFooter>
@@ -226,16 +251,17 @@ export function AppLayout() {
               </div>
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold leading-tight">Resume Agent</div>
-                <div className="truncate text-[0.68rem] text-muted-foreground">Command Center</div>
+                <div className="truncate text-[0.68rem] text-muted-foreground">{t("shell.commandCenter")}</div>
               </div>
             </div>
             <div className="hidden min-w-0 md:block">
-              <div className="text-sm font-medium">Job search operations</div>
-              <div className="text-xs text-muted-foreground">Pull, discover, review, and ship.</div>
+              <div className="text-sm font-medium">{t("shell.operations")}</div>
+              <div className="text-xs text-muted-foreground">{t("shell.operationsSummary")}</div>
             </div>
             <RunActions className="ml-auto hidden flex-nowrap xl:flex" />
             <div className="ml-auto flex shrink-0 items-center gap-1 xl:ml-0">
               <NotificationsBell />
+              <LanguageSwitcher />
               <ThemeToggle />
               <LogoutButton />
             </div>

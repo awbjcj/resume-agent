@@ -38,7 +38,7 @@ export function TrackingTab({
       <hr className="border-border" />
 
       <section className="space-y-3">
-        <SectionHeading>Application</SectionHeading>
+        <SectionHeading>Application &amp; timeline</SectionHeading>
         <ApplicationEditor jobId={job.id} application={job.application} />
       </section>
 

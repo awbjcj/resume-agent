@@ -11,7 +11,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { ConversionChart } from "./ConversionChart";
-import { useAnalytics } from "./use-analytics";
+import { useAnalytics, useTimelineAnalytics } from "./use-analytics";
+import { StageFlowChart } from "./StageFlowChart";
+import { CycleTimeChart } from "./CycleTimeChart";
+import { PipelineTimelineChart } from "./PipelineTimelineChart";
+import { OfferComparisonChart } from "./OfferComparisonChart";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { components } from "@/lib/api/schema";
 
 type Cohort = components["schemas"]["CohortOut"];
@@ -65,7 +70,8 @@ function CohortTable({
 
 export function AnalyticsContainer() {
   const { data, isLoading } = useAnalytics();
-  if (isLoading) return <BoardSkeleton />;
+  const timeline = useTimelineAnalytics();
+  if (isLoading || timeline.isLoading) return <BoardSkeleton />;
 
   const totalApps = data?.bySource.reduce((a, c) => a + c.applications, 0) ?? 0;
   const totalOffers = data?.bySource.reduce((a, c) => a + c.offers, 0) ?? 0;
@@ -84,6 +90,26 @@ export function AnalyticsContainer() {
           ["Sources tracked", String(data?.bySource.length ?? 0)],
         ]}
       />
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle><h2>Stage flow</h2></CardTitle><CardDescription>Where applications advance or leave the process.</CardDescription></CardHeader>
+          <CardContent><StageFlowChart flows={timeline.data?.flows ?? []} /></CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle><h2>Cycle time</h2></CardTitle><CardDescription>Median elapsed days between consecutive stages.</CardDescription></CardHeader>
+          <CardContent><CycleTimeChart cycleTimes={timeline.data?.cycleTimes ?? []} /></CardContent>
+        </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader><CardTitle><h2>Active pipeline</h2></CardTitle><CardDescription>Past and upcoming events around today.</CardDescription></CardHeader>
+          <CardContent><PipelineTimelineChart pipeline={timeline.data?.activePipeline ?? []} /></CardContent>
+        </Card>
+        {(timeline.data?.offers.length ?? 0) > 0 ? (
+          <Card className="xl:col-span-2">
+            <CardHeader><CardTitle><h2>Offer comparison</h2></CardTitle><CardDescription>Annualized components, kept separate by currency.</CardDescription></CardHeader>
+            <CardContent><OfferComparisonChart offers={timeline.data!.offers} /></CardContent>
+          </Card>
+        ) : null}
+      </div>
       {totalApps === 0 ? (
         <EmptyState
           title="No applications tracked yet"
