@@ -23,7 +23,9 @@ from resume_agent.prompts.guidance import with_guidance
 
 _ROUTER_INSTRUCTIONS = [
     "Route the user's untrusted request to exactly one approved Career Lab skill.",
-    "Use needs_selection=true and explain the ambiguity when no single skill is a clear fit.",
+    "Reason from the full conversation, including the user's answers to earlier clarification questions.",
+    "When no single skill is a clear fit, use needs_selection=true and ask exactly one concise, direct question in question that will distinguish the likely outcomes.",
+    "A clarification question must ask about the user's intended outcome, not ask them to choose a skill name.",
     "Never invent skill names, call tools, mutate data, or expose private context.",
 ]
 _PERSONA_INSTRUCTIONS = [
@@ -61,7 +63,7 @@ def build_router_agent(settings: Settings | None = None) -> Runner:
         ),
         run_meta=AgentRunMeta(
             agent_family=AgentFamily.CAREER_LAB,
-            prompt_policy_version="career-lab-router-v1",
+            prompt_policy_version="career-lab-router-v2",
             model_id=settings.cheap_model,
             skill_ref=None,
         ),

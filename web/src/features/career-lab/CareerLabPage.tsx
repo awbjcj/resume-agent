@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Bot, FileText, ListChecks, MessageCircleMore, Sparkles, SquareCheckBig } from "lucide-react";
 
@@ -31,7 +31,7 @@ import { useChatStream } from "@/lib/chat/useChatStream";
 import type { RunRecord } from "@/lib/runs/store";
 import { cn } from "@/lib/utils";
 
-import { CareerLabContextRail, CareerLabSkillPicker } from "./CareerLabContextRail";
+import { CareerLabContextRail } from "./CareerLabContextRail";
 import {
   useArchiveCareerLabSession,
   useCareerLabRecoveredRun,
@@ -105,11 +105,6 @@ export function CareerLabPage() {
   const [pending, setPending] = useState<{ text: string; baseline: number } | null>(null);
   const [runError, setRunError] = useState("");
   const [retryMessage, setRetryMessage] = useState("");
-  const [selectionNotice, setSelectionNotice] = useState("");
-  const [selectionExchange, setSelectionExchange] = useState<{
-    userText: string;
-    assistantText: string;
-  } | null>(null);
   const skillRef = useRef<HTMLSelectElement>(null);
   const ignoredRuns = useRef(new Set<string>());
   const attachedRuns = useRef(new Set<string>());
@@ -129,10 +124,6 @@ export function CareerLabPage() {
     setStreamRunId((current) => (current === completedRunId ? null : current));
   };
 
-  useEffect(() => {
-    if (selectionNotice) skillRef.current?.focus();
-  }, [selectionNotice]);
-
   const active = session.data;
   const sessionLoading = Boolean(displayedSessionId && session.isPending);
   const baseline = pending?.baseline ?? active?.turns?.length ?? 0;
@@ -146,21 +137,15 @@ export function CareerLabPage() {
       setRunError(completed.error ?? "Career Lab run did not complete");
       return;
     }
-    const result = completed.result as { sessionId?: string; needsSelection?: boolean; route?: { reason?: string } } | null;
-    if (result?.needsSelection) {
-      const reason = result.route?.reason ?? "Choose the Career Lab skill that best fits this request.";
-      const userText = message ?? "";
+    const result = completed.result as { sessionId?: string } | null;
+    if (result?.sessionId) {
       setPending(null);
-      setSelectionNotice(reason);
-      setSelectionExchange({ userText, assistantText: reason });
-      setComposer(userText);
-      setRetryMessage(userText);
-    } else if (result?.sessionId) {
-      setPending(null);
-      setSelectionExchange(null);
       setSelectedSessionId(result.sessionId);
       setRetryMessage("");
       if (message) setComposer((value) => (value.trim() === message.trim() ? "" : value));
+    } else {
+      setPending(null);
+      setRunError("Career Lab completed without returning a session.");
     }
   };
 
@@ -168,8 +153,6 @@ export function CareerLabPage() {
     const message = (retry ?? composer).trim();
     if (!message || busy) return;
     setRunError("");
-    setSelectionNotice("");
-    setSelectionExchange(null);
     setRetryMessage(message);
     setSuppressedRunId(null);
     stream.reset();
@@ -224,8 +207,8 @@ export function CareerLabPage() {
 
   const durableTurns = active?.turns?.length ?? 0;
   const durableAdvanced = durableTurns > baseline;
-  const showThread = Boolean(active || pending || selectionExchange || runId);
-  const canCompose = active?.status === "active" || (!active && (Boolean(pending) || Boolean(selectionExchange) || Boolean(runId)));
+  const showThread = Boolean(active || pending || runId);
+  const canCompose = active?.status === "active" || (!active && (Boolean(pending) || Boolean(runId)));
   const chatTurns = active?.turns ?? [];
   const chatMessages: ChatThreadMessage[] = chatTurns.map((turn, index) => ({
     id: `${turn.turnId}-${index}`,
@@ -237,12 +220,6 @@ export function CareerLabPage() {
   }));
   if (pending && !durableAdvanced) {
     chatMessages.push({ id: "pending-user", role: "user", parts: [{ kind: "text", text: pending.text }] });
-  }
-  if (selectionExchange) {
-    chatMessages.push(
-      { id: "selection-user", role: "user", parts: [{ kind: "text", text: selectionExchange.userText }] },
-      { id: "selection-assistant", role: "assistant", parts: [{ kind: "notice", message: selectionExchange.assistantText }] },
-    );
   }
 
   // Keyed exactly as `chatMessages` ids are built above. `renderAfter` used to
@@ -300,26 +277,16 @@ export function CareerLabPage() {
         ) : undefined}
       />
 
-      {error || selectionNotice ? (
-        <Alert variant={error ? "destructive" : "default"} role="alert">
-          <AlertTitle>{error ? "Career Lab needs attention" : "Choose a skill"}</AlertTitle>
+      {error ? (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>Career Lab needs attention</AlertTitle>
           <AlertDescription>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="flex-1">{error || selectionNotice}</span>
+              <span className="flex-1">{error}</span>
               {error && retryMessage ? (
                 <Button variant="outline" size="sm" onClick={() => void sendMessage(retryMessage, !active)} disabled={busy}>
                   Retry draft
                 </Button>
-              ) : null}
-              {selectionNotice && retryMessage ? (
-                <Button variant="outline" size="sm" onClick={() => void sendMessage(retryMessage, !active)} disabled={!skill || busy}>
-                  Continue with skill
-                </Button>
-              ) : null}
-              {selectionNotice && !active ? (
-                <div className="w-full sm:max-w-sm">
-                  <CareerLabSkillPicker skill={skill} setSkill={setSkill} skills={skills} selectRef={skillRef} id="career-skill-selection" />
-                </div>
               ) : null}
             </div>
           </AlertDescription>
@@ -351,7 +318,7 @@ export function CareerLabPage() {
                   }}
                 />
               ) : null}
-              {busy && runId && !stream.parts.length && !durableAdvanced && !selectionExchange ? (
+              {busy && runId && !stream.parts.length && !durableAdvanced ? (
                 <div className="flex items-center gap-3 text-sm text-muted-foreground" role="status">
                   <Spinner />
                   <span>Career Lab is thinking…</span>

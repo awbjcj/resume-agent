@@ -51,44 +51,22 @@ export function CareerLabSetupDialog({
   const [skill, setSkill] = useState("");
   const [resumeVersionId, setResumeVersionId] = useState(0);
   const [includeProfile, setIncludeProfile] = useState(true);
-  const [notice, setNotice] = useState("");
 
   const onDone = (completed: RunRecord) => {
     if (completed.status !== "succeeded") return;
-    const result = completed.result as {
-      sessionId?: string;
-      needsSelection?: boolean;
-      route?: { reason?: string };
-    } | null;
+    const result = completed.result as { sessionId?: string } | null;
     if (result?.sessionId) {
       navigate(`/career-lab?session=${result.sessionId}`);
       return;
     }
-    // Career Lab could not route the request to one skill, so no session was
-    // created and there is nothing to open. Reopen with the request intact and
-    // ask for the skill explicitly — the same recovery the Career Lab page does.
-    //
-    // The toast is not decoration: the dialog closes as soon as the run is
-    // accepted, and it lives inside a Tabs panel that unmounts when the user
-    // switches tab or closes the modal. If that happened, `setNotice` reaches a
-    // dead component and the run succeeded, so the mutation's own failure toast
-    // never fires either — a paid-for request would vanish with no feedback at
-    // all. The toast is the one part of this recovery that survives unmounting.
-    if (result?.needsSelection) {
-      const reason =
-        result.route?.reason ??
-        "Career Lab could not tell which skill this needs. Choose one and start again.";
-      toast.warning(reason);
-      setNotice(reason);
-      onOpenChange(true);
-    }
+    toast.error("Career Lab completed without opening a session.");
+    onOpenChange(true);
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const request = message.trim();
     if (!request) return;
-    setNotice("");
     try {
       await start.mutateAsync({
         message: request,
@@ -132,14 +110,6 @@ export function CareerLabSetupDialog({
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)}>
           <div className="space-y-5 p-5 sm:p-6">
-            {notice ? (
-              <p
-                className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-                role="alert"
-              >
-                {notice}
-              </p>
-            ) : null}
             <Field>
               <FieldLabel htmlFor="career-lab-request">
                 What do you want help with?

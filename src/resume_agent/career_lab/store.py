@@ -150,6 +150,64 @@ def append_turns(
         return store.load(root, session_id)
 
 
+def append_clarification_turns(
+    root: Path | str,
+    session_id: str,
+    *,
+    user_text: str,
+    context_refs: CareerLabContextRefs | dict[str, Any] | None,
+    assistant_text: str,
+    agent_meta: AgentRunMeta,
+) -> dict:
+    """Commit a user observation and the router's next question atomically."""
+    user = user_text.strip()
+    if not user:
+        raise ValueError("message is empty")
+    if len(user) > 100_000:
+        raise ValueError("message is too large")
+    assistant = assistant_text.strip()
+    if not assistant:
+        raise ValueError("assistant message is empty")
+    if agent_meta.skill_ref is not None:
+        raise ValueError("clarification metadata cannot carry a skill")
+    refs = (
+        context_refs
+        if isinstance(context_refs, CareerLabContextRefs)
+        else CareerLabContextRefs.model_validate(context_refs or {})
+    )
+    with store.lock():
+        session = store.load(root, session_id)
+        if session["status"] != "active":
+            raise ValueError("session ended")
+        first_id = f"t{len(session['turns']) + 1}"
+        second_id = f"t{len(session['turns']) + 2}"
+        at = now_iso()
+        from resume_agent.career_lab.models import CareerLabTurnRecord
+
+        user_turn = CareerLabTurnRecord(
+            turn_id=first_id,
+            role="user",
+            text=user,
+            at=at,
+            context_refs=refs,
+        )
+        assistant_turn = CareerLabTurnRecord(
+            turn_id=second_id,
+            role="assistant",
+            text=assistant,
+            at=at,
+            agent_meta=agent_meta,
+        )
+        session["turns"].extend(
+            [
+                user_turn.model_dump(mode="json"),
+                assistant_turn.model_dump(mode="json"),
+            ]
+        )
+        store.write(root, session)
+        return store.load(root, session_id)
+
+
 def end_session(root: Path | str, session_id: str) -> dict:
     def apply(session: dict) -> None:
         if session["status"] != "active":

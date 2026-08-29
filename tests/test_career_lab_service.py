@@ -6,7 +6,7 @@ from typing import TypedDict
 
 import pytest
 
-from resume_agent.career_lab.models import CareerLabContextRefs
+from resume_agent.career_lab.models import CareerLabContextRefs, CareerLabRoute
 from resume_agent.career_lab.store import create_session, load_session
 from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
 from resume_agent.career_skills.registry import CareerSkillRegistry
@@ -63,6 +63,24 @@ class _Formatter:
                 summary="Review base, equity, and downside risk.",
             )
         )
+
+    async def arun(self, prompt: str) -> _Response:
+        return self.run(prompt)
+
+
+class _Router:
+    def __init__(self, responses: list[CareerLabRoute]) -> None:
+        self.responses = list(responses)
+        self.prompts: list[str] = []
+        self.run_meta = AgentRunMeta(
+            agent_family=AgentFamily.CAREER_LAB,
+            prompt_policy_version="career-lab-router-v2",
+            model_id="test-router",
+        )
+
+    def run(self, prompt: str) -> _Response:
+        self.prompts.append(prompt)
+        return _Response(self.responses.pop(0))
 
     async def arun(self, prompt: str) -> _Response:
         return self.run(prompt)
@@ -168,3 +186,64 @@ def test_cancel_before_commit_keeps_transcript_byte_identical(tmp_path, monkeypa
             formatter_agent=_Formatter(),
         )
     assert path.read_bytes() == before
+
+
+def test_ambiguous_request_asks_then_reroutes_from_the_same_transcript(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        career_lab, "get_settings", lambda: SimpleNamespace(stream_enabled=False)
+    )
+    skill = _skill()
+    router = _Router(
+        [
+            CareerLabRoute(
+                needs_selection=True,
+                reason="Several outcomes are possible.",
+                question="What should the company research help you accomplish?",
+            ),
+            CareerLabRoute(
+                skill="salary-negotiation-prep",
+                needs_selection=False,
+                reason="The user wants negotiation preparation.",
+            ),
+        ]
+    )
+    registry = CareerSkillRegistry.from_paths("skills", "skills-lock.json")
+
+    started = career_lab.run_start_turn(
+        reporter=_Reporter(),
+        root=tmp_path,
+        engine=None,
+        message="Research Acme.",
+        goal="Research Acme.",
+        context_refs=CareerLabContextRefs(),
+        sink=NullSink(),
+        registry=registry,
+        router_agent=router,
+    )
+    session_id = started["sessionId"]
+    assert started["turns"][-1]["text"].endswith("help you accomplish?")
+    assert started["turns"][-1]["skillRef"] is None
+
+    completed = career_lab.run_message_turn(
+        reporter=_Reporter(),
+        root=tmp_path,
+        engine=None,
+        session_id=session_id,
+        message="Help me prepare to negotiate an offer.",
+        context_refs=CareerLabContextRefs(),
+        sink=NullSink(),
+        registry=registry,
+        router_agent=router,
+        persona_agent=_Persona(_meta(skill)),
+        formatter_agent=_Formatter(),
+    )
+
+    assert completed["sessionId"] == session_id
+    assert len(completed["turns"]) == 4
+    assert completed["turns"][-1]["skillRef"]["name"] == (
+        "salary-negotiation-prep"
+    )
+    assert "user: Research Acme." in router.prompts[1]
+    assert "assistant: What should the company research" in router.prompts[1]

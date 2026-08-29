@@ -250,7 +250,24 @@ describe("CareerLabPage", () => {
     expect(screen.getByRole("button", { name: "Create Career Lab session" })).toBeInTheDocument();
   });
 
-  it("requires an explicit choice when routing is ambiguous", async () => {
+  it("opens the same conversation when routing asks a clarifying question", async () => {
+    mocks.session.mockImplementation((sessionId) => ({
+      data: sessionId === "clarification-session" ? {
+        sessionId,
+        title: "Research Acme",
+        goal: "Research Acme",
+        startedAt: "2026-08-02T00:00:00Z",
+        endedAt: null,
+        status: "active",
+        archivedAt: null,
+        jobId: null,
+        turns: [
+          { turnId: "t1", role: "user", text: "Research Acme", at: "2026-08-02T00:00:00Z", contextRefs: {}, skillRef: null, agentMeta: null, artifact: null, notice: "" },
+          { turnId: "t2", role: "assistant", text: "What outcome should this research support?", at: "2026-08-02T00:00:00Z", contextRefs: null, skillRef: null, agentMeta: { agentFamily: "career_lab", promptPolicyVersion: "career-lab-router-v2", modelId: "test", skillRef: null }, artifact: null, notice: "" },
+        ],
+      } : undefined,
+      isPending: false,
+    }));
     const mutateAsync = vi.fn().mockImplementation(async (input) => {
       input.onDone?.({
         runId: "run-1",
@@ -261,19 +278,21 @@ describe("CareerLabPage", () => {
         current: 1,
         total: 1,
         etaText: null,
-        result: { needsSelection: true, route: { reason: "Choose a skill" } },
+        result: { sessionId: "clarification-session" },
       });
       return { runId: "run-1" };
     });
     mocks.start.mockReturnValue({ mutateAsync, isPending: false });
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: "Create Career Lab session" }));
-    await userEvent.type(screen.getByLabelText("Career Lab request"), "Help with my career");
+    await userEvent.type(screen.getByLabelText("Career Lab request"), "Research Acme");
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/choose a skill/i);
-    expect(screen.getByTestId("chat-viewport")).toHaveTextContent("Help with my career");
-    expect(screen.getByTestId("chat-viewport")).toHaveTextContent("Choose a skill");
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Career skill" })).toHaveFocus());
+    expect(await screen.findByTestId("chat-viewport")).toHaveTextContent("Research Acme");
+    expect(screen.getByTestId("chat-viewport")).toHaveTextContent(
+      "What outcome should this research support?",
+    );
+    expect(screen.getByLabelText("Message Career Lab")).toBeEnabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     await waitFor(() => expect(mocks.streamIds.at(-1)).toBeNull());
   });
 

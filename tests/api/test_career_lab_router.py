@@ -47,12 +47,21 @@ class _Formatter:
 
 
 class _Router:
-    run_meta = None
+    run_meta = AgentRunMeta(
+        agent_family=AgentFamily.CAREER_LAB,
+        prompt_policy_version="career-lab-router-v2",
+        model_id="test",
+    )
 
     def run(self, _prompt):
         from resume_agent.career_lab.models import CareerLabRoute
 
-        return _Response(CareerLabRoute(needs_selection=True, reason="choose one"))
+        return _Response(
+            CareerLabRoute(
+                needs_selection=True,
+                reason="The intended outcome is unclear.",
+            )
+        )
 
 
 def _client(tmp_path):
@@ -426,7 +435,9 @@ def test_job_delete_survives_a_corrupt_career_lab_session_file(tmp_path):
         assert client.get("/api/career-lab/sessions").json()["sessions"] == []
 
 
-def test_ambiguous_route_returns_selection_without_persisting(monkeypatch, tmp_path):
+def test_ambiguous_route_starts_a_session_with_a_clarifying_question(
+    monkeypatch, tmp_path
+):
     monkeypatch.setattr(
         "resume_agent.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
@@ -441,6 +452,16 @@ def test_ambiguous_route_returns_selection_without_persisting(monkeypatch, tmp_p
         assert response.status_code == 202
         result = _wait(client, response.json()["runId"])
         assert result["state"] == "done"
-        assert result["result"]["needsSelection"] is True
+        assert result["result"]["sessionId"]
+        assert [turn["role"] for turn in result["result"]["turns"]] == [
+            "user",
+            "assistant",
+        ]
+        clarification = result["result"]["turns"][-1]
+        assert clarification["text"].endswith("a career decision?")
+        assert clarification["skillRef"] is None
+        assert clarification["agentMeta"]["prompt_policy_version"] == (
+            "career-lab-router-v2"
+        )
         listing = client.get("/api/career-lab/sessions").json()
-        assert listing["sessions"] == []
+        assert listing["sessions"][0]["sessionId"] == result["result"]["sessionId"]

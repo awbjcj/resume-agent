@@ -10,6 +10,7 @@ from resume_agent.career_lab.models import (
 )
 from resume_agent.career_lab.store import (
     active_session_for_job,
+    append_clarification_turns,
     append_turns,
     create_session,
     delete_sessions_for_job,
@@ -19,7 +20,7 @@ from resume_agent.career_lab.store import (
 )
 
 
-def test_assistant_turn_requires_exactly_one_skill_ref():
+def test_assistant_turn_requires_agent_metadata():
     with pytest.raises(ValidationError):
         CareerLabTurnRecord(
             turn_id="t1",
@@ -27,6 +28,25 @@ def test_assistant_turn_requires_exactly_one_skill_ref():
             text="draft",
             at="2026-08-02T00:00:00+00:00",
         )
+
+
+def test_assistant_turn_accepts_tool_free_router_clarification():
+    from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+
+    turn = CareerLabTurnRecord(
+        turn_id="t1",
+        role="assistant",
+        text="What outcome do you want?",
+        at="2026-08-02T00:00:00+00:00",
+        agent_meta=AgentRunMeta(
+            agent_family=AgentFamily.CAREER_LAB,
+            prompt_policy_version="career-lab-router-v2",
+            model_id="test",
+        ),
+    )
+
+    assert turn.skill_ref is None
+    assert turn.agent_meta is not None
 
 
 def test_assistant_turn_requires_matching_run_metadata():
@@ -143,6 +163,29 @@ def test_append_turns_round_trips_typed_artifact(tmp_path):
     session = load_session(tmp_path, "s1")
     assert [turn["role"] for turn in session["turns"]] == ["user", "assistant"]
     assert session["turns"][1]["artifact"]["artifact_type"] == "offer_comparison"
+
+
+def test_append_clarification_turns_round_trips_without_a_skill(tmp_path):
+    create_session(tmp_path, session_id="s1")
+    from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+
+    append_clarification_turns(
+        tmp_path,
+        "s1",
+        user_text="Research this company.",
+        context_refs={},
+        assistant_text="What outcome should the research support?",
+        agent_meta=AgentRunMeta(
+            agent_family=AgentFamily.CAREER_LAB,
+            prompt_policy_version="career-lab-router-v2",
+            model_id="test",
+        ),
+    )
+
+    session = load_session(tmp_path, "s1")
+    assistant = session["turns"][1]
+    assert assistant["skill_ref"] is None
+    assert assistant["agent_meta"]["skill_ref"] is None
 
 
 def test_store_model_accepts_legacy_empty_turns():

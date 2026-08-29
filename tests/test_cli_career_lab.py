@@ -118,3 +118,58 @@ def test_career_lab_command_resumes_the_thread_for_the_given_job(monkeypatch, tm
     assert result.exit_code == 0, result.output
     assert captured.asked_job_id == 7
     assert "Resuming your active Career Lab session." in result.output
+
+
+def test_career_lab_command_keeps_prompting_after_a_clarification(
+    monkeypatch, tmp_path
+):
+    captured = SimpleNamespace(messages=[])
+
+    class _Settings:
+        stream_enabled = False
+
+    monkeypatch.setattr(cli, "get_settings", lambda: _Settings())
+    monkeypatch.setattr(cli, "missing_model_keys", lambda _settings: [])
+    monkeypatch.setattr(cli, "_engine", lambda _db_url: object())
+    monkeypatch.setattr(cli, "_tenant_cli_path", lambda _path: tmp_path / "data")
+    monkeypatch.setattr(
+        "resume_agent.career_lab.store.active_session_for_job",
+        lambda _root, _job_id: None,
+    )
+
+    def start(_reporter, **_kwargs):
+        return {
+            "sessionId": "s1",
+            "status": "active",
+            "turns": [
+                {
+                    "role": "assistant",
+                    "text": "What outcome should the research support?",
+                }
+            ],
+        }
+
+    def message(_reporter, **kwargs):
+        captured.messages.append(kwargs["message"])
+        return {
+            "sessionId": "s1",
+            "status": "active",
+            "turns": [{"role": "assistant", "text": "Here is your draft."}],
+        }
+
+    monkeypatch.setattr("resume_agent.services.career_lab.run_start_turn", start)
+    monkeypatch.setattr("resume_agent.services.career_lab.run_message_turn", message)
+    monkeypatch.setattr(
+        "resume_agent.services.career_lab.run_end_turn",
+        lambda _reporter, **_kwargs: {"status": "ended", "turns": []},
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["career-lab"],
+        input="Research Acme\nPrepare me to negotiate\nend\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "What outcome should the research support?" in result.output
+    assert captured.messages == ["Prepare me to negotiate"]

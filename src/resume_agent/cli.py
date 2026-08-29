@@ -639,9 +639,6 @@ def career_lab_cmd(
                 sink=sink,
             )
         )
-        if view.get("needsSelection"):
-            typer.echo(f"Choose a Career Lab skill: {view['route'].get('reason', '')}")
-            raise typer.Exit(code=1)
     else:
         view = career_service.session_view(root, active["session_id"])
         typer.echo("Resuming your active Career Lab session.")
@@ -675,9 +672,6 @@ def career_lab_cmd(
                 sink=sink,
             )
         )
-        if view.get("needsSelection"):
-            typer.echo(f"Choose a Career Lab skill: {view['route'].get('reason', '')}")
-            continue
         show_latest(view)
 
 

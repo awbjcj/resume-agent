@@ -1834,10 +1834,15 @@
     "en": "Career Lab controls",
     "zh-CN": "职业实验室控制"
   },
-  "Career Lab could not tell which skill this needs. Choose one and start again.": {
-    "key": "ui_ab73d67ec846",
-    "en": "Career Lab could not tell which skill this needs. Choose one and start again.",
-    "zh-CN": "职业实验室无法判断这需要哪种技能。选择一项，然后重新开始。"
+  "Career Lab completed without opening a session.": {
+    "key": "ui_06a12cb365cd",
+    "en": "Career Lab completed without opening a session.",
+    "zh-CN": "职业实验室已完成，但未打开会话。"
+  },
+  "Career Lab completed without returning a session.": {
+    "key": "ui_0840c8f213fc",
+    "en": "Career Lab completed without returning a session.",
+    "zh-CN": "职业实验室已完成，但未返回会话。"
   },
   "Career Lab draft": {
     "key": "ui_04856cfe2db8",
@@ -2108,11 +2113,6 @@
     "key": "ui_ff68713e36d5",
     "en": "Choose jobs that have passed approval, including tailored or rendered jobs. All jobs start selected.",
     "zh-CN": "选择已通过批准的职位，包括定制或渲染的职位。所有职位开始选择。"
-  },
-  "Choose the Career Lab skill that best fits this request.": {
-    "key": "ui_995bb5b72e79",
-    "en": "Choose the Career Lab skill that best fits this request.",
-    "zh-CN": "选择最适合此要求的职业实验室技能。"
   },
   "Choose the hiring platform, verify the live board, then add it to discovery.": {
     "key": "ui_4034d9b4230c",
@@ -2498,11 +2498,6 @@
     "key": "ui_cce937e89144",
     "en": "Continue with Google",
     "zh-CN": "继续使用谷歌"
-  },
-  "Continue with skill": {
-    "key": "ui_358be6d27544",
-    "en": "Continue with skill",
-    "zh-CN": "继续发挥技巧"
   },
   "Control recurring allowances, durable credits, pricing coverage, and auditable balance changes.": {
     "key": "ui_73469b41bb83",

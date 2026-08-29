@@ -46,6 +46,7 @@ class CareerLabRoute(BaseModel):
     skill: CareerLabSkillName | None = None
     needs_selection: bool = False
     reason: str = Field(default="", max_length=500)
+    question: str = Field(default="", max_length=500)
 
 
 class CareerLabArtifactMeta(ExtensibleModel):
@@ -85,8 +86,14 @@ class CareerLabTurnRecord(ExtensibleModel):
 
         if self.context_refs is not None:
             raise ValueError("assistant turns cannot carry context references")
-        if self.skill_ref is None or self.agent_meta is None:
-            raise ValueError("assistant turns require skill and agent metadata")
+        if self.agent_meta is None:
+            raise ValueError("assistant turns require agent metadata")
+        if self.skill_ref is None:
+            if self.agent_meta.skill_ref is not None:
+                raise ValueError("clarification metadata cannot carry a skill")
+            if self.artifact is not None:
+                raise ValueError("clarification turns cannot carry artifacts")
+            return self
         if self.agent_meta.skill_ref != self.skill_ref:
             raise ValueError("assistant skill and agent metadata must match")
         return self
