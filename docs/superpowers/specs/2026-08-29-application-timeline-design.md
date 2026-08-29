@@ -309,13 +309,20 @@ un-sticks jobs already stuck in existing databases. **Requires an ADR.**
 
 ### Migration
 
-Hand-rolled `ensure_*` functions in `tracking/migrate.py`, matching every other
-schema change in this repo (no Alembic):
+**One** hand-rolled `ensure_*` function in `tracking/migrate.py`, matching every
+other schema change in this repo (no Alembic):
 
-- `ensure_application_events_table(engine)` — create table + indexes.
 - `ensure_application_submitted_events(engine)` — for each `Application` with a
   non-null `submitted_at` and no existing `application_submitted` event, emit
   one (`all_day=True`, `result="advanced"`, `source="migration"`). Idempotent.
+
+No table-creation migration is needed. `init_db` (`db.py:88`) calls
+`SQLModel.metadata.create_all(engine)` **before** the `ensure_*` sequence, and
+that creates any table — with its `Field(index=True)` indexes — that is imported
+into the metadata. The `ensure_*` functions exist only for `ALTER`-shaped
+changes to tables that already exist in deployed databases. The single
+requirement is that `ApplicationEvent` is imported in `db.py`'s table-import
+block (`db.py:10`) so its metadata registers before `create_all` runs.
 
 Status is **not** backfilled into synthetic events. An `interview` status
 implies some interview happened but carries no date, and an undated synthetic
