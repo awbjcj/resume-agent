@@ -1,10 +1,12 @@
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 import type { DashboardSummary } from "./use-dashboard-summary";
 
 type Stage = {
   key: string;
   label: string;
+  labelKey: `dashboard.stages.${"raw" | "triage" | "shortlist" | "approved" | "tailored" | "rendered" | "applied"}`;
   count: (s: DashboardSummary) => number;
 };
 
@@ -15,20 +17,22 @@ export const RAIL_STAGES: Stage[] = [
   {
     key: "raw",
     label: "Raw",
+    labelKey: "dashboard.stages.raw",
     count: (s) => (s.statusCounts.raw ?? 0) + (s.statusCounts.extracted ?? 0),
   },
-  { key: "triage", label: "Triage", count: status("filtered") },
-  { key: "shortlist", label: "Shortlist", count: status("shortlisted") },
-  { key: "approved", label: "Approved", count: status("approved") },
-  { key: "tailored", label: "Tailored", count: status("tailored") },
-  { key: "rendered", label: "Rendered", count: status("rendered") },
-  { key: "applied", label: "Applied", count: (s) => s.applied },
+  { key: "triage", label: "Triage", labelKey: "dashboard.stages.triage", count: status("filtered") },
+  { key: "shortlist", label: "Shortlist", labelKey: "dashboard.stages.shortlist", count: status("shortlisted") },
+  { key: "approved", label: "Approved", labelKey: "dashboard.stages.approved", count: status("approved") },
+  { key: "tailored", label: "Tailored", labelKey: "dashboard.stages.tailored", count: status("tailored") },
+  { key: "rendered", label: "Rendered", labelKey: "dashboard.stages.rendered", count: status("rendered") },
+  { key: "applied", label: "Applied", labelKey: "dashboard.stages.applied", count: (s) => s.applied },
 ];
 
 export function StageRail({ summary }: { summary: DashboardSummary }) {
+  const { t } = useTranslation();
   return (
     <ol
-      aria-label="Pipeline stages"
+      aria-label={t("dashboard.pipelineStages")}
       className="flex flex-wrap items-center gap-x-1 gap-y-4 rounded-lg border bg-card px-4 py-4 shadow-card"
     >
       {RAIL_STAGES.map((stage, index) => {
@@ -70,7 +74,7 @@ export function StageRail({ summary }: { summary: DashboardSummary }) {
                 {count}
               </div>
               <div className="mt-1.5 whitespace-nowrap text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {stage.label}
+                {t(stage.labelKey)}
               </div>
             </div>
           </li>

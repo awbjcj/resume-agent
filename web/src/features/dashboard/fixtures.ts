@@ -14,4 +14,5 @@ export const SUMMARY = {
   openErrorCount: 0,
   activeInterviews: [],
   activeCoachSession: null,
+  upcomingEvents: [],
 };

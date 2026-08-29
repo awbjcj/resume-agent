@@ -158,6 +158,8 @@ sponsorship policy and never hard-rejects a job.
 | `GOOGLE_OAUTH_CLIENT_SECRET` | empty | Platform Google OAuth Web application secret. |
 | `GMAIL_SYNC_INTERVAL_HOURS` | `6` | Hosted Gmail scheduler interval; non-negative integer, with `0` disabling the scheduler. |
 | `FOLLOW_UP_DAYS` | `14` | Age at which stale-application reminders are proposed; non-negative integer, with `0` disabling reminders. |
+| `INTERVIEW_REMINDER_HOURS` | `24` | Lead time for upcoming-interview reminders; non-negative integer, with `0` disabling these reminders. |
+| `OFFER_DEADLINE_REMINDER_DAYS` | `2` | Lead time for offer-deadline reminders; non-negative integer, with `0` disabling these reminders. |
 | `GMAIL_MAX_MESSAGES` | `50` | Maximum recent messages read per sync/draft lookup; integer at least 1. |
 | `RESEND_API_KEY` | empty | Resend HTTPS mail credential. When present, Resend wins over SMTP. |
 | `MAIL_FROM` | empty | Backend-neutral sender address; falls back to `SMTP_FROM`. |

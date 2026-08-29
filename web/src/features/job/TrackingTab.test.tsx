@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ mutate: vi.fn() }));
@@ -12,6 +13,7 @@ vi.mock("@/features/triage/use-triage-mutations", () => ({
 
 import { TrackingTab } from "./TrackingTab";
 import type { JobDetail } from "./use-job-detail";
+import { server } from "@/test/server";
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
@@ -31,13 +33,18 @@ const baseJob = {
 } as unknown as JobDetail;
 
 describe("TrackingTab", () => {
-  beforeEach(() => mocks.mutate.mockReset());
+  beforeEach(() => {
+    mocks.mutate.mockReset();
+    server.use(http.get("*/api/jobs/42/events", () => HttpResponse.json([])));
+  });
 
   it("renders stage, application, and a fenced danger zone", () => {
     render(<TrackingTab job={baseJob} onDeleted={vi.fn()} />, { wrapper });
 
     expect(screen.getByLabelText("Stage")).toBeInTheDocument();
-    expect(screen.getByLabelText("Application status")).toBeInTheDocument();
+    expect(screen.getByText("Current status")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Override" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Application notes")).toBeInTheDocument();
     expect(screen.getByText("Danger zone")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete/i })).toBeEnabled();
   });

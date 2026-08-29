@@ -275,10 +275,12 @@ def seed_llm_rates(engine: Engine) -> None:
     # Google publishes both Flash models' current rate as promotional "through
     # 2026-12-31", doubling on 2027-01-01. Seeding only the promo left the
     # quota system under-billing shared-key spend 2x from January, on a date
-    # nobody would be watching -- so the reversion is scheduled now, the same
-    # way `sonnet_intro_end` is.
+    # nobody would be watching -- so the reversion is scheduled now.
     gemini_promo_end = datetime(2027, 1, 1, tzinfo=timezone.utc)
-    sonnet_intro_end = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    # Sonnet 5 launched with a September 1 price increase scheduled. Anthropic
+    # later made the $2/$10 launch price permanent. Retain the old boundary
+    # only to repair databases that already contain the cancelled future row.
+    sonnet_cancelled_increase = datetime(2026, 9, 1, tzinfo=timezone.utc)
     deepseek_price_update = datetime(2026, 8, 16, 16, 0, tzinfo=timezone.utc)
     openai = "https://developers.openai.com/api/docs/pricing"
     openai_sol = "https://developers.openai.com/api/docs/models/gpt-5.6-sol"
@@ -427,11 +429,7 @@ def seed_llm_rates(engine: Engine) -> None:
                     output_micros_per_million=_micros_per_million(output_rate),
                     tool_micros_per_unit=tool,
                     effective_from=start,
-                    effective_to=(
-                        sonnet_intro_end
-                        if provider == "anthropic" and model == "claude-sonnet-5"
-                        else None
-                    ),
+                    effective_to=None,
                     source_url=source,
                 )
             )
@@ -691,7 +689,7 @@ def seed_llm_rates(engine: Engine) -> None:
             current_rate.output_micros_per_million = _micros_per_million(output_rate)
             current_rate.source_url = deepseek
 
-        sonnet_intro = (
+        sonnet_standard_rate = (
             session.execute(
                 select(LlmRate).where(
                     LlmRate.provider == "anthropic",
@@ -702,28 +700,36 @@ def seed_llm_rates(engine: Engine) -> None:
             .scalars()
             .first()
         )
-        if sonnet_intro is not None:
-            sonnet_intro.effective_to = sonnet_intro_end
-        future_key = (
-            "anthropic",
-            "claude-sonnet-5",
-            0,
-            stamp(sonnet_intro_end),
-        )
-        if future_key not in existing:
-            session.add(
-                LlmRate(
-                    id=uuid.uuid4().hex,
-                    provider="anthropic",
-                    model="claude-sonnet-5",
-                    input_micros_per_million=_micros_per_million(3),
-                    cache_read_micros_per_million=_micros_per_million(0.3),
-                    cache_write_micros_per_million=_micros_per_million(3.75),
-                    output_micros_per_million=_micros_per_million(15),
-                    tool_micros_per_unit=10_000,
-                    effective_from=sonnet_intro_end,
-                    source_url=anthropic,
+        cancelled_sonnet_rate = (
+            session.execute(
+                select(LlmRate).where(
+                    LlmRate.provider == "anthropic",
+                    LlmRate.model == "claude-sonnet-5",
+                    LlmRate.context_min_tokens == 0,
+                    LlmRate.effective_from == sonnet_cancelled_increase,
                 )
             )
+            .scalars()
+            .first()
+        )
+        if cancelled_sonnet_rate is None:
+            if sonnet_standard_rate is not None:
+                sonnet_standard_rate.effective_to = None
+        else:
+            # Do not delete a previously seeded row: usage events may refer to
+            # its immutable id. Make both sides of the old boundary carry the
+            # now-permanent Standard price instead.
+            if sonnet_standard_rate is not None:
+                sonnet_standard_rate.effective_to = sonnet_cancelled_increase
+            cancelled_sonnet_rate.input_micros_per_million = _micros_per_million(2)
+            cancelled_sonnet_rate.cache_read_micros_per_million = _micros_per_million(
+                0.2
+            )
+            cancelled_sonnet_rate.cache_write_micros_per_million = _micros_per_million(
+                2.5
+            )
+            cancelled_sonnet_rate.output_micros_per_million = _micros_per_million(10)
+            cancelled_sonnet_rate.tool_micros_per_unit = 10_000
+            cancelled_sonnet_rate.source_url = anthropic
         session.commit()
     invalidate_rate_cache(engine)

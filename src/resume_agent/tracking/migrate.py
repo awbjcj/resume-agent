@@ -454,12 +454,10 @@ def ensure_application_submitted_events(engine: Engine) -> None:
             conn.execute(
                 text(
                     "INSERT INTO application_events ("
-                    "  application_id, kind, sequence, sequence_overridden, "
-                    "  occurred_at, all_day, "
+                    "  application_id, kind, sequence, occurred_at, all_day, "
                     "  result, source, schema_version, created_at, updated_at"
                     ") VALUES ("
-                    "  :application_id, 'application_submitted', 1, 0, "
-                    "  :occurred_at, 1, "
+                    "  :application_id, 'application_submitted', 1, :occurred_at, 1, "
                     "  'advanced', 'migration', 1, :now, :now)"
                 ),
                 {
@@ -471,22 +469,30 @@ def ensure_application_submitted_events(engine: Engine) -> None:
 
 
 def ensure_application_event_sequence_override_column(engine: Engine) -> None:
-    """Add the marker that separates automatic sequences from user overrides."""
-    with engine.begin() as conn:
-        columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info(application_events)"))
-        }
-        if not columns or "sequence_overridden" in columns:
-            return
-        conn.execute(
-            text(
-                "ALTER TABLE application_events ADD COLUMN "
-                "sequence_overridden BOOLEAN NOT NULL DEFAULT 0"
+    """Persist whether an event sequence was explicitly chosen by the user.
+
+    Legacy rows cannot reveal that provenance. Treat their effective value as
+    explicit so a later insert/edit/delete cannot silently destroy ordering a
+    user may have chosen. If the short-lived boolean marker migration already
+    ran, retain only the rows it identified as explicit overrides.
+    """
+    cols = _table_columns(engine, "application_events")
+    if cols and "sequence_override" not in cols:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE application_events "
+                    "ADD COLUMN sequence_override INTEGER"
+                )
             )
-        )
-        # The old schema could not distinguish automatic values from explicit
-        # user choices. Preserve every legacy value conservatively; events
-        # created after this migration use the column default, and migration
-        # backfills explicitly write false.
-        conn.execute(text("UPDATE application_events SET sequence_overridden = 1"))
+            conn.execute(
+                text(
+                    "UPDATE application_events "
+                    "SET sequence_override = sequence"
+                    + (
+                        " WHERE sequence_overridden = 1"
+                        if "sequence_overridden" in cols
+                        else ""
+                    )
+                )
+            )

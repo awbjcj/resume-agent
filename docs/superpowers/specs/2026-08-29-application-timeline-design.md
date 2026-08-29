@@ -94,7 +94,8 @@ class ApplicationEvent(SQLModel, table=True):
 
     kind: str = Field(index=True)              # EventKind value
     custom_label: str | None = None            # required iff kind == "custom"
-    sequence: int = 1                          # nth event of this kind
+    sequence: int = 1                          # effective nth event of this kind
+    sequence_override: int | None = None        # explicit user choice; NULL = auto
 
     occurred_at: datetime | None = Field(default=None, index=True)  # UTC
     all_day: bool = False
@@ -284,6 +285,16 @@ Rounds are logged in order roughly always, and the override covers the
 remainder. Inserting a forgotten earlier round renumbers the later ones unless
 they carry an override.
 
+Override provenance is stored separately because an effective value of `1`
+cannot reveal whether it was automatic or explicit. Automatic rows fill the
+lowest positive values not reserved by overrides. `ApplicationEventOut` exposes
+nullable `sequenceOverride` so the edit form shows only the user's choice;
+PATCH `{"sequence": null}` clears it and returns the row to automatic order.
+Legacy rows cannot reveal original intent, so migration freezes their effective
+value as an override. This compatibility-first choice prevents the next group
+mutation from silently destroying an old manual order; users can explicitly
+clear the override afterward.
+
 ### `has_progress` — enforcing the stated intent
 
 `has_progress`'s docstring says it protects "user investment that must never be
@@ -309,9 +320,12 @@ un-sticks jobs already stuck in existing databases. **Requires an ADR.**
 
 ### Migration
 
-**One** hand-rolled `ensure_*` function in `tracking/migrate.py`, matching every
+**Two** hand-rolled `ensure_*` functions in `tracking/migrate.py`, matching every
 other schema change in this repo (no Alembic):
 
+- `ensure_application_event_sequence_override_column(engine)` — idempotently
+  adds the nullable override-provenance column to deployed event tables. During
+  the one-time ALTER, existing effective values are copied into the override.
 - `ensure_application_submitted_events(engine)` — for each `Application` with a
   non-null `submitted_at` and no existing `application_submitted` event, emit
   one (`all_day=True`, `result="advanced"`, `source="migration"`). Idempotent.
@@ -319,8 +333,9 @@ other schema change in this repo (no Alembic):
 No table-creation migration is needed. `init_db` (`db.py:88`) calls
 `SQLModel.metadata.create_all(engine)` **before** the `ensure_*` sequence, and
 that creates any table — with its `Field(index=True)` indexes — that is imported
-into the metadata. The `ensure_*` functions exist only for `ALTER`-shaped
-changes to tables that already exist in deployed databases. The single
+into the metadata. The override `ensure_*` exists for the `ALTER`-shaped change
+to tables that already exist in deployed databases; the submitted-event helper
+is a data backfill. The single
 requirement is that `ApplicationEvent` is imported in `db.py`'s table-import
 block (`db.py:10`) so its metadata registers before `create_all` runs.
 

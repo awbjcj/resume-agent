@@ -252,6 +252,7 @@ def events_for_application(
                 occurred.is_(None),  # False (0) sorts before True (1)
                 occurred.asc(),
                 cast(Any, ApplicationEvent.created_at).asc(),
+                cast(Any, ApplicationEvent.id).asc(),
             )
         ).all()
     )
@@ -296,30 +297,43 @@ def next_sequence(session: Session, application_id: int, kind: str) -> int:
             ApplicationEvent.kind == kind,
         )
     ).all()
-    return len(existing) + 1
+    return max((event.sequence for event in existing), default=0) + 1
 
 
 def resequence_event_kind(
     session: Session, application_id: int, kind: str, *, commit: bool = True
 ) -> None:
-    """Renumber automatic same-kind events in timeline order.
-
-    Manual values keep their override, but still occupy their chronological
-    position so automatic values remain the nth event of their kind.
-    """
+    """Renumber automatic same-kind events around explicit sequence values."""
     events = [
         event
         for event in events_for_application(session, application_id)
         if event.kind == kind
     ]
+    occupied = {
+        event.sequence_override
+        for event in events
+        if event.sequence_override is not None
+    }
     changed = False
-    for sequence, event in enumerate(events, start=1):
-        if event.sequence_overridden or event.sequence == sequence:
+    sequence = 1
+    for event in events:
+        if event.sequence_override is not None:
+            if event.sequence != event.sequence_override:
+                event.sequence = event.sequence_override
+                event.updated_at = utcnow()
+                session.add(event)
+                changed = True
+            continue
+        while sequence in occupied:
+            sequence += 1
+        if event.sequence == sequence:
+            sequence += 1
             continue
         event.sequence = sequence
         event.updated_at = utcnow()
         session.add(event)
         changed = True
+        sequence += 1
     if changed:
         if commit:
             session.commit()

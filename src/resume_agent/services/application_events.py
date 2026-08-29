@@ -9,9 +9,12 @@ conditions are checked.
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from resume_agent.tracking.event_vocab import (
     KIND_IMPLIES_STATUS,
@@ -22,16 +25,13 @@ from resume_agent.tracking.event_vocab import (
 )
 from resume_agent.tracking.repository import (
     application_for_job,
-    delete_application_event,
     events_for_application,
     get_application_event,
-    next_sequence,
-    resequence_event_kind,
-    save_application,
-    save_application_event,
 )
 from resume_agent.tracking.status_rules import advance_application_status
-from resume_agent.tracking.tables import Application, ApplicationEvent
+from resume_agent.tracking.tables import Application, ApplicationEvent, utcnow
+
+logger = logging.getLogger(__name__)
 
 _WRITABLE = {
     "kind",
@@ -81,6 +81,14 @@ def _validate(payload: dict[str, Any]) -> None:
         if payload.get("occurred_at") is None:
             raise EventValidationError(f"occurred_at is required for kind '{kind}'")
 
+    sequence = payload.get("sequence")
+    if sequence is not None and (
+        not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1
+    ):
+        raise EventValidationError("sequence must be a positive integer")
+    if "all_day" in payload and not isinstance(payload["all_day"], bool):
+        raise EventValidationError("all_day must be true or false")
+
     platform = payload.get("platform")
     if platform is not None and platform not in {p.value for p in Platform}:
         raise EventValidationError(f"Unknown platform '{platform}'")
@@ -104,12 +112,22 @@ def _validate(payload: dict[str, Any]) -> None:
     if result is not None and result not in {r.value for r in EventResult}:
         raise EventValidationError(f"Unknown result '{result}'")
 
+    timezone = payload.get("timezone")
+    if timezone:
+        try:
+            ZoneInfo(timezone)
+        except ZoneInfoNotFoundError as error:
+            raise EventValidationError(f"Unknown IANA timezone '{timezone}'") from error
+
 
 def _application(session: Session, job_id: int) -> Application:
     existing = application_for_job(session, job_id)
     if existing is not None:
         return existing
-    return save_application(session, Application(job_id=job_id), commit=False)
+    application = Application(job_id=job_id)
+    session.add(application)
+    session.flush()
+    return application
 
 
 def _advance(session: Session, application: Application, kind: str) -> None:
@@ -119,7 +137,70 @@ def _advance(session: Session, application: Application, kind: str) -> None:
     moved = advance_application_status(application.status, implied)
     if moved != application.status:
         application.status = moved
-        save_application(session, application, commit=False)
+        if moved == "submitted" and application.submitted_at is None:
+            application.submitted_at = utcnow()
+        session.add(application)
+
+
+def _sort_moment(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.max.replace(tzinfo=timezone.utc)
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _resequence_group(session: Session, application_id: int, kind: str) -> None:
+    """Recompute effective order while reserving every explicit override."""
+    events = list(
+        session.exec(
+            select(ApplicationEvent).where(
+                ApplicationEvent.application_id == application_id,
+                ApplicationEvent.kind == kind,
+            )
+        ).all()
+    )
+    occupied = {
+        item.sequence_override for item in events if item.sequence_override is not None
+    }
+    for item in events:
+        if item.sequence_override is not None:
+            item.sequence = item.sequence_override
+            session.add(item)
+
+    automatic = sorted(
+        (item for item in events if item.sequence_override is None),
+        key=lambda item: (
+            _sort_moment(item.occurred_at),
+            _sort_moment(item.created_at),
+            item.id or 0,
+        ),
+    )
+    next_sequence = 1
+    for item in automatic:
+        while next_sequence in occupied:
+            next_sequence += 1
+        item.sequence = next_sequence
+        session.add(item)
+        next_sequence += 1
+
+
+def _warn_duplicate_override(session: Session, event: ApplicationEvent) -> None:
+    """Log the spec-permitted collision without blocking the write."""
+    if event.sequence_override is None:
+        return
+    statement = select(ApplicationEvent).where(
+        ApplicationEvent.application_id == event.application_id,
+        ApplicationEvent.kind == event.kind,
+        ApplicationEvent.sequence_override == event.sequence_override,
+    )
+    if event.id is not None:
+        statement = statement.where(ApplicationEvent.id != event.id)
+    if session.exec(statement).first() is not None:
+        logger.warning(
+            "Duplicate application event key application_id=%s kind=%s sequence=%s",
+            event.application_id,
+            event.kind,
+            event.sequence_override,
+        )
 
 
 def create_event(
@@ -129,19 +210,24 @@ def create_event(
     try:
         application = _application(session, job_id)
         fields = {k: v for k, v in payload.items() if k in _WRITABLE}
+        if fields.get("occurred_at") is not None:
+            fields["occurred_at"] = fields["occurred_at"].astimezone(timezone.utc)
         kind = fields["kind"]
-        sequence_overridden = "sequence" in fields
-        fields.setdefault("sequence", next_sequence(session, application.id, kind))
-        event = save_application_event(
-            session,
-            ApplicationEvent(
-                application_id=application.id,
-                sequence_overridden=sequence_overridden,
-                **fields,
-            ),
-            commit=False,
+        application_id = application.id
+        if application_id is None:
+            raise RuntimeError("Application id was not assigned")
+        sequence_override = fields.pop("sequence", None)
+        event = ApplicationEvent(
+            application_id=application_id,
+            sequence=sequence_override or 1,
+            sequence_override=sequence_override,
+            **fields,
         )
-        resequence_event_kind(session, application.id, kind, commit=False)
+        _warn_duplicate_override(session, event)
+        event.updated_at = utcnow()
+        session.add(event)
+        session.flush()
+        _resequence_group(session, application_id, kind)
         _advance(session, application, kind)
         session.commit()
         session.refresh(event)
@@ -159,22 +245,37 @@ def update_event(
     if application is None or event is None or event.application_id != application.id:
         return None
     try:
-        previous_kind = event.kind
+        old_kind = event.kind
+        sequence_supplied = "sequence" in payload
+        sequence_override = payload.get("sequence") if sequence_supplied else None
+        if sequence_override is not None and (
+            not isinstance(sequence_override, int)
+            or isinstance(sequence_override, bool)
+            or sequence_override < 1
+        ):
+            raise EventValidationError("sequence must be a positive integer")
         merged = {field: getattr(event, field) for field in _WRITABLE}
-        merged.update({k: v for k, v in payload.items() if k in _WRITABLE})
+        merged.update(
+            {k: v for k, v in payload.items() if k in _WRITABLE and k != "sequence"}
+        )
+        if payload.get("occurred_at") is not None:
+            merged["occurred_at"] = payload["occurred_at"].astimezone(timezone.utc)
         _validate(merged)
         for field, value in merged.items():
             setattr(event, field, value)
-        if "sequence" in payload:
-            event.sequence_overridden = True
-        saved = save_application_event(session, event, commit=False)
-        resequence_event_kind(session, application.id, previous_kind, commit=False)
-        if saved.kind != previous_kind:
-            resequence_event_kind(session, application.id, saved.kind, commit=False)
-        _advance(session, application, saved.kind)
+        if sequence_supplied:
+            event.sequence_override = sequence_override
+        event.updated_at = utcnow()
+        session.add(event)
+        session.flush()
+        _warn_duplicate_override(session, event)
+        application_id = event.application_id
+        for kind in {old_kind, event.kind}:
+            _resequence_group(session, application_id, kind)
+        _advance(session, application, event.kind)
         session.commit()
-        session.refresh(saved)
-        return saved
+        session.refresh(event)
+        return event
     except BaseException:
         session.rollback()
         raise
@@ -186,13 +287,14 @@ def delete_event(session: Session, job_id: int, event_id: int) -> bool:
     event = get_application_event(session, event_id)
     if application is None or event is None or event.application_id != application.id:
         return False
-    kind = event.kind
     try:
-        deleted = delete_application_event(session, event_id, commit=False)
-        if deleted:
-            resequence_event_kind(session, application.id, kind, commit=False)
+        application_id = event.application_id
+        kind = event.kind
+        session.delete(event)
+        session.flush()
+        _resequence_group(session, application_id, kind)
         session.commit()
-        return deleted
+        return True
     except BaseException:
         session.rollback()
         raise

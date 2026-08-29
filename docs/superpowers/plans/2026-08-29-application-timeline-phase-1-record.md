@@ -21,6 +21,16 @@
 - **SQLite runs without `PRAGMA foreign_keys`.** Declared FKs do not cascade or restrict. Any cleanup must be explicit in code.
 - **After any API schema change**, regenerate the contract: `make openapi && make client` (or `bash scripts/gen_ts_client.sh`). Commit `contracts/openapi.json`, `contracts/ts/api.ts`, and `web/src/lib/api/schema.ts` together with the change.
 
+## Correctness amendment (reviewed 2026-08-29)
+
+- Persist `sequence_override` separately from effective `sequence`; NULL means
+  automatic. Expose nullable `sequenceOverride` in event responses so edit forms
+  do not resubmit automatic values as manual choices, and accept PATCH null to
+  clear an override. Add the idempotent nullable-column ALTER migration before
+  the submitted-event backfill. Because legacy provenance is unrecoverable,
+  freeze existing effective values as overrides so later mutations cannot
+  silently destroy an old manual order; users can clear them explicitly.
+
 ---
 
 ## File Structure
@@ -30,7 +40,7 @@
 | `src/resume_agent/tracking/event_vocab.py` | **Create.** The four enums + the kind→status mapping. Pure data, no I/O, no SQLModel import. Isolated so tests and the web contract can read the vocabulary without touching the DB layer. |
 | `src/resume_agent/tracking/tables.py` | **Modify.** Add the `ApplicationEvent` table. |
 | `src/resume_agent/db.py` | **Modify.** Import `ApplicationEvent` into the metadata block; register the backfill migration. |
-| `src/resume_agent/tracking/migrate.py` | **Modify.** Add `ensure_application_submitted_events`. |
+| `src/resume_agent/tracking/migrate.py` | **Modify.** Add `ensure_application_event_sequence_override_column` and `ensure_application_submitted_events`. |
 | `src/resume_agent/tracking/repository.py` | **Modify.** Event CRUD; refine `has_progress` and `progressed_job_ids`. |
 | `src/resume_agent/tracking/status_rules.py` | **Create.** Progression-versus-terminal transition logic. Pure function over strings — no session, no ORM — so the rule is testable in isolation and readable by anyone auditing the invariant. |
 | `src/resume_agent/services/application_events.py` | **Create.** Service layer: validation, sequence assignment, status advancement, transactional create/update/delete. |
@@ -295,12 +305,12 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _engine():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     return engine
 
@@ -637,13 +647,13 @@ git commit -m "feat(tracking): progression-vs-terminal application status (ADR-0
 # tests/test_has_progress_investment.py
 from sqlmodel import Session
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.repository import has_progress, progressed_job_ids
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _setup(**app_kwargs):
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     session = Session(engine)
     job = Job(source="test", company="Acme", title="SWE", status="raw")
@@ -701,7 +711,7 @@ def test_job_status_check_is_unchanged():
 
 
 def test_batched_and_single_predicates_agree_across_a_mixed_set():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     session = Session(engine)
     ids = []
@@ -881,7 +891,7 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.repository import (
     delete_application_event,
     events_for_application,
@@ -893,7 +903,7 @@ from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _app():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     session = Session(engine)
     job = Job(source="test")
@@ -1075,7 +1085,7 @@ from datetime import datetime, timezone
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.services.application_events import (
     EventValidationError,
     create_event,
@@ -1088,7 +1098,7 @@ from resume_agent.tracking.tables import Job
 
 
 def _job():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     session = Session(engine)
     job = Job(source="test", company="Acme", title="SWE")
@@ -1417,13 +1427,13 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.migrate import ensure_application_submitted_events
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _seed(submitted_at):
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     with Session(engine) as session:
         job = Job(source="test", company="Acme")
@@ -1465,7 +1475,7 @@ def test_skips_applications_with_no_submitted_at():
 
 
 def test_does_not_synthesize_events_from_status_alone():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     with Session(engine) as session:
         job = Job(source="test")
@@ -1858,7 +1868,7 @@ from resume_agent.services.application_events import (
     list_events,
     update_event,
 )
-from resume_agent.tracking.queries import get_job
+from resume_agent.tracking.repository import get_job
 
 router = APIRouter()
 

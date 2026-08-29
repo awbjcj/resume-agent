@@ -187,6 +187,10 @@ class Settings(BaseSettings):
     google_oauth_client_secret: str = ""
     gmail_sync_interval_hours: int = Field(default=6, ge=0)  # 0 = scheduler off
     follow_up_days: int = Field(default=14, ge=0)  # 0 = reminders off
+    # The short lead belongs to exported calendar VALARMs; these are the
+    # long-lead in-app nudges delivered by the hourly all-user scheduler.
+    interview_reminder_hours: int = Field(default=24, ge=0)  # 0 = off
+    offer_deadline_reminder_days: int = Field(default=2, ge=0)  # 0 = off
     gmail_max_messages: int = Field(default=50, ge=1)
 
     @property

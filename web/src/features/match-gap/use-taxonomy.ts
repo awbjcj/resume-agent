@@ -8,7 +8,7 @@ import { MATCH_GAP_QUERY_KEY } from "./use-match-gap";
 type MatchGap = components["schemas"]["MatchGapOut"];
 export type NewDomainInput = { label: string; category: string };
 
-function useTaxonomyMutation<V>(
+function useTaxonomyMutationMessage<V>(
   run: (variables: V) => Promise<MatchGap>,
   message: string,
 ) {
@@ -47,7 +47,7 @@ export function useRestoreSkills() {
 }
 
 export function useMoveSkill() {
-  return useTaxonomyMutation(
+  return useTaxonomyMutationMessage(
     (variables: {
       token: string;
       domainId?: string;
@@ -66,7 +66,7 @@ export function useMoveSkill() {
   );
 }
 export function useAddSkill() {
-  return useTaxonomyMutation(
+  return useTaxonomyMutationMessage(
     (variables: {
       token: string;
       domainId?: string;
@@ -79,7 +79,7 @@ export function useAddSkill() {
   );
 }
 export function useRemoveSkill() {
-  return useTaxonomyMutation(
+  return useTaxonomyMutationMessage(
     (variables: { token: string }) =>
       unwrap(
         api.DELETE("/api/taxonomy/skills/{token}", {
@@ -90,7 +90,7 @@ export function useRemoveSkill() {
   );
 }
 export function useMergeSkills() {
-  return useTaxonomyMutation(
+  return useTaxonomyMutationMessage(
     (variables: { token: string; canonical: string }) =>
       unwrap(
         api.POST("/api/taxonomy/aliases", { body: variables }),
@@ -99,7 +99,7 @@ export function useMergeSkills() {
   );
 }
 export function usePatchDomain() {
-  return useTaxonomyMutation(
+  return useTaxonomyMutationMessage(
     (variables: {
       domainId: string;
       body: { label?: string; category?: string };
@@ -114,7 +114,7 @@ export function usePatchDomain() {
   );
 }
 export function useMergeDomains() {
-  return useTaxonomyMutation(
+  return useTaxonomyMutationMessage(
     (variables: { domainId: string; into: string }) =>
       unwrap(
         api.POST("/api/taxonomy/domains/{domain_id}/merge", {

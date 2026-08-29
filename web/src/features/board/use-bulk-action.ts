@@ -73,8 +73,8 @@ export function useBulkAction(board: Board) {
       for (const key of ["shortlist", "pipeline", "triage"]) {
         qc.invalidateQueries({ queryKey: [key] });
       }
-      const skipped = result.skipped ? ` · ${result.skipped} skipped` : "";
-      toast.success(`${args.action}: ${result.affected} job(s)${skipped}`);
+      const skippedText = result.skipped ? ` · ${result.skipped} skipped` : "";
+      toast.success(`${args.action}: ${result.affected} job(s)${skippedText}`);
       return result;
     },
   };

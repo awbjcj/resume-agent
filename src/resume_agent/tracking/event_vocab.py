@@ -73,6 +73,8 @@ _INTERVIEW_KINDS = (
     EventKind.team_match,
 )
 
+INTERVIEW_KINDS: tuple[str, ...] = tuple(kind.value for kind in _INTERVIEW_KINDS)
+
 KIND_IMPLIES_STATUS: dict[str, str] = {
     EventKind.application_submitted.value: "submitted",
     **{kind.value: "interview" for kind in _INTERVIEW_KINDS},

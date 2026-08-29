@@ -107,6 +107,92 @@
 }
 .shell-action-rail::-webkit-scrollbar { display: none; }
 
+/* Authentication is a quiet product moment rather than a generic form page.
+   The generated illustration carries the narrative; the form surface stays
+   calm and legible so the artwork never competes with the task. */
+.auth-shell {
+  isolation: isolate;
+}
+
+.auth-brand-panel {
+  background: #061d26;
+}
+
+.auth-brand-art {
+  filter: saturate(0.88) contrast(1.03);
+}
+
+.auth-surface {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(70% 45% at 82% 8%, color-mix(in oklab, var(--primary), transparent 90%), transparent 72%),
+    radial-gradient(52% 42% at 8% 92%, color-mix(in oklab, var(--chart-2), transparent 94%), transparent 76%);
+}
+
+.auth-card {
+  animation: auth-card-enter 240ms var(--ease-out-strong) both;
+}
+
+@keyframes auth-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* The command panel uses the same teal/ink vocabulary as the auth artwork,
+   but stays code-native so navigation remains crisp at every density. */
+.command-panel {
+  background-color: var(--sidebar);
+  background-image:
+    radial-gradient(90% 24% at 18% 0%, color-mix(in oklab, var(--sidebar-primary), transparent 87%), transparent 72%),
+    linear-gradient(180deg, color-mix(in oklab, var(--sidebar), var(--sidebar-accent) 10%), var(--sidebar) 38%);
+}
+
+.command-panel-mark {
+  box-shadow:
+    0 10px 24px -14px color-mix(in oklab, var(--sidebar-primary), transparent 22%),
+    inset 0 1px 0 color-mix(in oklab, var(--sidebar-primary-foreground), transparent 78%);
+}
+
+.command-sidebar-brief {
+  background-color: color-mix(in oklab, var(--sidebar), transparent 4%);
+  background-image: radial-gradient(
+    90% 160% at 100% 0%,
+    color-mix(in oklab, var(--sidebar-primary), transparent 88%),
+    transparent 66%
+  );
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--sidebar-foreground), transparent 94%);
+}
+
+.command-panel [data-sidebar="menu-button"][aria-current="page"] {
+  background: color-mix(in oklab, var(--sidebar-accent), var(--sidebar) 12%);
+  color: var(--sidebar-accent-foreground);
+  box-shadow:
+    inset 3px 0 0 var(--sidebar-primary),
+    inset 0 0 0 1px color-mix(in oklab, var(--sidebar-primary), transparent 82%),
+    0 8px 18px -16px color-mix(in oklab, var(--sidebar-primary), transparent 20%);
+}
+
+/* Ctrl/Cmd+B is a high-frequency keyboard action. Its result should be
+   immediate, so desktop sidebar geometry never eases after the shortcut. */
+@media (min-width: 48rem) {
+  .command-shell [data-slot="sidebar-gap"],
+  .command-shell [data-slot="sidebar-container"] {
+    transition-duration: 0ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-card {
+    animation: none;
+  }
+}
+
 /* Job boards can render hundreds of cards. Preserve a realistic placeholder
    height while letting the browser skip off-screen layout and paint work. */
 .job-card {

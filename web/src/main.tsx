@@ -4,12 +4,20 @@ import { RouterProvider } from "react-router-dom";
 
 import { Providers } from "./app/providers";
 import { router } from "./app/router";
+import i18n from "./i18n";
 import "./index.css";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>
-  </StrictMode>,
-);
+const root = createRoot(document.getElementById("root")!);
+
+function renderApp(): void {
+  root.render(
+    <StrictMode>
+      <Providers>
+        <RouterProvider router={router} />
+      </Providers>
+    </StrictMode>,
+  );
+}
+
+renderApp();
+i18n.on("languageChanged", renderApp);

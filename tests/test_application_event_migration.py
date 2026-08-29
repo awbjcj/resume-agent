@@ -75,32 +75,70 @@ def test_init_db_runs_the_backfill():
         assert len(session.exec(select(ApplicationEvent)).all()) == 1
 
 
-def test_adds_sequence_override_marker_to_an_existing_event_table():
+def test_adds_nullable_sequence_override_to_a_legacy_event_table():
     engine = make_engine("sqlite://")
-    with engine.begin() as connection:
-        connection.execute(
+    with engine.begin() as conn:
+        conn.execute(
             text(
                 "CREATE TABLE application_events ("
                 "id INTEGER PRIMARY KEY, sequence INTEGER NOT NULL DEFAULT 1)"
             )
         )
-        connection.execute(
-            text("INSERT INTO application_events (id, sequence) VALUES (1, 7)")
+        conn.execute(
+            text("INSERT INTO application_events (id, sequence) VALUES (1, 3), (2, 9)")
         )
 
     ensure_application_event_sequence_override_column(engine)
+
+    with engine.begin() as conn:
+        columns = {
+            row[1]: row
+            for row in conn.execute(text("PRAGMA table_info(application_events)"))
+        }
+        migrated = conn.execute(
+            text(
+                "SELECT sequence, sequence_override FROM application_events ORDER BY id"
+            )
+        ).fetchall()
+        conn.execute(
+            text(
+                "INSERT INTO application_events (id, sequence, sequence_override) "
+                "VALUES (3, 2, NULL)"
+            )
+        )
+    ensure_application_event_sequence_override_column(engine)
+    with engine.begin() as conn:
+        new_row_override = conn.execute(
+            text("SELECT sequence_override FROM application_events WHERE id = 3")
+        ).scalar_one()
+    assert "sequence_override" in columns
+    assert columns["sequence_override"][3] == 0
+    assert migrated == [(3, 3), (9, 9)]
+    assert new_row_override is None
+
+
+def test_upgrades_boolean_sequence_override_marker_without_freezing_auto_rows():
+    engine = make_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE application_events ("
+                "id INTEGER PRIMARY KEY, sequence INTEGER NOT NULL DEFAULT 1, "
+                "sequence_overridden BOOLEAN NOT NULL DEFAULT 0)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO application_events "
+                "(id, sequence, sequence_overridden) "
+                "VALUES (1, 3, 0), (2, 9, 1)"
+            )
+        )
+
     ensure_application_event_sequence_override_column(engine)
 
-    with engine.begin() as connection:
-        columns = {
-            row[1]
-            for row in connection.execute(text("PRAGMA table_info(application_events)"))
-        }
-        legacy = connection.execute(
-            text(
-                "SELECT sequence, sequence_overridden "
-                "FROM application_events WHERE id = 1"
-            )
-        ).one()
-    assert "sequence_overridden" in columns
-    assert legacy == (7, 1)
+    with engine.begin() as conn:
+        migrated = conn.execute(
+            text("SELECT sequence_override FROM application_events ORDER BY id")
+        ).fetchall()
+    assert migrated == [(None,), (9,)]

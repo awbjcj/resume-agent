@@ -191,7 +191,7 @@ export function useDeleteVersions(jobId: number) {
             }),
           )
         : unwrap(api.POST("/api/resume-versions/bulk-delete", { body: { ids } })),
-    (ids) => `Deleted ${ids.length} version${ids.length === 1 ? "" : "s"}`,
+    deletedVersionsMessage,
   );
 }
 
@@ -206,9 +206,15 @@ export function useDeleteCoverLetters(jobId: number) {
             }),
           )
         : unwrap(api.POST("/api/cover-letters/bulk-delete", { body: { ids } })),
-    (ids) => `Deleted ${ids.length} cover letter${ids.length === 1 ? "" : "s"}`,
+    deletedCoverLettersMessage,
   );
 }
+
+const deletedVersionsMessage = (ids: number[]) =>
+  `Deleted ${ids.length} version${ids.length === 1 ? "" : "s"}`;
+
+const deletedCoverLettersMessage = (ids: number[]) =>
+  `Deleted ${ids.length} cover letter${ids.length === 1 ? "" : "s"}`;
 
 export function useGenerateCoverLetter(jobId: number) {
   const { launch } = useLaunchRun();

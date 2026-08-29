@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/PageHeader";
+import { useTranslation } from "react-i18next";
 import { BoardSkeleton } from "@/components/skeletons";
 import { GettingStartedChecklist } from "@/features/journey/GettingStartedChecklist";
 import { JourneyRail } from "@/features/journey/JourneyRail";
@@ -10,6 +11,7 @@ import { InProgressCard } from "./InProgressCard";
 import { RecentRuns } from "./RecentRuns";
 import { QuickAccess } from "./QuickAccess";
 import { StageRail } from "./StageRail";
+import { UpcomingCard } from "./UpcomingCard";
 import { useDashboardSummary } from "./use-dashboard-summary";
 
 export function heroTitle(waiting: number): string {
@@ -18,6 +20,7 @@ export function heroTitle(waiting: number): string {
 }
 
 export function DashboardPage() {
+  const { t, i18n } = useTranslation();
   const { data: summary, isPending } = useDashboardSummary();
   if (isPending || !summary) return <BoardSkeleton />;
 
@@ -28,7 +31,7 @@ export function DashboardPage() {
     (sum, [status, count]) => (status === "rejected" ? sum : sum + count),
     0,
   );
-  const eyebrow = `Operations · ${new Date().toLocaleDateString(undefined, {
+  const eyebrow = `${t("dashboard.operations")} · ${new Date().toLocaleDateString(i18n.resolvedLanguage, {
     month: "short",
     day: "numeric",
   })}`;
@@ -37,8 +40,12 @@ export function DashboardPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         kicker={eyebrow}
-        title={heroTitle(waiting)}
-        sub="Pull fresh listings, triage the queue, and ship tailored resumes."
+        title={waiting === 0
+          ? t("dashboard.waiting_zero", { count: waiting })
+          : waiting === 1
+            ? t("dashboard.waiting_one", { count: waiting })
+            : t("dashboard.waiting_other", { count: waiting })}
+        sub={t("dashboard.subtitle")}
       />
       <QuickAccess />
       <GettingStartedChecklist />
@@ -55,6 +62,7 @@ export function DashboardPage() {
             </>
           )}
           <InProgressCard summary={summary} />
+          <UpcomingCard events={summary.upcomingEvents ?? []} />
           <AttentionCard />
         </div>
         {/* Standing "is the desk working?" column: setup readiness plus live run
@@ -68,7 +76,7 @@ export function DashboardPage() {
             column scrolls; below xl the columns stack and status follows the
             work, which is the right priority order. */}
         <aside
-          aria-label="System status"
+          aria-label={t("dashboard.systemStatus")}
           className="stagger-children flex min-w-0 flex-col gap-6 xl:sticky xl:top-20 xl:self-start"
         >
           <DeskHealth />

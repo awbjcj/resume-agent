@@ -23,6 +23,9 @@ const TriagePage = lazy(() =>
 const AnalyticsPage = lazy(() =>
   import("@/features/analytics/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })),
 );
+const ApplicationsPage = lazy(() =>
+  import("@/features/applications/ApplicationsPage").then((m) => ({ default: m.ApplicationsPage })),
+);
 const MatchGapPage = lazy(() =>
   import("@/features/match-gap/MatchGapPage").then((m) => ({ default: m.MatchGapPage })),
 );
@@ -151,6 +154,7 @@ export const router = createBrowserRouter([
       { path: "pipeline", element: <SetupGate>{page(<PipelinePage />)}</SetupGate> },
       { path: "triage", element: <SetupGate>{page(<TriagePage />)}</SetupGate> },
       { path: "analytics", element: <SetupGate>{page(<AnalyticsPage />)}</SetupGate> },
+      { path: "applications", element: <SetupGate>{page(<ApplicationsPage />)}</SetupGate> },
       { path: "match-gap", element: <SetupGate>{page(<MatchGapPage />)}</SetupGate> },
       { path: "profile", element: <SetupGate>{page(<ProfileWorkspace />)}</SetupGate> },
       { path: "coach", element: <SetupGate>{page(<CoachPage />)}</SetupGate> },

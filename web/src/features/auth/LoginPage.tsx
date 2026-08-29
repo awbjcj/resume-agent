@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRound } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -13,6 +14,7 @@ import { AuthNotice, callbackErrorMessage } from "./AuthNotice";
 import { GoogleButton } from "./GoogleButton";
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -34,27 +36,27 @@ export function LoginPage() {
   };
   return (
     <AuthLayout
-      title="Welcome back"
-      description="Sign in to continue to your private workspace."
+      title={t("auth.welcomeBack")}
+      description={t("auth.signInDescription")}
       icon={<KeyRound aria-hidden="true" />}
-      footer={<p className="text-center text-muted-foreground">New here? <Link className="font-medium text-foreground underline underline-offset-4" to="/register">Create an account</Link></p>}
+      footer={<p className="text-center text-muted-foreground">{t("auth.newHere")} <Link className="font-medium text-foreground underline underline-offset-4" to="/register">{t("auth.createAccount")}</Link></p>}
     >
       {calloutError ? <AuthNotice tone="error">{calloutError}</AuthNotice> : null}
       <form onSubmit={submit}>
         <GoogleButton mode="login" />
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          Sign in with your Google account — no password required.
+          {t("auth.googleSignInHint")}
         </p>
-        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or use email and password<span className="h-px flex-1 bg-border" /></div>
+        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("auth.emailDivider")}<span className="h-px flex-1 bg-border" /></div>
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="login-email">Email</FieldLabel>
+            <FieldLabel htmlFor="login-email">{t("auth.email")}</FieldLabel>
             <Input id="login-email" type="text" autoComplete="username" value={identifier} disabled={login.isPending} onChange={(event) => setIdentifier(event.target.value)} required />
           </Field>
           <Field data-invalid={login.isError || undefined}>
             <div className="flex items-center justify-between">
-              <FieldLabel htmlFor="login-password">Password</FieldLabel>
-              <Link className="text-xs text-muted-foreground underline underline-offset-4" to="/forgot-password">Forgot password?</Link>
+              <FieldLabel htmlFor="login-password">{t("auth.password")}</FieldLabel>
+              <Link className="text-xs text-muted-foreground underline underline-offset-4" to="/forgot-password">{t("auth.forgotPassword")}</Link>
             </div>
             <Input id="login-password" type="password" autoComplete="current-password" value={password} disabled={login.isPending} aria-invalid={login.isError || undefined} onChange={(event) => setPassword(event.target.value)} required />
             {login.isError ? <FieldError>{login.error.message}</FieldError> : null}
@@ -62,7 +64,7 @@ export function LoginPage() {
         </FieldGroup>
         <Button className="mt-6 w-full" type="submit" disabled={login.isPending}>
           {login.isPending ? <Spinner data-icon="inline-start" /> : null}
-          {login.isPending ? "Signing in…" : "Sign in"}
+          {login.isPending ? t("auth.signingIn") : t("auth.signIn")}
         </Button>
       </form>
     </AuthLayout>

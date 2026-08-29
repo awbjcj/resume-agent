@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { AuthLayout } from "./AuthLayout";
 
 describe("AuthLayout", () => {
-  it("renders one main landmark and hides its brand art", () => {
+  it("renders one main landmark and keeps the generated brand art decorative", () => {
     const { container } = render(
       <AuthLayout title="Sign in" description="Welcome back">
         <p>Form</p>
@@ -16,5 +16,9 @@ describe("AuthLayout", () => {
       "aria-hidden",
       "true",
     );
+    expect(
+      container.querySelector("[data-slot='auth-brand'] img")?.getAttribute("src"),
+    ).toContain("auth-evidence-command-center");
+    expect(screen.getByText("Secure workspace")).toBeInTheDocument();
   });
 });

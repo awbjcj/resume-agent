@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LogOutIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -7,6 +8,7 @@ import { api, unwrap } from "@/lib/api/client";
 import { useMe } from "./AuthGate";
 
 export function LogoutButton() {
+  const { t } = useTranslation();
   const me = useMe();
   const queryClient = useQueryClient();
   const logout = useMutation({
@@ -31,7 +33,7 @@ export function LogoutButton() {
       ) : (
         <LogOutIcon data-icon="inline-start" />
       )}
-      Sign out
+      {logout.isPending ? t("shell.signingOut") : t("shell.signOut")}
     </Button>
   );
 }

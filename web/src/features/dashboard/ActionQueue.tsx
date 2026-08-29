@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -6,28 +7,35 @@ import { cn } from "@/lib/utils";
 import type { DashboardSummary } from "./use-dashboard-summary";
 
 export const QUEUE_CARDS = [
-  { key: "triage", verb: "Triage", sub: "new jobs to sort", to: "/triage" },
+  { key: "triage", verb: "Triage", verbKey: "dashboard.queue.triage", sub: "new jobs to sort", subKey: "dashboard.queue.triageDetail", to: "/triage" },
   {
     key: "approve",
     verb: "Approve",
+    verbKey: "dashboard.queue.approve",
     sub: "shortlisted picks",
+    subKey: "dashboard.queue.approveDetail",
     to: "/shortlist",
   },
   {
     key: "tailor",
     verb: "Tailor",
+    verbKey: "dashboard.queue.tailor",
     sub: "approved and ready",
+    subKey: "dashboard.queue.tailorDetail",
     to: "/pipeline?stage=approved",
   },
   {
     key: "apply",
     verb: "Apply",
+    verbKey: "dashboard.queue.apply",
     sub: "rendered resumes",
+    subKey: "dashboard.queue.applyDetail",
     to: "/pipeline?stage=rendered",
   },
 ] as const;
 
 export function ActionQueue({ summary }: { summary: DashboardSummary }) {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {QUEUE_CARDS.map((card) => {
@@ -37,7 +45,7 @@ export function ActionQueue({ summary }: { summary: DashboardSummary }) {
           <Link
             key={card.key}
             to={card.to}
-            aria-label={`${card.verb} ${count} ${card.sub}`}
+            aria-label={`${t(card.verbKey)} ${count} ${t(card.subKey)}`}
             className="group rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             data-empty={empty}
           >
@@ -66,8 +74,8 @@ export function ActionQueue({ summary }: { summary: DashboardSummary }) {
               >
                 {count}
               </div>
-              <CardTitle className="text-sm">{card.verb}</CardTitle>
-              <CardDescription className="text-xs">{card.sub}</CardDescription>
+              <CardTitle className="text-sm">{t(card.verbKey)}</CardTitle>
+              <CardDescription className="text-xs">{t(card.subKey)}</CardDescription>
             </Card>
           </Link>
         );

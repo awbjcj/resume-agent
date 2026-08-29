@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Bell, Check, Inbox, Loader2, RefreshCw, X } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,6 +11,18 @@ import {
   useGmailSync,
   useNotifications,
 } from "./use-notifications";
+
+function isEventNudge(kind: string): boolean {
+  return kind === "interview_soon" || kind === "offer_deadline_soon";
+}
+
+function notificationTitle(item: { kind: string; company?: string | null; proposedStatus: string }) {
+  const company = item.company ?? "application";
+  if (item.kind === "follow_up") return `Follow up: ${company}`;
+  if (item.kind === "interview_soon") return `Interview soon: ${company}`;
+  if (item.kind === "offer_deadline_soon") return `Offer deadline: ${company}`;
+  return `Move to ${item.proposedStatus}`;
+}
 
 export function NotificationsBell() {
   const { data: items = [], isLoading } = useNotifications();
@@ -74,11 +87,7 @@ export function NotificationsBell() {
               <li key={item.id} className="rounded-lg border bg-background p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium">
-                      {item.kind === "follow_up"
-                        ? `Follow up: ${item.company ?? "application"}`
-                        : `Move to ${item.proposedStatus}`}
-                    </div>
+                    <div className="font-medium">{notificationTitle(item)}</div>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {item.evidence}
                     </p>
@@ -94,19 +103,25 @@ export function NotificationsBell() {
                     <X className="size-4" aria-hidden="true" />
                     Dismiss
                   </Button>
-                  <Button
-                    size="sm"
-                    disabled={accept.isPending}
-                    onClick={() => {
-                      accept.mutate(item.id);
-                      if (item.kind === "follow_up" && item.jobId != null) {
-                        setDraftJobId(item.jobId);
-                      }
-                    }}
-                  >
-                    <Check className="size-4" aria-hidden="true" />
-                    {item.kind === "follow_up" ? "Draft follow-up" : "Accept"}
-                  </Button>
+                  {isEventNudge(item.kind) && item.jobId != null ? (
+                    <Button size="sm" render={<Link to={`/pipeline?job=${item.jobId}`} />}>
+                      View job
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled={accept.isPending}
+                      onClick={() => {
+                        accept.mutate(item.id);
+                        if (item.kind === "follow_up" && item.jobId != null) {
+                          setDraftJobId(item.jobId);
+                        }
+                      }}
+                    >
+                      <Check className="size-4" aria-hidden="true" />
+                      {item.kind === "follow_up" ? "Draft follow-up" : "Accept"}
+                    </Button>
+                  )}
                 </div>
               </li>
             ))}
