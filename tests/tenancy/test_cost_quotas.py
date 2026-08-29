@@ -79,9 +79,25 @@ def test_seeded_rate_prices_cache_and_reasoning_without_double_charge(tmp_path):
     assert priced.rate_id
 
 
-def test_seeded_model_prices_use_current_openai_deepseek_and_gemini_rates(tmp_path):
+def test_seeded_model_prices_use_current_provider_rates(tmp_path):
     engine = _engine(tmp_path)
     current = datetime(2026, 8, 27, tzinfo=UTC)
+
+    expected_anthropic = {
+        "claude-haiku-4-5": (1_000_000, 100_000, 1_250_000, 5_000_000),
+        "claude-sonnet-5": (2_000_000, 200_000, 2_500_000, 10_000_000),
+        "claude-opus-4-8": (5_000_000, 500_000, 6_250_000, 25_000_000),
+        "claude-opus-5": (5_000_000, 500_000, 6_250_000, 25_000_000),
+    }
+    for model, expected in expected_anthropic.items():
+        rate = find_rate(engine, "anthropic", model, now=current)
+        assert rate is not None
+        assert (
+            rate.input_micros_per_million,
+            rate.cache_read_micros_per_million,
+            rate.cache_write_micros_per_million,
+            rate.output_micros_per_million,
+        ) == expected
 
     expected_openai = {
         "gpt-5.6-sol": (4_000_000, 400_000, 5_000_000, 20_000_000),
@@ -127,6 +143,55 @@ def test_seeded_model_prices_use_current_openai_deepseek_and_gemini_rates(tmp_pa
             rate.output_micros_per_million,
             rate.tool_micros_per_unit,
         ) == expected
+
+
+def test_seed_corrects_previously_scheduled_sonnet_increase(tmp_path):
+    engine = _engine(tmp_path)
+    cutoff = datetime(2026, 9, 1, tzinfo=UTC)
+    current = find_rate(
+        engine,
+        "anthropic",
+        "claude-sonnet-5",
+        now=datetime(2026, 8, 31, tzinfo=UTC),
+    )
+    assert current is not None
+
+    with Session(engine) as session:
+        stored_current = session.get(LlmRate, current.id)
+        assert stored_current is not None
+        stored_current.effective_to = cutoff
+        session.add(
+            LlmRate(
+                id="cancelled-sonnet-increase",
+                provider="anthropic",
+                model="claude-sonnet-5",
+                input_micros_per_million=3_000_000,
+                cache_read_micros_per_million=300_000,
+                cache_write_micros_per_million=3_750_000,
+                output_micros_per_million=15_000_000,
+                tool_micros_per_unit=10_000,
+                effective_from=cutoff,
+                source_url="https://platform.claude.com/docs/en/about-claude/pricing",
+            )
+        )
+        session.commit()
+
+    seed_llm_rates(engine)
+
+    corrected = find_rate(
+        engine,
+        "anthropic",
+        "claude-sonnet-5",
+        now=cutoff,
+    )
+    assert corrected is not None
+    assert corrected.id == "cancelled-sonnet-increase"
+    assert (
+        corrected.input_micros_per_million,
+        corrected.cache_read_micros_per_million,
+        corrected.cache_write_micros_per_million,
+        corrected.output_micros_per_million,
+    ) == (2_000_000, 200_000, 2_500_000, 10_000_000)
 
 
 def test_deepseek_switches_to_peak_off_peak_rates_after_cutover(tmp_path):
@@ -405,7 +470,7 @@ def test_month_end_anchor_clamps_without_drifting(tmp_path):
     assert rolled.period_end == datetime(2026, 3, 31, 9, 30, tzinfo=UTC)
 
 
-def test_effective_rate_version_preserves_historical_sonnet_price(tmp_path):
+def test_sonnet_standard_rate_does_not_increase_in_september(tmp_path):
     engine = _engine(tmp_path)
     usage = MeteredUsage(
         provider="anthropic",
@@ -416,8 +481,8 @@ def test_effective_rate_version_preserves_historical_sonnet_price(tmp_path):
     july = calculate_cost(engine, usage, now=NOW)
     september = calculate_cost(engine, usage, now=datetime(2026, 9, 2, tzinfo=UTC))
     assert july.total_micros == 12_000_000
-    assert september.total_micros == 18_000_000
-    assert july.rate_id != september.rate_id
+    assert september.total_micros == 12_000_000
+    assert july.rate_id == september.rate_id
 
 
 def test_enforcement_rejects_unknown_shared_rate_but_allows_byok(tmp_path):
