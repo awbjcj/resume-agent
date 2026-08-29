@@ -18,7 +18,11 @@ from resume_agent.tracking.prune import (
     prune_reason_counts,
     prune_skipped,
 )
-from resume_agent.tenancy.storage import delete_artifact_pdf
+from resume_agent.tenancy.storage import (
+    delete_staged_artifact_pdf,
+    restore_staged_artifact_pdf,
+    stage_artifact_pdf,
+)
 from resume_agent.tracking.prune_config import PruneConfig
 from resume_agent.tracking.tables import (
     Application,
@@ -35,7 +39,10 @@ from resume_agent.tracking.tables import (
 
 
 def _stamp_submitted_at(application: Application) -> None:
-    if application.status == ApplicationStatus.submitted.value and application.submitted_at is None:
+    if (
+        application.status == ApplicationStatus.submitted.value
+        and application.submitted_at is None
+    ):
         application.submitted_at = utcnow()
 
 
@@ -87,9 +94,7 @@ def find_existing(
         conditions = [Job.jd_text == jd_text, archived_col.is_(None)]
         if fingerprint:
             conditions.insert(0, Job.content_fingerprint == fingerprint)
-        by_jd = first_compatible(
-            session.exec(select(Job).where(*conditions)).all()
-        )
+        by_jd = first_compatible(session.exec(select(Job).where(*conditions)).all())
         if by_jd is not None:
             return by_jd
     if dedup_key:
@@ -122,9 +127,10 @@ def company_rename_collides(
     dedup_key: str | None,
 ) -> bool:
     """Return whether a rename would take another live row's identity."""
-    return company_rename_collision(
-        session, existing=existing, dedup_key=dedup_key
-    ) is not None
+    return (
+        company_rename_collision(session, existing=existing, dedup_key=dedup_key)
+        is not None
+    )
 
 
 def company_rename_collision(
@@ -175,21 +181,30 @@ def save_resume_version(session: Session, version: ResumeVersion) -> ResumeVersi
 
 
 def resume_versions_for_job(session: Session, job_id: int) -> list[ResumeVersion]:
-    return list(session.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).all())
+    return list(
+        session.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).all()
+    )
 
 
 def cover_letters_for_job(session: Session, job_id: int) -> list[CoverLetter]:
-    return list(session.exec(select(CoverLetter).where(CoverLetter.job_id == job_id)).all())
+    return list(
+        session.exec(select(CoverLetter).where(CoverLetter.job_id == job_id)).all()
+    )
 
 
 def get_resume_version(session: Session, version_id: int) -> ResumeVersion | None:
     return session.get(ResumeVersion, version_id)
 
 
-def save_application(session: Session, application: Application) -> Application:
+def save_application(
+    session: Session, application: Application, *, commit: bool = True
+) -> Application:
     _stamp_submitted_at(application)
     session.add(application)
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     session.refresh(application)
     return application
 
@@ -203,7 +218,9 @@ def application_for_job(session: Session, job_id: int) -> Application | None:
 
 
 def applications_by_status(session: Session, status: str) -> list[Application]:
-    return list(session.exec(select(Application).where(Application.status == status)).all())
+    return list(
+        session.exec(select(Application).where(Application.status == status)).all()
+    )
 
 
 def update_application_status(
@@ -245,21 +262,29 @@ def get_application_event(session: Session, event_id: int) -> ApplicationEvent |
 
 
 def save_application_event(
-    session: Session, event: ApplicationEvent
+    session: Session, event: ApplicationEvent, *, commit: bool = True
 ) -> ApplicationEvent:
     event.updated_at = utcnow()
     session.add(event)
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     session.refresh(event)
     return event
 
 
-def delete_application_event(session: Session, event_id: int) -> bool:
+def delete_application_event(
+    session: Session, event_id: int, *, commit: bool = True
+) -> bool:
     event = session.get(ApplicationEvent, event_id)
     if event is None:
         return False
     session.delete(event)
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     return True
 
 
@@ -274,6 +299,34 @@ def next_sequence(session: Session, application_id: int, kind: str) -> int:
     return len(existing) + 1
 
 
+def resequence_event_kind(
+    session: Session, application_id: int, kind: str, *, commit: bool = True
+) -> None:
+    """Renumber automatic same-kind events in timeline order.
+
+    Manual values keep their override, but still occupy their chronological
+    position so automatic values remain the nth event of their kind.
+    """
+    events = [
+        event
+        for event in events_for_application(session, application_id)
+        if event.kind == kind
+    ]
+    changed = False
+    for sequence, event in enumerate(events, start=1):
+        if event.sequence_overridden or event.sequence == sequence:
+            continue
+        event.sequence = sequence
+        event.updated_at = utcnow()
+        session.add(event)
+        changed = True
+    if changed:
+        if commit:
+            session.commit()
+        else:
+            session.flush()
+
+
 def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
     round_col = cast(Any, ResumeVersion.round)
     id_col = cast(Any, ResumeVersion.id)
@@ -284,7 +337,9 @@ def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None
     ).first()
 
 
-def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
+def latest_rendered_resume_version(
+    session: Session, job_id: int
+) -> ResumeVersion | None:
     pdf_path_col = cast(Any, ResumeVersion.pdf_path)
     round_col = cast(Any, ResumeVersion.round)
     id_col = cast(Any, ResumeVersion.id)
@@ -347,9 +402,7 @@ def pick_best(versions: list[ResumeVersion]) -> BestResume:
         score_key=_score_key,
         latest_key=_latest_key,
     )
-    return BestResume(
-        version=best, no_clean_round=no_clean_round, regressed=regressed
-    )
+    return BestResume(version=best, no_clean_round=no_clean_round, regressed=regressed)
 
 
 def best_resume_version(session: Session, job_id: int) -> BestResume:
@@ -391,7 +444,9 @@ def notification_by_key(
 
 
 def pending_notifications(session: Session) -> list[Notification]:
-    return list(session.exec(select(Notification).where(Notification.state == "pending")).all())
+    return list(
+        session.exec(select(Notification).where(Notification.state == "pending")).all()
+    )
 
 
 def save_email_draft(session: Session, draft: EmailDraft) -> EmailDraft:
@@ -465,7 +520,6 @@ def delete_artifact_rows(
     *,
     versions: Collection[ResumeVersion] = (),
     cover_letters: Collection[CoverLetter] = (),
-    commit: bool = True,
 ) -> None:
     """Delete resume versions and cover letters, orphaning whatever points at them.
 
@@ -498,11 +552,23 @@ def delete_artifact_rows(
     _orphan(Application, cast(Any, Application.cover_letter_id), letter_ids)
     _orphan(CoverLetter, cast(Any, CoverLetter.parent_id), letter_ids)
 
-    for row in (*versions, *cover_letters):
-        delete_artifact_pdf(row.pdf_path)
-        session.delete(row)
-    if commit:
+    rows = (*versions, *cover_letters)
+    staged_pdfs = [
+        staged
+        for row in rows
+        if (staged := stage_artifact_pdf(row.pdf_path)) is not None
+    ]
+    try:
+        for row in rows:
+            session.delete(row)
         session.commit()
+    except BaseException:
+        session.rollback()
+        for staged in reversed(staged_pdfs):
+            restore_staged_artifact_pdf(staged)
+        raise
+    for staged in staged_pdfs:
+        delete_staged_artifact_pdf(staged)
 
 
 def delete_job(session: Session, job_id: int) -> bool:
@@ -558,7 +624,10 @@ def has_progress(session: Session, job_id: int) -> bool:
     if invested_application is not None:
         return True
     for model in (ResumeVersion, CoverLetter):
-        if session.exec(select(model).where(model.job_id == job_id)).first() is not None:
+        if (
+            session.exec(select(model).where(model.job_id == job_id)).first()
+            is not None
+        ):
             return True
     return False
 
@@ -626,7 +695,9 @@ def applications_by_job(
 
 def job_has_progress(job: Job, progressed: set[int]) -> bool:
     """Batched counterpart of has_progress(): same rule, zero per-job queries."""
-    return job.status in _PROGRESS_STATUSES or (job.id is not None and job.id in progressed)
+    return job.status in _PROGRESS_STATUSES or (
+        job.id is not None and job.id in progressed
+    )
 
 
 def _prune_rows(session: Session) -> list[PruneRow]:

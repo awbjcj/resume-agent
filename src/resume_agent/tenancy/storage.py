@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 from resume_agent.tenancy.context import current_context
@@ -10,6 +12,14 @@ logger = logging.getLogger(__name__)
 
 class TenantPathError(ValueError):
     """A persisted path attempts to escape its tenant-owned storage root."""
+
+
+@dataclass(frozen=True)
+class StagedArtifactPdf:
+    """A recoverable rename held until the owning database row commits."""
+
+    original_path: Path
+    staged_path: Path
 
 
 def _confine(path: Path | str, root: Path, *, prefix: str | None = None) -> Path:
@@ -83,3 +93,34 @@ def delete_artifact_pdf(pdf_path: str | None) -> bool:
         logger.warning("could not unlink artifact %s", path, exc_info=True)
         return False
     return True
+
+
+def stage_artifact_pdf(pdf_path: str | None) -> StagedArtifactPdf | None:
+    """Atomically move an artifact aside so a failed row delete can restore it."""
+    path = resolve_artifact_pdf(pdf_path)
+    if path is None:
+        return None
+    staged = path.with_name(f".{path.name}.{uuid.uuid4().hex}.deleting")
+    try:
+        path.replace(staged)
+    except OSError:
+        logger.warning("could not stage artifact %s", path, exc_info=True)
+        return None
+    return StagedArtifactPdf(original_path=path, staged_path=staged)
+
+
+def restore_staged_artifact_pdf(staged: StagedArtifactPdf) -> bool:
+    """Put a staged artifact back after its database transaction rolls back."""
+    try:
+        staged.staged_path.replace(staged.original_path)
+    except OSError:
+        logger.warning(
+            "could not restore staged artifact %s", staged.original_path, exc_info=True
+        )
+        return False
+    return True
+
+
+def delete_staged_artifact_pdf(staged: StagedArtifactPdf) -> bool:
+    """Finalize deletion through the same tenant-confined unlink chokepoint."""
+    return delete_artifact_pdf(str(staged.staged_path))

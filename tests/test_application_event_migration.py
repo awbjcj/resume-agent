@@ -1,9 +1,13 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import text
 from sqlmodel import Session, select
 
 from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.migrate import ensure_application_submitted_events
+from resume_agent.tracking.migrate import (
+    ensure_application_event_sequence_override_column,
+    ensure_application_submitted_events,
+)
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
@@ -69,3 +73,34 @@ def test_init_db_runs_the_backfill():
     init_db(engine)  # second call must backfill and stay idempotent
     with Session(engine) as session:
         assert len(session.exec(select(ApplicationEvent)).all()) == 1
+
+
+def test_adds_sequence_override_marker_to_an_existing_event_table():
+    engine = make_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE application_events ("
+                "id INTEGER PRIMARY KEY, sequence INTEGER NOT NULL DEFAULT 1)"
+            )
+        )
+        connection.execute(
+            text("INSERT INTO application_events (id, sequence) VALUES (1, 7)")
+        )
+
+    ensure_application_event_sequence_override_column(engine)
+    ensure_application_event_sequence_override_column(engine)
+
+    with engine.begin() as connection:
+        columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(application_events)"))
+        }
+        legacy = connection.execute(
+            text(
+                "SELECT sequence, sequence_overridden "
+                "FROM application_events WHERE id = 1"
+            )
+        ).one()
+    assert "sequence_overridden" in columns
+    assert legacy == (7, 1)

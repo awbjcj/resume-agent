@@ -144,6 +144,10 @@ class ApplicationEvent(SQLModel, table=True):
     kind: str = Field(index=True)
     custom_label: str | None = None
     sequence: int = 1
+    # Sequence values are normally derived from timeline order. Persisting the
+    # distinction is what lets a later backfill renumber automatic rounds while
+    # preserving an explicit user override.
+    sequence_overridden: bool = False
 
     # UTC. `all_day` distinguishes "applied on the 3rd" from "Zoom at 14:00";
     # `timezone` is an IANA name, not an offset, because DST can shift between

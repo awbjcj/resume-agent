@@ -11,6 +11,7 @@ from resume_agent.config import get_settings
 from resume_agent.tracking import tables  # noqa: F401
 from resume_agent.tracking.migrate import (
     ensure_application_cover_letter_id_column,
+    ensure_application_event_sequence_override_column,
     ensure_application_submitted_events,
     ensure_agent_metadata_columns,
     ensure_archived_at_column,
@@ -105,6 +106,7 @@ def init_db(engine: Engine) -> None:
     ensure_application_cover_letter_id_column(engine)
     ensure_agent_metadata_columns(engine)
     ensure_url_index(engine)
+    ensure_application_event_sequence_override_column(engine)
     ensure_application_submitted_events(engine)
 
 

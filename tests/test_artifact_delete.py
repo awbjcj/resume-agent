@@ -7,6 +7,7 @@ the job's own progress gate exactly as strict as it was.
 
 from pathlib import Path
 
+import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from resume_agent.services import board
@@ -40,7 +41,9 @@ def _require_id(value: int | None) -> int:
 
 
 def _job(session: Session, status: str = JobStatus.tailored.value) -> int:
-    return _require_id(save_job(session, Job(source="m", jd_text="jd", status=status)).id)
+    return _require_id(
+        save_job(session, Job(source="m", jd_text="jd", status=status)).id
+    )
 
 
 def _version(session: Session, job_id: int, **kwargs) -> int:
@@ -50,7 +53,9 @@ def _version(session: Session, job_id: int, **kwargs) -> int:
 
 
 def _letter(session: Session, job_id: int, **kwargs) -> int:
-    return _require_id(save_cover_letter(session, CoverLetter(job_id=job_id, **kwargs)).id)
+    return _require_id(
+        save_cover_letter(session, CoverLetter(job_id=job_id, **kwargs)).id
+    )
 
 
 # --- orphaning -----------------------------------------------------------
@@ -128,7 +133,9 @@ def test_deselecting_clears_the_pointer_and_unblocks_the_delete():
         version_id = _version(s, job_id)
         save_application(s, Application(job_id=job_id, resume_version_id=version_id))
 
-        assert board.delete_resume_versions(s, [version_id]).blocked_ids == (version_id,)
+        assert board.delete_resume_versions(s, [version_id]).blocked_ids == (
+            version_id,
+        )
 
         application = board.deselect_resume_version(s, job_id)
         assert application is not None
@@ -250,6 +257,24 @@ def test_a_missing_pdf_does_not_block_the_row_delete(tmp_path: Path):
         assert get_resume_version(s, version_id) is None
 
 
+def test_commit_failure_restores_staged_pdf_and_keeps_row(tmp_path: Path, monkeypatch):
+    with _session() as s:
+        job_id = _job(s)
+        pdf = tmp_path / "resume-v1-tailor.pdf"
+        pdf.write_bytes(b"%PDF-1.7")
+        version_id = _version(s, job_id, pdf_path=str(pdf))
+
+        def fail_commit() -> None:
+            raise RuntimeError("forced commit failure")
+
+        monkeypatch.setattr(s, "commit", fail_commit)
+        with pytest.raises(RuntimeError, match="forced commit failure"):
+            board.delete_resume_versions(s, [version_id])
+
+        assert pdf.read_bytes() == b"%PDF-1.7"
+        assert get_resume_version(s, version_id) is not None
+
+
 # --- the invariant this feature must not weaken --------------------------
 
 
@@ -264,6 +289,9 @@ def test_deleting_every_version_does_not_make_a_progressed_job_deletable():
         assert board.delete_resume_versions(s, [version_id]).deleted == 1
         assert board.delete_cover_letters(s, [letter_id]).deleted == 1
 
-        assert s.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).first() is None
+        assert (
+            s.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).first()
+            is None
+        )
         assert has_progress(s, job_id) is True
         assert board.delete(s, job_id) is False

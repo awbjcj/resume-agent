@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 
 import pytest
-from sqlmodel import Session
+from sqlmodel import Session, select
 
+import resume_agent.services.application_events as application_events
 from resume_agent.db import init_db, make_engine
 from resume_agent.services.application_events import (
     EventValidationError,
@@ -12,7 +13,7 @@ from resume_agent.services.application_events import (
     update_event,
 )
 from resume_agent.tracking.repository import application_for_job
-from resume_agent.tracking.tables import Job
+from resume_agent.tracking.tables import ApplicationEvent, Job
 
 
 def _job():
@@ -36,6 +37,25 @@ def test_create_makes_the_application_row_when_absent():
         session, job.id, {"kind": "application_submitted", "occurred_at": _at(3)}
     )
     assert application_for_job(session, job.id) is not None
+
+
+def test_create_rolls_back_event_and_application_when_advancement_fails(monkeypatch):
+    session, job = _job()
+
+    def fail_advance(*_args):
+        raise RuntimeError("forced advancement failure")
+
+    monkeypatch.setattr(application_events, "_advance", fail_advance)
+
+    with pytest.raises(RuntimeError, match="forced advancement failure"):
+        create_event(
+            session,
+            job.id,
+            {"kind": "application_submitted", "occurred_at": _at(3)},
+        )
+
+    assert application_for_job(session, job.id) is None
+    assert session.exec(select(ApplicationEvent)).all() == []
 
 
 def test_create_advances_status_through_the_progression():
@@ -89,6 +109,79 @@ def test_sequence_auto_increments_per_kind():
     assert (first.sequence, second.sequence) == (1, 2)
 
 
+def test_inserting_an_earlier_round_renumbers_automatic_sequences():
+    session, job = _job()
+    later = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+    earlier = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(3)}
+    )
+    session.refresh(later)
+    assert (earlier.sequence, later.sequence) == (1, 2)
+
+
+def test_resequencing_preserves_manual_overrides():
+    session, job = _job()
+    overridden = create_event(
+        session,
+        job.id,
+        {"kind": "technical_round", "occurred_at": _at(9), "sequence": 7},
+    )
+    earlier = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(3)}
+    )
+    session.refresh(overridden)
+    assert (earlier.sequence, overridden.sequence) == (1, 7)
+
+
+def test_updating_a_round_date_resequences_its_kind():
+    session, job = _job()
+    first = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(3)}
+    )
+    second = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+
+    update_event(session, job.id, second.id, {"occurred_at": _at(1)})
+
+    session.refresh(first)
+    session.refresh(second)
+    assert (second.sequence, first.sequence) == (1, 2)
+
+
+def test_changing_kind_resequences_both_groups():
+    session, job = _job()
+    first = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(3)}
+    )
+    moved = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+
+    update_event(session, job.id, first.id, {"kind": "behavioral"})
+
+    session.refresh(first)
+    session.refresh(moved)
+    assert (first.sequence, moved.sequence) == (1, 1)
+
+
+def test_deleting_a_round_resequences_later_rounds():
+    session, job = _job()
+    first = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(3)}
+    )
+    second = create_event(
+        session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
+    )
+
+    assert delete_event(session, job.id, first.id) is True
+
+    session.refresh(second)
+    assert second.sequence == 1
+
+
 def test_explicit_sequence_overrides_auto_assignment():
     session, job = _job()
     event = create_event(
@@ -107,6 +200,23 @@ def test_explicit_sequence_overrides_auto_assignment():
         ({"kind": "custom"}, "custom_label"),
         (
             {"kind": "technical_round", "occurred_at": _at(3), "platform": "other"},
+            "platform_other",
+        ),
+        (
+            {
+                "kind": "technical_round",
+                "occurred_at": _at(3),
+                "custom_label": "not custom",
+            },
+            "custom_label",
+        ),
+        (
+            {
+                "kind": "technical_round",
+                "occurred_at": _at(3),
+                "platform": "zoom",
+                "platform_other": "not other",
+            },
             "platform_other",
         ),
         (
@@ -144,6 +254,31 @@ def test_update_changes_fields_and_can_advance_status():
     )
     assert updated.kind == "offer_received"
     assert application_for_job(session, job.id).status == "offer"
+
+
+def test_update_rolls_back_event_and_status_when_advancement_fails(monkeypatch):
+    session, job = _job()
+    event = create_event(
+        session, job.id, {"kind": "recruiter_screen", "occurred_at": _at(3)}
+    )
+    original_status = application_for_job(session, job.id).status
+
+    def fail_advance(*_args):
+        raise RuntimeError("forced advancement failure")
+
+    monkeypatch.setattr(application_events, "_advance", fail_advance)
+
+    with pytest.raises(RuntimeError, match="forced advancement failure"):
+        update_event(
+            session,
+            job.id,
+            event.id,
+            {"kind": "offer_received", "occurred_at": _at(20)},
+        )
+
+    session.refresh(event)
+    assert event.kind == "recruiter_screen"
+    assert application_for_job(session, job.id).status == original_status
 
 
 def test_update_returns_none_for_an_event_on_another_job():
