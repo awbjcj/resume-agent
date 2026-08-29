@@ -222,6 +222,58 @@ def update_application_status(
     return application
 
 
+def events_for_application(
+    session: Session, application_id: int
+) -> list[ApplicationEvent]:
+    """Timeline order: by date ascending, undated last, then by creation."""
+    occurred = cast(Any, ApplicationEvent.occurred_at)
+    return list(
+        session.exec(
+            select(ApplicationEvent)
+            .where(ApplicationEvent.application_id == application_id)
+            .order_by(
+                occurred.is_(None),  # False (0) sorts before True (1)
+                occurred.asc(),
+                cast(Any, ApplicationEvent.created_at).asc(),
+            )
+        ).all()
+    )
+
+
+def get_application_event(session: Session, event_id: int) -> ApplicationEvent | None:
+    return session.get(ApplicationEvent, event_id)
+
+
+def save_application_event(
+    session: Session, event: ApplicationEvent
+) -> ApplicationEvent:
+    event.updated_at = utcnow()
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return event
+
+
+def delete_application_event(session: Session, event_id: int) -> bool:
+    event = session.get(ApplicationEvent, event_id)
+    if event is None:
+        return False
+    session.delete(event)
+    session.commit()
+    return True
+
+
+def next_sequence(session: Session, application_id: int, kind: str) -> int:
+    """The nth event of this kind, 1-based. Auto-assignment for repeatable kinds."""
+    existing = session.exec(
+        select(ApplicationEvent).where(
+            ApplicationEvent.application_id == application_id,
+            ApplicationEvent.kind == kind,
+        )
+    ).all()
+    return len(existing) + 1
+
+
 def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
     round_col = cast(Any, ResumeVersion.round)
     id_col = cast(Any, ResumeVersion.id)
