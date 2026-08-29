@@ -21,12 +21,12 @@ from resume_agent.api.schemas.secrets import (
 )
 from resume_agent.llm_runner import (
     MODEL_CATALOG,
-    PROVIDER_LABELS,
     catalog_entry,
     model_access_available,
     provider_capabilities,
     supports_native_search,
 )
+from resume_agent.provider_registry import PROVIDER_LABELS
 from resume_agent.services.env_config import read_env, write_env_updates
 
 router = APIRouter()

@@ -13,7 +13,7 @@ from resume_agent.api.schemas.admin_routing import (
     RoutingUpdate,
 )
 from resume_agent.llm_routing import RouteConfigError
-from resume_agent.llm_runner import PROVIDER_LABELS
+from resume_agent.provider_registry import PROVIDER_LABELS
 from resume_agent.services.admin_routing import (
     RoutingState,
     routing_state,
@@ -22,6 +22,7 @@ from resume_agent.services.admin_routing import (
 from resume_agent.tenancy.context import UserContext
 
 router = APIRouter(prefix="/admin/routing", tags=["admin"])
+
 
 def _document(state: RoutingState) -> RoutingConfigDoc:
     return RoutingConfigDoc(

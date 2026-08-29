@@ -15,8 +15,13 @@ import httpx
 from pydantic import BaseModel
 
 from resume_agent.agent_trace import record_agent_run
-from resume_agent.config import Settings, get_settings
 from resume_agent.career_skills.models import AgentRunMeta
+from resume_agent.config import Settings, get_settings
+from resume_agent.provider_registry import (
+    PROVIDERS,
+    PROVIDER_SPECS,
+    provider_spec,
+)
 from resume_agent.sessions.stream import (
     Completed,
     Failed,
@@ -620,18 +625,6 @@ def expect_text(result: Any, *, source: str) -> str:
     raise UnparsedAgentOutput(_describe_unparsed(result, content, headline))
 
 
-# Providers selectable via a ``provider:model`` prefix on any model id. A bare id
-# (no recognised prefix) stays Anthropic, so existing config keeps working.
-PROVIDERS = ("anthropic", "openai", "gemini", "deepseek")
-
-PROVIDER_LABELS: dict[str, str] = {
-    "anthropic": "Anthropic",
-    "openai": "OpenAI",
-    "gemini": "Gemini",
-    "deepseek": "DeepSeek",
-}
-
-
 @dataclass(frozen=True)
 class ModelCatalogEntry:
     """One selectable model id in the cheap/mid/premium tier pickers."""
@@ -934,12 +927,8 @@ def supports_native_search(model_id: str) -> bool:
 
 
 def _settings_provider_key(settings: Settings, provider: str) -> str:
-    return {
-        "anthropic": settings.anthropic_api_key,
-        "openai": settings.openai_api_key,
-        "gemini": settings.gemini_api_key,
-        "deepseek": settings.deepseek_api_key,
-    }.get(provider, "")
+    spec = provider_spec(provider)
+    return str(getattr(settings, spec.api_key_field, "") or "") if spec else ""
 
 
 def resolve_api_key(model_id: str, *, settings: Settings | None = None) -> str:
@@ -1884,8 +1873,10 @@ def tool_kwargs() -> dict[str, Any]:
     return {"tool_call_limit": 15}
 
 
-_TRANSCRIBE_PROVIDERS = ("gemini", "openai")
-_SPEECH_PROVIDERS = ("openai",)
+_TRANSCRIBE_PROVIDERS = tuple(
+    spec.id for spec in PROVIDER_SPECS if spec.supports_transcription
+)
+_SPEECH_PROVIDERS = tuple(spec.id for spec in PROVIDER_SPECS if spec.supports_speech)
 _SPEECH_INSTRUCTIONS = (
     "Speak as a professional interviewer. Read the supplied text exactly without "
     "adding or omitting words."
@@ -2008,7 +1999,9 @@ def speech_available() -> bool:
     settings = get_settings()
     model_id = settings.speech_model
     provider, _ = split_provider(model_id)
-    return provider in _SPEECH_PROVIDERS and bool(settings.openai_api_key.strip())
+    return provider in _SPEECH_PROVIDERS and bool(
+        _settings_provider_key(settings, provider).strip()
+    )
 
 
 def synthesize_speech(

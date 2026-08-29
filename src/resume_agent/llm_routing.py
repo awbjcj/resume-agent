@@ -24,6 +24,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 from resume_agent.config import RouteMode, Settings
+from resume_agent.provider_registry import PROVIDER_SPECS
 
 __all__ = [
     "DIRECT_API_BASE_URL_FIELDS",
@@ -54,29 +55,21 @@ class RouteConfigError(RuntimeError):
 
 # provider -> Settings field. Both maps are the single enumeration of the
 # routing vocabulary; the admin API derives its env-var names from them.
-SUB2API_KEY_FIELDS: dict[str, str] = {
-    "anthropic": "sub2api_anthropic_key",
-    "openai": "sub2api_openai_key",
-    "gemini": "sub2api_gemini_key",
-    "deepseek": "sub2api_deepseek_key",
+SUB2API_KEY_FIELDS = {spec.id: spec.subscription_key_field for spec in PROVIDER_SPECS}
+
+DIRECT_API_BASE_URL_FIELDS = {
+    spec.id: spec.direct_base_url_field
+    for spec in PROVIDER_SPECS
+    if spec.direct_base_url_field is not None
 }
 
-DIRECT_API_BASE_URL_FIELDS: dict[str, str] = {
-    "anthropic": "anthropic_base_url",
-    "openai": "openai_base_url",
+_DIRECT_API_BASE_URL_DEFAULTS = {
+    spec.id: spec.default_direct_base_url
+    for spec in PROVIDER_SPECS
+    if spec.default_direct_base_url is not None
 }
 
-_DIRECT_API_BASE_URL_DEFAULTS: dict[str, str] = {
-    "anthropic": "https://api.anthropic.com",
-    "openai": "https://api.openai.com/v1",
-}
-
-ROUTE_MODE_FIELDS: dict[str, str] = {
-    "anthropic": "anthropic_route_mode",
-    "openai": "openai_route_mode",
-    "gemini": "gemini_route_mode",
-    "deepseek": "deepseek_route_mode",
-}
+ROUTE_MODE_FIELDS = {spec.id: spec.route_mode_field for spec in PROVIDER_SPECS}
 
 
 def _validated_base_url(raw_value: str, setting_name: str) -> str:
