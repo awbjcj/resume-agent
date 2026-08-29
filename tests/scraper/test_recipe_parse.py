@@ -78,4 +78,7 @@ def test_has_job_like_content_true_for_multiple_job_links():
 
 
 def test_has_job_like_content_false_for_empty_page():
-    assert has_job_like_content("<html><body><p>No results found.</p></body></html>") is False
+    assert (
+        has_job_like_content("<html><body><p>No results found.</p></body></html>")
+        is False
+    )

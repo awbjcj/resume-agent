@@ -12,7 +12,10 @@ def _session():
 
 
 def _seed(session, source, fit, status):
-    job = save_job(session, Job(source=source, company="C", title="T", fit_score=fit, status="rendered"))
+    job = save_job(
+        session,
+        Job(source=source, company="C", title="T", fit_score=fit, status="rendered"),
+    )
     assert job.id is not None
     save_application(session, Application(job_id=job.id, status=status))
 
@@ -51,11 +54,17 @@ def test_analytics_excludes_archived_jobs():
 
     with _session() as session:
         _seed(session, "greenhouse", 85, ApplicationStatus.submitted.value)
-        hidden = save_job(session, Job(source="adzuna", company="C", title="T",
-                                       fit_score=90, status="rendered"))
+        hidden = save_job(
+            session,
+            Job(
+                source="adzuna", company="C", title="T", fit_score=90, status="rendered"
+            ),
+        )
         assert hidden.id is not None
-        save_application(session, Application(job_id=hidden.id,
-                                             status=ApplicationStatus.interview.value))
+        save_application(
+            session,
+            Application(job_id=hidden.id, status=ApplicationStatus.interview.value),
+        )
         archive_job(session, hidden.id)
 
         assert [stat.label for stat in source_stats(session)] == ["greenhouse"]

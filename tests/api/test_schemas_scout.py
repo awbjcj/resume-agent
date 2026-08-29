@@ -22,7 +22,11 @@ def test_source_resolution_fields_serialize_as_camel_case():
         canonical_board_url="https://jobs.lever.co/acme",
         resolution_status="unverified",
         resolution_reason="OWNERSHIP_NOT_PROVEN",
-        evidence=[ScoutEvidenceOut(kind="candidate", source_url="https://acme.example/careers")],
+        evidence=[
+            ScoutEvidenceOut(
+                kind="candidate", source_url="https://acme.example/careers"
+            )
+        ],
         searched_families=["lever"],
         unsearched_families=["workday"],
     )
@@ -36,7 +40,10 @@ def test_source_resolution_fields_serialize_as_camel_case():
 
 def test_approval_and_exact_url_request_models_are_closed_at_the_boundary():
     assert ScoutApproveIn().manual_confirmation is False
-    assert str(ScoutResolveSourceIn(url=_http_url("https://jobs.lever.co/acme")).url) == "https://jobs.lever.co/acme"
+    assert (
+        str(ScoutResolveSourceIn(url=_http_url("https://jobs.lever.co/acme")).url)
+        == "https://jobs.lever.co/acme"
+    )
     with pytest.raises(ValidationError):
         ScoutResolveSourceIn.model_validate({"url": "file:///tmp/board"})
 

@@ -8,8 +8,8 @@ def test_parse_env_ignores_comments_and_blanks():
 def test_merge_preserves_unmanaged_keys():
     existing = {"OPENAI_API_KEY": "keep-me", "ANTHROPIC_API_KEY": "old"}
     merged = merge_env(existing, {"ANTHROPIC_API_KEY": "new"})
-    assert merged["OPENAI_API_KEY"] == "keep-me"   # untouched
-    assert merged["ANTHROPIC_API_KEY"] == "new"     # overwritten
+    assert merged["OPENAI_API_KEY"] == "keep-me"  # untouched
+    assert merged["ANTHROPIC_API_KEY"] == "new"  # overwritten
 
 
 def test_format_quotes_values_with_spaces():

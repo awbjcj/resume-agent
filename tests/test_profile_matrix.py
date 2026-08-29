@@ -75,9 +75,7 @@ def _taxonomy(
 
 def test_matrix_rows_are_canonical_with_deduplicated_evidence_and_recency():
     facts = _facts()
-    matrix = build_matrix(
-        facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1)
-    )
+    matrix = build_matrix(facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1))
     kubernetes = next(row for row in matrix.rows if row.key == "kubernetes")
     bullet = facts.experience[0].bullets[0]
     skill = facts.skills["Platforms"][0]
@@ -140,12 +138,8 @@ def test_override_tokens_covers_alias_forbid_and_category():
 
 def test_matrix_deterministic_and_round_trips(tmp_path):
     facts = _facts()
-    first = build_matrix(
-        facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1)
-    )
-    second = build_matrix(
-        facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1)
-    )
+    first = build_matrix(facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1))
+    second = build_matrix(facts, _taxonomy(ClusterMap.empty()), today=date(2026, 7, 1))
     assert [(row.key, row.strength) for row in first.rows] == [
         (row.key, row.strength) for row in second.rows
     ]
@@ -171,12 +165,8 @@ def test_load_matrix_rejects_different_facts_or_effective_map(tmp_path):
 
 
 def test_build_matrix_pins_the_semantic_revision():
-    facts = ProfileFacts(
-        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
-    )
-    taxonomy = EffectiveTaxonomy.from_parts(
-        ClusterMap(aliases={"py": "python"})
-    )
+    facts = ProfileFacts(contact=Contact(name="A"), skills={"hard": [Skill(name="py")]})
+    taxonomy = EffectiveTaxonomy.from_parts(ClusterMap(aliases={"py": "python"}))
 
     matrix = build_matrix(facts, taxonomy)
 
@@ -189,20 +179,14 @@ def test_load_matrix_rebuilds_a_legacy_matrix_with_no_revision(tmp_path):
     """A pre-contract cache is unknown even if its legacy hash looks fresh."""
     path = tmp_path / "matrix.json"
     save_matrix(SkillMatrix(rows=[MatrixRow(key="python", display="Python")]), path)
-    taxonomy = EffectiveTaxonomy.from_parts(
-        ClusterMap(aliases={"py": "python"})
-    )
+    taxonomy = EffectiveTaxonomy.from_parts(ClusterMap(aliases={"py": "python"}))
 
     assert load_matrix(path, taxonomy=taxonomy) is None
 
 
 def test_load_matrix_accepts_a_matching_revision(tmp_path):
-    facts = ProfileFacts(
-        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
-    )
-    taxonomy = EffectiveTaxonomy.from_parts(
-        ClusterMap(aliases={"py": "python"})
-    )
+    facts = ProfileFacts(contact=Contact(name="A"), skills={"hard": [Skill(name="py")]})
+    taxonomy = EffectiveTaxonomy.from_parts(ClusterMap(aliases={"py": "python"}))
     path = tmp_path / "matrix.json"
     save_matrix(build_matrix(facts, taxonomy), path)
 
@@ -212,9 +196,7 @@ def test_load_matrix_accepts_a_matching_revision(tmp_path):
 def test_a_regroup_timestamp_does_not_invalidate_a_saved_matrix(tmp_path):
     from resume_agent.taxonomy.state import GroupingStatus, TaxonomyState
 
-    facts = ProfileFacts(
-        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
-    )
+    facts = ProfileFacts(contact=Contact(name="A"), skills={"hard": [Skill(name="py")]})
     cluster_map = ClusterMap(aliases={"py": "python"})
     before = EffectiveTaxonomy.from_parts(cluster_map)
     path = tmp_path / "matrix.json"
@@ -230,9 +212,7 @@ def test_a_regroup_timestamp_does_not_invalidate_a_saved_matrix(tmp_path):
 
 
 def test_a_ban_does_invalidate_a_saved_matrix(tmp_path):
-    facts = ProfileFacts(
-        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
-    )
+    facts = ProfileFacts(contact=Contact(name="A"), skills={"hard": [Skill(name="py")]})
     cluster_map = ClusterMap(aliases={"py": "python"})
     path = tmp_path / "matrix.json"
     save_matrix(build_matrix(facts, EffectiveTaxonomy.from_parts(cluster_map)), path)
@@ -244,9 +224,7 @@ def test_a_ban_does_invalidate_a_saved_matrix(tmp_path):
 
 
 def test_canonical_map_sha256_is_still_written_for_old_readers():
-    facts = ProfileFacts(
-        contact=Contact(name="A"), skills={"hard": [Skill(name="py")]}
-    )
+    facts = ProfileFacts(contact=Contact(name="A"), skills={"hard": [Skill(name="py")]})
 
     matrix = build_matrix(facts, EffectiveTaxonomy.from_parts(ClusterMap()))
 

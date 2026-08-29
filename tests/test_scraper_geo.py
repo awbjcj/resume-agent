@@ -22,7 +22,11 @@ def _client(payload):
 
 def test_resolve_picks_first_geo_hit():
     payload = [
-        {"id": "103624908", "type": "GEO", "displayName": "Detroit, Michigan, United States"},
+        {
+            "id": "103624908",
+            "type": "GEO",
+            "displayName": "Detroit, Michigan, United States",
+        },
         {
             "id": "103013972",
             "type": "GEO",
@@ -39,7 +43,11 @@ def test_resolve_prefers_city_over_postal_variant():
             "type": "GEO",
             "displayName": "48228, Detroit, Michigan, United States",
         },
-        {"id": "103624908", "type": "GEO", "displayName": "Detroit, Michigan, United States"},
+        {
+            "id": "103624908",
+            "type": "GEO",
+            "displayName": "Detroit, Michigan, United States",
+        },
     ]
     assert resolve_geo_id("Detroit, MI", client=_client(payload)) == "103624908"
 

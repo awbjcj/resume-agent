@@ -46,7 +46,9 @@ def test_canonical_skill_applies_alias_then_normalizes():
 
 
 def test_merge_aliases_keeps_existing_choice():
-    merged = skills.merge_aliases({"k8s": "kubernetes"}, {"k8s": "k8s", "js": "javascript"})
+    merged = skills.merge_aliases(
+        {"k8s": "kubernetes"}, {"k8s": "k8s", "js": "javascript"}
+    )
     assert merged == {"k8s": "kubernetes", "js": "javascript"}
 
 

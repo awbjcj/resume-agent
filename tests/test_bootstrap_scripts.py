@@ -84,9 +84,12 @@ def test_dev_passes_selected_api_port_to_vite_proxy(monkeypatch):
     monkeypatch.setattr(dev, "_spawn", fake_spawn)
     monkeypatch.setattr(dev, "_stop", lambda process: None)
 
-    assert dev.run(
-        api_host="127.0.0.1", api_port=8123, web_host="localhost", web_port=5179
-    ) == 0
+    assert (
+        dev.run(
+            api_host="127.0.0.1", api_port=8123, web_host="localhost", web_port=5179
+        )
+        == 0
+    )
     assert environments[0] is None
     assert environments[1]["VITE_API_PROXY_TARGET"] == "http://127.0.0.1:8123"
 

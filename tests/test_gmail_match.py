@@ -8,7 +8,9 @@ def _job(id_, company):
 
 
 def test_matches_company_in_sender_domain():
-    email = EmailMessage(sender="ta@acme.com", sender_domain="acme.com", subject="Hi", snippet="")
+    email = EmailMessage(
+        sender="ta@acme.com", sender_domain="acme.com", subject="Hi", snippet=""
+    )
     job = match_email_to_application(email, [_job(1, "Acme Corp"), _job(2, "Beta")])
     assert job is not None
     assert job.id == 1
@@ -27,5 +29,10 @@ def test_matches_company_in_subject_text():
 
 
 def test_no_match_returns_none():
-    email = EmailMessage(sender="x@unknown.com", sender_domain="unknown.com", subject="Newsletter", snippet="")
+    email = EmailMessage(
+        sender="x@unknown.com",
+        sender_domain="unknown.com",
+        subject="Newsletter",
+        snippet="",
+    )
     assert match_email_to_application(email, [_job(1, "Acme")]) is None

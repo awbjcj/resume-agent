@@ -59,7 +59,9 @@ def test_decide_treats_same_source_different_url_as_distinct():
 
 
 def test_decide_post_raw_higher_tier_with_url_upgrades_url_only():
-    existing = _existing(source="adzuna", status=JobStatus.tailored.value, url="http://adz/1")
+    existing = _existing(
+        source="adzuna", status=JobStatus.tailored.value, url="http://adz/1"
+    )
     action = decide(existing, _incoming(source="workday", url="http://wd/1"))
     assert action == UpgradeUrlOnly(url="http://wd/1", source="workday")
 

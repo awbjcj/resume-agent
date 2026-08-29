@@ -90,7 +90,9 @@ def test_errors_list_paginates():
         with Session(app.state.engine) as session:
             for index in range(7):
                 record_error(
-                    session, kind="source", source_label=f"workday:acme-{index}",
+                    session,
+                    kind="source",
+                    source_label=f"workday:acme-{index}",
                     message="HTTP 500",
                 )
 

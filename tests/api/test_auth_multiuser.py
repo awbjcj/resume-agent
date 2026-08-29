@@ -57,10 +57,13 @@ def test_register_consumes_invite_and_provisions_workspace(mu_app, mu_client):
     assert response.status_code == 202
     match = re.search(r"\b(\d{6})\b", mu_app.state.mailer.sent[-1][2])
     assert match
-    assert mu_client.post(
-        "/api/auth/verify-email",
-        json={"email": "alice@example.com", "code": match.group(1)},
-    ).status_code == 200
+    assert (
+        mu_client.post(
+            "/api/auth/verify-email",
+            json={"email": "alice@example.com", "code": match.group(1)},
+        ).status_code
+        == 200
+    )
     with Session(mu_app.state.system_engine) as session:
         alice = session.execute(
             select(User).where(User.username == "alice")

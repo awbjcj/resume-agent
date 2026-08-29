@@ -55,9 +55,7 @@ def test_error_list_defaults_to_open_records(tmp_path):
         "jobDetails": None,
     }
     pagination = response.json()["pagination"]
-    assert pagination == {
-        "page": 1, "pageSize": 50, "totalItems": 1, "totalPages": 1
-    }
+    assert pagination == {"page": 1, "pageSize": 50, "totalItems": 1, "totalPages": 1}
 
 
 def test_dismiss_resolve_conflicts_and_unknown_ids(tmp_path):

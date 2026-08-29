@@ -57,9 +57,7 @@ def test_parse_tesla_listings_compact_keys():
 
 def test_fetch_tesla_gates_then_details(monkeypatch):
     portal = _use(monkeypatch, _FakePortal())
-    jobs = tesla.fetch_tesla(
-        TARGET, SearchConfig(role_anchors=["Software Engineer"])
-    )
+    jobs = tesla.fetch_tesla(TARGET, SearchConfig(role_anchors=["Software Engineer"]))
     assert [job.title for job in jobs] == ["Software Engineer"]
     assert portal.detail_calls == ["1"]
     assert "Python" in jobs[0].jd_text

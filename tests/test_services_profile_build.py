@@ -82,9 +82,10 @@ def test_run_corpus_build_derives_groups_from_the_shared_taxonomy_tree(
     assert load_taxonomy_state(profile_dir / "cluster_map.json").legacy_group_map_sha256
     matrix = load_matrix(profile_dir / "matrix.json")
     assert matrix is not None
-    assert matrix.taxonomy_revision == build_effective_taxonomy(
-        profile_dir
-    ).semantic_revision
+    assert (
+        matrix.taxonomy_revision
+        == build_effective_taxonomy(profile_dir).semantic_revision
+    )
     assert {row.key: row.group for row in matrix.rows} == {
         "kubernetes": "cloud-infra",
         "python": "languages",

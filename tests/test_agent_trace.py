@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from resume_agent.agent_trace import agent_trace, current_trace, read_trace, record_agent_run
+from resume_agent.agent_trace import (
+    agent_trace,
+    current_trace,
+    read_trace,
+    record_agent_run,
+)
 from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
 from resume_agent.config import Settings
 from resume_agent.llm_runner import AgentRunner

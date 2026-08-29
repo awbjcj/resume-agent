@@ -40,7 +40,9 @@ def _seed_job(engine, *, company="C", skills=None):
                 company=company,
                 title="Platform Engineer",
                 status=JobStatus.shortlisted.value,
-                criteria_json={"must_have_skills": skills or ["Kubernetes", "Terraform"]},
+                criteria_json={
+                    "must_have_skills": skills or ["Kubernetes", "Terraform"]
+                },
             ),
         )
 
@@ -56,7 +58,9 @@ def _configure(monkeypatch, tmp_path):
         cluster_path,
     )
     monkeypatch.setattr(router_module, "_CLUSTER_PATH", str(cluster_path))
-    monkeypatch.setattr(router_module, "_FACTS_PATH", str(tmp_path / "missing-facts.json"))
+    monkeypatch.setattr(
+        router_module, "_FACTS_PATH", str(tmp_path / "missing-facts.json")
+    )
 
 
 def test_suggestion_graph_uses_effective_taxonomy_corrections(tmp_path, monkeypatch):
@@ -149,7 +153,9 @@ def test_generate_rejects_browser_supplied_context(monkeypatch, tmp_path):
 def test_generate_skill_then_get_cached_suggestion(monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
     draft = SuggestionDraft(
-        repos=[RepoRef(name="foo/bar", url="https://github.com/foo/bar", why="Reference")],
+        repos=[
+            RepoRef(name="foo/bar", url="https://github.com/foo/bar", why="Reference")
+        ],
         bridge="Bridge",
     )
     monkeypatch.setattr(

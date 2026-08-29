@@ -110,7 +110,9 @@ def test_bulk_delete_including_the_applied_version_deletes_nothing():
     with client:
         job_id, versions, _ = _seed(client.app, versions=3, applied_version=True)
 
-        response = client.post("/api/resume-versions/bulk-delete", json={"ids": versions})
+        response = client.post(
+            "/api/resume-versions/bulk-delete", json={"ids": versions}
+        )
 
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "ARTIFACT_IN_USE"
@@ -136,7 +138,9 @@ def test_bulk_delete_rejects_an_empty_id_list():
         _seed(client.app)
 
         assert (
-            client.post("/api/resume-versions/bulk-delete", json={"ids": []}).status_code
+            client.post(
+                "/api/resume-versions/bulk-delete", json={"ids": []}
+            ).status_code
             == 422
         )
 

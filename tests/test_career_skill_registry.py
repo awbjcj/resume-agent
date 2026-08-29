@@ -55,9 +55,14 @@ def test_shipped_manifest_covers_every_skill_once():
 
     assert len(registry.all()) == 35
     assert len(registry.public_capabilities()) == 34
-    assert registry.require(
-        "project-dossier", family=AgentFamily.INTERNAL_PROFILE, use="profile_project"
-    ).ref.name == "project-dossier"
+    assert (
+        registry.require(
+            "project-dossier",
+            family=AgentFamily.INTERNAL_PROFILE,
+            use="profile_project",
+        ).ref.name
+        == "project-dossier"
+    )
     assert all(skill.ref.sha256 for skill in registry.all())
 
 
@@ -119,9 +124,12 @@ def test_invalid_manifest_entry_fails_only_its_capability(tmp_path, failure):
         registry.require(
             "resume-customizer", family=AgentFamily.RESUME_AUTHORING, use="tailor"
         )
-    assert registry.require(
-        "job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit"
-    ).ref.name == "job-fit-analyzer"
+    assert (
+        registry.require(
+            "job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit"
+        ).ref.name
+        == "job-fit-analyzer"
+    )
 
 
 def test_registry_resolves_paths_consistently(tmp_path):
@@ -162,9 +170,7 @@ def test_registry_revalidates_a_skill_after_the_file_changes(tmp_path):
 
     assert first is not second
     with pytest.raises(SkillUnavailable):
-        second.require(
-            "job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit"
-        )
+        second.require("job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit")
 
 
 def test_registry_revalidates_a_same_size_swap_with_preserved_mtime(tmp_path):
@@ -200,6 +206,4 @@ def test_registry_revalidates_a_same_size_swap_with_preserved_mtime(tmp_path):
 
     assert first is not second
     with pytest.raises(SkillUnavailable):
-        second.require(
-            "job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit"
-        )
+        second.require("job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit")

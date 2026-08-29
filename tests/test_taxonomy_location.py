@@ -47,12 +47,12 @@ def test_full_country_table_does_not_capture_us_state_codes():
     turned every "Atlanta, GA" into Gabon.
     """
     for raw, region in (
-        ("Atlanta, GA", "GA"),      # GA is also Gabon
+        ("Atlanta, GA", "GA"),  # GA is also Gabon
         ("Atlanta, Georgia", "GA"),  # Georgia is also a country
-        ("Boston, MA", "MA"),       # MA is also Morocco
+        ("Boston, MA", "MA"),  # MA is also Morocco
         ("New Orleans, LA", "LA"),  # LA is also Laos
         ("Philadelphia, PA", "PA"),  # PA is also Panama
-        ("Richmond, VA", "VA"),     # VA is also the Holy See
+        ("Richmond, VA", "VA"),  # VA is also the Holy See
         ("Birmingham, Ala", "AL"),  # ALA is also the Aland Islands
     ):
         parsed = location._parse_location(raw)
@@ -77,12 +77,15 @@ def test_build_location_keeps_region_for_a_country_outside_the_legacy_table():
     loc = location.build_location("Colombo", "Western Province", "Sri Lanka")
 
     assert (loc.city, loc.region, loc.country, loc.is_us) == (
-        "Colombo", "Western Province", "LK", False
+        "Colombo",
+        "Western Province",
+        "LK",
+        False,
     )
 
 
 def test_parse_location_recovers_a_two_part_foreign_country():
-    """"Colombo, Sri Lanka" used to yield city-only: the country was unresolved,
+    """ "Colombo, Sri Lanka" used to yield city-only: the country was unresolved,
     so the trailing part stayed in the region slot and was then discarded."""
     parsed = location._parse_location("Colombo, Sri Lanka")
 
@@ -90,9 +93,7 @@ def test_parse_location_recovers_a_two_part_foreign_country():
 
 
 def test_parse_location_matches_a_comma_bearing_country_suffix():
-    parsed = location._parse_location(
-        "Kralendijk, Bonaire, Sint Eustatius and Saba"
-    )
+    parsed = location._parse_location("Kralendijk, Bonaire, Sint Eustatius and Saba")
 
     assert (parsed.city, parsed.region, parsed.country) == (
         "Kralendijk",
@@ -135,16 +136,22 @@ def test_a_purely_remote_location_is_still_country_only():
     """Regression guard: stripping workplace tags must not eat these shapes."""
     for raw, country in (("Remote", None), ("Remote - US", "US"), ("Remote, US", "US")):
         parsed = location._parse_location(raw)
-        assert (parsed.city, parsed.region, parsed.country) == (None, None, country), raw
+        assert (parsed.city, parsed.region, parsed.country) == (None, None, country), (
+            raw
+        )
 
 
 def test_normalize_region_us_and_pass_through():
     assert location.normalize_region("California", "US") == "CA"
     assert location.normalize_region("CA", "US") == "CA"
     assert location.normalize_region(None, "US") is None
-    assert location.normalize_region("Ontario", "CA") == "Ontario"  # non-US -> pass-through
+    assert (
+        location.normalize_region("Ontario", "CA") == "Ontario"
+    )  # non-US -> pass-through
     assert location.normalize_region("New Taipei City", "TW") == "New Taipei City"
-    assert location.normalize_region("Some Province", None) is None  # country unresolved
+    assert (
+        location.normalize_region("Some Province", None) is None
+    )  # country unresolved
 
 
 def test_clean_region_collapses_whitespace_and_strips_zip():
@@ -155,7 +162,9 @@ def test_clean_region_collapses_whitespace_and_strips_zip():
 
 
 def test_build_location_us():
-    loc = location.build_location("Mountain View", "CA", "USA", raw="Mountain View, CA, USA")
+    loc = location.build_location(
+        "Mountain View", "CA", "USA", raw="Mountain View, CA, USA"
+    )
     assert loc.city == "Mountain View"
     assert loc.region == "CA"
     assert loc.country == "US"
@@ -172,7 +181,9 @@ def test_build_location_foreign_region_pass_through():
 
 def test_build_location_taiwan_end_to_end():
     loc = location.build_location(
-        "Banqiao District", "New Taipei City", "Taiwan",
+        "Banqiao District",
+        "New Taipei City",
+        "Taiwan",
         raw="New Taipei, Banqiao District, New Taipei City, Taiwan",
     )
     assert loc.city == "Banqiao District"
@@ -201,7 +212,11 @@ def test_build_location_unparseable_country():
 def test_as_dict_roundtrips():
     loc = location.build_location("Austin", "Texas", "US")
     assert loc.as_dict() == {
-        "city": "Austin", "region": "TX", "country": "US", "is_us": True, "raw": None
+        "city": "Austin",
+        "region": "TX",
+        "country": "US",
+        "is_us": True,
+        "raw": None,
     }
 
 

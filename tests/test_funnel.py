@@ -7,6 +7,11 @@ from resume_agent.tracking.funnel import _sequences, stage_cycle_times, stage_fl
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def _at(day: int, hour: int = 12) -> datetime:
     return datetime(2026, 3, day, hour, tzinfo=timezone.utc)
 
@@ -22,17 +27,19 @@ def _app(session: Session, status: str = "interview") -> Application:
     session.add(job)
     session.commit()
     session.refresh(job)
-    app = Application(job_id=job.id, status=status)
+    app = Application(job_id=_require_id(job.id), status=status)
     session.add(app)
     session.commit()
     session.refresh(app)
     return app
 
 
-def _event(session: Session, app: Application, kind: str, day: int, hour: int = 12, **over):
+def _event(
+    session: Session, app: Application, kind: str, day: int, hour: int = 12, **over
+):
     session.add(
         ApplicationEvent(
-            application_id=app.id,
+            application_id=_require_id(app.id),
             kind=kind,
             occurred_at=_at(day, hour),
             **over,
@@ -42,7 +49,14 @@ def _event(session: Session, app: Application, kind: str, day: int, hour: int = 
 
 
 def _edge(edges, source: str, target: str) -> int:
-    return next((edge.count for edge in edges if (edge.source, edge.target) == (source, target)), 0)
+    return next(
+        (
+            edge.count
+            for edge in edges
+            if (edge.source, edge.target) == (source, target)
+        ),
+        0,
+    )
 
 
 def test_stage_flows_accumulate_and_emit_distinct_exits():
@@ -96,14 +110,14 @@ def test_equal_dates_tie_break_by_created_at_instead_of_stage_sequence():
     session.add_all(
         [
             ApplicationEvent(
-                application_id=app.id,
+                application_id=_require_id(app.id),
                 kind="recruiter_screen",
                 occurred_at=shared_time,
                 sequence=1,
                 created_at=_at(5),
             ),
             ApplicationEvent(
-                application_id=app.id,
+                application_id=_require_id(app.id),
                 kind="technical_round",
                 occurred_at=shared_time,
                 sequence=9,

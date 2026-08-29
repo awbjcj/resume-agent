@@ -28,7 +28,9 @@ def _require_id(value: int | None) -> int:
 
 def test_application_crud_and_lookup():
     with _session() as s:
-        app = save_application(s, Application(job_id=1, status=ApplicationStatus.ready.value))
+        app = save_application(
+            s, Application(job_id=1, status=ApplicationStatus.ready.value)
+        )
         app_id = _require_id(app.id)
         loaded = get_application(s, app_id)
         assert loaded is not None
@@ -37,14 +39,21 @@ def test_application_crud_and_lookup():
         assert by_job is not None
         assert by_job.id == app.id
         assert application_for_job(s, 999) is None
-        assert [a.id for a in applications_by_status(s, ApplicationStatus.ready.value)] == [app.id]
+        assert [
+            a.id for a in applications_by_status(s, ApplicationStatus.ready.value)
+        ] == [app.id]
 
 
 def test_update_application_status_and_notes():
     with _session() as s:
-        app = save_application(s, Application(job_id=1, status=ApplicationStatus.ready.value))
+        app = save_application(
+            s, Application(job_id=1, status=ApplicationStatus.ready.value)
+        )
         updated = update_application_status(
-            s, _require_id(app.id), ApplicationStatus.submitted.value, notes="applied via portal"
+            s,
+            _require_id(app.id),
+            ApplicationStatus.submitted.value,
+            notes="applied via portal",
         )
         assert updated is not None
         assert updated.status == ApplicationStatus.submitted.value
@@ -53,19 +62,28 @@ def test_update_application_status_and_notes():
 
 def test_submitted_status_sets_submitted_at_once():
     with _session() as s:
-        created = save_application(s, Application(job_id=1, status=ApplicationStatus.submitted.value))
+        created = save_application(
+            s, Application(job_id=1, status=ApplicationStatus.submitted.value)
+        )
         assert created.submitted_at is not None
 
-        ready = save_application(s, Application(job_id=2, status=ApplicationStatus.ready.value))
+        ready = save_application(
+            s, Application(job_id=2, status=ApplicationStatus.ready.value)
+        )
         assert ready.submitted_at is None
 
-        submitted = update_application_status(s, _require_id(ready.id), ApplicationStatus.submitted.value)
+        submitted = update_application_status(
+            s, _require_id(ready.id), ApplicationStatus.submitted.value
+        )
         assert submitted is not None
         assert submitted.submitted_at is not None
 
         first_submitted_at = submitted.submitted_at
         updated = update_application_status(
-            s, _require_id(submitted.id), ApplicationStatus.submitted.value, notes="done"
+            s,
+            _require_id(submitted.id),
+            ApplicationStatus.submitted.value,
+            notes="done",
         )
         assert updated is not None
         assert updated.submitted_at == first_submitted_at
@@ -83,16 +101,26 @@ def test_latest_resume_version_picks_highest_round():
 
 def test_latest_rendered_resume_version_picks_highest_round_with_pdf():
     with _session() as s:
-        save_resume_version(s, ResumeVersion(job_id=7, round=1, content_json={"a": 1}, pdf_path="one.pdf"))
+        save_resume_version(
+            s,
+            ResumeVersion(job_id=7, round=1, content_json={"a": 1}, pdf_path="one.pdf"),
+        )
         save_resume_version(s, ResumeVersion(job_id=7, round=2, content_json={"a": 2}))
-        save_resume_version(s, ResumeVersion(job_id=7, round=3, content_json={"a": 3}, pdf_path="three.pdf"))
+        save_resume_version(
+            s,
+            ResumeVersion(
+                job_id=7, round=3, content_json={"a": 3}, pdf_path="three.pdf"
+            ),
+        )
         latest = latest_rendered_resume_version(s, 7)
         assert latest is not None
         assert latest.round == 3
         assert latest.pdf_path == "three.pdf"
 
 
-def _rv(round_num: int, score: int | None, passed: bool, version_id: int | None) -> ResumeVersion:
+def _rv(
+    round_num: int, score: int | None, passed: bool, version_id: int | None
+) -> ResumeVersion:
     return ResumeVersion(
         id=version_id,
         job_id=7,
@@ -147,7 +175,8 @@ def test_best_resume_version_reads_persisted_rows():
             s, ResumeVersion(job_id=7, round=1, review_score=90, fact_check_passed=True)
         )
         save_resume_version(
-            s, ResumeVersion(job_id=7, round=2, review_score=80, fact_check_passed=False)
+            s,
+            ResumeVersion(job_id=7, round=2, review_score=80, fact_check_passed=False),
         )
         best = best_resume_version(s, 7)
         assert best.version is not None and best.version.round == 1

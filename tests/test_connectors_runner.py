@@ -215,13 +215,25 @@ def test_skip_seen_prunes_canonical_url_but_spares_aggregator(tmp_path):
     with _session() as s:
         save_job(
             s,
-            Job(source="scrape", jd_text="jd", url="https://co/1", company="Acme",
-                title="Backend Engineer", status=JobStatus.raw.value),
+            Job(
+                source="scrape",
+                jd_text="jd",
+                url="https://co/1",
+                company="Acme",
+                title="Backend Engineer",
+                status=JobStatus.raw.value,
+            ),
         )
         save_job(
             s,
-            Job(source="adzuna", jd_text="thin", url="https://agg/1", company="Beta",
-                title="AI Engineer", status=JobStatus.raw.value),
+            Job(
+                source="adzuna",
+                jd_text="thin",
+                url="https://agg/1",
+                company="Beta",
+                title="AI Engineer",
+                status=JobStatus.raw.value,
+            ),
         )
         captor = _SeenAwareConnector()
         run_pull(s, [captor], SearchConfig(), tmp_path / "runs.json")
@@ -229,9 +241,15 @@ def test_skip_seen_prunes_canonical_url_but_spares_aggregator(tmp_path):
         assert callable(seen)
 
         # Already held from a canonical source -> prune before the costly detail fetch.
-        assert seen(RawJob("scrape", "https://co/1", None, "Backend Engineer", None, "")) is True
+        assert (
+            seen(RawJob("scrape", "https://co/1", None, "Backend Engineer", None, ""))
+            is True
+        )
         # Held only as a lower-priority aggregator copy -> must still be fetched to upgrade it.
-        assert seen(RawJob("scrape", "https://agg/1", None, "AI Engineer", None, "")) is False
+        assert (
+            seen(RawJob("scrape", "https://agg/1", None, "AI Engineer", None, ""))
+            is False
+        )
         # Unknown URL and URL-less cards are never pruned.
         assert seen(RawJob("scrape", "https://co/2", None, "X", None, "")) is False
         assert seen(RawJob("scrape", None, None, "X", None, "")) is False

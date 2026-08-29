@@ -94,9 +94,7 @@ def test_restore_brings_back_a_deleted_manual_skill(built_profile_dir):
     profile_skills.add_skill(built_profile_dir, "Rust", "hard")
     profile_skills.delete_skill(built_profile_dir, "rust")
     gone = load_facts(built_profile_dir / "facts.json")
-    assert all(
-        s.name != "Rust" for skills in gone.skills.values() for s in skills
-    )
+    assert all(s.name != "Rust" for skills in gone.skills.values() for s in skills)
 
     profile_skills.restore_skill(built_profile_dir, "rust")
     facts = load_facts(built_profile_dir / "facts.json")

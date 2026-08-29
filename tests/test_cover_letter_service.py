@@ -48,9 +48,13 @@ def test_generate_revises_until_provenance_clean_then_persists():
     draft_agent = _Agent(_letter("GHOST"))
     reviser_agent = _Agent(_letter("exp1"))
     with _session() as s:
-        job = add_job(s, source="manual", jd_text="Build APIs", company="Acme", title="Eng")
+        job = add_job(
+            s, source="manual", jd_text="Build APIs", company="Acme", title="Eng"
+        )
         assert job is not None
-        cover = generate_cover_letter(s, job, _facts(), draft_agent, reviser_agent, max_rounds=2)
+        cover = generate_cover_letter(
+            s, job, _facts(), draft_agent, reviser_agent, max_rounds=2
+        )
         assert cover.id is not None
         assert cover.fact_check_passed is True
         assert cover.content_json is not None
@@ -63,5 +67,7 @@ def test_generate_marks_unfixed_fabrication_as_failed():
     with _session() as s:
         job = add_job(s, source="manual", jd_text="jd", company="Acme", title="Eng")
         assert job is not None
-        cover = generate_cover_letter(s, job, _facts(), draft_agent, reviser_agent, max_rounds=2)
+        cover = generate_cover_letter(
+            s, job, _facts(), draft_agent, reviser_agent, max_rounds=2
+        )
         assert cover.fact_check_passed is False

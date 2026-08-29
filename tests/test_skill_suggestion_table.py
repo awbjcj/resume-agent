@@ -46,13 +46,9 @@ def test_skill_suggestion_kind_and_key_are_unique():
     init_db(engine)
 
     with Session(engine) as session:
-        session.add(
-            SkillSuggestion(kind="skill", key="infra", payload_json=_payload())
-        )
+        session.add(SkillSuggestion(kind="skill", key="infra", payload_json=_payload()))
         session.commit()
-        session.add(
-            SkillSuggestion(kind="skill", key="infra", payload_json=_payload())
-        )
+        session.add(SkillSuggestion(kind="skill", key="infra", payload_json=_payload()))
         with pytest.raises(IntegrityError):
             session.commit()
 

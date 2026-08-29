@@ -19,7 +19,9 @@ def _auth_client(handler) -> GitHubClient:
 def test_fetch_profile():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/users/ada"
-        return httpx.Response(200, json={"login": "ada", "followers": 42, "public_repos": 3})
+        return httpx.Response(
+            200, json={"login": "ada", "followers": 42, "public_repos": 3}
+        )
 
     gh = _client(handler)
     profile = gh.fetch_profile("ada")
@@ -66,7 +68,9 @@ def test_fetch_repos_authenticated_other_user_uses_public_endpoint():
             return httpx.Response(200, json=[{"name": "pub"}])
         return httpx.Response(404)
 
-    assert [repo["name"] for repo in _auth_client(handler).fetch_repos("ada")] == ["pub"]
+    assert [repo["name"] for repo in _auth_client(handler).fetch_repos("ada")] == [
+        "pub"
+    ]
 
 
 def test_fetch_repos_authenticated_identity_unknown_falls_back_to_public():
@@ -79,7 +83,9 @@ def test_fetch_repos_authenticated_identity_unknown_falls_back_to_public():
             return httpx.Response(200, json=[{"name": "pub"}])
         return httpx.Response(404)
 
-    assert [repo["name"] for repo in _auth_client(handler).fetch_repos("ada")] == ["pub"]
+    assert [repo["name"] for repo in _auth_client(handler).fetch_repos("ada")] == [
+        "pub"
+    ]
 
 
 def test_fetch_repos_follows_pagination_link():
@@ -157,7 +163,9 @@ def test_fetch_root_listing_raw_file_and_languages_validate_boundaries():
     def handler(request: httpx.Request) -> httpx.Response:
         raw_path = request.url.raw_path.decode().split("?", 1)[0]
         if raw_path == "/repos/ada/my%20repo/contents":
-            return httpx.Response(200, json=[{"name": "README file.md", "type": "file"}])
+            return httpx.Response(
+                200, json=[{"name": "README file.md", "type": "file"}]
+            )
         if raw_path == "/repos/ada/my%20repo/contents/README%20file.md":
             assert request.headers["Accept"] == "application/vnd.github.raw"
             return httpx.Response(200, text="# Readme")

@@ -167,7 +167,10 @@ def test_writer_and_reviser_receive_unfenced_fact_clamped_depth_plan():
                 id="e1",
                 company="Acme",
                 title="Engineer",
-                bullets=[Bullet(id=f"b{index}", text=f"Did work {index}") for index in range(5)],
+                bullets=[
+                    Bullet(id=f"b{index}", text=f"Did work {index}")
+                    for index in range(5)
+                ],
             )
         ],
     )

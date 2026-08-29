@@ -4,7 +4,11 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.tracking.prune_config import PruneConfig
 from resume_agent.tracking.repository import (
-    get_job, prune_preview, prune_run, save_application, save_job,
+    get_job,
+    prune_preview,
+    prune_run,
+    save_application,
+    save_job,
 )
 from resume_agent.tracking.tables import Application, Job, JobStatus
 
@@ -25,15 +29,26 @@ def _require_id(value: int | None) -> int:
 def test_prune_run_archives_junk_expires_old_and_skips_progress():
     cfg = PruneConfig()
     with _session() as s:
-        rejected = save_job(s, Job(source="m", jd_text="a", status=JobStatus.rejected.value))
-        protected = save_job(s, Job(source="m", jd_text="b", status=JobStatus.rejected.value))
+        rejected = save_job(
+            s, Job(source="m", jd_text="a", status=JobStatus.rejected.value)
+        )
+        protected = save_job(
+            s, Job(source="m", jd_text="b", status=JobStatus.rejected.value)
+        )
         # ADR-0013: protection comes from real investment, not a bare row —
         # an empty `ready` application no longer shields a job from pruning.
         save_application(
             s, Application(job_id=_require_id(protected.id), status="submitted")
         )
-        old_archived = save_job(s, Job(source="m", jd_text="c", status=JobStatus.raw.value,
-                                       archived_at=NOW - timedelta(days=45)))
+        old_archived = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="c",
+                status=JobStatus.raw.value,
+                archived_at=NOW - timedelta(days=45),
+            ),
+        )
 
         preview = prune_preview(s, cfg, now=NOW)
         assert preview.archived == 1 and preview.expired == 1 and preview.skipped == 1
@@ -49,9 +64,9 @@ def test_prune_run_archives_junk_expires_old_and_skips_progress():
         rejected_after = get_job(s, _require_id(rejected.id))
         assert rejected_after is not None
         assert rejected_after.archived_at is not None
-        assert get_job(s, _require_id(old_archived.id)) is None       # expired
+        assert get_job(s, _require_id(old_archived.id)) is None  # expired
         protected_after = get_job(s, _require_id(protected.id))
-        assert protected_after is not None      # progress kept
+        assert protected_after is not None  # progress kept
         assert protected_after.archived_at is None
 
 

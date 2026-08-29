@@ -10,7 +10,11 @@ def _client() -> TestClient:
 def _job(client: TestClient, company: str = "Acme") -> int:
     response = client.post(
         "/api/jobs",
-        json={"jdText": f"Build things for {company}.", "company": company, "title": "SWE"},
+        json={
+            "jdText": f"Build things for {company}.",
+            "company": company,
+            "title": "SWE",
+        },
     )
     assert response.status_code == 201, response.text
     return response.json()["id"]
@@ -61,7 +65,10 @@ def test_event_advances_application_status() -> None:
             },
         )
         assert response.status_code == 201, response.text
-        assert client.get(f"/api/jobs/{job_id}").json()["application"]["status"] == "submitted"
+        assert (
+            client.get(f"/api/jobs/{job_id}").json()["application"]["status"]
+            == "submitted"
+        )
 
 
 def test_offer_response_derives_total_compensation() -> None:
@@ -113,7 +120,10 @@ def test_event_ids_are_scoped_to_the_job_in_mutation_routes() -> None:
             ).status_code
             == 404
         )
-        assert client.delete(f"/api/jobs/{second_job}/events/{event_id}").status_code == 404
+        assert (
+            client.delete(f"/api/jobs/{second_job}/events/{event_id}").status_code
+            == 404
+        )
 
 
 def test_missing_job_and_event_are_404() -> None:
@@ -122,7 +132,9 @@ def test_missing_job_and_event_are_404() -> None:
         assert client.get("/api/jobs/9999/events").status_code == 404
         job_id = _job(client)
         assert (
-            client.patch(f"/api/jobs/{job_id}/events/9999", json={"notes": "x"}).status_code
+            client.patch(
+                f"/api/jobs/{job_id}/events/9999", json={"notes": "x"}
+            ).status_code
             == 404
         )
 
@@ -185,7 +197,9 @@ def test_patch_null_sequence_clears_the_manual_override() -> None:
     assert response.json()["sequenceOverride"] is None
 
 
-def test_auto_sequence_reorders_earlier_rounds_and_manual_sequence_is_preserved() -> None:
+def test_auto_sequence_reorders_earlier_rounds_and_manual_sequence_is_preserved() -> (
+    None
+):
     client = _client()
     with client:
         job_id = _job(client)

@@ -51,9 +51,10 @@ def test_save_writes_valid_json_without_abandoned_temp_files(tmp_path):
 
     save_group_corrections(ledger, path)
 
-    assert json.loads(path.read_text(encoding="utf-8"))["corrections"]["python"][
-        "group"
-    ] == "languages"
+    assert (
+        json.loads(path.read_text(encoding="utf-8"))["corrections"]["python"]["group"]
+        == "languages"
+    )
     assert list(tmp_path.glob(f".{path.name}.*.tmp")) == []
 
 

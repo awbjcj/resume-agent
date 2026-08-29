@@ -68,9 +68,7 @@ def test_tailor_job_persists_versions_and_marks_tailored():
     tailor_agent = _ContentAgent()
     reviewer = _FactCheck()
     reviser_agent = _ContentAgent()
-    taxonomy = EffectiveTaxonomy.from_parts(
-        ClusterMap(aliases={"js": "javascript"})
-    )
+    taxonomy = EffectiveTaxonomy.from_parts(ClusterMap(aliases={"js": "javascript"}))
     with _session() as s:
         job = save_job(
             s,

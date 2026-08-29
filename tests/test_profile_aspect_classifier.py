@@ -1,5 +1,15 @@
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.aspect_classifier import AspectAssignment, AspectAssignments, classify_aspects
+from resume_agent.models.profile import (
+    Bullet,
+    Contact,
+    Experience,
+    ProfileFacts,
+    Project,
+)
+from resume_agent.profile.aspect_classifier import (
+    AspectAssignment,
+    AspectAssignments,
+    classify_aspects,
+)
 
 
 class _Result:

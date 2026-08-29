@@ -4,7 +4,8 @@ import sqlite3
 from pathlib import Path
 
 _SPEC = importlib.util.spec_from_file_location(
-    "tailor_health", Path(__file__).resolve().parents[1] / "scripts" / "tailor_health.py"
+    "tailor_health",
+    Path(__file__).resolve().parents[1] / "scripts" / "tailor_health.py",
 )
 assert _SPEC and _SPEC.loader
 tailor_health = importlib.util.module_from_spec(_SPEC)
@@ -65,7 +66,16 @@ def test_all_gate_names_are_counted_and_blocking_kinds_are_keyed_by_gate(tmp_pat
 def test_coverage_rate_rides_the_reviewer_means(tmp_path):
     path = _db(
         tmp_path,
-        [[{"reviewer": "must-have-coverage", "score": 60, "passed": True, "issues": []}]],
+        [
+            [
+                {
+                    "reviewer": "must-have-coverage",
+                    "score": 60,
+                    "passed": True,
+                    "issues": [],
+                }
+            ]
+        ],
     )
 
     report = tailor_health.collect(path)

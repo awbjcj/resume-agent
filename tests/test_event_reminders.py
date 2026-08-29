@@ -13,6 +13,11 @@ from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def _session_with_event(**event_kwargs) -> Session:
     engine = make_engine("sqlite://")
     init_db(engine)
@@ -21,11 +26,15 @@ def _session_with_event(**event_kwargs) -> Session:
     session.add(job)
     session.commit()
     session.refresh(job)
-    application = Application(job_id=job.id, status="interview")
+    application = Application(job_id=_require_id(job.id), status="interview")
     session.add(application)
     session.commit()
     session.refresh(application)
-    session.add(ApplicationEvent(application_id=application.id, **event_kwargs))
+    session.add(
+        ApplicationEvent(
+            application_id=_require_id(application.id), **event_kwargs
+        )
+    )
     session.commit()
     return session
 

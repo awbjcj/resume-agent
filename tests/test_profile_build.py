@@ -45,7 +45,14 @@ class _FakeGitHub:
         return {"login": username, "followers": 7, "public_repos": 1}
 
     def fetch_repos(self, username):
-        return [{"name": "engine", "stargazers_count": 3, "language": "Python", "html_url": "https://github.com/ada/engine"}]
+        return [
+            {
+                "name": "engine",
+                "stargazers_count": 3,
+                "language": "Python",
+                "html_url": "https://github.com/ada/engine",
+            }
+        ]
 
 
 class _SequenceAgent:
@@ -264,10 +271,12 @@ def test_build_aborts_when_primary_has_no_fragment(tmp_path):
 
 class _Extractor:
     def run(self, prompt):
-        return _FakeResult(ProfileFacts(
-            contact=Contact(name="Ada"),
-            experience=[Experience(company="Acme", title="Engineer")],
-        ))
+        return _FakeResult(
+            ProfileFacts(
+                contact=Contact(name="Ada"),
+                experience=[Experience(company="Acme", title="Engineer")],
+            )
+        )
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -280,11 +289,21 @@ class _SkeletonAwareSynthesis:
         skeleton_json = prompt.split("PROFILE SKELETON (anchor candidates):\n")[1]
         skeleton = json.loads(skeleton_json.split("\n\nDOCUMENT:\n")[0])
         anchor = next(r["id"] for r in skeleton if r["kind"] == "experience")
-        return _FakeResult(SynthesizedFragment(entries=[SynthesizedEntry(
-            kind="experience_bullets", anchor_id=anchor,
-            claims=[SynthesizedClaim(text="Cut latency 30%",
-                                     support=["Cut latency 30%"])],
-        )]))
+        return _FakeResult(
+            SynthesizedFragment(
+                entries=[
+                    SynthesizedEntry(
+                        kind="experience_bullets",
+                        anchor_id=anchor,
+                        claims=[
+                            SynthesizedClaim(
+                                text="Cut latency 30%", support=["Cut latency 30%"]
+                            )
+                        ],
+                    )
+                ]
+            )
+        )
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -293,9 +312,13 @@ class _SkeletonAwareSynthesis:
 class _ApproveAll:
     def run(self, prompt):
         claims = json.loads(prompt)
-        return _FakeResult(ClaimVerdicts(verdicts=[
-            ClaimVerdict(index=c["index"], verdict="supported") for c in claims
-        ]))
+        return _FakeResult(
+            ClaimVerdicts(
+                verdicts=[
+                    ClaimVerdict(index=c["index"], verdict="supported") for c in claims
+                ]
+            )
+        )
 
     async def arun(self, prompt):
         return self.run(prompt)

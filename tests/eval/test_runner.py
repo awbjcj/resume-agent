@@ -258,9 +258,7 @@ def test_run_case_judges_the_surfaced_best_clean_round():
         contact=Contact(name="Ada"),
         experience=[Experience(id="e1", company="Acme", title="Eng")],
     )
-    result = run_case(
-        case, facts, config, bundle, judge
-    )
+    result = run_case(case, facts, config, bundle, judge)
 
     assert result.surfaced_round_num == 1
     assert result.regressed is True

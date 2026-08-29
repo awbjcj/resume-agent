@@ -80,13 +80,19 @@ class StreamingScout:
         return self.run(prompt)
 
 
-CheckStatus = Literal["validated", "unverified", "conflict", "failed", "duplicate", "avoid", "new"]
+CheckStatus = Literal[
+    "validated", "unverified", "conflict", "failed", "duplicate", "avoid", "new"
+]
 
 
-def source_proposal(company: str = "Modal", check: CheckStatus = "validated") -> ScoutProposal:
+def source_proposal(
+    company: str = "Modal", check: CheckStatus = "validated"
+) -> ScoutProposal:
     return ScoutProposal(
         kind="source",
-        source=SourcePayload(company=company, url=f"https://{company.casefold()}.example/jobs"),
+        source=SourcePayload(
+            company=company, url=f"https://{company.casefold()}.example/jobs"
+        ),
         check=check,
     )
 
@@ -138,7 +144,9 @@ def test_post_process_reuses_the_company_and_board_resolution(tmp_path):
     assert proposals[0].source.token == "modal"
 
 
-def test_streamed_prose_is_stored_and_source_is_authoritatively_resolved(monkeypatch, tmp_path):
+def test_streamed_prose_is_stored_and_source_is_authoritatively_resolved(
+    monkeypatch, tmp_path
+):
     class Resolver:
         def __init__(self, _search_path):
             pass
@@ -175,7 +183,10 @@ def test_streamed_prose_is_stored_and_source_is_authoritatively_resolved(monkeyp
                     "proposals": [
                         {
                             "kind": "source",
-                            "source": {"company": "Modal", "url": "https://modal.example/jobs"},
+                            "source": {
+                                "company": "Modal",
+                                "url": "https://modal.example/jobs",
+                            },
                         }
                     ],
                 }
@@ -186,7 +197,10 @@ def test_streamed_prose_is_stored_and_source_is_authoritatively_resolved(monkeyp
     assert view["proposals"][0]["check"] == "validated"
     assert view["proposals"][0]["source"]["url"] == "https://jobs.lever.co/modal"
     assert view["proposals"][0]["source"]["roleCount"] == 4
-    assert "".join(event.text for event in sink.events if isinstance(event, TextDelta)) == "Found one option."
+    assert (
+        "".join(event.text for event in sink.events if isinstance(event, TextDelta))
+        == "Found one option."
+    )
     assert [
         type(event).__name__
         for event in sink.events
@@ -253,8 +267,20 @@ def test_interrupted_search_only_downgrades_unresolved_sources(tmp_path):
         {
             "message": "Found two companies.",
             "proposals": [
-                {"kind": "source", "source": {"company": verified.company, "url": verified.requested_url}},
-                {"kind": "source", "source": {"company": unresolved.company, "url": unresolved.requested_url}},
+                {
+                    "kind": "source",
+                    "source": {
+                        "company": verified.company,
+                        "url": verified.requested_url,
+                    },
+                },
+                {
+                    "kind": "source",
+                    "source": {
+                        "company": unresolved.company,
+                        "url": unresolved.requested_url,
+                    },
+                },
             ],
         }
     ).proposals
@@ -270,7 +296,9 @@ def test_interrupted_search_only_downgrades_unresolved_sources(tmp_path):
         session={"proposals": []},
         connectors_path=str(tmp_path / "connectors.yaml"),
         search_path=str(tmp_path / "search.yaml"),
-        resolve_source=lambda company, _url: verified if company == verified.company else unresolved,
+        resolve_source=lambda company, _url: (
+            verified if company == verified.company else unresolved
+        ),
         search_coverage=coverage,
     )
 
@@ -308,7 +336,10 @@ def test_post_process_limits_concurrent_company_resolutions_to_four(tmp_path):
             "proposals": [
                 {
                     "kind": "source",
-                    "source": {"company": f"Company {index}", "url": f"https://company-{index}.example/jobs"},
+                    "source": {
+                        "company": f"Company {index}",
+                        "url": f"https://company-{index}.example/jobs",
+                    },
                 }
                 for index in range(6)
             ],
@@ -347,7 +378,9 @@ def test_dismissed_feedback_is_in_next_prompt(tmp_path):
         scout_turn=ScoutTurnRecord(role="scout", text="First"),
         proposals=[source_proposal("Scale-AI")],
     )
-    service.dismiss_proposal(tmp_path, "s1", "p1", reason="too big", browser_enabled=False)
+    service.dismiss_proposal(
+        tmp_path, "s1", "p1", reason="too big", browser_enabled=False
+    )
     runner = StreamingScout("Here are smaller teams.")
     service.run_message_turn(
         Reporter(),
@@ -378,7 +411,10 @@ def test_repeated_source_and_term_are_stored_as_duplicates(tmp_path):
         {
             "message": "Repeated",
             "proposals": [
-                {"kind": "source", "source": {"company": "Modal", "url": "https://other.example/jobs"}},
+                {
+                    "kind": "source",
+                    "source": {"company": "Modal", "url": "https://other.example/jobs"},
+                },
                 {"kind": "search_term", "term": {"value": "Inference Serving"}},
             ],
         }
@@ -395,7 +431,10 @@ def test_repeated_source_and_term_are_stored_as_duplicates(tmp_path):
         scout_agent=StreamingScout("Repeated"),
         formatter_agent=Formatter(turn),
     )
-    assert [row["check"] for row in view["proposals"][-2:]] == ["duplicate", "duplicate"]
+    assert [row["check"] for row in view["proposals"][-2:]] == [
+        "duplicate",
+        "duplicate",
+    ]
 
 
 def test_term_approval_preserves_unrelated_fields(tmp_path):
@@ -447,7 +486,9 @@ def _seed_source_for_approval(
                 kind="source",
                 source=SourcePayload(
                     company="Acme",
-                    url="https://jobs.lever.co/acme" if ats else "https://acme.example/careers",
+                    url="https://jobs.lever.co/acme"
+                    if ats
+                    else "https://acme.example/careers",
                     ats=ats,
                     resolution_status=resolution_status.get(check),
                     resolution_reason="OWNERSHIP_NOT_PROVEN",
@@ -474,7 +515,9 @@ def test_normal_approval_requires_a_verified_source(monkeypatch, tmp_path):
         )
 
 
-def test_manual_confirmation_adds_unverified_known_ats_and_audits(monkeypatch, tmp_path):
+def test_manual_confirmation_adds_unverified_known_ats_and_audits(
+    monkeypatch, tmp_path
+):
     _seed_source_for_approval(tmp_path, check="unverified", ats="lever")
     calls = []
     monkeypatch.setattr(service, "add_source", lambda **kwargs: calls.append(kwargs))
@@ -491,12 +534,19 @@ def test_manual_confirmation_adds_unverified_known_ats_and_audits(monkeypatch, t
     )
 
     assert calls[0]["provider"] == "auto"
-    assert view["proposals"][0]["manualConfirmation"]["url"] == "https://jobs.lever.co/acme"
+    assert (
+        view["proposals"][0]["manualConfirmation"]["url"]
+        == "https://jobs.lever.co/acme"
+    )
 
 
-def test_manual_confirmation_requires_a_browser_for_generic_sources(monkeypatch, tmp_path):
+def test_manual_confirmation_requires_a_browser_for_generic_sources(
+    monkeypatch, tmp_path
+):
     _seed_source_for_approval(tmp_path, check="unverified", ats=None)
-    monkeypatch.setattr(service, "add_source", lambda **_kwargs: pytest.fail("must not add"))
+    monkeypatch.setattr(
+        service, "add_source", lambda **_kwargs: pytest.fail("must not add")
+    )
 
     with pytest.raises(ValueError, match="requires a local browser"):
         service.approve_proposal(
@@ -512,9 +562,13 @@ def test_manual_confirmation_requires_a_browser_for_generic_sources(monkeypatch,
 
 
 @pytest.mark.parametrize("check", ["conflict", "failed"])
-def test_conflict_and_failed_sources_cannot_be_manually_confirmed(monkeypatch, tmp_path, check):
+def test_conflict_and_failed_sources_cannot_be_manually_confirmed(
+    monkeypatch, tmp_path, check
+):
     _seed_source_for_approval(tmp_path, check=check)
-    monkeypatch.setattr(service, "add_source", lambda **_kwargs: pytest.fail("must not add"))
+    monkeypatch.setattr(
+        service, "add_source", lambda **_kwargs: pytest.fail("must not add")
+    )
 
     with pytest.raises(ValueError, match="not approvable"):
         service.approve_proposal(
@@ -556,7 +610,10 @@ def test_re_resolve_replaces_only_the_pending_exact_source_url(monkeypatch, tmp_
 
     proposal = view["proposals"][0]
     assert proposal["check"] == "validated"
-    assert proposal["source"]["url"] == "https://tempus.wd5.myworkdayjobs.com/Tempus_Careers"
+    assert (
+        proposal["source"]["url"]
+        == "https://tempus.wd5.myworkdayjobs.com/Tempus_Careers"
+    )
     assert proposal["source"]["requestedUrl"] == "https://tempus.example/careers"
 
 
@@ -617,7 +674,9 @@ def test_session_view_projects_source_resolution_fields(tmp_path):
         ],
     )
 
-    source = service.session_view(tmp_path, "s1", browser_enabled=False)["proposals"][0]["source"]
+    source = service.session_view(tmp_path, "s1", browser_enabled=False)["proposals"][
+        0
+    ]["source"]
 
     assert source["resolutionStatus"] == "unverified"
     assert source["resolutionReason"] == "OWNERSHIP_NOT_PROVEN"
@@ -636,7 +695,9 @@ class UnparsableFormatter:
         return self.run(prompt)
 
 
-def test_unparsable_formatter_keeps_the_reply_the_user_already_watched(tmp_path, caplog):
+def test_unparsable_formatter_keeps_the_reply_the_user_already_watched(
+    tmp_path, caplog
+):
     # agno reports "could not coerce into output_schema" by handing back a raw
     # str, which expect_schema raises as UnparsedAgentOutput -- a TypeError, so
     # the TurnRejected fallback never saw it. The researcher's answer has
@@ -658,7 +719,9 @@ def test_unparsable_formatter_keeps_the_reply_the_user_already_watched(tmp_path,
     assert view["turns"][-1]["text"] == "Found one option."
     assert view["turns"][-1]["notice"] == service._TURN_OMITTED_NOTICE
     assert view["proposals"] == []
-    assert any("Expected ScoutTurnDraft" in record.getMessage() for record in caplog.records)
+    assert any(
+        "Expected ScoutTurnDraft" in record.getMessage() for record in caplog.records
+    )
 
 
 def test_a_posting_url_reuses_its_company_and_board_resolution(tmp_path):
@@ -691,7 +754,10 @@ def test_a_posting_url_reuses_its_company_and_board_resolution(tmp_path):
                 {
                     "message": "Found PHINIA.",
                     "proposals": [
-                        {"kind": "source", "source": {"company": "PHINIA", "url": posting}}
+                        {
+                            "kind": "source",
+                            "source": {"company": "PHINIA", "url": posting},
+                        }
                     ],
                 }
             ).proposals[0]

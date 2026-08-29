@@ -16,7 +16,11 @@ def test_usd_rate_for_reads_and_caches_frankfurter_quote(monkeypatch):
         return Response()
 
     monkeypatch.setattr(currency.httpx, "get", get)
-    monkeypatch.setattr(currency, "_rates", {"USD": (1.0, currency.datetime.max.replace(tzinfo=currency.UTC))})
+    monkeypatch.setattr(
+        currency,
+        "_rates",
+        {"USD": (1.0, currency.datetime.max.replace(tzinfo=currency.UTC))},
+    )
 
     assert currency.usd_rate_for("eur") == 1.08
     assert currency.usd_rate_for("EUR") == 1.08

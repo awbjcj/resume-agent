@@ -32,7 +32,9 @@ class FakeRunner:
 
 def assignments(*pairs: tuple[str, str]) -> SkillGroupAssignments:
     return SkillGroupAssignments(
-        assignments=[SkillGroupAssignment(token=token, group=group) for token, group in pairs]
+        assignments=[
+            SkillGroupAssignment(token=token, group=group) for token, group in pairs
+        ]
     )
 
 
@@ -111,9 +113,7 @@ def test_classifier_accepts_only_exact_batch_tokens_and_known_slugs():
             ("k8s", "made-up"),
         )
     )
-    assert classify_missing_groups({"Python", "k8s"}, runner) == {
-        "python": "languages"
-    }
+    assert classify_missing_groups({"Python", "k8s"}, runner) == {"python": "languages"}
     assert json.loads(runner.prompts[0]) == ["k8s", "python"]
 
 

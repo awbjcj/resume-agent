@@ -8,12 +8,16 @@ def _patch_fetch(monkeypatch, html, final_url):
     fetch_page for LinkedIn, and upgrade_if_shell for the browser upgrade a
     short static page would otherwise trigger against the real network."""
     monkeypatch.setattr(
-        service, "fetch_static",
+        service,
+        "fetch_static",
         lambda url: PageContent(html=html, final_url=final_url, rendered=False),
     )
     monkeypatch.setattr(
-        service, "fetch_page",
-        lambda url, allow_browser=True: PageContent(html=html, final_url=final_url, rendered=False),
+        service,
+        "fetch_page",
+        lambda url, allow_browser=True: PageContent(
+            html=html, final_url=final_url, rendered=False
+        ),
     )
     monkeypatch.setattr(
         service, "upgrade_if_shell", lambda page, allow_browser=True: page
@@ -37,7 +41,9 @@ def test_greenhouse_url_uses_parser(monkeypatch):
     )
     _patch_fetch(monkeypatch, html, "https://boards.greenhouse.io/hooli/jobs/1")
 
-    job = service.job_from_url("https://boards.greenhouse.io/hooli/jobs/1", agent=_Agent())
+    job = service.job_from_url(
+        "https://boards.greenhouse.io/hooli/jobs/1", agent=_Agent()
+    )
 
     assert job is not None
     assert job.source == "url"
@@ -64,12 +70,19 @@ def test_linkedin_url_uses_parser(monkeypatch):
 
 
 def test_unknown_site_uses_llm(monkeypatch):
-    _patch_fetch(monkeypatch, "<html><body><p>Some role.</p></body></html>", "https://acme.test/job")
+    _patch_fetch(
+        monkeypatch,
+        "<html><body><p>Some role.</p></body></html>",
+        "https://acme.test/job",
+    )
 
     class _LLM:
         def run(self, prompt):
             class _R:
-                content = ExtractedJob(title="Lead", company="Acme", jd_text="Lead the team.")
+                content = ExtractedJob(
+                    title="Lead", company="Acme", jd_text="Lead the team."
+                )
+
             return _R()
 
         async def arun(self, prompt):
@@ -96,7 +109,9 @@ class _EmptyLLM:
 
 
 def test_empty_jd_returns_none(monkeypatch):
-    _patch_fetch(monkeypatch, "<html><body></body></html>", "https://boards.greenhouse.io/x")
+    _patch_fetch(
+        monkeypatch, "<html><body></body></html>", "https://boards.greenhouse.io/x"
+    )
 
     job = service.job_from_url("https://boards.greenhouse.io/x", agent=_EmptyLLM())
 
@@ -115,13 +130,16 @@ def test_recognized_ats_without_a_reader_falls_back_to_llm(monkeypatch):
     from resume_agent.discovery.connectors.detect import AtsTarget
 
     monkeypatch.setattr(
-        service, "identify_host", lambda url: AtsTarget("unregistered-ats", token="acme")
+        service,
+        "identify_host",
+        lambda url: AtsTarget("unregistered-ats", token="acme"),
     )
 
     class _LLM:
         def run(self, prompt):
             class _R:
                 content = ExtractedJob(title="Eng", company="Acme", jd_text="real jd")
+
             return _R()
 
         async def arun(self, prompt):
@@ -143,8 +161,11 @@ def test_reader_returning_none_falls_back_to_llm_not_browser(monkeypatch):
         "https://jobs.ashbyhq.com/acme/missing-id",
     )
     monkeypatch.setattr(
-        service, "fetch_page",
-        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("browser must not be used")),
+        service,
+        "fetch_page",
+        lambda *a, **kw: (_ for _ in ()).throw(
+            AssertionError("browser must not be used")
+        ),
     )
     monkeypatch.setitem(service.ATS_READERS, "ashby", lambda target, url, html: None)
 
@@ -152,6 +173,7 @@ def test_reader_returning_none_falls_back_to_llm_not_browser(monkeypatch):
         def run(self, prompt):
             class _R:
                 content = ExtractedJob(title="Eng", company="Acme", jd_text="real jd")
+
             return _R()
 
         async def arun(self, prompt):
@@ -167,10 +189,13 @@ def test_singleton_portal_may_still_be_rendered(monkeypatch):
     # careers.google.com is recognized by host but builds its listing in JS --
     # its JD lives in an AF_initDataCallback script tag that html_to_text
     # decomposes. Locking it out of the browser left the LLM nothing to read.
-    shell = "<html><body><script>AF_initDataCallback({data:'...'})</script></body></html>"
+    shell = (
+        "<html><body><script>AF_initDataCallback({data:'...'})</script></body></html>"
+    )
     _patch_fetch(monkeypatch, shell, "https://careers.google.com/jobs/results/123")
     monkeypatch.setattr(
-        service, "upgrade_if_shell",
+        service,
+        "upgrade_if_shell",
         lambda page, allow_browser=True: PageContent(
             html="<html><body><p>Rendered JD body.</p></body></html>",
             final_url=page.final_url,
@@ -184,14 +209,18 @@ def test_singleton_portal_may_still_be_rendered(monkeypatch):
             seen.append(prompt)
 
             class _R:
-                content = ExtractedJob(title="SWE", company="Google", jd_text="Rendered JD body.")
+                content = ExtractedJob(
+                    title="SWE", company="Google", jd_text="Rendered JD body."
+                )
 
             return _R()
 
         async def arun(self, prompt):
             return self.run(prompt)
 
-    job = service.job_from_url("https://careers.google.com/jobs/results/123", agent=_LLM())
+    job = service.job_from_url(
+        "https://careers.google.com/jobs/results/123", agent=_LLM()
+    )
 
     assert job is not None
     assert "Rendered JD body." in seen[0]
@@ -205,20 +234,27 @@ def test_unknown_host_is_fetched_exactly_once(monkeypatch):
     def _static(url):
         calls.append(url)
         return PageContent(
-            html="<html><body><p>Some role.</p></body></html>", final_url=url, rendered=False
+            html="<html><body><p>Some role.</p></body></html>",
+            final_url=url,
+            rendered=False,
         )
 
     monkeypatch.setattr(service, "fetch_static", _static)
-    monkeypatch.setattr(service, "upgrade_if_shell", lambda page, allow_browser=True: page)
     monkeypatch.setattr(
-        service, "fetch_page",
+        service, "upgrade_if_shell", lambda page, allow_browser=True: page
+    )
+    monkeypatch.setattr(
+        service,
+        "fetch_page",
         lambda *a, **kw: (_ for _ in ()).throw(AssertionError("must not re-fetch")),
     )
 
     class _LLM:
         def run(self, prompt):
             class _R:
-                content = ExtractedJob(title="Lead", company="Acme", jd_text="Lead the team.")
+                content = ExtractedJob(
+                    title="Lead", company="Acme", jd_text="Lead the team."
+                )
 
             return _R()
 
@@ -240,14 +276,20 @@ def test_a_link_redirecting_to_linkedin_uses_the_linkedin_reader(monkeypatch):
         '<div class="show-more-less-html__markup">Keep it up.</div></body></html>'
     )
     monkeypatch.setattr(
-        service, "fetch_static",
+        service,
+        "fetch_static",
         lambda url: PageContent(
-            html="<html></html>", final_url="https://www.linkedin.com/jobs/view/9", rendered=False
+            html="<html></html>",
+            final_url="https://www.linkedin.com/jobs/view/9",
+            rendered=False,
         ),
     )
     monkeypatch.setattr(
-        service, "fetch_page",
-        lambda url, allow_browser=True: PageContent(html=html, final_url=url, rendered=True),
+        service,
+        "fetch_page",
+        lambda url, allow_browser=True: PageContent(
+            html=html, final_url=url, rendered=True
+        ),
     )
 
     job = service.job_from_url("https://tracking.example/r/abc123", agent=_Agent())
@@ -281,6 +323,7 @@ def test_spoof_host_does_not_route_to_known_parser(monkeypatch):
         def run(self, prompt):
             class _R:
                 content = ExtractedJob(title="X", company="Y", jd_text="real jd")
+
             return _R()
 
         async def arun(self, prompt):
@@ -311,7 +354,9 @@ def test_unknown_host_recovers_sidebar_facts_from_json_ld(monkeypatch):
     """An employer-hosted posting (stripe.com) is not a detectable ATS, so it
     falls to the LLM -- which is told to drop site chrome and therefore loses
     the sidebar. The page's own JSON-LD restores those facts deterministically."""
-    _patch_fetch(monkeypatch, _STRIPE_SHAPED_PAGE, "https://stripe.com/careers/listing/x/1")
+    _patch_fetch(
+        monkeypatch, _STRIPE_SHAPED_PAGE, "https://stripe.com/careers/listing/x/1"
+    )
 
     class _LLM:
         def run(self, prompt):

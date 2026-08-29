@@ -18,7 +18,11 @@ def client(tmp_path, monkeypatch):
     facts_path = tmp_path / "facts.json"
     save_cluster_map(
         ClusterMap(
-            aliases={"python": "python", "javascript": "javascript", "js": "javascript"},
+            aliases={
+                "python": "python",
+                "javascript": "javascript",
+                "js": "javascript",
+            },
             domain_of={"python": "scripting", "javascript": "web"},
             domain_label={"scripting": "Scripting", "web": "Web"},
             category_of={"scripting": "languages", "web": "frontend-web"},
@@ -59,9 +63,10 @@ def test_move_skill_to_new_domain_returns_updated_map(client):
     )
     assert response.status_code == 200
     payload = response.json()
-    assert next(s for s in payload["skills"] if s["key"] == "python")[
-        "domainId"
-    ] == "backend-languages"
+    assert (
+        next(s for s in payload["skills"] if s["key"] == "python")["domainId"]
+        == "backend-languages"
+    )
 
 
 def test_move_unknown_domain_is_404_envelope(client):
@@ -83,7 +88,9 @@ def test_bad_category_is_400_envelope(client):
 
 def test_remove_then_readd_skill(client):
     assert client.delete("/api/taxonomy/skills/python").status_code == 200
-    assert all(s["key"] != "python" for s in client.get("/api/match-gap").json()["skills"])
+    assert all(
+        s["key"] != "python" for s in client.get("/api/match-gap").json()["skills"]
+    )
     response = client.post(
         "/api/taxonomy/skills",
         json={"token": "python", "domainId": "scripting"},
@@ -101,9 +108,7 @@ def test_compound_domain_patch_and_merge(client):
     domain = next(item for item in patched.json()["domains"] if item["id"] == "web")
     assert (domain["label"], domain["category"]) == ("Frontend", "tools-platforms")
 
-    merged = client.post(
-        "/api/taxonomy/domains/web/merge", json={"into": "scripting"}
-    )
+    merged = client.post("/api/taxonomy/domains/web/merge", json={"into": "scripting"})
     assert merged.status_code == 200
     assert all(item["id"] != "web" for item in merged.json()["domains"])
 
@@ -115,9 +120,12 @@ def test_alias_unknown_skill_and_cycle_use_stable_envelopes(client):
     assert unknown.status_code == 404
     assert unknown.json()["error"]["code"] == "UNKNOWN_SKILL"
 
-    assert client.post(
-        "/api/taxonomy/aliases", json={"token": "js", "canonical": "javascript"}
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/taxonomy/aliases", json={"token": "js", "canonical": "javascript"}
+        ).status_code
+        == 200
+    )
     cycle = client.post(
         "/api/taxonomy/aliases", json={"token": "javascript", "canonical": "js"}
     )

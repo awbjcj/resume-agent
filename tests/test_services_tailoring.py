@@ -51,7 +51,14 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     exports = []
 
     def fake_tailor_jobs(
-        session, targets, facts, config, tailor, reviewers, reviser, reporter=None,
+        session,
+        targets,
+        facts,
+        config,
+        tailor,
+        reviewers,
+        reviser,
+        reporter=None,
         match_plan_agent=None,
         skill_matrix=None,
         cluster_map=None,
@@ -62,21 +69,21 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
         captured["match_plan"] = match_plan_agent
         captured["skill_matrix"] = skill_matrix
         return TailorOutcome(
-            versions=cast(
-                dict[int, list[ResumeVersion]], {targets[0].id: ["v1"]}
-            ),
+            versions=cast(dict[int, list[ResumeVersion]], {targets[0].id: ["v1"]}),
             failures={},
         )
 
     monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
     monkeypatch.setattr(
-        tailoring, "load_review_config",
+        tailoring,
+        "load_review_config",
         lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
     )
     monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
     monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
     monkeypatch.setattr(
-        tailoring, "build_tailor_bundle",
+        tailoring,
+        "build_tailor_bundle",
         lambda config, style_guide=None: tailoring.TailorBundle(
             tailor=_RunnerStub("t"),
             reviser=_RunnerStub("r"),
@@ -106,7 +113,8 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
 def test_tailor_does_not_raise_when_only_some_targets_fail(monkeypatch):
     """fail_on_partial raises only on TOTAL failure -- a partial result is kept."""
     monkeypatch.setattr(
-        tailoring, "load_review_config",
+        tailoring,
+        "load_review_config",
         lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
     )
     monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
@@ -115,7 +123,9 @@ def test_tailor_does_not_raise_when_only_some_targets_fail(monkeypatch):
         tailoring,
         "build_tailor_bundle",
         lambda config, style_guide=None: tailoring.TailorBundle(
-            tailor=_RunnerStub("t"), reviser=_RunnerStub("r"), reviewers={},
+            tailor=_RunnerStub("t"),
+            reviser=_RunnerStub("r"),
+            reviewers={},
             revision=_RunnerStub("revise"),
         ),
     )
@@ -129,7 +139,9 @@ def test_tailor_does_not_raise_when_only_some_targets_fail(monkeypatch):
         session.commit()
         for job in jobs:
             session.refresh(job)
-        failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
+        failure = StageFailure(
+            error_type="RuntimeError", message="boom", traceback_tail=""
+        )
         monkeypatch.setattr(
             tailoring,
             "tailor_jobs",
@@ -138,7 +150,9 @@ def test_tailor_does_not_raise_when_only_some_targets_fail(monkeypatch):
                 failures=cast(dict[int, StageFailure], {jobs[1].id: failure}),
             ),
         )
-        monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            tailoring, "export_job_artifacts", lambda *args, **kwargs: None
+        )
 
         outcome = tailoring.tailor(
             session,
@@ -169,17 +183,13 @@ def test_tailoring_sees_a_taxonomy_correction(tmp_path, monkeypatch):
     save_facts(facts, facts_path)
     save_cluster_map(cluster_map, profile_dir / "cluster_map.json")
     taxonomy = build_effective_taxonomy(profile_dir)
-    save_matrix(
-        build_matrix(facts, taxonomy), profile_dir / "matrix.json"
-    )
+    save_matrix(build_matrix(facts, taxonomy), profile_dir / "matrix.json")
     captured = {}
 
     def fake_tailor_jobs(*args, **kwargs):
         captured.update(kwargs)
         return TailorOutcome(
-            versions=cast(
-                dict[int, list[ResumeVersion]], {args[1][0].id: ["v1"]}
-            ),
+            versions=cast(dict[int, list[ResumeVersion]], {args[1][0].id: ["v1"]}),
             failures={},
         )
 
@@ -259,14 +269,18 @@ def test_fail_on_partial_raises_only_when_everything_failed(monkeypatch, session
     monkeypatch.setattr(tailoring, "enforce_active_budget", lambda: None)
     monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
     monkeypatch.setattr(
-        tailoring, "load_review_config",
+        tailoring,
+        "load_review_config",
         lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
     )
     monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
     monkeypatch.setattr(
-        tailoring, "build_tailor_bundle",
+        tailoring,
+        "build_tailor_bundle",
         lambda config, style_guide=None: tailoring.TailorBundle(
-            tailor=_RunnerStub("t"), reviser=_RunnerStub("r"), reviewers={},
+            tailor=_RunnerStub("t"),
+            reviser=_RunnerStub("r"),
+            reviewers={},
             revision=_RunnerStub("revise"),
         ),
     )
@@ -299,22 +313,24 @@ def test_partial_failure_does_not_raise(monkeypatch, session):
     monkeypatch.setattr(tailoring, "enforce_active_budget", lambda: None)
     monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
     monkeypatch.setattr(
-        tailoring, "load_review_config",
+        tailoring,
+        "load_review_config",
         lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
     )
     monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
     monkeypatch.setattr(
-        tailoring, "build_tailor_bundle",
+        tailoring,
+        "build_tailor_bundle",
         lambda config, style_guide=None: tailoring.TailorBundle(
-            tailor=_RunnerStub("t"), reviser=_RunnerStub("r"), reviewers={},
+            tailor=_RunnerStub("t"),
+            reviser=_RunnerStub("r"),
+            reviewers={},
             revision=_RunnerStub("revise"),
         ),
     )
     monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *a, **k: None)
 
-    outcome = tailoring.tailor(
-        session, job_ids=[ok_id, bad_id], fail_on_partial=True
-    )
+    outcome = tailoring.tailor(session, job_ids=[ok_id, bad_id], fail_on_partial=True)
 
     assert list(outcome.versions) == [ok.id]
     assert list(outcome.failures) == [bad.id]

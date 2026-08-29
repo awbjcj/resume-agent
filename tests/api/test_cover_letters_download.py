@@ -33,7 +33,12 @@ def test_cover_letter_pdf_download_uses_friendly_filename(tmp_path):
     pdf.write_bytes(b"%PDF-1.4 test")
     with client:
         with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
-            job = Job(source="manual", jd_text="x", company="Acme Corp", title="Senior Engineer")
+            job = Job(
+                source="manual",
+                jd_text="x",
+                company="Acme Corp",
+                title="Senior Engineer",
+            )
             s.add(job)
             s.commit()
             s.refresh(job)

@@ -35,9 +35,7 @@ def _every_kind_config() -> ConnectorsConfig:
             "ashby": {"enabled": True, "boards": [{"token": "ash"}]},
             "workday": {
                 "enabled": True,
-                "boards": [
-                    {"url": "https://acme.wd5.myworkdayjobs.com/External"}
-                ],
+                "boards": [{"url": "https://acme.wd5.myworkdayjobs.com/External"}],
             },
             "companies": {
                 "enabled": True,
@@ -63,9 +61,7 @@ def test_patch_source_round_trips_every_unit(tmp_path):
     for source_id in ids:
         view = svc.patch_source(source_id, enabled=False, connectors_path=path)
         assert view.enabled is False, source_id
-        view = svc.patch_source(
-            source_id, enabled=True, limit=7, connectors_path=path
-        )
+        view = svc.patch_source(source_id, enabled=True, limit=7, connectors_path=path)
         assert view.enabled is True, source_id
         assert view.limit == 7, source_id
 
@@ -428,7 +424,10 @@ def test_add_scrape_target_duplicate_refused(tmp_path, monkeypatch):
             "https://jobs.smartrecruiters.com/Acme/744000012345-senior-engineer",
             "https://careers.smartrecruiters.com/Acme",
         ),
-        ("https://apply.workable.com/acme/j/ABC123/", "https://apply.workable.com/acme"),
+        (
+            "https://apply.workable.com/acme/j/ABC123/",
+            "https://apply.workable.com/acme",
+        ),
         ("https://acme.recruitee.com/o/senior-engineer", "https://acme.recruitee.com"),
         ("https://acme.jobs.personio.de/job/12345", "https://acme.jobs.personio.de"),
     ],
@@ -447,7 +446,9 @@ def test_board_root_url_keeps_an_unrecognized_host_but_drops_tracking():
     # No known ATS shape means there is no root to reduce to; only the analytics
     # parameters an agent copied along with the link are safe to remove.
     assert (
-        svc.board_root_url("https://acme.example/careers/openings/12?utm_campaign=x&team=eng")
+        svc.board_root_url(
+            "https://acme.example/careers/openings/12?utm_campaign=x&team=eng"
+        )
         == "https://acme.example/careers/openings/12?team=eng"
     )
     assert svc.board_root_url("") == ""
@@ -464,7 +465,9 @@ def test_board_root_url_strips_tracking_without_losing_a_meaningful_parameter():
     # A Greenhouse embed carries its board slug in ?for=, so tracking-stripping
     # must be an allowlist of analytics keys rather than "drop the query".
     assert (
-        svc.board_root_url("https://boards.greenhouse.io/embed/job_board?for=acme&utm_source=x")
+        svc.board_root_url(
+            "https://boards.greenhouse.io/embed/job_board?for=acme&utm_source=x"
+        )
         == "https://job-boards.greenhouse.io/acme"
     )
 
@@ -473,4 +476,7 @@ def test_board_root_url_survives_a_value_that_is_not_a_url():
     # `_clean_proposal` already rejects non-HTTP source URLs, but this runs on
     # untrusted model output and must degrade rather than raise.
     assert svc.board_root_url("not a url at all") == "not a url at all"
-    assert svc.board_root_url("https://acme.example/careers#openings") == "https://acme.example/careers"
+    assert (
+        svc.board_root_url("https://acme.example/careers#openings")
+        == "https://acme.example/careers"
+    )

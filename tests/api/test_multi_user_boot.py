@@ -169,9 +169,7 @@ def test_startup_recovery_records_error_in_the_owner_workspace(tmp_path):
         runs_root = first_app.state.default_context.paths.runs_root
 
     writer = RunManager(root=runs_root)
-    run_id = writer.create(
-        "pull", user_id=user_id, storage_root=runs_root
-    )
+    run_id = writer.create("pull", user_id=user_id, storage_root=runs_root)
     writer.shutdown()
 
     recovered_app = create_app(

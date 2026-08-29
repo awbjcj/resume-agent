@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Protocol, cast
 
 import pytest
 from sqlmodel import Session, select
@@ -16,7 +17,22 @@ from resume_agent.tracking.repository import application_for_job
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
-def _job():
+class _PersistedJob(Protocol):
+    id: int
+
+
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
+def _application_status(session: Session, job_id: int) -> str:
+    application = application_for_job(session, job_id)
+    assert application is not None
+    return application.status
+
+
+def _job() -> tuple[Session, _PersistedJob]:
     engine = make_engine("sqlite://")
     init_db(engine)
     session = Session(engine)
@@ -24,7 +40,7 @@ def _job():
     session.add(job)
     session.commit()
     session.refresh(job)
-    return session, job
+    return session, cast(_PersistedJob, job)
 
 
 def _at(day):
@@ -63,23 +79,23 @@ def test_create_advances_status_through_the_progression():
     create_event(
         session, job.id, {"kind": "application_submitted", "occurred_at": _at(3)}
     )
-    assert application_for_job(session, job.id).status == "submitted"
+    assert _application_status(session, job.id) == "submitted"
     create_event(session, job.id, {"kind": "technical_round", "occurred_at": _at(9)})
-    assert application_for_job(session, job.id).status == "interview"
+    assert _application_status(session, job.id) == "interview"
 
 
 def test_a_late_logged_earlier_stage_never_demotes():
     session, job = _job()
     create_event(session, job.id, {"kind": "offer_received", "occurred_at": _at(20)})
     create_event(session, job.id, {"kind": "recruiter_screen", "occurred_at": _at(3)})
-    assert application_for_job(session, job.id).status == "offer"
+    assert _application_status(session, job.id) == "offer"
 
 
 def test_rejected_event_is_terminal_even_from_offer():
     session, job = _job()
     create_event(session, job.id, {"kind": "offer_received", "occurred_at": _at(20)})
     create_event(session, job.id, {"kind": "rejected", "occurred_at": _at(22)})
-    assert application_for_job(session, job.id).status == "rejected"
+    assert _application_status(session, job.id) == "rejected"
 
 
 def test_result_rejected_on_a_round_does_not_kill_the_application():
@@ -89,13 +105,13 @@ def test_result_rejected_on_a_round_does_not_kill_the_application():
         job.id,
         {"kind": "technical_round", "occurred_at": _at(9), "result": "rejected"},
     )
-    assert application_for_job(session, job.id).status == "interview"
+    assert _application_status(session, job.id) == "interview"
 
 
 def test_custom_events_never_move_status():
     session, job = _job()
     create_event(session, job.id, {"kind": "custom", "custom_label": "sent thank-you"})
-    assert application_for_job(session, job.id).status == "ready"
+    assert _application_status(session, job.id) == "ready"
 
 
 def test_sequence_auto_increments_per_kind():
@@ -144,7 +160,7 @@ def test_updating_a_round_date_resequences_its_kind():
         session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
     )
 
-    update_event(session, job.id, second.id, {"occurred_at": _at(1)})
+    update_event(session, job.id, _require_id(second.id), {"occurred_at": _at(1)})
 
     session.refresh(first)
     session.refresh(second)
@@ -160,7 +176,7 @@ def test_changing_kind_resequences_both_groups():
         session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
     )
 
-    update_event(session, job.id, first.id, {"kind": "behavioral"})
+    update_event(session, job.id, _require_id(first.id), {"kind": "behavioral"})
 
     session.refresh(first)
     session.refresh(moved)
@@ -176,7 +192,7 @@ def test_deleting_a_round_resequences_later_rounds():
         session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
     )
 
-    assert delete_event(session, job.id, first.id) is True
+    assert delete_event(session, job.id, _require_id(first.id)) is True
 
     session.refresh(second)
     assert second.sequence == 1
@@ -206,7 +222,7 @@ def test_manual_one_survives_earlier_auto_insert_and_delete():
 
     assert manual.sequence == 1
     assert earlier.sequence == 2
-    assert delete_event(session, job.id, earlier.id) is True
+    assert delete_event(session, job.id, _require_id(earlier.id)) is True
     session.refresh(manual)
     assert manual.sequence == 1
     assert manual.sequence_override == 1
@@ -241,11 +257,11 @@ def test_editing_auto_round_date_and_kind_resequences_both_groups():
         session, job.id, {"kind": "behavioral", "occurred_at": _at(11)}
     )
 
-    update_event(session, job.id, second.id, {"occurred_at": _at(8)})
+    update_event(session, job.id, _require_id(second.id), {"occurred_at": _at(8)})
     session.refresh(first)
     assert (second.sequence, first.sequence) == (1, 2)
 
-    update_event(session, job.id, second.id, {"kind": "behavioral"})
+    update_event(session, job.id, _require_id(second.id), {"kind": "behavioral"})
     session.refresh(first)
     session.refresh(behavioral)
     assert first.sequence == 1
@@ -264,7 +280,9 @@ def test_clearing_manual_sequence_restores_automatic_order():
         {"kind": "technical_round", "occurred_at": _at(9), "sequence": 9},
     )
 
-    updated = update_event(session, job.id, manual.id, {"sequence": None})
+    updated = update_event(
+        session, job.id, _require_id(manual.id), {"sequence": None}
+    )
     session.refresh(automatic)
 
     assert updated is not None
@@ -279,7 +297,7 @@ def test_update_rejects_an_invalid_sequence_at_the_service_boundary():
     )
 
     with pytest.raises(EventValidationError, match="positive integer"):
-        update_event(session, job.id, event.id, {"sequence": 0})
+        update_event(session, job.id, _require_id(event.id), {"sequence": 0})
 
 
 def test_update_warns_when_sequence_override_collides(caplog):
@@ -294,7 +312,7 @@ def test_update_warns_when_sequence_override_collides(caplog):
     )
 
     with caplog.at_level("WARNING"):
-        update_event(session, job.id, event.id, {"sequence": 3})
+        update_event(session, job.id, _require_id(event.id), {"sequence": 3})
 
     assert "Duplicate application event key" in caplog.text
 
@@ -313,7 +331,7 @@ def test_update_warns_when_kind_move_collides_with_an_override(caplog):
     )
 
     with caplog.at_level("WARNING"):
-        update_event(session, job.id, event.id, {"kind": "behavioral"})
+        update_event(session, job.id, _require_id(event.id), {"kind": "behavioral"})
 
     assert "Duplicate application event key" in caplog.text
 
@@ -376,10 +394,13 @@ def test_update_changes_fields_and_can_advance_status():
         session, job.id, {"kind": "recruiter_screen", "occurred_at": _at(3)}
     )
     updated = update_event(
-        session, job.id, event.id, {"kind": "offer_received", "occurred_at": _at(20)}
+        session,
+        job.id,
+        _require_id(event.id),
+        {"kind": "offer_received", "occurred_at": _at(20)},
     )
     assert updated.kind == "offer_received"
-    assert application_for_job(session, job.id).status == "offer"
+    assert _application_status(session, job.id) == "offer"
 
 
 def test_update_rolls_back_event_and_status_when_advancement_fails(monkeypatch):
@@ -387,7 +408,7 @@ def test_update_rolls_back_event_and_status_when_advancement_fails(monkeypatch):
     event = create_event(
         session, job.id, {"kind": "recruiter_screen", "occurred_at": _at(3)}
     )
-    original_status = application_for_job(session, job.id).status
+    original_status = _application_status(session, job.id)
 
     def fail_advance(*_args):
         raise RuntimeError("forced advancement failure")
@@ -398,13 +419,13 @@ def test_update_rolls_back_event_and_status_when_advancement_fails(monkeypatch):
         update_event(
             session,
             job.id,
-            event.id,
+            _require_id(event.id),
             {"kind": "offer_received", "occurred_at": _at(20)},
         )
 
     session.refresh(event)
     assert event.kind == "recruiter_screen"
-    assert application_for_job(session, job.id).status == original_status
+    assert _application_status(session, job.id) == original_status
 
 
 def test_update_returns_none_for_an_event_on_another_job():
@@ -414,9 +435,11 @@ def test_update_returns_none_for_an_event_on_another_job():
     session.commit()
     session.refresh(other)
     event = create_event(
-        session, other.id, {"kind": "behavioral", "occurred_at": _at(3)}
+        session, _require_id(other.id), {"kind": "behavioral", "occurred_at": _at(3)}
     )
-    assert update_event(session, job.id, event.id, {"notes": "x"}) is None
+    assert (
+        update_event(session, job.id, _require_id(event.id), {"notes": "x"}) is None
+    )
 
 
 def test_delete_does_not_move_status_back():
@@ -424,8 +447,8 @@ def test_delete_does_not_move_status_back():
     event = create_event(
         session, job.id, {"kind": "technical_round", "occurred_at": _at(9)}
     )
-    assert delete_event(session, job.id, event.id) is True
-    assert application_for_job(session, job.id).status == "interview"
+    assert delete_event(session, job.id, _require_id(event.id)) is True
+    assert _application_status(session, job.id) == "interview"
 
 
 def test_deleting_an_auto_numbered_round_closes_the_sequence_gap():
@@ -438,7 +461,7 @@ def test_deleting_an_auto_numbered_round_closes_the_sequence_gap():
     )
     create_event(session, job.id, {"kind": "technical_round", "occurred_at": _at(11)})
 
-    assert delete_event(session, job.id, middle.id) is True
+    assert delete_event(session, job.id, _require_id(middle.id)) is True
 
     rounds = [
         event

@@ -71,6 +71,7 @@ def test_ensure_archived_at_column_adds_missing_column():
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
     from resume_agent.tracking.migrate import ensure_archived_at_column
+
     ensure_archived_at_column(engine)
     with engine.begin() as conn:
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
@@ -84,6 +85,7 @@ def test_ensure_archived_at_column_is_idempotent():
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
     from resume_agent.tracking.migrate import ensure_archived_at_column
+
     ensure_archived_at_column(engine)
     ensure_archived_at_column(engine)
     with engine.begin() as conn:
@@ -139,9 +141,11 @@ def test_location_instance_migration_backfills_legacy_multi_location_jobs():
     ensure_job_location_instances(engine)
 
     with engine.connect() as conn:
-        stored = conn.execute(
-            text("SELECT criteria_json FROM jobs ORDER BY id")
-        ).scalars().all()
+        stored = (
+            conn.execute(text("SELECT criteria_json FROM jobs ORDER BY id"))
+            .scalars()
+            .all()
+        )
     migrated = json.loads(stored[0])
     assert [item["city"] for item in migrated["locations"]] == ["Austin", "Toronto"]
     assert migrated["locations"][1]["country"] == "CA"

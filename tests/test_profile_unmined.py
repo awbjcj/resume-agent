@@ -60,7 +60,9 @@ def _workspace(tmp_path):
     return profile_dir, resume_doc, zero_doc, skill_doc
 
 
-def test_unmined_sources_are_ranked_by_all_fact_totals_and_exclude_bullet_docs(tmp_path):
+def test_unmined_sources_are_ranked_by_all_fact_totals_and_exclude_bullet_docs(
+    tmp_path,
+):
     profile_dir, resume_doc, zero_doc, skill_doc = _workspace(tmp_path)
 
     rows = unmined_sources(profile_dir)
@@ -90,7 +92,9 @@ def test_unmined_block_degrades_away_when_every_candidate_is_unreadable(tmp_path
     assert unmined_block(profile_dir) == ""
 
 
-def test_one_unreadable_unmined_source_does_not_hide_the_other_question_material(tmp_path):
+def test_one_unreadable_unmined_source_does_not_hide_the_other_question_material(
+    tmp_path,
+):
     profile_dir, _resume_doc, zero_doc, skill_doc = _workspace(tmp_path)
     manifest = {doc.id: doc for doc in load_manifest(profile_dir).docs}
     doc_path(profile_dir, manifest[zero_doc.id]).unlink()

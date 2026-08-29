@@ -8,9 +8,19 @@ from resume_agent.services.reminder_scheduler import (
     REMINDER_INTERVAL_SECONDS,
     run_reminder_pass,
 )
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job, Notification
+from resume_agent.tracking.tables import (
+    Application,
+    ApplicationEvent,
+    Job,
+    Notification,
+)
 
 NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
+
+
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
 
 
 def _session() -> Session:
@@ -25,13 +35,13 @@ def test_reminder_pass_requires_no_gmail_token_and_is_idempotent() -> None:
     session.add(job)
     session.commit()
     session.refresh(job)
-    application = Application(job_id=job.id, status="interview")
+    application = Application(job_id=_require_id(job.id), status="interview")
     session.add(application)
     session.commit()
     session.refresh(application)
     session.add(
         ApplicationEvent(
-            application_id=application.id,
+            application_id=_require_id(application.id),
             kind="technical_round",
             occurred_at=NOW + timedelta(hours=20),
         )
@@ -50,7 +60,7 @@ def test_reminder_pass_still_owns_stale_follow_ups() -> None:
     session.refresh(job)
     session.add(
         Application(
-            job_id=job.id,
+            job_id=_require_id(job.id),
             status="submitted",
             updated_at=NOW - timedelta(days=30),
         )

@@ -120,7 +120,9 @@ def test_match_gap_honors_canonicalizer():
         _job(session, JobStatus.shortlisted.value, ["k8s"])
 
         def canon(tokens):
-            return {t: ("kubernetes" if t in {"k8s", "kubernetes"} else t) for t in tokens}
+            return {
+                t: ("kubernetes" if t in {"k8s", "kubernetes"} else t) for t in tokens
+            }
 
         report = match_gap(
             session,

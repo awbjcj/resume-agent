@@ -13,7 +13,9 @@ def _session():
 
 def test_prune_dry_run_counts_without_writing(tmp_path):
     cfg = tmp_path / "prune.yaml"
-    cfg.write_text("fit_threshold: 40\nstale_days: 30\nretention_days: 90\n", encoding="utf-8")
+    cfg.write_text(
+        "fit_threshold: 40\nstale_days: 30\nretention_days: 90\n", encoding="utf-8"
+    )
     with _session() as session:
         session.add(Job(source="manual", jd_text="x", status=JobStatus.rejected.value))
         session.commit()
@@ -25,10 +27,17 @@ def test_prune_dry_run_counts_without_writing(tmp_path):
 
 def test_prune_override_beats_config(tmp_path):
     cfg = tmp_path / "prune.yaml"
-    cfg.write_text("fit_threshold: 40\nstale_days: 30\nretention_days: 90\n", encoding="utf-8")
+    cfg.write_text(
+        "fit_threshold: 40\nstale_days: 30\nretention_days: 90\n", encoding="utf-8"
+    )
     with _session() as session:
         session.add(
-            Job(source="manual", jd_text="x", status=JobStatus.shortlisted.value, fit_score=50)
+            Job(
+                source="manual",
+                jd_text="x",
+                status=JobStatus.shortlisted.value,
+                fit_score=50,
+            )
         )
         session.commit()
         low = prune(session, dry_run=True, fit_threshold=60, config_path=str(cfg))

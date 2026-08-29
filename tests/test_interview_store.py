@@ -32,7 +32,9 @@ def _make(tmp_path, session_id="abc123", job_id=7):
         job_id=job_id,
         resume_version_id=3,
         style=InterviewStyle(),
-        context=InterviewContext(company="Acme", title="Engineer", jd_text="Build things"),
+        context=InterviewContext(
+            company="Acme", title="Engineer", jd_text="Build things"
+        ),
         plan=[
             PlanItem(id="q1", competency="Leadership", question_type="behavioral"),
             PlanItem(id="q2", competency="Python", question_type="role_specific"),
@@ -41,7 +43,10 @@ def _make(tmp_path, session_id="abc123", job_id=7):
             role="interviewer",
             text="Tell me about yourself.",
             question_id="q1",
-            hints=["Connect your experience to the role.", "Choose a relevant example."],
+            hints=[
+                "Connect your experience to the role.",
+                "Choose a relevant example.",
+            ],
         ),
     )
     return session_id
@@ -54,7 +59,10 @@ def test_create_marks_opening_question_asked(tmp_path):
     assert session["job_id"] == 7
     assert session["turns"][0]["role"] == "interviewer"
     assert len(session["turns"][0]["hints"]) == 2
-    assert {p["id"]: p["status"] for p in session["plan"]} == {"q1": "asked", "q2": "pending"}
+    assert {p["id"]: p["status"] for p in session["plan"]} == {
+        "q1": "asked",
+        "q2": "pending",
+    }
     assert session["concluded"] is False
 
 
@@ -90,8 +98,15 @@ def test_answer_delta_advances_plan(tmp_path):
         concluded=False,
     )
     session = load_session(tmp_path, sid)
-    assert [t["role"] for t in session["turns"]] == ["interviewer", "candidate", "interviewer"]
-    assert {p["id"]: p["status"] for p in session["plan"]} == {"q1": "done", "q2": "asked"}
+    assert [t["role"] for t in session["turns"]] == [
+        "interviewer",
+        "candidate",
+        "interviewer",
+    ]
+    assert {p["id"]: p["status"] for p in session["plan"]} == {
+        "q1": "done",
+        "q2": "asked",
+    }
 
 
 def test_followup_keeps_plan_statuses(tmp_path):
@@ -101,12 +116,18 @@ def test_followup_keeps_plan_statuses(tmp_path):
         sid,
         answer_text="We improved things.",
         interviewer_turn=InterviewTurnRecord(
-            role="interviewer", text="How did you measure that?", question_id="q1", is_followup=True
+            role="interviewer",
+            text="How did you measure that?",
+            question_id="q1",
+            is_followup=True,
         ),
         concluded=False,
     )
     session = load_session(tmp_path, sid)
-    assert {p["id"]: p["status"] for p in session["plan"]} == {"q1": "asked", "q2": "pending"}
+    assert {p["id"]: p["status"] for p in session["plan"]} == {
+        "q1": "asked",
+        "q2": "pending",
+    }
 
 
 def test_conclude_marks_asked_done(tmp_path):
@@ -115,12 +136,17 @@ def test_conclude_marks_asked_done(tmp_path):
         tmp_path,
         sid,
         answer_text="Thanks!",
-        interviewer_turn=InterviewTurnRecord(role="interviewer", text="That's all from me."),
+        interviewer_turn=InterviewTurnRecord(
+            role="interviewer", text="That's all from me."
+        ),
         concluded=True,
     )
     session = load_session(tmp_path, sid)
     assert session["concluded"] is True
-    assert {p["id"]: p["status"] for p in session["plan"]} == {"q1": "done", "q2": "pending"}
+    assert {p["id"]: p["status"] for p in session["plan"]} == {
+        "q1": "done",
+        "q2": "pending",
+    }
 
 
 def test_end_with_debrief_and_double_end_rejected(tmp_path):
@@ -128,7 +154,9 @@ def test_end_with_debrief_and_double_end_rejected(tmp_path):
     debrief = InterviewDebrief(
         summary="Solid rehearsal.",
         question_reviews=[
-            QuestionReview(question_id="q1", question="Tell me about yourself.", score=4)
+            QuestionReview(
+                question_id="q1", question="Tell me about yourself.", score=4
+            )
         ],
     )
     end_with_debrief(tmp_path, sid, debrief)
@@ -148,7 +176,9 @@ def test_delta_on_ended_session_rejected(tmp_path):
             tmp_path,
             sid,
             answer_text="hello",
-            interviewer_turn=InterviewTurnRecord(role="interviewer", text="Q", question_id="q1"),
+            interviewer_turn=InterviewTurnRecord(
+                role="interviewer", text="Q", question_id="q1"
+            ),
             concluded=False,
         )
 
@@ -173,8 +203,7 @@ def test_archive_unarchive_and_delete_session(tmp_path):
     assert archived["archived_at"]
     assert list_sessions(tmp_path) == []
     assert [
-        row["session_id"]
-        for row in list_sessions(tmp_path, include_archived=True)
+        row["session_id"] for row in list_sessions(tmp_path, include_archived=True)
     ] == [sid]
 
     assert unarchive_session(tmp_path, sid)["archived_at"] is None

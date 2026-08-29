@@ -12,9 +12,7 @@ from resume_agent.tracking.tables import H1BCompanyEvidence
 def _evidence(company: str, *, expires_in_days: int = 30) -> H1BSponsorshipEvidence:
     now = datetime.now(timezone.utc)
     retrieved_at = (
-        now - timedelta(days=-expires_in_days + 1)
-        if expires_in_days < 0
-        else now
+        now - timedelta(days=-expires_in_days + 1) if expires_in_days < 0 else now
     )
     return H1BSponsorshipEvidence(
         status="matched",

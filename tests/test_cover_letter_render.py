@@ -24,7 +24,13 @@ def test_render_cover_letter_writes_pdf_path(tmp_path):
         return Path(output_path)
 
     with _session() as s:
-        job = add_job(s, source="manual", jd_text="jd", company="Acme Corp", title="Backend Engineer")
+        job = add_job(
+            s,
+            source="manual",
+            jd_text="jd",
+            company="Acme Corp",
+            title="Backend Engineer",
+        )
         assert job is not None and job.id is not None
         cover = save_cover_letter(
             s,
@@ -39,7 +45,9 @@ def test_render_cover_letter_writes_pdf_path(tmp_path):
             ),
         )
         assert cover.id is not None
-        out = render_cover_letter(s, cover.id, output_dir=str(tmp_path), render_fn=fake_render)
+        out = render_cover_letter(
+            s, cover.id, output_dir=str(tmp_path), render_fn=fake_render
+        )
         assert out == calls["path"]
         fetched = get_cover_letter(s, cover.id)
         assert fetched is not None
@@ -51,4 +59,7 @@ def test_render_cover_letter_writes_pdf_path(tmp_path):
 
 def test_render_missing_cover_letter_returns_none(tmp_path):
     with _session() as s:
-        assert render_cover_letter(s, 999, output_dir=str(tmp_path), render_fn=lambda *a: None) is None  # type: ignore[arg-type]
+        assert (
+            render_cover_letter(s, 999, output_dir=str(tmp_path))
+            is None
+        )

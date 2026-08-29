@@ -119,9 +119,7 @@ def test_lever_never_pushes_location_even_when_configured(monkeypatch):
     import resume_agent.discovery.connectors.lever as lever
 
     monkeypatch.setattr(lever.board, "get", fake_get)
-    LeverConnector([LeverBoard(token="acme")]).fetch(
-        SearchConfig(locations=["Remote"])
-    )
+    LeverConnector([LeverBoard(token="acme")]).fetch(SearchConfig(locations=["Remote"]))
 
     assert captured["params"] == {"mode": "json"}
 

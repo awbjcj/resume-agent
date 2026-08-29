@@ -68,7 +68,9 @@ def _patch_flow(monkeypatch):
     from resume_agent.api.routers import gmail as gmail_router
 
     flow = _FakeFlow()
-    monkeypatch.setattr(gmail_router, "_build_flow", lambda settings, redirect_uri: flow)
+    monkeypatch.setattr(
+        gmail_router, "_build_flow", lambda settings, redirect_uri: flow
+    )
     return flow
 
 
@@ -80,9 +82,7 @@ def test_build_flow_disables_pkce():
     from resume_agent.api.routers.gmail import _build_flow
     from resume_agent.config import Settings
 
-    settings = Settings(
-        google_oauth_client_id="cid", google_oauth_client_secret="cs"
-    )
+    settings = Settings(google_oauth_client_id="cid", google_oauth_client_secret="cs")
     flow = _build_flow(settings, "https://example.test/api/gmail/callback")
 
     assert flow.autogenerate_code_verifier is False

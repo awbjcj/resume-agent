@@ -64,7 +64,12 @@ def test_profilefacts_coerces_null_collections():
     from resume_agent.models.profile import ProfileFacts
 
     facts = ProfileFacts.model_validate(
-        {"contact": {"name": "X"}, "experience": None, "skills": None, "interests": None}
+        {
+            "contact": {"name": "X"},
+            "experience": None,
+            "skills": None,
+            "interests": None,
+        }
     )
     assert facts.experience == []
     assert facts.skills == {}

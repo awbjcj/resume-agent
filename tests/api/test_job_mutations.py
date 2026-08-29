@@ -35,9 +35,7 @@ def _h1b_client(tmp_path, *, enabled=True):
     env = tmp_path / "h1b.env"
     env.write_text(
         (
-            "H1B_MCP_ENABLED=true\n"
-            "H1B_MCP_TRANSPORT=stdio\n"
-            "H1B_MCP_COMMAND=server\n"
+            "H1B_MCP_ENABLED=true\nH1B_MCP_TRANSPORT=stdio\nH1B_MCP_COMMAND=server\n"
             if enabled
             else ""
         ),
@@ -111,7 +109,15 @@ def test_manual_h1b_check_returns_evidence(monkeypatch, tmp_path):
         caveat=HISTORICAL_ONLY_CAVEAT,
     )
 
-    async def fake_enrich(engine, companies, *, settings, agent_factory, company_resolver_factory=None, force_refresh=False):
+    async def fake_enrich(
+        engine,
+        companies,
+        *,
+        settings,
+        agent_factory,
+        company_resolver_factory=None,
+        force_refresh=False,
+    ):
         assert settings.h1b_mcp_enabled is True
         report = H1BEnrichmentReport(by_company={"acme": evidence})
         _persist_h1b_cache(engine, report)
@@ -164,7 +170,15 @@ def test_manual_h1b_check_reports_unavailable_evidence(monkeypatch, tmp_path):
         unavailable_reason=H1B_AGENT_UNAVAILABLE_REASON,
     )
 
-    async def fake_enrich(engine, companies, *, settings, agent_factory, company_resolver_factory=None, force_refresh=False):
+    async def fake_enrich(
+        engine,
+        companies,
+        *,
+        settings,
+        agent_factory,
+        company_resolver_factory=None,
+        force_refresh=False,
+    ):
         report = H1BEnrichmentReport(by_company={"acme": evidence})
         _persist_h1b_cache(engine, report)
         return report
@@ -181,7 +195,10 @@ def test_manual_h1b_check_reports_unavailable_evidence(monkeypatch, tmp_path):
 
     assert detail["h1BSponsorship"]["capability"] == "unavailable"
     assert detail["h1BSponsorship"]["message"] == H1B_AGENT_UNAVAILABLE_REASON
-    assert detail["h1BSponsorship"]["evidence"]["unavailableReason"] == H1B_AGENT_UNAVAILABLE_REASON
+    assert (
+        detail["h1BSponsorship"]["evidence"]["unavailableReason"]
+        == H1B_AGENT_UNAVAILABLE_REASON
+    )
 
 
 def test_patch_archived_then_restore():
@@ -226,7 +243,9 @@ def test_put_application_upserts():
 def test_post_manual_job_creates():
     client = _client()
     with client:
-        resp = client.post("/api/jobs", json={"jdText": "Need a dev", "company": "Acme"})
+        resp = client.post(
+            "/api/jobs", json={"jdText": "Need a dev", "company": "Acme"}
+        )
     assert resp.status_code == 201
     assert resp.json()["company"] == "Acme"
 

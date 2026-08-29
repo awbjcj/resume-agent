@@ -23,8 +23,16 @@ class _HandshakeConnector:
         self._mine.set()
         assert self._peer.wait(timeout=10), "peer fetch never started concurrently"
         return FetchResult(
-            jobs=[RawJob(source=self.name, url=None, company="Acme", title=f"{self.name} role",
-                         location=None, jd_text=f"jd from {self.name}")]
+            jobs=[
+                RawJob(
+                    source=self.name,
+                    url=None,
+                    company="Acme",
+                    title=f"{self.name} role",
+                    location=None,
+                    jd_text=f"jd from {self.name}",
+                )
+            ]
         )
 
 

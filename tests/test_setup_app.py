@@ -126,8 +126,12 @@ async def test_nav_buttons_stay_in_viewport_on_small_terminal():
             footer = screen.query_one(Footer)
             name = screen_cls.__name__
             assert btn.region.y >= 0, f"{name}: nav button above viewport"
-            assert btn.region.bottom <= app.size.height, f"{name}: nav button below viewport"
-            assert btn.region.bottom <= footer.region.y, f"{name}: nav button overlaps footer"
+            assert btn.region.bottom <= app.size.height, (
+                f"{name}: nav button below viewport"
+            )
+            assert btn.region.bottom <= footer.region.y, (
+                f"{name}: nav button overlaps footer"
+            )
 
 
 @pytest.mark.asyncio
@@ -168,12 +172,18 @@ def test_load_existing_state_survives_corrupt_config(tmp_path):
 
     cfg = tmp_path / "config"
     cfg.mkdir()
-    (cfg / "search.yaml").write_text("keywords: [unclosed\n", encoding="utf-8")  # malformed YAML
-    (cfg / "connectors.yaml").write_text("greenhouse: not-a-mapping\n", encoding="utf-8")  # bad schema
-    (cfg / "profile_sources.yaml").write_text("resume_path: ok.pdf\n", encoding="utf-8")  # valid
+    (cfg / "search.yaml").write_text(
+        "keywords: [unclosed\n", encoding="utf-8"
+    )  # malformed YAML
+    (cfg / "connectors.yaml").write_text(
+        "greenhouse: not-a-mapping\n", encoding="utf-8"
+    )  # bad schema
+    (cfg / "profile_sources.yaml").write_text(
+        "resume_path: ok.pdf\n", encoding="utf-8"
+    )  # valid
 
     state = load_existing_state(tmp_path)
-    assert state.keywords == []           # bad search.yaml -> section defaults
+    assert state.keywords == []  # bad search.yaml -> section defaults
     assert state.greenhouse_enabled is False  # bad connectors.yaml -> section defaults
     assert state.resume_path == "ok.pdf"  # valid file still loaded
 

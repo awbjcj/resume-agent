@@ -33,8 +33,7 @@ def test_each_case_valid_and_grounded():
             assert trap.probe_provenance in facts_by_id
             assert isinstance(facts_by_id[trap.probe_provenance], Bullet)
             assert any(
-                term_present(trap.probe_claim, term)
-                for term in trap.forbidden_terms
+                term_present(trap.probe_claim, term) for term in trap.forbidden_terms
             )
         assert case.rubric, f"{case.id}: needs judge rubric dimensions"
 
@@ -62,11 +61,7 @@ def test_craft_cases_present():
 
 
 def test_cover_letter_seed_cases_valid_and_grounded():
-    cases = [
-        case
-        for case in load_cases(CASES)
-        if case.target == "cover_letter"
-    ]
+    cases = [case for case in load_cases(CASES) if case.target == "cover_letter"]
 
     assert len(cases) == 4
     for case in cases:
@@ -76,12 +71,9 @@ def test_cover_letter_seed_cases_valid_and_grounded():
             f"{case.id}: cover-letter cases must embed criteria"
         )
         for trap in case.traps:
-            assert trap.forbidden_terms, (
-                f"{case.id}: trap has no forbidden_terms"
-            )
+            assert trap.forbidden_terms, f"{case.id}: trap has no forbidden_terms"
             assert trap.probe_provenance in facts_by_id
             assert any(
-                term_present(trap.probe_claim, term)
-                for term in trap.forbidden_terms
+                term_present(trap.probe_claim, term) for term in trap.forbidden_terms
             )
         assert case.rubric, f"{case.id}: needs judge rubric dimensions"

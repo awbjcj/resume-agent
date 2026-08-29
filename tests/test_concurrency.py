@@ -55,7 +55,9 @@ def test_gather_isolated_cancels_in_flight_tasks_when_checkpoint_raises():
             raise StopRun
 
     with __import__("pytest").raises(StopRun):
-        asyncio.run(gather_isolated([0, 1, 2], fn, checkpoint=checkpoint, poll_interval=0.001))
+        asyncio.run(
+            gather_isolated([0, 1, 2], fn, checkpoint=checkpoint, poll_interval=0.001)
+        )
 
     assert cancelled == 3
 

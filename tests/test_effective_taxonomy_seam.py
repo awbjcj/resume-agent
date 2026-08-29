@@ -32,9 +32,7 @@ def _seed(tmp_path):
     save_taxonomy_corrections(
         TaxonomyCorrections(aliases={"js": "javascript"}), corrections_path
     )
-    facts = ProfileFacts(
-        contact=Contact(name="A"), skills={"hard": [Skill(name="js")]}
-    )
+    facts = ProfileFacts(contact=Contact(name="A"), skills={"hard": [Skill(name="js")]})
     return profile_dir, corrections_path, facts
 
 

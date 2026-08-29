@@ -136,9 +136,7 @@ def test_repair_rounds_recover_tokens_the_first_partition_omitted():
     canonicalizer = _OmittingCanonicalizer(full_at=1)
     demanded = {f"skill {index}" for index in range(8)}
 
-    outcome = _classify(
-        demanded=demanded, canonicalizer=canonicalizer, batch_size=8
-    )
+    outcome = _classify(demanded=demanded, canonicalizer=canonicalizer, batch_size=8)
 
     # Every demanded token ends the pass with a canonical.
     assert set(outcome.additions.aliases) == demanded
@@ -163,9 +161,7 @@ class _RefusingCanonicalizer:
     """Answers every batch, and covers nothing.  The permanent-omission case."""
 
     async def arun(self, prompt):
-        return SimpleNamespace(
-            content=SkillClusters.model_validate({"clusters": []})
-        )
+        return SimpleNamespace(content=SkillClusters.model_validate({"clusters": []}))
 
     def run(self, prompt):
         raise AssertionError("async path expected")
@@ -336,7 +332,11 @@ def test_reconcile_preserves_aliases_that_already_target_a_stable_canonical():
 
 def test_failed_canonical_batch_stays_absent_and_retryable():
     def respond(new, existing):
-        return RuntimeError("provider down") if new == ["rust"] else [[token] for token in new]
+        return (
+            RuntimeError("provider down")
+            if new == ["rust"]
+            else [[token] for token in new]
+        )
 
     outcome = _classify(
         demanded={"python", "rust"},
@@ -346,7 +346,9 @@ def test_failed_canonical_batch_stays_absent_and_retryable():
 
     assert outcome.additions.aliases == {"python": "python"}
     assert "rust" not in outcome.additions.domain_of
-    assert any(f.phase == "canonicalize" and f.tokens == ("rust",) for f in outcome.failures)
+    assert any(
+        f.phase == "canonicalize" and f.tokens == ("rust",) for f in outcome.failures
+    )
 
 
 def test_ambiguous_existing_canonicals_reject_the_new_token():
@@ -473,9 +475,7 @@ def test_existing_unthemed_canonical_is_themed_without_canonical_call():
 
 def test_legacy_category_hint_follows_an_alias_to_its_canonical():
     existing = ClusterMap(aliases={"kubernetes": "kubernetes"})
-    canonicalizer = _Canonicalizer(
-        lambda _new, _existing: [["kubernetes", "k8s"]]
-    )
+    canonicalizer = _Canonicalizer(lambda _new, _existing: [["kubernetes", "k8s"]])
     themer = _Themer()
 
     _classify(
@@ -486,9 +486,7 @@ def test_legacy_category_hint_follows_an_alias_to_its_canonical():
         category_hints={"k8s": "cloud-infra"},
     )
 
-    assert themer.calls[0]["category_hints"] == {
-        "kubernetes": "cloud-infra"
-    }
+    assert themer.calls[0]["category_hints"] == {"kubernetes": "cloud-infra"}
 
 
 def test_failed_domain_batch_keeps_alias_but_not_domain():
@@ -499,7 +497,9 @@ def test_failed_domain_batch_keeps_alias_but_not_domain():
 
     assert outcome.additions.aliases == {"python": "python"}
     assert outcome.additions.domain_of == {}
-    assert any(f.phase == "domain" and f.tokens == ("python",) for f in outcome.failures)
+    assert any(
+        f.phase == "domain" and f.tokens == ("python",) for f in outcome.failures
+    )
 
 
 def test_existing_theme_id_is_reused():
@@ -716,7 +716,9 @@ def test_concurrent_batches_cannot_overshoot_category_cap():
         category_cap=2,
     )
 
-    admitted = {token for token in ("alpha", "beta") if token in outcome.additions.domain_of}
+    admitted = {
+        token for token in ("alpha", "beta") if token in outcome.additions.domain_of
+    }
     assert admitted == {"alpha"}
     assert any(f.phase == "domain" and f.tokens == ("beta",) for f in outcome.failures)
 

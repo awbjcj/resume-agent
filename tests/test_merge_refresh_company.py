@@ -4,7 +4,13 @@ from sqlmodel import select
 
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.ingest import IngestOutcome, save_or_upgrade
-from resume_agent.discovery.merge import IncomingJob, RefreshCompany, RefreshText, Skip, decide
+from resume_agent.discovery.merge import (
+    IncomingJob,
+    RefreshCompany,
+    RefreshText,
+    Skip,
+    decide,
+)
 from resume_agent.tracking.dedup import compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
 
@@ -70,7 +76,9 @@ def test_save_refreshes_company_and_key_atomically():
 
 
 def test_richer_text_refreshes_company_and_key_atomically():
-    richer = " ".join(["Build systems with distributed services and production ownership"] * 8)
+    richer = " ".join(
+        ["Build systems with distributed services and production ownership"] * 8
+    )
     action = decide(_existing(), _incoming(jd_text=richer))
     assert isinstance(action, RefreshText)
     assert action.updates["company"] == "Acme Corp"

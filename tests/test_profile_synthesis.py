@@ -37,16 +37,30 @@ class _FakeAgent:
 def _facts():
     return ProfileFacts(
         contact=Contact(name="Ada"),
-        experience=[Experience(id="exp1", company="Acme", title="Engineer",
-                               start="2022", end=None, current=True)],
+        experience=[
+            Experience(
+                id="exp1",
+                company="Acme",
+                title="Engineer",
+                start="2022",
+                end=None,
+                current=True,
+            )
+        ],
         projects=[Project(id="proj1", name="Engine")],
     )
 
 
 def test_profile_skeleton_lists_anchor_candidates():
     rows = profile_skeleton(_facts())
-    assert {"id": "exp1", "kind": "experience", "company": "Acme",
-            "title": "Engineer", "start": "2022", "end": None} in rows
+    assert {
+        "id": "exp1",
+        "kind": "experience",
+        "company": "Acme",
+        "title": "Engineer",
+        "start": "2022",
+        "end": None,
+    } in rows
     assert {"id": "proj1", "kind": "project", "name": "Engine"} in rows
 
 
@@ -66,11 +80,20 @@ def test_fact_item_synthesized_defaults_false_and_round_trips():
 
 
 def test_synthesized_fragment_models_validate():
-    fragment = SynthesizedFragment(entries=[SynthesizedEntry(
-        kind="experience_bullets", anchor_id="exp1",
-        claims=[SynthesizedClaim(text="Cut latency 30%", support=["latency fell 30%"])],
-        tech=["Kubernetes"],
-    )])
+    fragment = SynthesizedFragment(
+        entries=[
+            SynthesizedEntry(
+                kind="experience_bullets",
+                anchor_id="exp1",
+                claims=[
+                    SynthesizedClaim(
+                        text="Cut latency 30%", support=["latency fell 30%"]
+                    )
+                ],
+                tech=["Kubernetes"],
+            )
+        ]
+    )
     assert fragment.entries[0].claims[0].support == ["latency fell 30%"]
 
 
@@ -85,8 +108,10 @@ def _claim(text, support=None):
 
 
 def test_supported_claim_passes():
-    claim = _claim("Cut p99 latency 30% across 4 services",
-                   support=["cut p99 latency 30% across 4 services"])
+    claim = _claim(
+        "Cut p99 latency 30% across 4 services",
+        support=["cut p99 latency 30% across 4 services"],
+    )
     assert deterministic_failures(claim, _SOURCE) == []
 
 
@@ -97,16 +122,20 @@ def test_unsupported_number_fails():
 
 def test_unsupported_proper_noun_fails():
     failures = deterministic_failures(
-        _claim("Migrated the pipeline to Terraform",
-               support=["migrated the pipeline to Kubernetes"]),
+        _claim(
+            "Migrated the pipeline to Terraform",
+            support=["migrated the pipeline to Kubernetes"],
+        ),
         _SOURCE,
     )
     assert any("Terraform" in reason for reason in failures)
 
 
 def test_sentence_initial_capital_is_exempt():
-    claim = _claim("Migrated the pipeline to Kubernetes",
-                   support=["migrated the pipeline to Kubernetes in 2024"])
+    claim = _claim(
+        "Migrated the pipeline to Kubernetes",
+        support=["migrated the pipeline to Kubernetes in 2024"],
+    )
     assert deterministic_failures(claim, _SOURCE) == []
 
 
@@ -158,18 +187,28 @@ class _SeqAgent:
 
 
 def _doc(anchor=None):
-    return SourceDoc(id="deck-1", filename="deck.pptx", sha256="0" * 64,
-                     added_at="2026-07-03T00:00:00+00:00", mode="synthesis",
-                     anchor=anchor)
+    return SourceDoc(
+        id="deck-1",
+        filename="deck.pptx",
+        sha256="0" * 64,
+        added_at="2026-07-03T00:00:00+00:00",
+        mode="synthesis",
+        anchor=anchor,
+    )
 
 
 _DECK = "The billing rewrite cut p99 latency 30%. Built on Kubernetes."
 
 
-def _entry(text="Cut p99 latency 30%", support=("cut p99 latency 30%",),
-           anchor_id="exp1", tech=()):
+def _entry(
+    text="Cut p99 latency 30%",
+    support=("cut p99 latency 30%",),
+    anchor_id="exp1",
+    tech=(),
+):
     return SynthesizedEntry(
-        kind="experience_bullets", anchor_id=anchor_id,
+        kind="experience_bullets",
+        anchor_id=anchor_id,
         claims=[SynthesizedClaim(text=text, support=list(support))],
         tech=list(tech),
     )
@@ -182,9 +221,14 @@ def _approve_all():
         def run(self, prompt):
             self.calls += 1
             claims = __import__("json").loads(prompt)
-            return _FakeResult(ClaimVerdicts(verdicts=[
-                ClaimVerdict(index=c["index"], verdict="supported") for c in claims
-            ]))
+            return _FakeResult(
+                ClaimVerdicts(
+                    verdicts=[
+                        ClaimVerdict(index=c["index"], verdict="supported")
+                        for c in claims
+                    ]
+                )
+            )
 
         async def arun(self, prompt):
             return self.run(prompt)
@@ -205,7 +249,11 @@ def test_happy_path_keeps_verified_claims():
 def test_pinned_anchor_overrides_agent_proposal():
     synthesis = _SeqAgent([SynthesizedFragment(entries=[_entry(anchor_id="wrong")])])
     fragment, _ = synthesize_document(
-        _doc(anchor="exp1"), _DECK, profile_skeleton(_facts()), synthesis, _approve_all()
+        _doc(anchor="exp1"),
+        _DECK,
+        profile_skeleton(_facts()),
+        synthesis,
+        _approve_all(),
     )
     assert fragment.entries[0].anchor_id == "exp1"
 
@@ -240,10 +288,16 @@ def test_entailment_unsupported_fails_closed():
     class _RejectAll:
         def run(self, prompt):
             claims = __import__("json").loads(prompt)
-            return _FakeResult(ClaimVerdicts(verdicts=[
-                ClaimVerdict(index=c["index"], verdict="unsupported", reason="overreach")
-                for c in claims
-            ]))
+            return _FakeResult(
+                ClaimVerdicts(
+                    verdicts=[
+                        ClaimVerdict(
+                            index=c["index"], verdict="unsupported", reason="overreach"
+                        )
+                        for c in claims
+                    ]
+                )
+            )
 
         async def arun(self, prompt):
             return self.run(prompt)
@@ -273,15 +327,29 @@ def test_missing_verdict_counts_as_unsupported():
 
 
 def test_fragment_to_facts_builds_anchored_stub_with_evidence():
-    fragment = SynthesizedFragment(entries=[
-        _entry(tech=["Kubernetes"]),
-        SynthesizedEntry(kind="skills", category="hard",
-                         claims=[SynthesizedClaim(text="Kubernetes",
-                                                  support=["Built on Kubernetes"])]),
-            SynthesizedEntry(kind="project", title="Billing rewrite",
-                         claims=[SynthesizedClaim(text="Rewrote billing", aspect="impact",
-                                                  support=["billing rewrite"])]),
-    ])
+    fragment = SynthesizedFragment(
+        entries=[
+            _entry(tech=["Kubernetes"]),
+            SynthesizedEntry(
+                kind="skills",
+                category="hard",
+                claims=[
+                    SynthesizedClaim(text="Kubernetes", support=["Built on Kubernetes"])
+                ],
+            ),
+            SynthesizedEntry(
+                kind="project",
+                title="Billing rewrite",
+                claims=[
+                    SynthesizedClaim(
+                        text="Rewrote billing",
+                        aspect="impact",
+                        support=["billing rewrite"],
+                    )
+                ],
+            ),
+        ]
+    )
     facts, evidence = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
 
     stub = facts.experience[0]
@@ -317,10 +385,13 @@ def test_bad_tech_token_does_not_leak_when_a_sibling_claim_survives():
     """An entry-level tech failure must not leak into the final fact, even when
     a different claim in the same entry independently passes verification."""
     entry = SynthesizedEntry(
-        kind="experience_bullets", anchor_id="exp1",
+        kind="experience_bullets",
+        anchor_id="exp1",
         claims=[
             _claim("Cut p99 latency 30%"),
-            SynthesizedClaim(text="Rebuilt the pipeline", support=["Built on Kubernetes"]),
+            SynthesizedClaim(
+                text="Rebuilt the pipeline", support=["Built on Kubernetes"]
+            ),
         ],
         tech=["Terraform"],  # not in _DECK — must never survive verification
     )

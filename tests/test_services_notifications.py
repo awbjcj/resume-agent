@@ -34,8 +34,12 @@ def test_sync_creates_pending_and_is_idempotent():
     init_db(engine)
     with Session(engine) as session:
         _seed(session)
-        first = sync_notifications(session, [_email("m1")], classify=lambda email: "interview")
-        again = sync_notifications(session, [_email("m1")], classify=lambda email: "interview")
+        first = sync_notifications(
+            session, [_email("m1")], classify=lambda email: "interview"
+        )
+        again = sync_notifications(
+            session, [_email("m1")], classify=lambda email: "interview"
+        )
 
         assert len(first) == 1
         assert len(again) == 1
@@ -60,7 +64,9 @@ def test_accept_applies_transition_and_dismiss_suppresses():
         assert updated is not None
         assert updated.status == "interview"
 
-        [second] = sync_notifications(session, [_email("m2")], classify=lambda email: "offer")
+        [second] = sync_notifications(
+            session, [_email("m2")], classify=lambda email: "offer"
+        )
         assert second.id is not None
         dismissed = dismiss_notification(session, second.id)
         assert dismissed is not None

@@ -7,6 +7,11 @@ from resume_agent.tracking.timeline_pivot import build_pivot
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
+def _persisted_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def _at(day: int, hour: int = 12) -> datetime:
     return datetime(2026, 3, day, hour, tzinfo=timezone.utc)
 
@@ -22,17 +27,19 @@ def _application(session: Session, company: str = "Acme", status: str = "intervi
     session.add(job)
     session.commit()
     session.refresh(job)
-    app = Application(job_id=job.id, status=status)
+    app = Application(job_id=_persisted_id(job.id), status=status)
     session.add(app)
     session.commit()
     session.refresh(app)
     return job, app
 
 
-def _event(session: Session, app: Application, kind: str, day: int | None = None, **over):
+def _event(
+    session: Session, app: Application, kind: str, day: int | None = None, **over
+):
     session.add(
         ApplicationEvent(
-            application_id=app.id,
+            application_id=_persisted_id(app.id),
             kind=kind,
             occurred_at=_at(day) if day else None,
             **over,
@@ -63,7 +70,7 @@ def test_technical_round_columns_use_stored_sequence_and_report_overflow():
     row = table.rows[0]
     assert row.cells["technical_round_2"].occurred_at == _at(11)
     assert table.technical_round_columns == 3
-    assert table.overflow_by_job[job.id] == 1
+    assert table.overflow_by_job[_persisted_id(job.id)] == 1
 
 
 def test_duplicate_technical_round_key_is_visible_as_overflow(caplog):
@@ -74,7 +81,7 @@ def test_duplicate_technical_round_key_is_visible_as_overflow(caplog):
 
     table = build_pivot(session)
 
-    assert table.overflow_by_job[job.id] == 1
+    assert table.overflow_by_job[_persisted_id(job.id)] == 1
     assert "Duplicate pivot cell" in caplog.text
 
 
@@ -94,14 +101,14 @@ def test_full_event_rows_tie_break_equal_dates_by_created_at_then_id():
     _, app = _application(session)
     shared_time = _at(12)
     later_created = ApplicationEvent(
-        application_id=app.id,
+        application_id=_persisted_id(app.id),
         kind="recruiter_screen",
         occurred_at=shared_time,
         sequence=1,
         created_at=_at(14),
     )
     earlier_created = ApplicationEvent(
-        application_id=app.id,
+        application_id=_persisted_id(app.id),
         kind="technical_round",
         occurred_at=shared_time,
         sequence=9,

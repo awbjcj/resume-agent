@@ -43,7 +43,9 @@ def test_resume_download_name_uses_company_and_title():
     job = Job(id=42, source="manual", company="Acme Corp", title="Senior Engineer")
     version = ResumeVersion(id=7, job_id=42, round=1, origin="revision")
 
-    assert resume_download_name(job, version) == "Acme_Corp-Senior_Engineer-Resume-v7.pdf"
+    assert (
+        resume_download_name(job, version) == "Acme_Corp-Senior_Engineer-Resume-v7.pdf"
+    )
 
 
 def test_cover_letter_download_name_uses_company_and_title():
@@ -145,7 +147,9 @@ def test_export_writes_manifest_and_content_idempotently(tmp_path):
         )
         save_application(
             session,
-            Application(job_id=job.id, resume_version_id=version.id, cover_letter_id=cover.id),
+            Application(
+                job_id=job.id, resume_version_id=version.id, cover_letter_id=cover.id
+            ),
         )
 
         out = export_job_artifacts(session, job.id, base=tmp_path)

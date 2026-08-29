@@ -36,7 +36,9 @@ def test_source_out_projects_optional_limit():
 
 
 def test_preview_out_projects_dataclass():
-    preview = SourcePreview(ok=True, url="u", kind="greenhouse", token="x", role_count=3)
+    preview = SourcePreview(
+        ok=True, url="u", kind="greenhouse", token="x", role_count=3
+    )
 
     dumped = SourcePreviewOut.model_validate(preview).model_dump(by_alias=True)
 

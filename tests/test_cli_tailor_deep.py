@@ -33,10 +33,9 @@ def test_tailor_deep_flag_selects_deep_config(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli,
         "tailor",
-        lambda session, *, review_path, **kwargs: captured.update(
-            review_path=review_path
-        )
-        or TailorOutcome(),
+        lambda session, *, review_path, **kwargs: (
+            captured.update(review_path=review_path) or TailorOutcome()
+        ),
     )
 
     result = runner.invoke(
@@ -53,10 +52,9 @@ def test_tailor_explicit_review_wins_over_deep(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli,
         "tailor",
-        lambda session, *, review_path, **kwargs: captured.update(
-            review_path=review_path
-        )
-        or TailorOutcome(),
+        lambda session, *, review_path, **kwargs: (
+            captured.update(review_path=review_path) or TailorOutcome()
+        ),
     )
 
     result = runner.invoke(

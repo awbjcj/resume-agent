@@ -10,8 +10,19 @@ from resume_agent.services.scout_context import (
 def test_ledger_renders_added_and_dismissed_feedback_as_untrusted():
     session = {
         "proposals": [
-            ScoutProposal(id="p1", kind="source", source=SourcePayload(company="Modal", url="https://modal.com/jobs"), status="added").model_dump(mode="json"),
-            ScoutProposal(id="p2", kind="source", source=SourcePayload(company="Scale AI", url="https://scale.com/jobs"), status="dismissed", dismiss_reason="too big").model_dump(mode="json"),
+            ScoutProposal(
+                id="p1",
+                kind="source",
+                source=SourcePayload(company="Modal", url="https://modal.com/jobs"),
+                status="added",
+            ).model_dump(mode="json"),
+            ScoutProposal(
+                id="p2",
+                kind="source",
+                source=SourcePayload(company="Scale AI", url="https://scale.com/jobs"),
+                status="dismissed",
+                dismiss_reason="too big",
+            ).model_dump(mode="json"),
         ]
     }
     text = render_ledger(session)

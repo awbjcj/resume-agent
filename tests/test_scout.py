@@ -39,12 +39,17 @@ def test_normalize_retries_integrity_then_drops_all_proposals():
         {"kind": "unknown", "term": {"value": "python"}},
         {"kind": "search_term", "term": {"value": "python"}, "disposition": "avoid"},
         {"kind": "source", "source": {"company": "Acme", "url": "file:///etc/passwd"}},
-        {"kind": "search_term", "term": {"value": "principal", "term_kind": "seniority"}},
+        {
+            "kind": "search_term",
+            "term": {"value": "principal", "term_kind": "seniority"},
+        },
         {"kind": "search_term", "term": {"value": "python"}, "fit_score": 101},
     ],
 )
 def test_normalize_classifies_semantically_bad_drafts(proposal):
-    turn = ScoutTurnDraft.model_validate({"message": "Found it", "proposals": [proposal]})
+    turn = ScoutTurnDraft.model_validate(
+        {"message": "Found it", "proposals": [proposal]}
+    )
     with pytest.raises((ProposalRejected, TurnRejected)):
         normalize_turn(turn, {"proposals": []})
 
@@ -75,7 +80,9 @@ def test_avoid_source_needs_company_and_evidence_but_not_careers_url():
                     "kind": "source",
                     "source": {"company": "Acme"},
                     "disposition": "avoid",
-                    "citations": [{"url": "https://news.example/acme", "title": "Layoffs"}],
+                    "citations": [
+                        {"url": "https://news.example/acme", "title": "Layoffs"}
+                    ],
                 }
             ],
         }
@@ -87,7 +94,10 @@ def test_avoid_source_needs_company_and_evidence_but_not_careers_url():
 
 
 def _term_rows(count: int) -> list[dict]:
-    return [{"kind": "search_term", "term": {"value": f"term-{index}"}} for index in range(count)]
+    return [
+        {"kind": "search_term", "term": {"value": f"term-{index}"}}
+        for index in range(count)
+    ]
 
 
 def test_turn_and_pending_caps_truncate_instead_of_losing_the_turn():
@@ -96,20 +106,26 @@ def test_turn_and_pending_caps_truncate_instead_of_losing_the_turn():
     # 5 companies answered a rejection retry by expanding past the cap, and the
     # fatal rejection dropped every proposal it had got right.
     validated = normalize_turn(
-        ScoutTurnDraft.model_validate({"message": "Too many", "proposals": _term_rows(9)}),
+        ScoutTurnDraft.model_validate(
+            {"message": "Too many", "proposals": _term_rows(9)}
+        ),
         {"proposals": []},
     )
     assert len(validated.proposals) == scout.PROPOSAL_CAP
     assert validated.notice == scout.PROPOSALS_TRUNCATED_NOTICE
 
     room_for_two = normalize_turn(
-        ScoutTurnDraft.model_validate({"message": "Some more", "proposals": _term_rows(5)}),
+        ScoutTurnDraft.model_validate(
+            {"message": "Some more", "proposals": _term_rows(5)}
+        ),
         {"proposals": [{"status": "pending"}] * (scout.PENDING_CAP - 2)},
     )
     assert len(room_for_two.proposals) == 2
 
     full = normalize_turn(
-        ScoutTurnDraft.model_validate({"message": "One more", "proposals": _term_rows(1)}),
+        ScoutTurnDraft.model_validate(
+            {"message": "One more", "proposals": _term_rows(1)}
+        ),
         {"proposals": [{"status": "pending"}] * scout.PENDING_CAP},
     )
     assert full.proposals == []
@@ -125,7 +141,10 @@ def test_turn_kind_is_python_owned_not_model_supplied():
             "kind": "scout_turn",
             "message": "I found four leads.",
             "proposals": [
-                {"kind": "source", "source": {"company": "Acme", "url": "https://acme.test/jobs"}}
+                {
+                    "kind": "source",
+                    "source": {"company": "Acme", "url": "https://acme.test/jobs"},
+                }
             ],
         }
     )
@@ -154,14 +173,23 @@ def test_recap_ignores_model_supplied_deltas():
 @pytest.mark.parametrize(
     "proposal",
     [
-        {"kind": "careers_source", "source": {"company": "Acme", "url": "https://acme.test"}},
-        {"kind": "source", "source": {"company": "Acme", "url": "https://acme.test"}, "disposition": "include"},
+        {
+            "kind": "careers_source",
+            "source": {"company": "Acme", "url": "https://acme.test"},
+        },
+        {
+            "kind": "source",
+            "source": {"company": "Acme", "url": "https://acme.test"},
+            "disposition": "include",
+        },
     ],
 )
 def test_invented_vocabulary_degrades_per_proposal(proposal):
     # An out-of-vocabulary label is one bad row, not a broken turn, so the
     # non-strict retry pass has to be able to drop it and keep the reply.
-    turn = ScoutTurnDraft.model_validate({"message": "Found it", "proposals": [proposal]})
+    turn = ScoutTurnDraft.model_validate(
+        {"message": "Found it", "proposals": [proposal]}
+    )
     with pytest.raises(ProposalRejected):
         normalize_turn(turn, {"proposals": []}, strict=True)
     degraded = normalize_turn(turn, {"proposals": []}, strict=False)
@@ -239,13 +267,25 @@ def test_build_scout_agent_uses_the_resolver_and_budgeted_fallback(monkeypatch):
 
     monkeypatch.setattr(scout, "Agent", FakeAgent)
     monkeypatch.setattr(scout, "AgentRunner", lambda agent: agent)
-    monkeypatch.setattr(scout, "get_settings", lambda: type("Settings", (), {"mid_model": "openai:gpt-4o"})())
+    monkeypatch.setattr(
+        scout,
+        "get_settings",
+        lambda: type("Settings", (), {"mid_model": "openai:gpt-4o"})(),
+    )
     monkeypatch.setattr(
         scout,
         "provider_capabilities",
-        lambda _model: type("Capabilities", (), {"supports_reasoning": False, "supports_prompt_cache": False})(),
+        lambda _model: type(
+            "Capabilities",
+            (),
+            {"supports_reasoning": False, "supports_prompt_cache": False},
+        )(),
     )
-    monkeypatch.setattr(scout, "build_search_equipped", lambda *args, **kwargs: (object(), [kwargs["tool_search"]]))
+    monkeypatch.setattr(
+        scout,
+        "build_search_equipped",
+        lambda *args, **kwargs: (object(), [kwargs["tool_search"]]),
+    )
 
     def resolve_company_source(company: str, candidate_url: str) -> str:
         """Resolve ownership for a company source."""

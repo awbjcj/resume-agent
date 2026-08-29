@@ -44,10 +44,17 @@ def test_artifact_path_resolves_cwd_relative_pdf_path_under_relative_data_dir(
         resolved = artifact_path(pdf_path)
 
     assert resolved.is_file()
-    assert resolved == (tmp_path / workspace.output_dir / "acme-role-1" / "resume-v1-tailor.pdf").resolve()
+    assert (
+        resolved
+        == (
+            tmp_path / workspace.output_dir / "acme-role-1" / "resume-v1-tailor.pdf"
+        ).resolve()
+    )
 
 
-def test_artifact_path_still_rejects_paths_outside_the_tenant_root(tmp_path, monkeypatch):
+def test_artifact_path_still_rejects_paths_outside_the_tenant_root(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     workspace = WorkspacePaths(Path("data") / "users" / "alice0000000")
     workspace.output_dir.mkdir(parents=True)

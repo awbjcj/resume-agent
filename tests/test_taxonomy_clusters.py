@@ -178,20 +178,26 @@ def test_save_cluster_map_roundtrips_deterministically_without_fixed_temp(tmp_pa
 
     assert load_cluster_map(path) == cmap
     assert path.read_text(encoding="utf-8") == first
-    assert first == json.dumps(
-        {
-            "aliases": cmap.aliases,
-            "domain_of": cmap.domain_of,
-            "domain_label": cmap.domain_label,
-            "category_of": cmap.category_of,
-        },
-        indent=2,
-        sort_keys=True,
-    ) + "\n"
+    assert (
+        first
+        == json.dumps(
+            {
+                "aliases": cmap.aliases,
+                "domain_of": cmap.domain_of,
+                "domain_label": cmap.domain_label,
+                "category_of": cmap.category_of,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
     assert fixed_temp.read_text(encoding="utf-8") == "leave me alone"
 
 
-def test_save_cluster_map_atomically_replaces_and_cleans_failed_temp(tmp_path, monkeypatch):
+def test_save_cluster_map_atomically_replaces_and_cleans_failed_temp(
+    tmp_path, monkeypatch
+):
     path = tmp_path / "nested" / "clusters.json"
     cmap = ClusterMap(aliases={"k8s": "kubernetes"})
     real_replace = os.replace
@@ -292,8 +298,12 @@ def test_prune_keeps_terminal_required_by_a_demanded_alias():
 
 
 def test_allocate_domain_ids_is_collision_safe_and_order_independent():
-    forward = allocate_domain_ids(existing_labels={"c": "C"}, proposed_labels=["C++", "C#"])
-    reverse = allocate_domain_ids(existing_labels={"c": "C"}, proposed_labels=["C#", "C++"])
+    forward = allocate_domain_ids(
+        existing_labels={"c": "C"}, proposed_labels=["C++", "C#"]
+    )
+    reverse = allocate_domain_ids(
+        existing_labels={"c": "C"}, proposed_labels=["C#", "C++"]
+    )
 
     assert forward == reverse
     assert set(forward.values()) == {"c-2", "c-3"}

@@ -675,7 +675,7 @@ def test_a_skill_that_failed_before_goes_straight_to_escalation(tmp_path):
 def test_the_deferred_backlog_is_reported_separately_from_uncertainty(
     tmp_path, monkeypatch
 ):
-    """"Deferred" and "uncertain" are different futures and must read that way.
+    """ "Deferred" and "uncertain" are different futures and must read that way.
 
     The cap already deferred work correctly; it just never said so, so a user
     could not tell monotonic progress from a permanent plateau.

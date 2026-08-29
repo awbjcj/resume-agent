@@ -18,12 +18,21 @@ def _seed(db_url) -> int:
     engine = make_engine(db_url)
     init_db(engine)
     with get_session(engine) as s:
-        job = Job(source="manual", jd_text="jd", company="Acme", title="Eng",
-                  status=JobStatus.tailored.value)
+        job = Job(
+            source="manual",
+            jd_text="jd",
+            company="Acme",
+            title="Eng",
+            status=JobStatus.tailored.value,
+        )
         s.add(job)
         s.commit()
         s.refresh(job)
-        v = ResumeVersion(job_id=_require_id(job.id), round=1, content_json={"contact": {"name": "Ada"}})
+        v = ResumeVersion(
+            job_id=_require_id(job.id),
+            round=1,
+            content_json={"contact": {"name": "Ada"}},
+        )
         s.add(v)
         s.commit()
         s.refresh(v)

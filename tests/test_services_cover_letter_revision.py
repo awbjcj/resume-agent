@@ -7,7 +7,11 @@ from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterPara
 from resume_agent.models.profile import Contact, Experience, ProfileFacts
 from resume_agent.services.agents import CoverLetterBundle
 from resume_agent.services.cover_letter_revision import revise_cover_letter_version
-from resume_agent.tracking.repository import get_cover_letter, save_cover_letter, save_job
+from resume_agent.tracking.repository import (
+    get_cover_letter,
+    save_cover_letter,
+    save_job,
+)
 from resume_agent.tracking.tables import CoverLetter, Job
 
 
@@ -67,7 +71,9 @@ def test_revise_cover_letter_persists_lineage_and_fact_flag(monkeypatch):
     )
 
     with Session(engine) as session:
-        job = save_job(session, Job(source="manual", jd_text="jd", company="Acme", title="Eng"))
+        job = save_job(
+            session, Job(source="manual", jd_text="jd", company="Acme", title="Eng")
+        )
         assert job.id is not None
         parent = save_cover_letter(
             session,
@@ -80,7 +86,9 @@ def test_revise_cover_letter_persists_lineage_and_fact_flag(monkeypatch):
             revision=_Agent(_letter(provenance="ghost")),
         )
 
-        child = revise_cover_letter_version(session, parent.id, "warmer tone", bundle=bundle)
+        child = revise_cover_letter_version(
+            session, parent.id, "warmer tone", bundle=bundle
+        )
 
         assert child is not None
         assert child.origin == "revision"

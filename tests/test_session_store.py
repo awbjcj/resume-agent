@@ -4,7 +4,12 @@ from typing import Literal
 
 import pytest
 
-from resume_agent.sessions.store import SessionModel, SessionStore, now_iso, valid_session_id
+from resume_agent.sessions.store import (
+    SessionModel,
+    SessionStore,
+    now_iso,
+    valid_session_id,
+)
 
 
 class _Session(SessionModel):
@@ -28,7 +33,9 @@ def _seed(
     root.mkdir(parents=True, exist_ok=True)
     store.write(
         root,
-        _Session(session_id=session_id, started_at=started_at, status=status).model_dump(mode="json"),
+        _Session(
+            session_id=session_id, started_at=started_at, status=status
+        ).model_dump(mode="json"),
     )
 
 
@@ -70,7 +77,9 @@ def test_list_sorts_and_filters_archived(store, tmp_path):
     _seed(store, tmp_path, "c", status="ended", started_at="2026-07-19T00:30:00+00:00")
     store.archive(tmp_path, "c")
     assert [row["session_id"] for row in store.list(tmp_path)] == ["a", "b"]
-    assert [row["session_id"] for row in store.list(tmp_path, include_archived=True)] == ["c", "a", "b"]
+    assert [
+        row["session_id"] for row in store.list(tmp_path, include_archived=True)
+    ] == ["c", "a", "b"]
 
 
 def test_list_missing_root_is_empty(store, tmp_path):
@@ -119,12 +128,19 @@ def test_delete_where_removes_only_matches_including_archived(store, tmp_path):
     _seed(store, tmp_path, "drop-archived", status="ended")
     store.archive(tmp_path, "drop-archived")
 
-    removed = store.delete_where(tmp_path, lambda row: row["session_id"].startswith("drop"))
+    removed = store.delete_where(
+        tmp_path, lambda row: row["session_id"].startswith("drop")
+    )
 
     assert removed == 2
-    assert [row["session_id"] for row in store.list(tmp_path, include_archived=True)] == ["keep"]
+    assert [
+        row["session_id"] for row in store.list(tmp_path, include_archived=True)
+    ] == ["keep"]
     # Idempotent: nothing left to match is zero, not an error.
-    assert store.delete_where(tmp_path, lambda row: row["session_id"].startswith("drop")) == 0
+    assert (
+        store.delete_where(tmp_path, lambda row: row["session_id"].startswith("drop"))
+        == 0
+    )
 
 
 def test_list_skips_an_unreadable_file_but_load_still_raises(store, tmp_path, caplog):

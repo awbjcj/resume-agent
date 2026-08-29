@@ -142,8 +142,11 @@ def test_discover_jobs_with_empty_job_ids_scopes_to_nothing_not_everything(
         discovery,
         "build_discovery_bundle",
         lambda: DiscoveryBundle(
-            extract=_RunnerStub(), fit=_RunnerStub(), relevance=None,
-            canonicalizer=None, industry_classifier=_RunnerStub(),
+            extract=_RunnerStub(),
+            fit=_RunnerStub(),
+            relevance=None,
+            canonicalizer=None,
+            industry_classifier=_RunnerStub(),
         ),
     )
     with _session() as session:
@@ -157,10 +160,15 @@ def test_discover_jobs_with_empty_job_ids_scopes_to_nothing_not_everything(
 def test_add_job_from_url_extracts_and_overrides(monkeypatch):
     monkeypatch.setattr(discovery, "build_url_extract_agent", lambda: object())
     monkeypatch.setattr(
-        discovery, "job_from_url",
+        discovery,
+        "job_from_url",
         lambda url, *, agent, allow_browser=True: RawJob(
-            source="url", url=url, company="Acme", title="Engineer",
-            location="Remote", jd_text="Build.",
+            source="url",
+            url=url,
+            company="Acme",
+            title="Engineer",
+            location="Remote",
+            jd_text="Build.",
         ),
     )
     with _session() as session:
@@ -184,7 +192,9 @@ def test_add_job_from_url_raises_on_fetch_error(monkeypatch):
 
 def test_add_job_from_url_raises_when_no_extraction(monkeypatch):
     monkeypatch.setattr(discovery, "build_url_extract_agent", lambda: object())
-    monkeypatch.setattr(discovery, "job_from_url", lambda url, *, agent, allow_browser=True: None)
+    monkeypatch.setattr(
+        discovery, "job_from_url", lambda url, *, agent, allow_browser=True: None
+    )
     with _session() as session:
         with pytest.raises(UrlFetchError, match="Couldn't extract"):
             discovery.add_job_from_url(session, url="https://x/job")
@@ -193,6 +203,7 @@ def test_add_job_from_url_raises_when_no_extraction(monkeypatch):
 # ---------------------------------------------------------------------------
 # Task-7 tests: reprocess_jobs + run_pull finish=False
 # ---------------------------------------------------------------------------
+
 
 class _FakeResult:
     def __init__(self, content):
@@ -203,12 +214,24 @@ class _ExtractRunner:
     def run(self, prompt: str):
         from resume_agent.models.job import JobCriteriaExtract, SponsorshipSignal
 
-        return _FakeResult(JobCriteriaExtract.model_validate(dict(
-            sponsorship_signal=SponsorshipSignal.offered, seniority=None,
-            employment_type=None, tech_stack=[], industry=None, company_size=None,
-            yoe_min=None, salary_range=None, remote_policy=None, location=None,
-            must_have_skills=[], nice_to_have_skills=[],
-        )))
+        return _FakeResult(
+            JobCriteriaExtract.model_validate(
+                dict(
+                    sponsorship_signal=SponsorshipSignal.offered,
+                    seniority=None,
+                    employment_type=None,
+                    tech_stack=[],
+                    industry=None,
+                    company_size=None,
+                    yoe_min=None,
+                    salary_range=None,
+                    remote_policy=None,
+                    location=None,
+                    must_have_skills=[],
+                    nice_to_have_skills=[],
+                )
+            )
+        )
 
     async def arun(self, prompt: str):
         return self.run(prompt)
@@ -259,13 +282,22 @@ def test_reprocess_jobs_rescores_shortlisted(tmp_path):
     search.write_text("titles: []\n", "utf-8")
 
     with _session() as s:
-        save_job(s, Job(
-            source="x", jd_text="jd", title="Eng",
-            status=JobStatus.shortlisted.value, fit_score=10, criteria_json={},
-        ))
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="jd",
+                title="Eng",
+                status=JobStatus.shortlisted.value,
+                fit_score=10,
+                criteria_json={},
+            ),
+        )
         counts = reprocess_jobs(
-            s, scopes=["shortlisted"],
-            search_path=str(search), facts_path=str(facts),
+            s,
+            scopes=["shortlisted"],
+            search_path=str(search),
+            facts_path=str(facts),
             bundle=_bundle(),
         )
         assert jobs_by_status(s, JobStatus.shortlisted.value)[0].fit_score == 77
@@ -279,7 +311,14 @@ def test_run_pull_finish_false_does_not_emit_done(tmp_path):
 
     with _session() as s:
         reporter = ProgressReporter("refresh", tmp_path)
-        run_pull(s, [], SearchConfig(), tmp_path / "runs.json", reporter=reporter, finish=False)
+        run_pull(
+            s,
+            [],
+            SearchConfig(),
+            tmp_path / "runs.json",
+            reporter=reporter,
+            finish=False,
+        )
     rec = read_progress("refresh", tmp_path)
     assert rec is not None and rec["state"] == "running"  # not "done"
 

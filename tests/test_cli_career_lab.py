@@ -31,7 +31,9 @@ def test_career_lab_command_passes_typed_context_and_skill(monkeypatch, tmp_path
     monkeypatch.setattr(
         "resume_agent.career_skills.registry.CareerSkillRegistry.from_settings",
         lambda _settings: SimpleNamespace(
-            require=lambda name, **_kwargs: SimpleNamespace(ref=SimpleNamespace(name=name))
+            require=lambda name, **_kwargs: SimpleNamespace(
+                ref=SimpleNamespace(name=name)
+            )
         ),
     )
 
@@ -111,9 +113,7 @@ def test_career_lab_command_resumes_the_thread_for_the_given_job(monkeypatch, tm
         lambda reporter, **_kwargs: {"status": "ended"},
     )
 
-    result = CliRunner().invoke(
-        cli.app, ["career-lab", "--job-id", "7"], input="end\n"
-    )
+    result = CliRunner().invoke(cli.app, ["career-lab", "--job-id", "7"], input="end\n")
 
     assert result.exit_code == 0, result.output
     assert captured.asked_job_id == 7

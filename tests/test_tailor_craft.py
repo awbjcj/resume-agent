@@ -70,7 +70,7 @@ def test_writer_instructions_keep_integrity_first():
     for base in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
         out = _writer_instructions(base)
         assert out[: len(base)] == base
-        assert out[len(base):] == CRAFT_WRITER
+        assert out[len(base) :] == CRAFT_WRITER
 
 
 def test_style_guide_lands_after_craft():
@@ -99,7 +99,7 @@ def test_revision_agent_stays_craft_free():
 def test_match_plan_instructions_keep_integrity_first():
     out = _plan_instructions()
     assert out[: len(_MATCH_PLAN_INSTRUCTIONS)] == _MATCH_PLAN_INSTRUCTIONS
-    assert out[len(_MATCH_PLAN_INSTRUCTIONS):] == CRAFT_MATCH_PLAN
+    assert out[len(_MATCH_PLAN_INSTRUCTIONS) :] == CRAFT_MATCH_PLAN
 
 
 def test_ats_keyword_rubric_treats_coverage_as_authoritative():

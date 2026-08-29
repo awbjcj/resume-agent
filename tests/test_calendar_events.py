@@ -9,6 +9,11 @@ from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def _event(**over) -> ApplicationEvent:
     values = {
         "id": 1,
@@ -33,8 +38,10 @@ def _job() -> Job:
 def test_event_mapping_preserves_actionable_calendar_details() -> None:
     entry = entry_for_event(_event(notes="LRU cache"), _job())
     assert entry.summary == "Technical round 2 — Acme"
+    assert entry.end is not None
     assert entry.end - entry.start == timedelta(minutes=90)
     assert entry.url == entry.location == "https://zoom.us/j/123"
+    assert entry.description is not None
     assert "Dana Vale" in entry.description
     assert "Zoom" in entry.description
     assert "LRU cache" in entry.description
@@ -63,24 +70,24 @@ def test_upcoming_bulk_calendar_excludes_past_cancelled_and_terminal_rows() -> N
             session.add(job)
             session.commit()
             session.refresh(job)
-            application = Application(job_id=job.id, status=status)
+            application = Application(job_id=_require_id(job.id), status=status)
             session.add(application)
             session.commit()
             session.refresh(application)
             session.add_all(
                 [
                     ApplicationEvent(
-                        application_id=application.id,
+                        application_id=_require_id(application.id),
                         kind="technical_round",
                         occurred_at=NOW + timedelta(days=3),
                     ),
                     ApplicationEvent(
-                        application_id=application.id,
+                        application_id=_require_id(application.id),
                         kind="recruiter_screen",
                         occurred_at=NOW - timedelta(days=1),
                     ),
                     ApplicationEvent(
-                        application_id=application.id,
+                        application_id=_require_id(application.id),
                         kind="behavioral",
                         occurred_at=NOW + timedelta(days=2),
                         result="cancelled",

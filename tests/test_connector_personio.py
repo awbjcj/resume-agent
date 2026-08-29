@@ -16,7 +16,10 @@ def _fixture() -> str:
 def test_personio_maps_search_json_and_converts_html():
     jobs = parse_personio(_fixture(), "pitch", "de")
 
-    assert search_url("pitch", "de") == "https://pitch.jobs.personio.de/search.json?language=en"
+    assert (
+        search_url("pitch", "de")
+        == "https://pitch.jobs.personio.de/search.json?language=en"
+    )
     assert jobs[0].company == "Pitch Software GmbH"
     assert jobs[0].title == "Frontend Performance Engineer"
     assert jobs[0].location == "Berlin | Remote"

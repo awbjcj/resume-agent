@@ -80,17 +80,18 @@ def _no_budget(monkeypatch):
         "resume_agent.tenancy.limits.enforce_agent_budget", lambda agent: None
     )
     monkeypatch.setattr(
-        "resume_agent.tenancy.usage.record_call", lambda agent, response: recorded.append(response)
+        "resume_agent.tenancy.usage.record_call",
+        lambda agent, response: recorded.append(response),
     )
-    monkeypatch.setattr("resume_agent.llm_runner.refresh_agent_api_key", lambda agent: None)
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.refresh_agent_api_key", lambda agent: None
+    )
     return recorded
 
 
 def test_stream_maps_real_agno_content_enum_to_text_delta(_no_budget):
     output = _Output("final")
-    agent = _FakeAgent(
-        [[_Event(RunEvent.run_content, content="Hello"), output]]
-    )
+    agent = _FakeAgent([[_Event(RunEvent.run_content, content="Hello"), output]])
 
     events = list(AgentRunner(agent).stream("p"))
 
@@ -108,11 +109,17 @@ def test_reasoning_that_merely_echoes_the_visible_answer_is_not_reasoning():
     # channel alternates the two kinds on every delta, which flushes the sink
     # per token and renders one collapsible plus one markdown block per token.
     agent = _FakeAgent(
-        [[
-            _Event(RunEvent.run_content, content="Hello", reasoning_content="Hello"),
-            _Event(RunEvent.run_content, content=" there", reasoning_content=" there"),
-            _Output("Hello there"),
-        ]]
+        [
+            [
+                _Event(
+                    RunEvent.run_content, content="Hello", reasoning_content="Hello"
+                ),
+                _Event(
+                    RunEvent.run_content, content=" there", reasoning_content=" there"
+                ),
+                _Output("Hello there"),
+            ]
+        ]
     )
 
     events = list(AgentRunner(agent).stream("p"))
@@ -126,10 +133,16 @@ def test_reasoning_that_merely_echoes_the_visible_answer_is_not_reasoning():
 
 def test_genuine_reasoning_alongside_different_content_is_still_forwarded():
     agent = _FakeAgent(
-        [[
-            _Event(RunEvent.run_content, content="Yes.", reasoning_content="weighing it"),
-            _Output("Yes."),
-        ]]
+        [
+            [
+                _Event(
+                    RunEvent.run_content,
+                    content="Yes.",
+                    reasoning_content="weighing it",
+                ),
+                _Output("Yes."),
+            ]
+        ]
     )
 
     events = list(AgentRunner(agent).stream("p"))
@@ -141,12 +154,14 @@ def test_genuine_reasoning_alongside_different_content_is_still_forwarded():
 def test_stream_maps_reasoning_and_tool_events_with_call_identity():
     tool = _Tool("call-7", "search_corpus", {"q": "Kafka"}, result="3 hits")
     agent = _FakeAgent(
-        [[
-            _Event(RunEvent.reasoning_content_delta, reasoning_content="because"),
-            _Event(RunEvent.tool_call_started, tool=tool),
-            _Event(RunEvent.tool_call_completed, tool=tool),
-            _Output("final"),
-        ]]
+        [
+            [
+                _Event(RunEvent.reasoning_content_delta, reasoning_content="because"),
+                _Event(RunEvent.tool_call_started, tool=tool),
+                _Event(RunEvent.tool_call_completed, tool=tool),
+                _Output("final"),
+            ]
+        ]
     )
 
     events = list(AgentRunner(agent).stream("p"))
@@ -159,10 +174,12 @@ def test_stream_maps_reasoning_and_tool_events_with_call_identity():
 def test_tool_error_uses_event_error_and_marks_completion_not_ok():
     tool = _Tool("call-2", "probe")
     agent = _FakeAgent(
-        [[
-            _Event(RunEvent.tool_call_error, tool=tool, error="boom"),
-            _Output("final"),
-        ]]
+        [
+            [
+                _Event(RunEvent.tool_call_error, tool=tool, error="boom"),
+                _Output("final"),
+            ]
+        ]
     )
 
     events = list(AgentRunner(agent).stream("p"))
@@ -185,7 +202,9 @@ def test_transient_failure_before_visible_output_retries(monkeypatch):
         "resume_agent.llm_runner.get_settings", lambda: _settings(retries=1)
     )
     output = _Output("final")
-    agent = _FakeAgent([[_Transient("busy")], [_Event(RunEvent.run_content, content="hi"), output]])
+    agent = _FakeAgent(
+        [[_Transient("busy")], [_Event(RunEvent.run_content, content="hi"), output]]
+    )
 
     events = list(AgentRunner(agent).stream("p"))
 

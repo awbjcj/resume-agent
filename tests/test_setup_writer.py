@@ -21,7 +21,9 @@ def _seed_examples(root):
 
 def test_atomic_write_all_writes_every_file(tmp_path):
     _seed_examples(tmp_path)
-    state = WizardState(anthropic_api_key="sk-test", keywords=["python"], remote_policy="remote")
+    state = WizardState(
+        anthropic_api_key="sk-test", keywords=["python"], remote_policy="remote"
+    )
     report = atomic_write_all(state, root=tmp_path)
 
     assert (tmp_path / ".env").exists()
@@ -42,7 +44,7 @@ def test_partial_failure_leaves_no_tmp_litter(tmp_path, monkeypatch):
 
     def flaky_replace(src, dst):
         calls["n"] += 1
-        if calls["n"] == 2:                     # fail on the 2nd file
+        if calls["n"] == 2:  # fail on the 2nd file
             raise OSError("disk full")
         return real_replace(src, dst)
 
@@ -50,14 +52,17 @@ def test_partial_failure_leaves_no_tmp_litter(tmp_path, monkeypatch):
     report = atomic_write_all(state, root=tmp_path)
 
     assert any(status.startswith("error") for status in report.values())
-    assert not list(tmp_path.rglob("*.tmp"))     # tmp cleaned up even on failure
+    assert not list(tmp_path.rglob("*.tmp"))  # tmp cleaned up even on failure
 
 
 def test_load_existing_state_round_trips_what_was_written(tmp_path):
     _seed_examples(tmp_path)
     written = WizardState(
-        anthropic_api_key="sk-rt", keywords=["go"], remote_policy="hybrid",
-        greenhouse_enabled=True, greenhouse_boards=[{"token": "stripe", "company": "Stripe"}],
+        anthropic_api_key="sk-rt",
+        keywords=["go"],
+        remote_policy="hybrid",
+        greenhouse_enabled=True,
+        greenhouse_boards=[{"token": "stripe", "company": "Stripe"}],
     )
     atomic_write_all(written, root=tmp_path)
     reloaded = load_existing_state(root=tmp_path)
@@ -84,7 +89,9 @@ def test_missing_example_degrades_to_error_status_not_crash(tmp_path):
     report = atomic_write_all(WizardState(anthropic_api_key="sk-test"), root=tmp_path)
 
     review = str(tmp_path / "config" / "review.yaml")
-    assert report[review].startswith("error")          # missing example → error status
-    assert report[str(tmp_path / "config" / "search.yaml")] == "written"  # others still written
+    assert report[review].startswith("error")  # missing example → error status
+    assert (
+        report[str(tmp_path / "config" / "search.yaml")] == "written"
+    )  # others still written
     assert (tmp_path / "config" / "search.yaml").exists()
-    assert not list(tmp_path.rglob("*.tmp"))            # no litter
+    assert not list(tmp_path.rglob("*.tmp"))  # no litter

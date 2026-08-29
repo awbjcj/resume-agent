@@ -50,7 +50,9 @@ def test_rejection_retries_once_with_feedback():
             raise TurnRejected("quote missing")
         return out
 
-    result = format_with_retry(formatter, "n", _Out, validate, label="INTERVIEWER NOTES")
+    result = format_with_retry(
+        formatter, "n", _Out, validate, label="INTERVIEWER NOTES"
+    )
     assert result.value == "good"
     assert modes == [True, False]
     assert "PREVIOUS OUTPUT REJECTED: quote missing" in formatter.prompts[1]

@@ -126,7 +126,10 @@ def test_fetch_google_pages_until_valid_empty_blob(monkeypatch):
             pass
 
     def fake_get(
-        url: str, params: dict[str, object], headers: dict[str, str] | None = None, **kwargs: object
+        url: str,
+        params: dict[str, object],
+        headers: dict[str, str] | None = None,
+        **kwargs: object,
     ) -> _Resp:
         calls.append(dict(params))
         return _Resp(FIXTURE if params["page"] == 1 else _page_html([]))
@@ -152,7 +155,10 @@ def test_fetch_google_limit_counts_relevant_unseen_rows(monkeypatch):
             pass
 
     def fake_get(
-        url: str, params: dict[str, object], headers: dict[str, str] | None = None, **kwargs: object
+        url: str,
+        params: dict[str, object],
+        headers: dict[str, str] | None = None,
+        **kwargs: object,
     ) -> _Resp:
         calls.append(params["page"])
         if params["page"] == 1:

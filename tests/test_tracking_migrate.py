@@ -220,8 +220,7 @@ def test_resume_version_taxonomy_migration_is_additive_and_idempotent():
         ]
         values = conn.execute(
             text(
-                "SELECT taxonomy_revision, taxonomy_manifest_json "
-                "FROM resume_versions"
+                "SELECT taxonomy_revision, taxonomy_manifest_json FROM resume_versions"
             )
         ).one()
 

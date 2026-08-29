@@ -20,6 +20,7 @@ def test_camel_model_validates_from_attributes():
     class Dto:
         fit_score = 70
         job_id = 1
+
     item = Item.model_validate(Dto())
     assert item.fit_score == 70
 

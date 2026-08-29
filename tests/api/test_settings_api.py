@@ -54,9 +54,13 @@ def test_preview_reports_sections_without_writing(mu_client):
     _login(mu_client)
     response = mu_client.post(
         "/api/settings/bundle/preview",
-        files={"file": ("b.tar.gz", _bundle(["sources"], {
-            "config/connectors.yaml": "companies: []\n"
-        }), "application/gzip")},
+        files={
+            "file": (
+                "b.tar.gz",
+                _bundle(["sources"], {"config/connectors.yaml": "companies: []\n"}),
+                "application/gzip",
+            )
+        },
     )
     assert response.status_code == 200
     body = response.json()
@@ -78,9 +82,15 @@ def test_import_applies_the_bundle(mu_client):
     _login(mu_client)
     response = mu_client.post(
         "/api/settings/bundle?confirm=APPLY",
-        files={"file": ("b.tar.gz", _bundle(["sources"], {
-            "config/connectors.yaml": "companies:\n  urls: []\n"
-        }), "application/gzip")},
+        files={
+            "file": (
+                "b.tar.gz",
+                _bundle(
+                    ["sources"], {"config/connectors.yaml": "companies:\n  urls: []\n"}
+                ),
+                "application/gzip",
+            )
+        },
     )
     assert response.status_code == 200
     assert response.json()["applied"] == ["sources"]
@@ -117,9 +127,15 @@ def test_reset_returns_the_section_uncustomized(mu_client):
     _login(mu_client)
     mu_client.post(
         "/api/settings/bundle?confirm=APPLY",
-        files={"file": ("b.tar.gz", _bundle(["sources"], {
-            "config/connectors.yaml": "companies:\n  urls: []\n"
-        }), "application/gzip")},
+        files={
+            "file": (
+                "b.tar.gz",
+                _bundle(
+                    ["sources"], {"config/connectors.yaml": "companies:\n  urls: []\n"}
+                ),
+                "application/gzip",
+            )
+        },
     )
     response = mu_client.post("/api/settings/sections/sources/reset")
     assert response.status_code == 200

@@ -28,6 +28,7 @@ def test_render_endpoint_invokes_service(monkeypatch, tmp_path):
 
     def fake_render(session, version_id, *, render_path="config/render.yaml"):
         from resume_agent.tracking.repository import get_resume_version
+
         v = get_resume_version(session, version_id)
         assert v is not None
         v.pdf_path = str(pdf)

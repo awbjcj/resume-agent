@@ -63,7 +63,8 @@ def test_discover_passes_search_and_facts_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "discover_jobs", fake_discover_jobs)
 
     result = runner.invoke(
-        cli.app, ["discover", "--db-url", db_url, "--search", "S.yaml", "--facts", "F.json"]
+        cli.app,
+        ["discover", "--db-url", db_url, "--search", "S.yaml", "--facts", "F.json"],
     )
     assert result.exit_code == 0, result.output
     assert seen == {"search": "S.yaml", "facts": "F.json"}
@@ -79,10 +80,18 @@ def test_reprocess_invokes_service(tmp_path, monkeypatch):
         return {"shortlisted": 3}
 
     monkeypatch.setattr(cli, "reprocess_jobs", fake_reprocess_jobs)
-    db_url = f"sqlite:///{tmp_path/'t.db'}"
+    db_url = f"sqlite:///{tmp_path / 't.db'}"
     result = runner.invoke(
-        cli.app, ["reprocess", "--scope", "shortlisted", "--scope", "rejected:relevance",
-                  "--db-url", db_url],
+        cli.app,
+        [
+            "reprocess",
+            "--scope",
+            "shortlisted",
+            "--scope",
+            "rejected:relevance",
+            "--db-url",
+            db_url,
+        ],
     )
     assert result.exit_code == 0
     assert captured["scopes"] == ["shortlisted", "rejected:relevance"]
@@ -96,11 +105,15 @@ def test_refresh_invokes_service(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "exists", lambda self: True)
 
     def fake_refresh_jobs(session, **kwargs):
-        return RefreshReport(pulled=5, totals={"greenhouse": 5},
-                             status_counts={"shortlisted": 2}, failures={})
+        return RefreshReport(
+            pulled=5,
+            totals={"greenhouse": 5},
+            status_counts={"shortlisted": 2},
+            failures={},
+        )
 
     monkeypatch.setattr(cli, "refresh_jobs", fake_refresh_jobs)
-    db_url = f"sqlite:///{tmp_path/'t.db'}"
+    db_url = f"sqlite:///{tmp_path / 't.db'}"
     result = runner.invoke(cli.app, ["refresh", "--db-url", db_url])
     assert result.exit_code == 0
     assert "5 pulled" in result.output

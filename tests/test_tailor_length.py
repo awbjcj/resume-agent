@@ -26,7 +26,10 @@ def test_budget_tells_the_writer_to_span_the_configured_aspects():
 
 
 def test_depth_plan_omits_an_empty_profile():
-    assert format_depth_plan(ProfileFacts(contact=Contact(name="Ada")), LengthBudget()) == ""
+    assert (
+        format_depth_plan(ProfileFacts(contact=Contact(name="Ada")), LengthBudget())
+        == ""
+    )
 
 
 def test_legacy_cap_only_budget_derives_an_achievable_floor():

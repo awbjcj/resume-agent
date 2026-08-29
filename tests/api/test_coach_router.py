@@ -51,7 +51,9 @@ def _seed_draft(tmp_path, sid="s1"):
         profile_dir,
         sid,
         user_text="I cut deploy time 40%.",
-        coach_turn=CoachTurnRecord(role="coach", kind="draft_note", text="Draft.", topic_id="t1"),
+        coach_turn=CoachTurnRecord(
+            role="coach", kind="draft_note", text="Draft.", topic_id="t1"
+        ),
         new_topics=[],
         skipped_topic_ids=[],
         draft=CoachDraftNote(
@@ -88,11 +90,15 @@ def _view(sid="s1", status="active"):
 
 def test_start_guards_and_opening_run(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     with client:
         assert client.post("/api/profile/coach/sessions").status_code == 400
         _seed_primary(client)
-        monkeypatch.setattr(coach_router, "run_opening_turn", lambda reporter, **kwargs: _view())
+        monkeypatch.setattr(
+            coach_router, "run_opening_turn", lambda reporter, **kwargs: _view()
+        )
         response = client.post("/api/profile/coach/sessions")
         assert response.status_code == 202
         assert _wait(client, response.json()["runId"])["state"] == "done"
@@ -109,14 +115,20 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
         api_token="",
     )
     client = TestClient(app)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     with client:
         _seed_primary(client)
         _seed_draft(tmp_path)
         assert client.get("/api/profile/coach/sessions/s1").status_code == 200
         assert client.get("/api/profile/coach/sessions/nope").status_code == 404
-        monkeypatch.setattr(coach_router, "run_message_turn", lambda reporter, **kwargs: _view())
-        sent = client.post("/api/profile/coach/sessions/s1/messages", json={"message": "hi"})
+        monkeypatch.setattr(
+            coach_router, "run_message_turn", lambda reporter, **kwargs: _view()
+        )
+        sent = client.post(
+            "/api/profile/coach/sessions/s1/messages", json={"message": "hi"}
+        )
         assert sent.status_code == 202
         run_id = sent.json()["runId"]
         assert _wait(client, run_id)["state"] == "done"
@@ -131,7 +143,9 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
 
 def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     with client:
         _seed_primary(client)
         _seed_draft(tmp_path)
@@ -142,7 +156,12 @@ def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
         }
         saved = client.post("/api/profile/coach/sessions/s1/notes/t1", json=body)
         assert saved.status_code == 200 and saved.json()["docId"]
-        assert client.post("/api/profile/coach/sessions/s1/notes/t1", json=body).status_code == 409
+        assert (
+            client.post(
+                "/api/profile/coach/sessions/s1/notes/t1", json=body
+            ).status_code
+            == 409
+        )
 
         # A separate pending draft exercises DELETE.
         from resume_agent.profile.coach_store import end_session
@@ -158,10 +177,14 @@ def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
             tmp_path / "data" / "profile",
             "s2",
             user_text="evidence",
-            coach_turn=CoachTurnRecord(role="coach", kind="draft_note", text="d", topic_id="t1"),
+            coach_turn=CoachTurnRecord(
+                role="coach", kind="draft_note", text="d", topic_id="t1"
+            ),
             new_topics=[],
             skipped_topic_ids=[],
-            draft=CoachDraftNote(topic_id="t1", title="T", summary="S", quotes=["evidence"]),
+            draft=CoachDraftNote(
+                topic_id="t1", title="T", summary="S", quotes=["evidence"]
+            ),
         )
         discarded = client.delete("/api/profile/coach/sessions/s2/notes/t1")
         assert discarded.status_code == 200
@@ -170,7 +193,9 @@ def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
 
 def test_end_run_returns_nested_build_id(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     with client:
         _seed_primary(client)
         _seed_draft(tmp_path)
@@ -179,14 +204,35 @@ def test_end_run_returns_nested_build_id(monkeypatch, tmp_path):
             "summary": "Cut deploy time 40%.",
             "quotes": ["I cut deploy time 40%."],
         }
-        assert client.post("/api/profile/coach/sessions/s1/notes/t1", json=body).status_code == 200
+        assert (
+            client.post(
+                "/api/profile/coach/sessions/s1/notes/t1", json=body
+            ).status_code
+            == 200
+        )
         ended_view = _view(status="ended") | {
-            "draftNotes": [{"topicId": "t1", "title": "T", "summary": "S", "quotes": ["q"], "status": "saved"}],
+            "draftNotes": [
+                {
+                    "topicId": "t1",
+                    "title": "T",
+                    "summary": "S",
+                    "quotes": ["q"],
+                    "status": "saved",
+                }
+            ],
             "recap": "Covered Acme.",
         }
-        monkeypatch.setattr(coach_router, "run_recap_turn", lambda reporter, **kwargs: ended_view)
-        monkeypatch.setattr(coach_router, "run_build_with_impact", lambda reporter, **kwargs: {"impact": {}})
-        response = client.post("/api/profile/coach/sessions/s1/end", json={"build": True})
+        monkeypatch.setattr(
+            coach_router, "run_recap_turn", lambda reporter, **kwargs: ended_view
+        )
+        monkeypatch.setattr(
+            coach_router,
+            "run_build_with_impact",
+            lambda reporter, **kwargs: {"impact": {}},
+        )
+        response = client.post(
+            "/api/profile/coach/sessions/s1/end", json={"build": True}
+        )
         run = _wait(client, response.json()["runId"])
         assert run["state"] == "done"
         assert run["result"]["buildRunId"]
@@ -214,8 +260,12 @@ def test_coach_archive_filters_unarchive_and_delete(tmp_path):
         assert included[0]["sessionId"] == "s1"
         assert included[0]["sessionTitle"] == "Leadership evidence"
 
-        assert client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 200
-        assert client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 409
+        assert (
+            client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 200
+        )
+        assert (
+            client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 409
+        )
         assert client.delete("/api/profile/coach/sessions/s1").status_code == 204
         assert client.delete("/api/profile/coach/sessions/s1").status_code == 404
 

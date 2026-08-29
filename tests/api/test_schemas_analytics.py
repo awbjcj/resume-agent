@@ -3,7 +3,9 @@ from resume_agent.tracking.analytics import CohortStat
 
 
 def test_cohort_out_projects_rates_from_dto():
-    dto = CohortStat(label="greenhouse", applications=10, responses=4, interviews=2, offers=1)
+    dto = CohortStat(
+        label="greenhouse", applications=10, responses=4, interviews=2, offers=1
+    )
     out = CohortOut.model_validate(dto)
     assert out.label == "greenhouse"
     assert out.applications == 10

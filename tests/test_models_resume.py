@@ -21,7 +21,9 @@ def test_tailored_bullet_requires_provenance():
 
 def test_tailored_bullet_provenance_is_mandatory():
     with pytest.raises(ValidationError):
-        TailoredBullet.model_validate({"text": "Built X"})  # no provenance -> fabrication risk
+        TailoredBullet.model_validate(
+            {"text": "Built X"}
+        )  # no provenance -> fabrication risk
 
 
 def test_tailored_skill_requires_provenance():
@@ -39,7 +41,11 @@ def test_resume_content_assembles_from_facts_contact():
                 company="Analytical Engines Ltd",
                 title="Engineer",
                 provenance="exp000000001",
-                bullets=[TailoredBullet(text="Wrote the first algorithm", provenance="bul000000001")],
+                bullets=[
+                    TailoredBullet(
+                        text="Wrote the first algorithm", provenance="bul000000001"
+                    )
+                ],
             )
         ],
     )
@@ -76,11 +82,15 @@ def test_resume_content_carries_new_sections_round_trip():
                 title="Notes on the Engine", venue="Memoirs", provenance="pub000000001"
             )
         ],
-        certifications=[TailoredCertification(name="PE", issuer="NSPE", provenance="cer000000001")],
+        certifications=[
+            TailoredCertification(name="PE", issuer="NSPE", provenance="cer000000001")
+        ],
         awards=[TailoredAward(name="Best Paper", provenance="awa000000001")],
         languages=[Language(language="English", proficiency="native")],
         volunteer=[
-            TailoredVolunteer(organization="OSS", role="Maintainer", provenance="vol000000001")
+            TailoredVolunteer(
+                organization="OSS", role="Maintainer", provenance="vol000000001"
+            )
         ],
         section_order=["experience", "education", "publications"],
     )

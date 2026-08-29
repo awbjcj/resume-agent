@@ -117,7 +117,10 @@ def test_the_writer_is_never_offered_an_unrenderable_fact():
         _facts(),
         _config(),
         writer,
-        {"fact-check": _Recorder("fact-check"), "ats-keyword": _Recorder("ats-keyword")},
+        {
+            "fact-check": _Recorder("fact-check"),
+            "ats-keyword": _Recorder("ats-keyword"),
+        },
         writer,
     )
     assert "forbidden" not in writer.received[0]
@@ -172,7 +175,10 @@ def test_a_citation_slip_scores_normally_gets_a_retry_and_still_fails_its_gate()
         _facts(),
         _config(score_threshold=1),
         agent,
-        {"fact-check": _Recorder("fact-check"), "ats-keyword": _Recorder("ats-keyword")},
+        {
+            "fact-check": _Recorder("fact-check"),
+            "ats-keyword": _Recorder("ats-keyword"),
+        },
         agent,
     )
 
@@ -208,9 +214,9 @@ def test_a_fabricated_metric_still_fails_the_round():
     class _Fabricator:
         def run(self, prompt):
             resume = _clean_resume()
-            resume.experience[0].bullets[0].text = (
-                "Built a reporting pipeline, saving 400 engineer-hours a quarter"
-            )
+            resume.experience[0].bullets[
+                0
+            ].text = "Built a reporting pipeline, saving 400 engineer-hours a quarter"
             return _Result(resume)
 
         async def arun(self, prompt):

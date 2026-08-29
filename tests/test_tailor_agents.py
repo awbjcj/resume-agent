@@ -20,8 +20,12 @@ def test_model_for_tier_maps_known_tiers():
 
 def test_build_tailor_and_reviser_agents(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    assert isinstance(build_tailor_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
-    assert isinstance(build_reviser_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
+    assert isinstance(
+        build_tailor_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner
+    )
+    assert isinstance(
+        build_reviser_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner
+    )
 
 
 def test_build_reviewer_agent(monkeypatch):

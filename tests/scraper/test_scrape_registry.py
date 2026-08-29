@@ -9,7 +9,10 @@ from resume_agent.discovery.connectors.config import (
     ScrapeConfig,
     ScrapeTarget,
 )
-from resume_agent.discovery.connectors.registry import build_connectors, build_source_connectors
+from resume_agent.discovery.connectors.registry import (
+    build_connectors,
+    build_source_connectors,
+)
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
 
 
@@ -37,8 +40,14 @@ def test_scrape_connector_absent_when_disabled_or_empty():
         )
     )
     empty = ConnectorsConfig(scrape=ScrapeConfig(enabled=True))
-    assert not any(isinstance(item, DashboardScraper) for item in build_connectors(disabled, _settings()))
-    assert not any(isinstance(item, DashboardScraper) for item in build_connectors(empty, _settings()))
+    assert not any(
+        isinstance(item, DashboardScraper)
+        for item in build_connectors(disabled, _settings())
+    )
+    assert not any(
+        isinstance(item, DashboardScraper)
+        for item in build_connectors(empty, _settings())
+    )
 
 
 def test_scrape_target_accepts_bare_string_and_validates_http_url():

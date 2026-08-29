@@ -52,7 +52,9 @@ def test_wide_csv_is_uncapped_and_long_csv_has_one_row_per_event():
     assert "technical_round_9" in wide_rows[0]
     long_rows = list(csv.DictReader(io.StringIO(long.text)))
     assert len(long_rows) == 9
-    assert {row["sequence"] for row in long_rows} == {str(value) for value in range(1, 10)}
+    assert {row["sequence"] for row in long_rows} == {
+        str(value) for value in range(1, 10)
+    }
 
 
 def test_unknown_shape_is_422_and_empty_csv_is_header_only():
@@ -79,10 +81,16 @@ def test_long_csv_preserves_zero_compensation_values():
 def test_csv_neutralizes_formula_cells_and_wide_includes_terminal_events():
     client = _client()
     with client:
-        job_id = _job(client, "=HYPERLINK(\"https://evil.test\")")
+        job_id = _job(client, '=HYPERLINK("https://evil.test")')
         _event(client, job_id, "rejected", 11, notes="+cmd|' /C calc'!A0")
-        wide = next(csv.DictReader(io.StringIO(client.get("/api/applications.csv").text)))
-        long = next(csv.DictReader(io.StringIO(client.get("/api/applications.csv?shape=long").text)))
+        wide = next(
+            csv.DictReader(io.StringIO(client.get("/api/applications.csv").text))
+        )
+        long = next(
+            csv.DictReader(
+                io.StringIO(client.get("/api/applications.csv?shape=long").text)
+            )
+        )
 
     assert wide["company"].startswith("'=")
     assert wide["rejected"] == "2026-03-11T12:00:00Z"

@@ -13,7 +13,9 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _seed(session: Session, *, status: str = "submitted", days_old: int = 20) -> Application:
+def _seed(
+    session: Session, *, status: str = "submitted", days_old: int = 20
+) -> Application:
     job = save_job(session, Job(source="manual", company="Acme", title="Eng"))
     assert job.id is not None
     app = save_application(session, Application(job_id=job.id, status=status))

@@ -1,4 +1,10 @@
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
+from resume_agent.models.profile import (
+    Bullet,
+    Contact,
+    Experience,
+    ProfileFacts,
+    Project,
+)
 from resume_agent.profile.depth import (
     SUPPLY_TARGET,
     depth_topics,
@@ -11,19 +17,39 @@ from resume_agent.tailor.review_config import LengthBudget
 
 
 def _bullets(count: int, *, prefix: str = "bullet") -> list[Bullet]:
-    return [Bullet(id=f"{prefix}-{index}", text=f"{prefix} {index}") for index in range(count)]
+    return [
+        Bullet(id=f"{prefix}-{index}", text=f"{prefix} {index}")
+        for index in range(count)
+    ]
 
 
 def _facts() -> ProfileFacts:
     return ProfileFacts(
         contact=Contact(name="Ada"),
         experience=[
-            Experience(id="exp-1", company="One", title="Engineer", bullets=_bullets(6, prefix="e1")),
-            Experience(id="exp-2", company="Two", title="Engineer", bullets=_bullets(2, prefix="e2")),
-            Experience(id="exp-3", company="Three", title="Engineer", bullets=_bullets(4, prefix="e3")),
+            Experience(
+                id="exp-1",
+                company="One",
+                title="Engineer",
+                bullets=_bullets(6, prefix="e1"),
+            ),
+            Experience(
+                id="exp-2",
+                company="Two",
+                title="Engineer",
+                bullets=_bullets(2, prefix="e2"),
+            ),
+            Experience(
+                id="exp-3",
+                company="Three",
+                title="Engineer",
+                bullets=_bullets(4, prefix="e3"),
+            ),
         ],
         projects=[
-            Project(id="prj-1", name="One project", highlights=_bullets(4, prefix="p1")),
+            Project(
+                id="prj-1", name="One project", highlights=_bullets(4, prefix="p1")
+            ),
             Project(id="prj-2", name="Empty project"),
         ],
     )

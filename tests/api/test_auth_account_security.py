@@ -26,9 +26,12 @@ def test_legacy_email_adoption_and_revoke_all(mu_app):
     with TestClient(mu_app, base_url="https://testserver") as client:
         _login(client)
         stale = client.cookies.get("ra_session")
-        assert client.post(
-            "/api/account/email", json={"email": "owner@example.com"}
-        ).status_code == 202
+        assert (
+            client.post(
+                "/api/account/email", json={"email": "owner@example.com"}
+            ).status_code
+            == 202
+        )
         verified = client.post(
             "/api/account/email/verify",
             json={"email": "owner@example.com", "code": _code(mu_app)},
@@ -46,7 +49,11 @@ def test_reset_and_adoption_codes_do_not_delete_each_other(mu_app):
     with TestClient(mu_app, base_url="https://testserver") as client:
         _login(client)
         with Session(mu_app.state.system_engine) as session:
-            owner = session.execute(select(User).where(User.username == "owner")).scalars().one()
+            owner = (
+                session.execute(select(User).where(User.username == "owner"))
+                .scalars()
+                .one()
+            )
             owner.email = "old@example.com"
             owner.email_verified_at = datetime.now(timezone.utc)
             session.commit()

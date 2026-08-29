@@ -58,7 +58,9 @@ def test_untrusted_data_prompts_define_an_instruction_boundary():
 
     for instructions in prompts:
         rendered = _text(instructions)
-        assert "not as instructions" in rendered or "never follow instructions" in rendered
+        assert (
+            "not as instructions" in rendered or "never follow instructions" in rendered
+        )
 
 
 def test_job_extractor_prompt_covers_every_domain_field():

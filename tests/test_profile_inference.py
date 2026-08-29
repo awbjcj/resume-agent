@@ -30,9 +30,7 @@ def _facts():
     return (
         ProfileFacts(
             contact=Contact(name="Ada"),
-            experience=[
-                Experience(company="Acme", title="Engineer", bullets=[bullet])
-            ],
+            experience=[Experience(company="Acme", title="Engineer", bullets=[bullet])],
             skills={"Languages": [Skill(name="Python")]},
         ),
         bullet.id,
@@ -91,9 +89,7 @@ def test_apply_inferred_skips_existing_literal_name_or_alias():
 def test_apply_inferred_is_idempotent():
     facts, bullet_id = _facts()
     inferred = [
-        InferredSkill(
-            name="Mentorship", category="soft", evidence_fact_ids=[bullet_id]
-        )
+        InferredSkill(name="Mentorship", category="soft", evidence_fact_ids=[bullet_id])
     ]
     once, _ = apply_inferred(facts, inferred)
     twice, _ = apply_inferred(once, inferred)

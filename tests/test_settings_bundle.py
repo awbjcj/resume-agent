@@ -259,9 +259,9 @@ def test_import_replaces_named_sections_and_leaves_the_rest(tmp_path):
         applied = import_settings_bundle(archive)
 
     assert applied == ("sources",)
-    assert (
-        paths.config_dir / "connectors.yaml"
-    ).read_text("utf-8") == "companies:\n  urls: []\n"
+    assert (paths.config_dir / "connectors.yaml").read_text(
+        "utf-8"
+    ) == "companies:\n  urls: []\n"
     assert (paths.config_dir / "search.yaml").read_text("utf-8") == "titles: [mine]\n"
 
 
@@ -281,10 +281,12 @@ def test_import_round_trips_an_export(tmp_path):
     with use_context(context):
         import_settings_bundle(archive)
 
-    assert (
-        paths.config_dir / "connectors.yaml"
-    ).read_text("utf-8") == "companies:\n  urls: []\n"
-    assert (paths.root / "profile" / "overrides.yaml").read_text("utf-8") == "ban: [x]\n"
+    assert (paths.config_dir / "connectors.yaml").read_text(
+        "utf-8"
+    ) == "companies:\n  urls: []\n"
+    assert (paths.root / "profile" / "overrides.yaml").read_text(
+        "utf-8"
+    ) == "ban: [x]\n"
 
 
 def test_import_ignores_a_credential_hidden_in_the_bundle(tmp_path):
@@ -343,10 +345,12 @@ def test_a_corrupt_ledger_leaves_every_live_file_byte_identical(tmp_path):
     with use_context(context), pytest.raises(InvalidBundleError):
         import_settings_bundle(archive)
 
-    assert (
-        paths.root / "profile" / "group_corrections.json"
-    ).read_text("utf-8") == original_groups
-    assert (paths.config_dir / "connectors.yaml").read_text("utf-8") == "companies: [keep]\n"
+    assert (paths.root / "profile" / "group_corrections.json").read_text(
+        "utf-8"
+    ) == original_groups
+    assert (paths.config_dir / "connectors.yaml").read_text(
+        "utf-8"
+    ) == "companies: [keep]\n"
 
 
 def test_import_replaces_the_whole_templates_set(tmp_path):
@@ -380,4 +384,6 @@ def test_a_section_claiming_no_files_is_skipped_not_cleared(tmp_path):
         applied = import_settings_bundle(archive)
 
     assert applied == ()
-    assert (paths.config_dir / "connectors.yaml").read_text("utf-8") == "companies: [keep]\n"
+    assert (paths.config_dir / "connectors.yaml").read_text(
+        "utf-8"
+    ) == "companies: [keep]\n"

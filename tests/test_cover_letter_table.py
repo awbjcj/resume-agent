@@ -16,7 +16,10 @@ def test_save_and_get_cover_letter():
         job = add_job(s, source="manual", jd_text="jd", company="Acme", title="Eng")
         assert job is not None and job.id is not None
         saved = save_cover_letter(
-            s, CoverLetter(job_id=job.id, content_json={"greeting": "Hi"}, fact_check_passed=True)
+            s,
+            CoverLetter(
+                job_id=job.id, content_json={"greeting": "Hi"}, fact_check_passed=True
+            ),
         )
         assert saved.id is not None
         fetched = get_cover_letter(s, saved.id)

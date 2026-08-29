@@ -39,7 +39,9 @@ def test_compose_input_includes_profile_and_jd():
 
 
 def test_draft_returns_typed_content():
-    letter = CoverLetterContent(contact=Contact(name="Ada"), greeting="Hi", paragraphs=[], closing="Bye")
+    letter = CoverLetterContent(
+        contact=Contact(name="Ada"), greeting="Hi", paragraphs=[], closing="Bye"
+    )
     agent = _FakeAgent(letter)
     out = draft_cover_letter("input", agent)
     assert isinstance(out, CoverLetterContent)

@@ -5,7 +5,9 @@ from pathlib import Path
 from resume_agent.discovery.connectors.remoteok import RemoteOKConnector, parse_remoteok
 from resume_agent.discovery.search_config import SearchConfig
 
-FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "remoteok" / "api.json").read_text())
+FIXTURE = json.loads(
+    (Path(__file__).parent / "fixtures" / "remoteok" / "api.json").read_text()
+)
 
 
 def test_parse_remoteok_skips_legal_header_and_maps_jobs():

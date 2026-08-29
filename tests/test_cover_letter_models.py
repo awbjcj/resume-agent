@@ -7,7 +7,9 @@ def test_cover_letter_content_roundtrips():
         contact=Contact(name="Ada Lovelace", email="ada@x.io"),
         recipient="Hiring Team at Acme",
         greeting="Dear Hiring Team,",
-        paragraphs=[CoverLetterParagraph(text="I build payment systems.", provenance=["exp1"])],
+        paragraphs=[
+            CoverLetterParagraph(text="I build payment systems.", provenance=["exp1"])
+        ],
         closing="Sincerely\nAda Lovelace",
     )
     dumped = content.model_dump(mode="json")

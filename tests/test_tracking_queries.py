@@ -6,9 +6,24 @@ from sqlmodel import Session, SQLModel, create_engine
 from resume_agent.db import init_db, make_engine
 from resume_agent.models.base import Source
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.tracking.repository import save_application, save_job, save_resume_version
-from resume_agent.tracking.queries import job_detail_row, pipeline_rows, shortlist_rows, triage_rows
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job, JobStatus, ResumeVersion
+from resume_agent.tracking.repository import (
+    save_application,
+    save_job,
+    save_resume_version,
+)
+from resume_agent.tracking.queries import (
+    job_detail_row,
+    pipeline_rows,
+    shortlist_rows,
+    triage_rows,
+)
+from resume_agent.tracking.tables import (
+    Application,
+    ApplicationStatus,
+    Job,
+    JobStatus,
+    ResumeVersion,
+)
 
 
 def _session() -> Session:
@@ -31,12 +46,29 @@ def _facts_with_python() -> ProfileFacts:
 
 def test_shortlist_rows_only_shortlisted_with_fit_and_sponsorship():
     with _session() as s:
-        save_job(s, Job(source="manual", jd_text="a", company="Acme", title="Eng",
-                        status=JobStatus.shortlisted.value, fit_score=82,
-                        fit_rationale="strong python match",
-                        criteria_json={"sponsorship_signal": "offered"}))
-        save_job(s, Job(source="manual", jd_text="b", company="Beta", title="Dev",
-                        status=JobStatus.raw.value))  # excluded
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="a",
+                company="Acme",
+                title="Eng",
+                status=JobStatus.shortlisted.value,
+                fit_score=82,
+                fit_rationale="strong python match",
+                criteria_json={"sponsorship_signal": "offered"},
+            ),
+        )
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="b",
+                company="Beta",
+                title="Dev",
+                status=JobStatus.raw.value,
+            ),
+        )  # excluded
 
         rows = shortlist_rows(s)
         assert len(rows) == 1
@@ -158,9 +190,20 @@ def test_shortlist_row_without_facts_marks_all_uncovered():
 
 def test_pipeline_rows_include_pdf_and_application_status():
     with _session() as s:
-        job = save_job(s, Job(source="manual", jd_text="a", company="Acme", title="Eng",
-                              status=JobStatus.rendered.value, fit_score=90))
-        save_resume_version(s, ResumeVersion(job_id=_require_id(job.id), round=1, content_json={"x": 1}))
+        job = save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="a",
+                company="Acme",
+                title="Eng",
+                status=JobStatus.rendered.value,
+                fit_score=90,
+            ),
+        )
+        save_resume_version(
+            s, ResumeVersion(job_id=_require_id(job.id), round=1, content_json={"x": 1})
+        )
         save_resume_version(
             s,
             ResumeVersion(
@@ -171,7 +214,12 @@ def test_pipeline_rows_include_pdf_and_application_status():
                 pdf_path="output/acme.pdf",
             ),
         )
-        save_application(s, Application(job_id=_require_id(job.id), status=ApplicationStatus.submitted.value))
+        save_application(
+            s,
+            Application(
+                job_id=_require_id(job.id), status=ApplicationStatus.submitted.value
+            ),
+        )
 
         rows = pipeline_rows(s)
         assert len(rows) == 1
@@ -186,9 +234,7 @@ def test_pipeline_rows_include_pdf_and_application_status():
 
 def test_pipeline_row_surfaces_best_gate_passing_round():
     with _session() as session:
-        job = save_job(
-            session, Job(source="url", status=JobStatus.tailored.value)
-        )
+        job = save_job(session, Job(source="url", status=JobStatus.tailored.value))
         job_id = _require_id(job.id)
         save_resume_version(
             session,
@@ -197,7 +243,9 @@ def test_pipeline_row_surfaces_best_gate_passing_round():
                 round=1,
                 review_score=90,
                 fact_check_passed=True,
-                critique_json=[{"reviewer": "ats-keyword", "score": 90, "passed": True}],
+                critique_json=[
+                    {"reviewer": "ats-keyword", "score": 90, "passed": True}
+                ],
             ),
         )
         save_resume_version(
@@ -222,9 +270,7 @@ def test_pipeline_row_surfaces_best_gate_passing_round():
 
 def test_pipeline_row_flags_no_clean_round():
     with _session() as session:
-        job = save_job(
-            session, Job(source="url", status=JobStatus.tailored.value)
-        )
+        job = save_job(session, Job(source="url", status=JobStatus.tailored.value))
         save_resume_version(
             session,
             ResumeVersion(
@@ -243,9 +289,7 @@ def test_pipeline_row_flags_no_clean_round():
 
 def test_job_detail_marks_best_version_and_attention():
     with _session() as session:
-        job = save_job(
-            session, Job(source="url", status=JobStatus.tailored.value)
-        )
+        job = save_job(session, Job(source="url", status=JobStatus.tailored.value))
         v1 = save_resume_version(
             session,
             ResumeVersion(
@@ -278,9 +322,7 @@ def test_job_detail_marks_best_version_and_attention():
 
 def test_job_detail_no_versions_has_no_best():
     with _session() as session:
-        job = save_job(
-            session, Job(source="url", status=JobStatus.shortlisted.value)
-        )
+        job = save_job(session, Job(source="url", status=JobStatus.shortlisted.value))
 
         row = job_detail_row(session, _require_id(job.id))
 
@@ -320,12 +362,31 @@ def test_pipeline_rows_distinguish_no_version_from_empty_critiques():
     # "tailored, reviewers raised nothing": None vs []. Collapsing both to []
     # made every untailored card read as an empty critique list.
     with _session() as s:
-        untailored = save_job(s, Job(source="manual", jd_text="a", company="A", title="E",
-                                     status=JobStatus.shortlisted.value))
-        reviewed_clean = save_job(s, Job(source="manual", jd_text="b", company="B", title="E",
-                                         status=JobStatus.tailored.value))
+        untailored = save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="a",
+                company="A",
+                title="E",
+                status=JobStatus.shortlisted.value,
+            ),
+        )
+        reviewed_clean = save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="b",
+                company="B",
+                title="E",
+                status=JobStatus.tailored.value,
+            ),
+        )
         save_resume_version(
-            s, ResumeVersion(job_id=_require_id(reviewed_clean.id), round=1, content_json={"x": 1})
+            s,
+            ResumeVersion(
+                job_id=_require_id(reviewed_clean.id), round=1, content_json={"x": 1}
+            ),
         )
 
         by_id = {row.job_id: row for row in pipeline_rows(s)}
@@ -337,10 +398,28 @@ def test_archived_jobs_excluded_from_shortlist_and_pipeline():
     from resume_agent.tracking.repository import archive_job
 
     with _session() as s:
-        keep = save_job(s, Job(source="m", jd_text="a", company="Keep", title="E",
-                               status=JobStatus.shortlisted.value, fit_score=70))
-        hide = save_job(s, Job(source="m", jd_text="b", company="Hide", title="E",
-                               status=JobStatus.shortlisted.value, fit_score=90))
+        keep = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="a",
+                company="Keep",
+                title="E",
+                status=JobStatus.shortlisted.value,
+                fit_score=70,
+            ),
+        )
+        hide = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="b",
+                company="Hide",
+                title="E",
+                status=JobStatus.shortlisted.value,
+                fit_score=90,
+            ),
+        )
         archive_job(s, _require_id(hide.id))
 
         assert [r.company for r in shortlist_rows(s)] == ["Keep"]
@@ -354,14 +433,38 @@ def test_archived_jobs_excluded_from_application_job_pairs():
     from resume_agent.tracking.tables import Application, ApplicationStatus
 
     with _session() as s:
-        keep = save_job(s, Job(source="m", jd_text="a", company="Keep", title="E",
-                               status=JobStatus.rendered.value))
-        hide = save_job(s, Job(source="m", jd_text="b", company="Hide", title="E",
-                               status=JobStatus.rendered.value))
-        save_application(s, Application(job_id=_require_id(keep.id),
-                                        status=ApplicationStatus.submitted.value))
-        save_application(s, Application(job_id=_require_id(hide.id),
-                                        status=ApplicationStatus.submitted.value))
+        keep = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="a",
+                company="Keep",
+                title="E",
+                status=JobStatus.rendered.value,
+            ),
+        )
+        hide = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="b",
+                company="Hide",
+                title="E",
+                status=JobStatus.rendered.value,
+            ),
+        )
+        save_application(
+            s,
+            Application(
+                job_id=_require_id(keep.id), status=ApplicationStatus.submitted.value
+            ),
+        )
+        save_application(
+            s,
+            Application(
+                job_id=_require_id(hide.id), status=ApplicationStatus.submitted.value
+            ),
+        )
         archive_job(s, _require_id(hide.id))
 
         assert [job.company for _, job in application_job_pairs(s)] == ["Keep"]
@@ -423,14 +526,47 @@ def test_triage_rows_are_pre_shortlist_and_unarchived():
     from resume_agent.tracking.repository import archive_job
 
     with _session() as s:
-        save_job(s, Job(source="m", jd_text="a", company="Raw", title="E",
-                        status=JobStatus.raw.value, fit_score=30))
-        save_job(s, Job(source="m", jd_text="b", company="Rej", title="E",
-                        status=JobStatus.rejected.value))
-        save_job(s, Job(source="m", jd_text="c", company="Short", title="E",
-                        status=JobStatus.shortlisted.value))  # excluded: has own page
-        hidden = save_job(s, Job(source="m", jd_text="d", company="Hidden", title="E",
-                                 status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="a",
+                company="Raw",
+                title="E",
+                status=JobStatus.raw.value,
+                fit_score=30,
+            ),
+        )
+        save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="b",
+                company="Rej",
+                title="E",
+                status=JobStatus.rejected.value,
+            ),
+        )
+        save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="c",
+                company="Short",
+                title="E",
+                status=JobStatus.shortlisted.value,
+            ),
+        )  # excluded: has own page
+        hidden = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="d",
+                company="Hidden",
+                title="E",
+                status=JobStatus.raw.value,
+            ),
+        )
         archive_job(s, _require_id(hidden.id))
 
         companies = {r.company for r in triage_rows(s)}
@@ -442,17 +578,30 @@ def test_triage_and_detail_rows_surface_reject_reason():
         rejected = save_job(
             s,
             Job(
-                source="m", jd_text="a", company="Rej", title="E",
+                source="m",
+                jd_text="a",
+                company="Rej",
+                title="E",
                 status=JobStatus.rejected.value,
                 reject_reason="off-target role: not a backend posting",
                 reject_category="relevance",
             ),
         )
-        save_job(s, Job(source="m", jd_text="b", company="Raw", title="E",
-                        status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="b",
+                company="Raw",
+                title="E",
+                status=JobStatus.raw.value,
+            ),
+        )
 
         by_company = {r.company: r for r in triage_rows(s)}
-        assert by_company["Rej"].reject_reason == "off-target role: not a backend posting"
+        assert (
+            by_company["Rej"].reject_reason == "off-target role: not a backend posting"
+        )
         assert by_company["Raw"].reject_reason is None
 
         detail = job_detail_row(s, _require_id(rejected.id))
@@ -465,12 +614,36 @@ def test_archived_rows_lists_all_archived_any_status():
     from resume_agent.tracking.repository import archive_job
 
     with _session() as s:
-        a = save_job(s, Job(source="m", jd_text="a", company="A", title="E",
-                            status=JobStatus.shortlisted.value))
-        b = save_job(s, Job(source="m", jd_text="b", company="B", title="E",
-                            status=JobStatus.raw.value))
-        save_job(s, Job(source="m", jd_text="c", company="C", title="E",
-                        status=JobStatus.raw.value))  # not archived
+        a = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="a",
+                company="A",
+                title="E",
+                status=JobStatus.shortlisted.value,
+            ),
+        )
+        b = save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="b",
+                company="B",
+                title="E",
+                status=JobStatus.raw.value,
+            ),
+        )
+        save_job(
+            s,
+            Job(
+                source="m",
+                jd_text="c",
+                company="C",
+                title="E",
+                status=JobStatus.raw.value,
+            ),
+        )  # not archived
         archive_job(s, _require_id(a.id))
         archive_job(s, _require_id(b.id))
 
@@ -485,15 +658,22 @@ def test_shortlist_row_exposes_industry_location_and_canonical_skills(tmp_path):
         save_job(
             s,
             Job(
-                source="x", jd_text="jd", title="Eng", company="C",
-                status=JobStatus.shortlisted.value, location="Austin, TX, USA",
+                source="x",
+                jd_text="jd",
+                title="Eng",
+                company="C",
+                status=JobStatus.shortlisted.value,
+                location="Austin, TX, USA",
                 criteria_json={
                     "industry": "Autonomous Driving",
                     "company_size": "Series A",
                     "must_have_skills": ["Python, C++ or C", "k8s"],
                     "location_parts": {
-                        "city": "Austin", "region": "TX", "country": "US",
-                        "is_us": True, "raw": "Austin, TX, USA",
+                        "city": "Austin",
+                        "region": "TX",
+                        "country": "US",
+                        "is_us": True,
+                        "raw": "Austin, TX, USA",
                     },
                 },
             ),
@@ -544,7 +724,9 @@ def _seeded_engine(job_count: int):
             session.refresh(job)
             if i % 2:
                 assert job.id is not None
-                session.add(ResumeVersion(job_id=job.id, round=1, fact_check_passed=True))
+                session.add(
+                    ResumeVersion(job_id=job.id, round=1, fact_check_passed=True)
+                )
                 session.add(Application(job_id=job.id, status="ready"))
                 session.commit()
     return engine

@@ -52,7 +52,12 @@ def _facts() -> ProfileFacts:
                 bullets=[Bullet(id="b1", text="Built X")],
             )
         ],
-        skills={"languages": [Skill(id="s1", name="Python"), Skill(id="s2", name="SecretRust")]},
+        skills={
+            "languages": [
+                Skill(id="s1", name="Python"),
+                Skill(id="s2", name="SecretRust"),
+            ]
+        },
     )
 
 
@@ -138,8 +143,12 @@ def test_run_panel_routes_gate_to_evidence_and_others_to_lean():
         ]
     )
     agents = {
-        "fact-check": _Agent(ReviewCritique(reviewer="fact-check", score=100, passed=True)),
-        "ats-keyword": _Agent(ReviewCritique(reviewer="ats-keyword", score=80, passed=True)),
+        "fact-check": _Agent(
+            ReviewCritique(reviewer="fact-check", score=100, passed=True)
+        ),
+        "ats-keyword": _Agent(
+            ReviewCritique(reviewer="ats-keyword", score=80, passed=True)
+        ),
     }
     coverage = "MUST-HAVE COVERAGE (x):\n- Python — covered — facts: s1"
     critiques = run_panel(
@@ -153,7 +162,10 @@ def test_run_panel_routes_gate_to_evidence_and_others_to_lean():
     assert "SUPPORTING FACTS" in agents["fact-check"].received
     assert coverage in agents["ats-keyword"].received
     assert "BULLET DEPTH PLAN" in agents["ats-keyword"].received
-    assert 'e1 "AE — Eng": 1 source -> render 1 (supply-limited' in agents["ats-keyword"].received
+    assert (
+        'e1 "AE — Eng": 1 source -> render 1 (supply-limited'
+        in agents["ats-keyword"].received
+    )
 
 
 def test_run_panel_rejects_non_merged_reviewer_identity_mismatch():
@@ -190,7 +202,11 @@ def test_arun_panel_runs_reviewers_concurrently_in_order():
     from resume_agent.tailor.panel import arun_panel
 
     config = ReviewConfig(
-        reviewers=[ReviewerSpec(name="a"), ReviewerSpec(name="b"), ReviewerSpec(name="c")]
+        reviewers=[
+            ReviewerSpec(name="a"),
+            ReviewerSpec(name="b"),
+            ReviewerSpec(name="c"),
+        ]
     )
 
     class _Slow:
@@ -224,7 +240,9 @@ def test_arun_panel_settles_reviewers_before_raising():
 
     from resume_agent.tailor.panel import arun_panel
 
-    config = ReviewConfig(reviewers=[ReviewerSpec(name="boom"), ReviewerSpec(name="slow")])
+    config = ReviewConfig(
+        reviewers=[ReviewerSpec(name="boom"), ReviewerSpec(name="slow")]
+    )
     events: list[str] = []
 
     class _AsyncAgent:
@@ -332,7 +350,9 @@ def test_split_merged_critiques_rejects_wrong_coverage(names):
     from resume_agent.tailor.panel import split_merged_critiques
 
     review = MergedPanelReview(
-        critiques=[ReviewCritique(reviewer=name, score=80, passed=True) for name in names]
+        critiques=[
+            ReviewCritique(reviewer=name, score=80, passed=True) for name in names
+        ]
     )
 
     with pytest.raises(ValueError):
@@ -398,7 +418,9 @@ def test_run_panel_merged_makes_one_lean_advisory_call():
         MERGED_ADVISORY: merged,
     }
 
-    critiques = run_panel(_content(), _facts(), "Backend role", _merged_config(), reviewers)
+    critiques = run_panel(
+        _content(), _facts(), "Backend role", _merged_config(), reviewers
+    )
 
     assert [critique.reviewer for critique in critiques] == [
         "fact-check",

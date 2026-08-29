@@ -32,7 +32,9 @@ def test_compose_does_not_mutate_base():
 
 def test_load_returns_stripped_text(tmp_path):
     f = tmp_path / "style.md"
-    f.write_text("\n  Lead every bullet with a quantified outcome.  \n", encoding="utf-8")
+    f.write_text(
+        "\n  Lead every bullet with a quantified outcome.  \n", encoding="utf-8"
+    )
 
     assert load_style_guide(f) == "Lead every bullet with a quantified outcome."
 

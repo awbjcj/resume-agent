@@ -12,8 +12,12 @@ from resume_agent.profile.store import save_facts
 
 @pytest.fixture()
 def client(tmp_path):
-    app = create_app(db_url="sqlite://", config_dir=tmp_path / "config",
-                     env_path=tmp_path / ".env", data_dir=tmp_path / "data")
+    app = create_app(
+        db_url="sqlite://",
+        config_dir=tmp_path / "config",
+        env_path=tmp_path / ".env",
+        data_dir=tmp_path / "data",
+    )
     with TestClient(app) as c:
         yield c, tmp_path / "data"
 
@@ -61,7 +65,9 @@ def test_bad_extension_and_oversize_rejected(client):
 def test_patch_mode_anchor_primary(client):
     c, _ = client
     _upload(c)
-    doc_id = _upload(c, name="deck.md", content=b"Cut latency 30%", mode="synthesis").json()["id"]
+    doc_id = _upload(
+        c, name="deck.md", content=b"Cut latency 30%", mode="synthesis"
+    ).json()["id"]
 
     patched = c.patch(f"/api/profile/sources/{doc_id}", json={"anchor": "exp1"})
     assert patched.status_code == 200
@@ -82,7 +88,9 @@ def test_patch_mode_anchor_primary(client):
 def test_patch_synthesis_primary_rejected(client):
     c, _ = client
     _upload(c)
-    doc_id = _upload(c, name="deck.md", content=b"Cut latency 30%", mode="synthesis").json()["id"]
+    doc_id = _upload(
+        c, name="deck.md", content=b"Cut latency 30%", mode="synthesis"
+    ).json()["id"]
     resp = c.patch(f"/api/profile/sources/{doc_id}", json={"primary": True})
     assert resp.status_code == 422
 
@@ -126,9 +134,12 @@ def test_note_and_url_intake_endpoints(client, monkeypatch):
     assert note.status_code == 201, note.text
     assert note.json()["filename"] == "note--on-call.md"
     assert note.json()["origin"] == "upload"
-    assert c.post(
-        "/api/profile/sources/note", json={"title": "x", "text": "  "}
-    ).status_code == 422
+    assert (
+        c.post(
+            "/api/profile/sources/note", json={"title": "x", "text": "  "}
+        ).status_code
+        == 422
+    )
 
     import httpx
     import resume_agent.api.routers.profile as profile_router

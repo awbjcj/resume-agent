@@ -83,7 +83,9 @@ def test_greenhouse_reader_delegates_to_html_scraper():
         '<div id="content"><p>Write code.</p></div></body></html>'
     )
     target = AtsTarget("greenhouse", token="hooli")
-    extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", html)
+    extracted = ATS_READERS["greenhouse"](
+        target, "https://boards.greenhouse.io/hooli/jobs/1", html
+    )
     assert extracted is not None
     assert extracted.title == "Dev"
     assert extracted.company == "Hooli"
@@ -101,12 +103,16 @@ def test_greenhouse_reader_resolves_the_board_display_name(monkeypatch):
 
     monkeypatch.setattr(ats_readers.board, "get", fake_get)
     target = AtsTarget("greenhouse", token="hooli")
-    extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>")
+    extracted = ATS_READERS["greenhouse"](
+        target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>"
+    )
     assert extracted is not None
     assert extracted.company == "Hooli, Inc"
 
 
-def test_greenhouse_reader_falls_back_to_token_when_board_name_lookup_fails(monkeypatch):
+def test_greenhouse_reader_falls_back_to_token_when_board_name_lookup_fails(
+    monkeypatch,
+):
     job = {"title": "Dev", "location": {"name": "SF"}, "content": "<p>Write code.</p>"}
 
     def fake_get(url, **kw):
@@ -116,7 +122,9 @@ def test_greenhouse_reader_falls_back_to_token_when_board_name_lookup_fails(monk
 
     monkeypatch.setattr(ats_readers.board, "get", fake_get)
     target = AtsTarget("greenhouse", token="hooli")
-    extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>")
+    extracted = ATS_READERS["greenhouse"](
+        target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>"
+    )
     assert extracted is not None
     assert extracted.company == "hooli"
 
@@ -132,11 +140,14 @@ _ASHBY_JSON_LD = (
 
 def test_ashby_falls_back_to_json_ld_when_the_board_api_is_unreachable(monkeypatch):
     monkeypatch.setattr(
-        ats_readers, "fetch_ashby_board",
+        ats_readers,
+        "fetch_ashby_board",
         lambda token: (_ for _ in ()).throw(httpx.ConnectError("down")),
     )
     target = AtsTarget("ashby", token="acme")
-    extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", _ASHBY_JSON_LD)
+    extracted = ATS_READERS["ashby"](
+        target, "https://jobs.ashbyhq.com/acme/abc-123", _ASHBY_JSON_LD
+    )
     assert extracted is not None
     assert extracted.title == "Eng"
     assert extracted.company == "Acme"
@@ -163,7 +174,9 @@ def test_ashby_prefers_the_board_api_over_json_ld_for_its_sidebar_facts(monkeypa
     }
     monkeypatch.setattr(ats_readers, "fetch_ashby_board", lambda token: payload)
     target = AtsTarget("ashby", token="acme")
-    extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", _ASHBY_JSON_LD)
+    extracted = ATS_READERS["ashby"](
+        target, "https://jobs.ashbyhq.com/acme/abc-123", _ASHBY_JSON_LD
+    )
     assert extracted is not None
     assert extracted.title == "Senior ML Engineer"
     assert "Compensation: $200K - $250K" in extracted.jd_text
@@ -175,15 +188,26 @@ def test_ashby_prefers_the_board_api_over_json_ld_for_its_sidebar_facts(monkeypa
 def test_ashby_falls_back_to_board_api_and_matches_by_id(monkeypatch):
     payload = {
         "jobs": [
-            {"id": "abc-123", "title": "Senior ML Engineer", "location": "Remote - US",
-             "descriptionPlain": "Build LLM systems.", "jobUrl": "https://jobs.ashbyhq.com/acme/abc-123"},
-            {"id": "def-456", "title": "Other role", "descriptionPlain": "Other.",
-             "jobUrl": "https://jobs.ashbyhq.com/acme/def-456"},
+            {
+                "id": "abc-123",
+                "title": "Senior ML Engineer",
+                "location": "Remote - US",
+                "descriptionPlain": "Build LLM systems.",
+                "jobUrl": "https://jobs.ashbyhq.com/acme/abc-123",
+            },
+            {
+                "id": "def-456",
+                "title": "Other role",
+                "descriptionPlain": "Other.",
+                "jobUrl": "https://jobs.ashbyhq.com/acme/def-456",
+            },
         ]
     }
     monkeypatch.setattr(ats_readers, "fetch_ashby_board", lambda token: payload)
     target = AtsTarget("ashby", token="acme")
-    extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", "<html></html>")
+    extracted = ATS_READERS["ashby"](
+        target, "https://jobs.ashbyhq.com/acme/abc-123", "<html></html>"
+    )
     assert extracted is not None
     assert extracted.title == "Senior ML Engineer"
     assert "Build LLM systems." in extracted.jd_text
@@ -192,7 +216,9 @@ def test_ashby_falls_back_to_board_api_and_matches_by_id(monkeypatch):
 def test_ashby_returns_none_when_id_not_found(monkeypatch):
     monkeypatch.setattr(ats_readers, "fetch_ashby_board", lambda token: {"jobs": []})
     target = AtsTarget("ashby", token="acme")
-    extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/missing", "<html></html>")
+    extracted = ATS_READERS["ashby"](
+        target, "https://jobs.ashbyhq.com/acme/missing", "<html></html>"
+    )
     assert extracted is None
 
 
@@ -211,7 +237,9 @@ def test_lever_falls_back_to_single_posting_endpoint(monkeypatch):
     }
     monkeypatch.setattr(ats_readers, "fetch_lever_posting", lambda token, pid: posting)
     target = AtsTarget("lever", token="acme")
-    extracted = ATS_READERS["lever"](target, "https://jobs.lever.co/acme/abc-123", "<html></html>")
+    extracted = ATS_READERS["lever"](
+        target, "https://jobs.lever.co/acme/abc-123", "<html></html>"
+    )
     assert extracted is not None
     assert extracted.title == "Senior Backend Engineer"
     assert "payment systems" in extracted.jd_text
@@ -225,7 +253,9 @@ def test_smartrecruiters_falls_back_to_detail_endpoint(monkeypatch):
         "name": "Senior Product Manager (Career Sites)",
         "company": {"name": "SmartRecruiters Inc"},
         "location": {"city": "United States", "region": "REMOTE", "country": "us"},
-        "jobAd": {"sections": {"jobDescription": {"text": "<p>Build a great product.</p>"}}},
+        "jobAd": {
+            "sections": {"jobDescription": {"text": "<p>Build a great product.</p>"}}
+        },
     }
     monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(detail))
     target = AtsTarget("smartrecruiters", token="smartrecruiters")
@@ -347,7 +377,9 @@ def test_recruitee_reads_json_ld_from_the_pasted_page():
         '"description":"<p>Help customers.</p>","hiringOrganization":{"name":"Channable"}}</script>'
     )
     target = AtsTarget("recruitee", token="channable")
-    extracted = ATS_READERS["recruitee"](target, "https://channable.recruitee.com/o/x", html)
+    extracted = ATS_READERS["recruitee"](
+        target, "https://channable.recruitee.com/o/x", html
+    )
     assert extracted is not None
     assert extracted.title == "Support Eng"
     assert extracted.company == "Channable"
@@ -364,7 +396,9 @@ def test_breezy_reads_json_ld_fixture():
 def test_jazzhr_reads_json_ld_fixture():
     html = _fixture("jazzhr", "detail.html")
     target = AtsTarget("jazzhr", token="utilidata")
-    extracted = ATS_READERS["jazzhr"](target, "https://utilidata.applytojob.com/apply/x", html)
+    extracted = ATS_READERS["jazzhr"](
+        target, "https://utilidata.applytojob.com/apply/x", html
+    )
     assert extracted is not None
     assert extracted.title == "Application Engineer, Data Center Software"
 
@@ -381,7 +415,9 @@ def test_workday_falls_back_to_cxs_detail_endpoint(monkeypatch):
         }
     }
     monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(detail))
-    target = AtsTarget("workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM")
+    target = AtsTarget(
+        "workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM"
+    )
     url = "https://generalmotors.wd5.myworkdayjobs.com/en-US/Careers_GM/job/Detroit-Michigan/Software-Engineer_R123"
     extracted = ATS_READERS["workday"](target, url, "<html></html>")
     assert extracted is not None
@@ -391,7 +427,9 @@ def test_workday_falls_back_to_cxs_detail_endpoint(monkeypatch):
 
 
 def test_workday_returns_none_when_url_has_no_matching_site():
-    target = AtsTarget("workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM")
+    target = AtsTarget(
+        "workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM"
+    )
     url = "https://generalmotors.wd5.myworkdayjobs.com/en-US/OtherSite/job/x"
     assert ATS_READERS["workday"](target, url, "<html></html>") is None
 
@@ -458,7 +496,10 @@ def test_workday_reader_uses_the_throttle_retrying_fetch(monkeypatch):
 
     monkeypatch.setattr(ats_readers, "fetch_job_detail", _detail)
     monkeypatch.setattr(ats_readers.board, "get", _fail)
-    assert ATS_READERS["workday"](_WORKDAY_TARGET, _WORKDAY_URL, "<html></html>") is not None
+    assert (
+        ATS_READERS["workday"](_WORKDAY_TARGET, _WORKDAY_URL, "<html></html>")
+        is not None
+    )
     assert calls == ["/job/Detroit-Michigan/Software-Engineer_R123"]
 
 
@@ -474,11 +515,14 @@ def test_readers_return_none_rather_than_an_empty_job_when_the_api_fails(monkeyp
         '"hiringOrganization":{"name":"Acme"}}</script>'
     )
     monkeypatch.setattr(
-        ats_readers, "fetch_ashby_board",
+        ats_readers,
+        "fetch_ashby_board",
         lambda token: (_ for _ in ()).throw(httpx.ConnectError("down")),
     )
     target = AtsTarget("ashby", token="acme")
-    result = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc", json_ld_without_description)
+    result = ATS_READERS["ashby"](
+        target, "https://jobs.ashbyhq.com/acme/abc", json_ld_without_description
+    )
     assert result is None
 
 
@@ -589,9 +633,12 @@ def test_recruitee_matches_the_offer_slug_exactly_not_as_a_substring(monkeypatch
     assert "Write code." in extracted.jd_text
 
 
-def test_recruitee_falls_back_to_json_ld_when_the_offers_feed_is_unreachable(monkeypatch):
+def test_recruitee_falls_back_to_json_ld_when_the_offers_feed_is_unreachable(
+    monkeypatch,
+):
     monkeypatch.setattr(
-        ats_readers.board, "get",
+        ats_readers.board,
+        "get",
         lambda url, **kw: (_ for _ in ()).throw(httpx.ConnectError("down")),
     )
     html = (
@@ -599,7 +646,9 @@ def test_recruitee_falls_back_to_json_ld_when_the_offers_feed_is_unreachable(mon
         '"description":"<p>Help customers.</p>","hiringOrganization":{"name":"Channable"}}</script>'
     )
     target = AtsTarget("recruitee", token="channable")
-    extracted = ATS_READERS["recruitee"](target, "https://channable.recruitee.com/o/x", html)
+    extracted = ATS_READERS["recruitee"](
+        target, "https://channable.recruitee.com/o/x", html
+    )
     assert extracted is not None
     assert extracted.title == "Support Eng"
 
@@ -609,11 +658,19 @@ def test_recruitee_falls_back_to_json_ld_when_the_offers_feed_is_unreachable(mon
 
 def test_smartrecruiters_posting_id_handles_every_public_url_shape():
     parse = ats_readers._smartrecruiters_posting_id
-    assert parse("https://jobs.smartrecruiters.com/acme/744000134902606-engineer") == "744000134902606"
-    assert parse("https://careers.smartrecruiters.com/acme/744000134902606") == "744000134902606"
+    assert (
+        parse("https://jobs.smartrecruiters.com/acme/744000134902606-engineer")
+        == "744000134902606"
+    )
+    assert (
+        parse("https://careers.smartrecruiters.com/acme/744000134902606")
+        == "744000134902606"
+    )
     # A dashed UUID id must not be truncated at its first "-".
     assert (
-        parse("https://jobs.smartrecruiters.com/oneclick-ui/company/acme/publication/8f1e-4b2c-9d3a")
+        parse(
+            "https://jobs.smartrecruiters.com/oneclick-ui/company/acme/publication/8f1e-4b2c-9d3a"
+        )
         == "8f1e-4b2c-9d3a"
     )
 
@@ -625,7 +682,12 @@ def test_smartrecruiters_oneclick_url_resolves_the_real_company(monkeypatch):
 
     def _get(url, **kw):
         seen.append(url)
-        return _Resp({"name": "Engineer", "jobAd": {"sections": {"jobDescription": {"text": "<p>Body.</p>"}}}})
+        return _Resp(
+            {
+                "name": "Engineer",
+                "jobAd": {"sections": {"jobDescription": {"text": "<p>Body.</p>"}}},
+            }
+        )
 
     monkeypatch.setattr(ats_readers.board, "get", _get)
     target = AtsTarget("smartrecruiters", token="oneclick-ui")
@@ -652,7 +714,9 @@ _JSON_LD_PAGE = """
 
 
 def test_with_json_ld_meta_adds_sidebar_facts_to_foreign_body():
-    body = ats_readers.ExtractedJob(company=None, title=None, location=None, jd_text="Full body prose.")
+    body = ats_readers.ExtractedJob(
+        company=None, title=None, location=None, jd_text="Full body prose."
+    )
     merged = ats_readers.with_json_ld_meta(body, _JSON_LD_PAGE)
     assert merged is not None
     assert "Location: Toronto, CA" in merged.jd_text
@@ -668,7 +732,9 @@ def test_with_json_ld_meta_adds_sidebar_facts_to_foreign_body():
 
 def test_with_json_ld_meta_does_not_duplicate_labels_the_body_already_has():
     body = ats_readers.ExtractedJob(
-        company="Stripe", title="Staff Engineer", location="Toronto",
+        company="Stripe",
+        title="Staff Engineer",
+        location="Toronto",
         jd_text="Location: Toronto, ON\n\nFull body prose.",
     )
     merged = ats_readers.with_json_ld_meta(body, _JSON_LD_PAGE)
@@ -680,8 +746,13 @@ def test_with_json_ld_meta_does_not_duplicate_labels_the_body_already_has():
 
 
 def test_with_json_ld_meta_passes_through_when_page_has_no_markup():
-    body = ats_readers.ExtractedJob(company=None, title=None, location=None, jd_text="Body.")
-    assert ats_readers.with_json_ld_meta(body, "<html><body>no markup</body></html>") is body
+    body = ats_readers.ExtractedJob(
+        company=None, title=None, location=None, jd_text="Body."
+    )
+    assert (
+        ats_readers.with_json_ld_meta(body, "<html><body>no markup</body></html>")
+        is body
+    )
 
 
 def test_with_json_ld_meta_keeps_none_none():

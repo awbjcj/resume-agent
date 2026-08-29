@@ -85,8 +85,9 @@ def test_preview_forwards_limit_and_browser(monkeypatch):
     monkeypatch.setattr(
         svc,
         "_preview_connector",
-        lambda target, url, *, browser=True: seen.update(browser=browser)
-        or FakeConnector(),
+        lambda target, url, *, browser=True: (
+            seen.update(browser=browser) or FakeConnector()
+        ),
     )
     monkeypatch.setattr(svc, "load_search_config", lambda path: object())
 
@@ -102,7 +103,11 @@ def test_preview_forwards_limit_and_browser(monkeypatch):
     ("provider", "kwargs", "expected"),
     [
         ("greenhouse", {"token": "acme"}, "https://job-boards.greenhouse.io/acme"),
-        ("personio", {"token": "acme", "country": "de"}, "https://acme.jobs.personio.de"),
+        (
+            "personio",
+            {"token": "acme", "country": "de"},
+            "https://acme.jobs.personio.de",
+        ),
         (
             "workday",
             {"tenant": "acme", "datacenter": "wd5", "site": "Careers"},

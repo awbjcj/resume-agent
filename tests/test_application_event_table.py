@@ -6,6 +6,11 @@ from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
+def _persisted_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def _engine():
     engine = make_engine("sqlite://")
     init_db(engine)
@@ -19,12 +24,12 @@ def test_create_all_makes_the_table_without_a_migration():
         session.add(job)
         session.commit()
         session.refresh(job)
-        app = Application(job_id=job.id, status="submitted")
+        app = Application(job_id=_persisted_id(job.id), status="submitted")
         session.add(app)
         session.commit()
         session.refresh(app)
         event = ApplicationEvent(
-            application_id=app.id,
+            application_id=_persisted_id(app.id),
             kind="technical_round",
             sequence=1,
             occurred_at=datetime(2026, 3, 3, 19, 0, tzinfo=timezone.utc),
@@ -50,11 +55,13 @@ def test_comp_fields_default_to_none():
         session.add(job)
         session.commit()
         session.refresh(job)
-        app = Application(job_id=job.id)
+        app = Application(job_id=_persisted_id(job.id))
         session.add(app)
         session.commit()
         session.refresh(app)
-        event = ApplicationEvent(application_id=app.id, kind="recruiter_screen")
+        event = ApplicationEvent(
+            application_id=_persisted_id(app.id), kind="recruiter_screen"
+        )
         session.add(event)
         session.commit()
         stored = session.exec(select(ApplicationEvent)).one()

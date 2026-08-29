@@ -5,7 +5,9 @@ from pathlib import Path
 from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
 
 FIXTURE = json.loads(
-    (Path(__file__).parent / "fixtures" / "ashby" / "job_board.json").read_text(encoding="utf-8")
+    (Path(__file__).parent / "fixtures" / "ashby" / "job_board.json").read_text(
+        encoding="utf-8"
+    )
 )
 
 
@@ -28,7 +30,9 @@ def test_parse_ashby_posted_at_none_when_absent():
 
 
 def test_parse_ashby_falls_back_to_html_description():
-    payload = {"jobs": [{"title": "Eng", "jobUrl": "u", "descriptionHtml": "<p>hello</p>"}]}
+    payload = {
+        "jobs": [{"title": "Eng", "jobUrl": "u", "descriptionHtml": "<p>hello</p>"}]
+    }
     jobs = parse_ashby(payload, "Acme")
     assert jobs[0].jd_text == "hello"
 
@@ -62,11 +66,15 @@ def test_parse_ashby_omits_missing_sidebar_fields():
     assert "Workplace Type:" not in jd_text
     assert "Department:" not in jd_text
     assert "Compensation:" not in jd_text
-    assert jd_text.startswith("Location: Detroit, MI\nEmployment Type: Part time\n\nDrive a truck.")
+    assert jd_text.startswith(
+        "Location: Detroit, MI\nEmployment Type: Part time\n\nDrive a truck."
+    )
 
 
 def test_parse_ashby_no_sidebar_when_no_metadata_present():
-    payload = {"jobs": [{"title": "Eng", "jobUrl": "u", "descriptionHtml": "<p>hello</p>"}]}
+    payload = {
+        "jobs": [{"title": "Eng", "jobUrl": "u", "descriptionHtml": "<p>hello</p>"}]
+    }
     jobs = parse_ashby(payload, "Acme")
     assert jobs[0].jd_text == "hello"
 

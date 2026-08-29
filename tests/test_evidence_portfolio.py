@@ -68,9 +68,15 @@ def _facts() -> ProfileFacts:
             )
         ],
         skills={
-            "Languages": [Skill(id="skill-python", name="Python", aliases=["Python 3"])],
-            "Messaging": [Skill(id="skill-kafka", name="Apache Kafka", aliases=["Kafka"])],
-            "Cloud": [Skill(id="skill-aws", name="Amazon Web Services", aliases=["AWS"])],
+            "Languages": [
+                Skill(id="skill-python", name="Python", aliases=["Python 3"])
+            ],
+            "Messaging": [
+                Skill(id="skill-kafka", name="Apache Kafka", aliases=["Kafka"])
+            ],
+            "Cloud": [
+                Skill(id="skill-aws", name="Amazon Web Services", aliases=["AWS"])
+            ],
         },
     )
 
@@ -125,7 +131,9 @@ def test_catalog_links_job_skills_to_exact_owners_and_metric_facts():
     catalog = build_evidence_catalog(_facts(), _criteria(), _context())
 
     api = next(owner for owner in catalog.owners if owner.owner_id == "exp-api")
-    project = next(owner for owner in catalog.owners if owner.owner_id == "project-kafka")
+    project = next(
+        owner for owner in catalog.owners if owner.owner_id == "project-kafka"
+    )
 
     assert api.direct_requirements == ["Python"]
     assert api.facts[0].metric_count == 2
@@ -244,9 +252,10 @@ def test_portfolio_profile_keeps_only_approved_work_project_and_skills():
     assert [experience.id for experience in sliced.experience] == ["exp-api"]
     assert [bullet.id for bullet in sliced.experience[0].bullets] == ["api"]
     assert [project.id for project in sliced.projects] == ["project-kafka"]
-    assert {
-        skill.id for entries in sliced.skills.values() for skill in entries
-    } == {"skill-python", "skill-kafka"}
+    assert {skill.id for entries in sliced.skills.values() for skill in entries} == {
+        "skill-python",
+        "skill-kafka",
+    }
     assert sliced.contact == _facts().contact
 
 
@@ -265,9 +274,7 @@ def test_alignment_requires_core_skill_in_list_and_context_when_available():
                 bullets=[TailoredBullet(text="Improved API latency", provenance="api")],
             )
         ],
-        skills={
-            "Languages": [TailoredSkill(name="Python", provenance="skill-python")]
-        },
+        skills={"Languages": [TailoredSkill(name="Python", provenance="skill-python")]},
     )
 
     critique = portfolio_alignment_critique(content, portfolio)
@@ -277,4 +284,6 @@ def test_alignment_requires_core_skill_in_list_and_context_when_available():
     assert critique.score == 25
     messages = [issue.message for issue in critique.issues]
     assert any("Python" in message and "context" in message for message in messages)
-    assert any("Kafka" in message and "skills section" in message for message in messages)
+    assert any(
+        "Kafka" in message and "skills section" in message for message in messages
+    )

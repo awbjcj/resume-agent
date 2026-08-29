@@ -82,7 +82,9 @@ def test_match_gap_per_job(tmp_path, monkeypatch):
     assert "Python" not in result.output
 
 
-def test_match_gap_uses_effective_persisted_map_before_llm_fallback(tmp_path, monkeypatch):
+def test_match_gap_uses_effective_persisted_map_before_llm_fallback(
+    tmp_path, monkeypatch
+):
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
     _seed_job(db_url, "shortlisted", ["FastAPI"])
     profile_dir = tmp_path / "profile"

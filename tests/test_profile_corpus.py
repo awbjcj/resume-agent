@@ -99,7 +99,9 @@ def test_remove_primary_promotes_oldest_remaining(tmp_path):
     first = add_source(profile_dir, _make_doc(tmp_path, "a.txt", "A"))
     second = add_source(profile_dir, _make_doc(tmp_path, "b.txt", "B"))
     remove_source(profile_dir, first.id)
-    assert load_manifest(profile_dir).docs == [second.model_copy(update={"primary": True})]
+    assert load_manifest(profile_dir).docs == [
+        second.model_copy(update={"primary": True})
+    ]
 
 
 def test_remove_primary_uses_manifest_order_when_timestamps_tie(tmp_path):
@@ -184,14 +186,17 @@ def test_default_mode_by_suffix():
 
 
 def test_add_source_defaults_and_overrides_mode(tmp_path):
-    add_source(tmp_path / "p", _file(tmp_path, "resume.txt", "resume body"), primary=True)
+    add_source(
+        tmp_path / "p", _file(tmp_path, "resume.txt", "resume body"), primary=True
+    )
     doc = add_source(
         tmp_path / "p", _file(tmp_path, "notes.md", "notes body"), mode="synthesis"
     )
     assert doc.mode == "synthesis"
     reloaded = load_manifest(tmp_path / "p")
     assert {d.filename: d.mode for d in reloaded.docs} == {
-        "resume.txt": "literal", "notes.md": "synthesis",
+        "resume.txt": "literal",
+        "notes.md": "synthesis",
     }
 
 

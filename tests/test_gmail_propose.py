@@ -58,4 +58,9 @@ def test_rejection_allowed_from_active_state():
 
 def test_unmatched_or_none_email_yields_nothing():
     pairs = [_pair(1, ApplicationStatus.submitted.value, "Acme")]
-    assert propose_transitions([_email("newsletter", domain="other.com")], pairs, _classify) == []
+    assert (
+        propose_transitions(
+            [_email("newsletter", domain="other.com")], pairs, _classify
+        )
+        == []
+    )

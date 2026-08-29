@@ -57,7 +57,9 @@ def test_github_project_and_profile_signals_are_modeled():
         topics=["llm"],
         is_fork=False,
     )
-    profile = GitHubProfile(username="ada", followers=42, top_languages=["Python"], total_stars=10)
+    profile = GitHubProfile(
+        username="ada", followers=42, top_languages=["Python"], total_stars=10
+    )
     assert proj.source.value == "github"
     assert proj.stars == 10
     assert profile.source.value == "github"

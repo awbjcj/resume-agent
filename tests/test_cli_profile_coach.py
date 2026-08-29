@@ -12,9 +12,25 @@ def _view(sid="s1", *, status="active", turns=None, drafts=None):
         "status": status,
         "turns": turns
         or [
-            {"role": "coach", "kind": "question", "text": "What changed at Acme?", "topicId": "t1", "at": "", "researchActions": []}
+            {
+                "role": "coach",
+                "kind": "question",
+                "text": "What changed at Acme?",
+                "topicId": "t1",
+                "at": "",
+                "researchActions": [],
+            }
         ],
-        "topics": [{"id": "t1", "gap": "Acme impact", "whyItMatters": "", "relatedRef": "", "status": "open", "noteDocId": None}],
+        "topics": [
+            {
+                "id": "t1",
+                "gap": "Acme impact",
+                "whyItMatters": "",
+                "relatedRef": "",
+                "status": "open",
+                "noteDocId": None,
+            }
+        ],
         "draftNotes": drafts or [],
         "recap": None,
         "impact": None,
@@ -27,11 +43,15 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
     source.write_text("Acme experience", encoding="utf-8")
     add_source(profile_dir, source, primary=True, mode="literal")
     calls = {"opened": 0, "messages": [], "approved": [], "discarded": [], "built": []}
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     monkeypatch.setattr(
         cli,
         "get_settings",
-        lambda: type("S", (), {"cheap_model": "c", "mid_model": "m", "db_url": "sqlite://"})(),
+        lambda: type(
+            "S", (), {"cheap_model": "c", "mid_model": "m", "db_url": "sqlite://"}
+        )(),
     )
     monkeypatch.setattr(cli, "_engine", lambda db_url: object())
     monkeypatch.setattr(
@@ -52,8 +72,25 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
     def message(reporter, **kwargs):
         calls["messages"].append(kwargs["message"])
         return _view(
-            turns=[{"role": "coach", "kind": "draft_note", "text": "Draft ready.", "topicId": "t1", "at": "", "researchActions": []}],
-            drafts=[{"topicId": "t1", "title": "Acme deploys", "summary": "Cut deploy time 40%.", "quotes": [kwargs["message"]], "status": "pending"}],
+            turns=[
+                {
+                    "role": "coach",
+                    "kind": "draft_note",
+                    "text": "Draft ready.",
+                    "topicId": "t1",
+                    "at": "",
+                    "researchActions": [],
+                }
+            ],
+            drafts=[
+                {
+                    "topicId": "t1",
+                    "title": "Acme deploys",
+                    "summary": "Cut deploy time 40%.",
+                    "quotes": [kwargs["message"]],
+                    "status": "pending",
+                }
+            ],
         )
 
     monkeypatch.setattr("resume_agent.services.profile_coach.run_message_turn", message)
@@ -63,7 +100,9 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
     )
     monkeypatch.setattr(
         "resume_agent.services.profile_coach.approve_draft",
-        lambda profile_dir, sid, topic_id, **kwargs: calls["approved"].append(kwargs) or "doc-1",
+        lambda profile_dir, sid, topic_id, **kwargs: (
+            calls["approved"].append(kwargs) or "doc-1"
+        ),
     )
     monkeypatch.setattr(
         "resume_agent.services.profile_coach.discard_draft",

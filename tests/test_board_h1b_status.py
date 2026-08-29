@@ -57,9 +57,7 @@ def test_production_shortlist_page_resolves_h1b_status_in_one_query():
     event.listen(engine, "before_cursor_execute", record)
     try:
         with Session(engine) as session:
-            rows = list_board(
-                session, "shortlist", with_facets=False
-            ).page.data
+            rows = list_board(session, "shortlist", with_facets=False).page.data
     finally:
         event.remove(engine, "before_cursor_execute", record)
 
@@ -95,9 +93,7 @@ def test_production_pipeline_page_resolves_h1b_status_in_one_query():
     event.listen(engine, "before_cursor_execute", record)
     try:
         with Session(engine) as session:
-            rows = list_board(
-                session, "pipeline", with_facets=False
-            ).page.data
+            rows = list_board(session, "pipeline", with_facets=False).page.data
     finally:
         event.remove(engine, "before_cursor_execute", record)
 
@@ -133,9 +129,7 @@ def test_production_triage_page_resolves_h1b_status_in_one_query():
     event.listen(engine, "before_cursor_execute", record)
     try:
         with Session(engine) as session:
-            rows = list_board(
-                session, "triage", with_facets=False
-            ).page.data
+            rows = list_board(session, "triage", with_facets=False).page.data
     finally:
         event.remove(engine, "before_cursor_execute", record)
 

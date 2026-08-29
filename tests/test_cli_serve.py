@@ -12,8 +12,11 @@ def test_serve_invokes_uvicorn(monkeypatch):
         captured["port"] = port
 
     import uvicorn
+
     monkeypatch.setattr(uvicorn, "run", fake_run)
-    result = CliRunner().invoke(cli.app, ["serve", "--host", "127.0.0.1", "--port", "9123"])
+    result = CliRunner().invoke(
+        cli.app, ["serve", "--host", "127.0.0.1", "--port", "9123"]
+    )
     assert result.exit_code == 0
     assert captured == {"host": "127.0.0.1", "port": 9123}
 

@@ -59,7 +59,9 @@ def test_search_coverage_forwards_events_and_tracks_unsearched_families():
         "web_search",
         '"Intuitive" site:jobs.lever.co OR site:myworkdayjobs.com careers',
     )
-    completed = ToolCompleted("t1", "web_search", '{"error_code":"SEARCH_RATE_LIMITED"}')
+    completed = ToolCompleted(
+        "t1", "web_search", '{"error_code":"SEARCH_RATE_LIMITED"}'
+    )
 
     sink.emit(started)
     sink.emit(completed)

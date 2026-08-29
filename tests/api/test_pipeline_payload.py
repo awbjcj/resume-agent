@@ -29,9 +29,7 @@ def test_pipeline_uses_bounded_previews_but_detail_keeps_full_description():
                     )
                 )
             session.commit()
-            first_id = session.exec(
-                select(Job.id).order_by(cast(Any, Job.id))
-            ).first()
+            first_id = session.exec(select(Job.id).order_by(cast(Any, Job.id))).first()
 
         response = client.get("/api/pipeline?pageSize=50")
         detail = client.get(f"/api/jobs/{first_id}")

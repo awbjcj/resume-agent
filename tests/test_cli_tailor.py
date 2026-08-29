@@ -49,7 +49,15 @@ def test_tailor_processes_a_job(tmp_path, monkeypatch):
     class _Version:
         fact_check_passed = True
 
-    def fake_tailor(session, *, job_ids=None, approved=False, review_path=None, facts_path=None, reporter=None):
+    def fake_tailor(
+        session,
+        *,
+        job_ids=None,
+        approved=False,
+        review_path=None,
+        facts_path=None,
+        reporter=None,
+    ):
         from resume_agent.tailor.service import TailorOutcome
 
         return TailorOutcome(
@@ -62,7 +70,9 @@ def test_tailor_processes_a_job(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "tailor", fake_tailor)
 
-    result = runner.invoke(cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url])
+    result = runner.invoke(
+        cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url]
+    )
     assert result.exit_code == 0, result.output
     assert "1 version" in result.output
 

@@ -30,9 +30,13 @@ def _context() -> SkillMatchContext:
                 requirement="LangChain",
                 source="must",
                 coverage="covered",
-                row=MatrixRow(key="langchain", display="LangChain", evidence_fact_ids=["s2"]),
+                row=MatrixRow(
+                    key="langchain", display="LangChain", evidence_fact_ids=["s2"]
+                ),
             ),
-            SkillMatch(requirement="Kubernetes", source="must", coverage="gap", row=None),
+            SkillMatch(
+                requirement="Kubernetes", source="must", coverage="gap", row=None
+            ),
             SkillMatch(
                 requirement="Terraform",
                 source="must",

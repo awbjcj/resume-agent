@@ -35,7 +35,10 @@ def test_tempus_workday_posting_reduces_to_the_durable_board_root():
 
     report = crawler.crawl("Tempus", "https://www.tempus.com/careers/")
 
-    assert report.candidates[0].url == "https://tempus.wd5.myworkdayjobs.com/Tempus_Careers"
+    assert (
+        report.candidates[0].url
+        == "https://tempus.wd5.myworkdayjobs.com/Tempus_Careers"
+    )
 
 
 def test_crawler_visits_at_most_five_first_party_pages():

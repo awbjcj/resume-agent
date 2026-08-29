@@ -11,6 +11,11 @@ from resume_agent.tracking.migrate import (
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
 
+def _persisted_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def _seed(submitted_at):
     engine = make_engine("sqlite://")
     init_db(engine)
@@ -20,7 +25,11 @@ def _seed(submitted_at):
         session.commit()
         session.refresh(job)
         session.add(
-            Application(job_id=job.id, status="submitted", submitted_at=submitted_at)
+            Application(
+                job_id=_persisted_id(job.id),
+                status="submitted",
+                submitted_at=submitted_at,
+            )
         )
         session.commit()
     return engine
@@ -61,7 +70,11 @@ def test_does_not_synthesize_events_from_status_alone():
         session.add(job)
         session.commit()
         session.refresh(job)
-        session.add(Application(job_id=job.id, status="interview", submitted_at=None))
+        session.add(
+            Application(
+                job_id=_persisted_id(job.id), status="interview", submitted_at=None
+            )
+        )
         session.commit()
     ensure_application_submitted_events(engine)
     with Session(engine) as session:

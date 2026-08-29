@@ -1,6 +1,12 @@
 from typer.testing import CliRunner
 
-from resume_agent.models.profile import Bullet, Contact, Experience, Project, ProfileFacts
+from resume_agent.models.profile import (
+    Bullet,
+    Contact,
+    Experience,
+    Project,
+    ProfileFacts,
+)
 from resume_agent.profile.build import BuildReport
 from resume_agent.profile.store import save_facts
 from resume_agent import cli
@@ -91,7 +97,16 @@ def test_profile_build_refuses_to_overwrite_without_refresh(tmp_path, monkeypatc
 
     result = runner.invoke(
         cli.app,
-        ["profile", "build", "--sources", str(sources), "--dir", str(profile_dir), "--out", str(out)],
+        [
+            "profile",
+            "build",
+            "--sources",
+            str(sources),
+            "--dir",
+            str(profile_dir),
+            "--out",
+            str(out),
+        ],
     )
 
     assert result.exit_code == 1
@@ -110,7 +125,17 @@ def test_profile_build_refresh_overwrites(tmp_path, monkeypatch):
 
     result = runner.invoke(
         cli.app,
-        ["profile", "build", "--sources", str(sources), "--dir", str(profile_dir), "--out", str(out), "--refresh"],
+        [
+            "profile",
+            "build",
+            "--sources",
+            str(sources),
+            "--dir",
+            str(profile_dir),
+            "--out",
+            str(out),
+            "--refresh",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -126,9 +151,7 @@ def test_profile_add_sources_and_remove(tmp_path):
         ["profile", "add", str(doc), "--primary", "--dir", str(profile_dir)],
     )
     assert added.exit_code == 0, added.output
-    listing = runner.invoke(
-        cli.app, ["profile", "sources", "--dir", str(profile_dir)]
-    )
+    listing = runner.invoke(cli.app, ["profile", "sources", "--dir", str(profile_dir)])
     assert "resume.txt" in listing.output
     assert "primary" in listing.output
     assert "fragment:missing" in listing.output
@@ -138,9 +161,7 @@ def test_profile_add_sources_and_remove(tmp_path):
         ["profile", "remove", "resume.txt", "--dir", str(profile_dir)],
     )
     assert removed.exit_code == 0
-    listing = runner.invoke(
-        cli.app, ["profile", "sources", "--dir", str(profile_dir)]
-    )
+    listing = runner.invoke(cli.app, ["profile", "sources", "--dir", str(profile_dir)])
     assert "resume.txt" not in listing.output
 
 
@@ -151,9 +172,12 @@ def test_profile_add_mode_flag_and_sources_listing(tmp_path):
     resume.write_text("Ada", encoding="utf-8")
     profile_dir = tmp_path / "profile"
 
-    assert runner.invoke(
-        cli.app, ["profile", "add", str(resume), "--dir", str(profile_dir)]
-    ).exit_code == 0
+    assert (
+        runner.invoke(
+            cli.app, ["profile", "add", str(resume), "--dir", str(profile_dir)]
+        ).exit_code
+        == 0
+    )
     result = runner.invoke(
         cli.app,
         ["profile", "add", str(doc), "--dir", str(profile_dir), "--mode", "synthesis"],
@@ -198,12 +222,17 @@ def test_profile_build_prints_report(tmp_path, monkeypatch):
     profile_dir = tmp_path / "profile"
     doc = tmp_path / "resume.txt"
     doc.write_text("Ada", encoding="utf-8")
-    runner.invoke(
-        cli.app, ["profile", "add", str(doc), "--dir", str(profile_dir)]
-    )
+    runner.invoke(cli.app, ["profile", "add", str(doc), "--dir", str(profile_dir)])
     result = runner.invoke(
         cli.app,
-        ["profile", "build", "--dir", str(profile_dir), "--out", str(profile_dir / "facts.json")],
+        [
+            "profile",
+            "build",
+            "--dir",
+            str(profile_dir),
+            "--out",
+            str(profile_dir / "facts.json"),
+        ],
     )
     assert result.exit_code == 0, result.output
     assert "CONFLICT: date conflict" in result.output
@@ -278,9 +307,12 @@ def test_profile_add_note_url_and_sync_github_commands(tmp_path, monkeypatch):
     profile_dir = tmp_path / "profile"
     resume = tmp_path / "resume.txt"
     resume.write_text("Ada", encoding="utf-8")
-    assert runner.invoke(
-        cli.app, ["profile", "add", str(resume), "--dir", str(profile_dir)]
-    ).exit_code == 0
+    assert (
+        runner.invoke(
+            cli.app, ["profile", "add", str(resume), "--dir", str(profile_dir)]
+        ).exit_code
+        == 0
+    )
 
     note = runner.invoke(
         cli.app,

@@ -121,11 +121,15 @@ def test_generate_grounds_links_verifies_repos_and_upserts():
         repos=[
             RepoRef(name="ok", url="https://github.com/foo/bar", why="Reference"),
             RepoRef(name="dead", url="https://github.com/foo/ghost", why="Dead"),
-            RepoRef(name="ungrounded", url="https://github.com/foo/other", why="Missing"),
+            RepoRef(
+                name="ungrounded", url="https://github.com/foo/other", why="Missing"
+            ),
         ],
         resources=[
             ResourceRef(title="Docs", url="https://k8s.io/docs", kind="doc"),
-            ResourceRef(title="Invented", url="https://example.com/invented", kind="tutorial"),
+            ResourceRef(
+                title="Invented", url="https://example.com/invented", kind="tutorial"
+            ),
         ],
         project=ProjectIdea(
             title="Mini scheduler",
@@ -217,7 +221,9 @@ def test_generate_suggestion_reuses_and_canonicalizes_legacy_cache_row():
     context = resolve_suggestion_context(_graph(), kind="skill", key="kubernetes")
     engine = _engine()
     with Session(engine) as session:
-        legacy = SkillSuggestion(kind="skill", key="K8s", payload_json={"bridge": "old"})
+        legacy = SkillSuggestion(
+            kind="skill", key="K8s", payload_json={"bridge": "old"}
+        )
         session.add(legacy)
         session.commit()
         legacy_id = legacy.id

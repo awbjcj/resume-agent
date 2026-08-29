@@ -118,7 +118,12 @@ def engine(tmp_path):
     engine = make_engine("sqlite://")
     init_db(engine)
     with get_session(engine) as db:
-        job = Job(source="manual", company="Acme", title="Engineer", jd_text="Ship Python services")
+        job = Job(
+            source="manual",
+            company="Acme",
+            title="Engineer",
+            jd_text="Ship Python services",
+        )
         db.add(job)
         db.commit()
         db.refresh(job)
@@ -201,12 +206,16 @@ def test_audio_preferred_opening_persists_synthesized_audio(tmp_path, engine):
     assert turn["audioUrl"].endswith("/turns/0/audio")
     from resume_agent.interview.store import turn_audio_path
 
-    assert turn_audio_path(tmp_path, view["sessionId"], 0).read_bytes().startswith(
-        b"spoken:Welcome"
+    assert (
+        turn_audio_path(tmp_path, view["sessionId"], 0)
+        .read_bytes()
+        .startswith(b"spoken:Welcome")
     )
 
 
-def test_audio_synthesis_failure_keeps_opening_turn_and_reveals_fallback(tmp_path, engine):
+def test_audio_synthesis_failure_keeps_opening_turn_and_reveals_fallback(
+    tmp_path, engine
+):
     job_id, version_id = _ids
     opening = OpeningInterview(
         message="Welcome. Tell me about yourself.",
@@ -274,7 +283,14 @@ def test_full_interview_flow(tmp_path, engine):
         message="I shipped a FastAPI service.",
         interviewer_agent=FakeRunner(["notes"]),
         formatter_agent=FakeRunner(
-            [InterviewTurn(message="Tell me about a project you owned end to end.", action="ask", question_id="q2", hints=_HINTS)]
+            [
+                InterviewTurn(
+                    message="Tell me about a project you owned end to end.",
+                    action="ask",
+                    question_id="q2",
+                    hints=_HINTS,
+                )
+            ]
         ),
     )
     run_answer_turn(
@@ -283,7 +299,9 @@ def test_full_interview_flow(tmp_path, engine):
         session_id=sid,
         message="I owned the billing migration.",
         interviewer_agent=FakeRunner(["notes"]),
-        formatter_agent=FakeRunner([InterviewTurn(message="That's all from me, thank you.", action="conclude")]),
+        formatter_agent=FakeRunner(
+            [InterviewTurn(message="That's all from me, thank you.", action="conclude")]
+        ),
     )
     view = run_debrief_turn(
         FakeReporter(),
@@ -295,7 +313,9 @@ def test_full_interview_flow(tmp_path, engine):
                 DebriefTurn(
                     summary="Good technical depth.",
                     question_reviews=[
-                        ReviewItem(question_id="q1", question="Python background", score=4),
+                        ReviewItem(
+                            question_id="q1", question="Python background", score=4
+                        ),
                         ReviewItem(question_id="q2", question="Ownership", score=3),
                     ],
                 )
@@ -321,7 +341,11 @@ def test_answer_streams_and_stores_interviewer_prose(tmp_path, engine):
         message="I shipped a FastAPI service.",
         interviewer_agent=interviewer,
         formatter_agent=FakeRunner(
-            [InterviewTurn(message="ignored", action="ask", question_id="q2", hints=_HINTS)]
+            [
+                InterviewTurn(
+                    message="ignored", action="ask", question_id="q2", hints=_HINTS
+                )
+            ]
         ),
         sink=sink,
     )

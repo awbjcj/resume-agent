@@ -11,9 +11,7 @@ def _client() -> TestClient:
 
 def test_redo_rejects_empty_job_ids():
     with _client() as client:
-        response = client.post(
-            "/api/redo", json={"jobIds": [], "stages": ["tailor"]}
-        )
+        response = client.post("/api/redo", json={"jobIds": [], "stages": ["tailor"]})
     assert response.status_code == 422
 
 
@@ -36,14 +34,12 @@ def test_redo_dedupes_repeated_ids_and_stages():
 
     params = RedoParams(job_ids=[3, 3, 1], stages=["tailor", "tailor"])
 
-    assert params.job_ids == [3, 1]     # order preserved, duplicates dropped
+    assert params.job_ids == [3, 1]  # order preserved, duplicates dropped
     assert params.stages == ["tailor"]
 
 
 def test_redo_returns_202_with_a_run():
     with _client() as client:
-        response = client.post(
-            "/api/redo", json={"jobIds": [1], "stages": ["tailor"]}
-        )
+        response = client.post("/api/redo", json={"jobIds": [1], "stages": ["tailor"]})
     assert response.status_code == 202
     assert response.json()["kind"] == "redo"

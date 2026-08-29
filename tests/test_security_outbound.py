@@ -10,7 +10,9 @@ def test_fetch_public_text_retains_validated_redirect_provenance():
         seen.append(request.url.path)
         if request.url.path == "/start":
             return httpx.Response(302, headers={"location": "/careers"})
-        return httpx.Response(200, headers={"content-type": "text/html"}, text="Careers")
+        return httpx.Response(
+            200, headers={"content-type": "text/html"}, text="Careers"
+        )
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
     try:

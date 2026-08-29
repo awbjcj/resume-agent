@@ -69,7 +69,9 @@ def test_default_recipes_dir_resolves_per_tenant_workspace(tmp_path):
 
 def test_save_is_atomic_and_removes_temporary_file(tmp_path):
     save_recipe("acme.com", _recipe(), base_dir=tmp_path)
-    assert not recipe_path("acme.com", base_dir=tmp_path).with_suffix(".json.tmp").exists()
+    assert (
+        not recipe_path("acme.com", base_dir=tmp_path).with_suffix(".json.tmp").exists()
+    )
 
 
 def test_load_missing_returns_none(tmp_path):

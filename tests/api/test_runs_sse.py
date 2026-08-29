@@ -22,7 +22,9 @@ def test_sse_stream_emits_terminal_event(monkeypatch, tmp_path):
 
     monkeypatch.setattr(runs_router, "discover_jobs", fake_discover_jobs)
     client = TestClient(
-        create_app(db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path)
+        create_app(
+            db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path
+        )
     )
     with client:
         run_id = client.post("/api/discover", json={}).json()["runId"]
@@ -34,7 +36,7 @@ def test_sse_stream_emits_terminal_event(monkeypatch, tmp_path):
             events = []
             for line in resp.iter_lines():
                 if line.startswith("data:"):
-                    events.append(json.loads(line[len("data:"):].strip()))
+                    events.append(json.loads(line[len("data:") :].strip()))
                     if events[-1]["state"] in ("done", "error"):
                         break
     assert events[-1]["state"] == "done"

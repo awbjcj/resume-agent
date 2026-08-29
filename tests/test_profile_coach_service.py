@@ -197,7 +197,11 @@ def test_opening_turn_seeds_measured_depth_topics_before_model_topics(tmp_path):
 
 
 def test_session_view_exposes_owner_id_in_camel_case(tmp_path):
-    from resume_agent.profile.coach_store import CoachTopic, CoachTurnRecord, create_session
+    from resume_agent.profile.coach_store import (
+        CoachTopic,
+        CoachTurnRecord,
+        create_session,
+    )
 
     create_session(
         tmp_path,
@@ -288,9 +292,7 @@ def test_missing_delimiter_degrades_instead_of_losing_the_turn(tmp_path):
             self.full = reply
             self.prompts = []
 
-    formatter = FakeAgent(
-        CoachTurn(message="formatted", action="ask", topic_id="t1")
-    )
+    formatter = FakeAgent(CoachTurn(message="formatted", action="ask", topic_id="t1"))
     view = run_message_turn(
         FakeReporter(),
         profile_dir=tmp_path,
@@ -430,7 +432,9 @@ def test_streamed_prose_survives_unparsable_formatter_output(tmp_path, caplog):
 
 def test_blocking_formatter_message_survives_structural_failure(tmp_path):
     sid = _open(tmp_path)["sessionId"]
-    bad = CoachTurn(message="Could you quantify that?", action="ask", topic_id="missing")
+    bad = CoachTurn(
+        message="Could you quantify that?", action="ask", topic_id="missing"
+    )
 
     view = run_message_turn(
         FakeReporter(),
@@ -536,7 +540,9 @@ def test_approving_a_seeded_topic_writes_a_pinned_synthesis_note(tmp_path):
         profile_dir,
         "seeded",
         user_text="I cut deploy time from 40 minutes to 6 minutes.",
-        coach_turn=CoachTurnRecord(role="coach", kind="draft_note", text="Draft", topic_id="t1"),
+        coach_turn=CoachTurnRecord(
+            role="coach", kind="draft_note", text="Draft", topic_id="t1"
+        ),
         new_topics=[],
         skipped_topic_ids=[],
         draft=CoachDraftNote(
@@ -594,7 +600,9 @@ def test_discard_recap_and_late_approval(tmp_path):
         session_id=sid,
         coach_agent=FakeAgent("notes"),
         formatter_agent=FakeAgent(
-            CoachTurn(message="Covered Acme; K8s remains open.", action="recap", topic_id="t1")
+            CoachTurn(
+                message="Covered Acme; K8s remains open.", action="recap", topic_id="t1"
+            )
         ),
     )
     assert view["status"] == "ended"
@@ -621,19 +629,27 @@ def test_discard_recap_and_late_approval(tmp_path):
                 message="Draft.",
                 action="draft",
                 topic_id="t1",
-                draft_note=DraftNote(title="Tool", summary="Shipped the tool.", quotes=["Shipped the tool."]),
+                draft_note=DraftNote(
+                    title="Tool",
+                    summary="Shipped the tool.",
+                    quotes=["Shipped the tool."],
+                ),
             )
         ),
     )
     discard_draft(other_profile, other_sid, "t1")
-    assert session_view(other_profile, other_sid)["draftNotes"][0]["status"] == "discarded"
+    assert (
+        session_view(other_profile, other_sid)["draftNotes"][0]["status"] == "discarded"
+    )
 
 
 def test_build_with_impact_records_errors(tmp_path, monkeypatch):
     profile_dir, sid = _drafted_session(tmp_path)
     import resume_agent.services.profile_coach as service
 
-    monkeypatch.setattr(service, "run_corpus_build", lambda reporter, **kwargs: {"experiences": 1})
+    monkeypatch.setattr(
+        service, "run_corpus_build", lambda reporter, **kwargs: {"experiences": 1}
+    )
     report = run_build_with_impact(
         FakeReporter(),
         profile_dir=profile_dir,
@@ -646,7 +662,9 @@ def test_build_with_impact_records_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(
         service,
         "run_corpus_build",
-        lambda reporter, **kwargs: (_ for _ in ()).throw(RuntimeError("build exploded")),
+        lambda reporter, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("build exploded")
+        ),
     )
     with pytest.raises(RuntimeError):
         run_build_with_impact(

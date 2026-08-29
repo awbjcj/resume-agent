@@ -14,7 +14,9 @@ _ANCHORED = SearchConfig(role_anchors=["engineer"])
 
 
 def _job(title: str, url: str = "u") -> RawJob:
-    return RawJob(source="x", url=url, company="Acme", title=title, location=None, jd_text="jd")
+    return RawJob(
+        source="x", url=url, company="Acme", title=title, location=None, jd_text="jd"
+    )
 
 
 def test_harvest_fans_out_and_concatenates_in_order():
@@ -61,7 +63,9 @@ def test_harvest_isolates_a_failing_unit_and_records_the_reason():
     def produce(unit):
         if unit == "dead":
             raise httpx.HTTPStatusError(
-                "404", request=httpx.Request("GET", "http://x"), response=httpx.Response(404)
+                "404",
+                request=httpx.Request("GET", "http://x"),
+                response=httpx.Response(404),
             )
         return [_job("Live Engineer")]
 
@@ -188,7 +192,9 @@ def test_harvest_detailed_isolates_a_failed_detail_fetch():
     def fetch_detail(row):
         if row.title == "Dead Engineer":
             raise httpx.HTTPStatusError(
-                "500", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+                "500",
+                request=httpx.Request("GET", "http://x"),
+                response=httpx.Response(500),
             )
         return {"jd": "jd"}
 
@@ -261,8 +267,14 @@ def test_detail_fetches_run_concurrently_per_host(monkeypatch):
         row.jd_text = detail["jd"]
 
     rows = [
-        RawJob(source="x", url=f"u{i}", company="C", title="AI Engineer",
-               location="Remote", jd_text="")
+        RawJob(
+            source="x",
+            url=f"u{i}",
+            company="C",
+            title="AI Engineer",
+            location="Remote",
+            jd_text="",
+        )
         for i in range(survivors)
     ]
 
@@ -301,8 +313,14 @@ def test_a_limit_still_bounds_how_many_details_are_fetched(monkeypatch):
         row.jd_text = detail["jd"]
 
     rows = [
-        RawJob(source="x", url=f"u{i}", company="C", title="AI Engineer",
-               location="Remote", jd_text="")
+        RawJob(
+            source="x",
+            url=f"u{i}",
+            company="C",
+            title="AI Engineer",
+            location="Remote",
+            jd_text="",
+        )
         for i in range(20)
     ]
     monkeypatch.setattr(

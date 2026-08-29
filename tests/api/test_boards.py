@@ -152,7 +152,10 @@ def test_pipeline_response_cleans_legacy_jd_tokens():
             session.commit()
         body = client.get("/api/pipeline?status=approved").json()
 
-    assert body["data"][0]["jdPreview"] == "Google Google San Francisco, CA Remote eligible Mid"
+    assert (
+        body["data"][0]["jdPreview"]
+        == "Google Google San Francisco, CA Remote eligible Mid"
+    )
 
 
 def test_triage_archived_query():
@@ -248,8 +251,20 @@ def test_shortlist_item_exposes_facet_fields():
 def test_shortlist_multi_location_filters_and_contract():
     client = _client()
     locations = [
-        {"city": "Austin", "region": "TX", "country": "US", "is_us": True, "raw": "Austin, TX"},
-        {"city": "Toronto", "region": "Ontario", "country": "CA", "is_us": False, "raw": "Toronto, Ontario"},
+        {
+            "city": "Austin",
+            "region": "TX",
+            "country": "US",
+            "is_us": True,
+            "raw": "Austin, TX",
+        },
+        {
+            "city": "Toronto",
+            "region": "Ontario",
+            "country": "CA",
+            "is_us": False,
+            "raw": "Toronto, Ontario",
+        },
     ]
     with client:
         _seed(
@@ -267,8 +282,20 @@ def test_shortlist_multi_location_filters_and_contract():
     assert [row["company"] for row in by_canada["data"]] == ["Multi"]
     assert crossed["data"] == []
     assert by_canada["data"][0]["locations"] == [
-        {"city": "Austin", "region": "TX", "country": "US", "isUs": True, "raw": "Austin, TX"},
-        {"city": "Toronto", "region": "Ontario", "country": "CA", "isUs": False, "raw": "Toronto, Ontario"},
+        {
+            "city": "Austin",
+            "region": "TX",
+            "country": "US",
+            "isUs": True,
+            "raw": "Austin, TX",
+        },
+        {
+            "city": "Toronto",
+            "region": "Ontario",
+            "country": "CA",
+            "isUs": False,
+            "raw": "Toronto, Ontario",
+        },
     ]
     assert by_canada["facets"]["country"] == {"CA": 1}
     assert unfiltered["facets"]["country"] == {"CA": 1, "US": 1}

@@ -42,12 +42,21 @@ def test_live_source_cli_writes_a_read_only_result_report(tmp_path, monkeypatch)
     monkeypatch.setattr(run_scout_source_eval, "CompanySourceResolver", Resolver)
     output = tmp_path / "report.json"
 
-    assert run_scout_source_eval.main(
-        [
-            "--cases", str(cases), "--output", str(output),
-            "--search-path", "config/eval-search.yaml", "--timeout-seconds", "20",
-        ]
-    ) == 0
+    assert (
+        run_scout_source_eval.main(
+            [
+                "--cases",
+                str(cases),
+                "--output",
+                str(output),
+                "--search-path",
+                "config/eval-search.yaml",
+                "--timeout-seconds",
+                "20",
+            ]
+        )
+        == 0
+    )
 
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["summary"] == {"total": 1, "passed": 1, "failed": 0}

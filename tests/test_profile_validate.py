@@ -1,4 +1,10 @@
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Publication
+from resume_agent.models.profile import (
+    Bullet,
+    Contact,
+    Experience,
+    ProfileFacts,
+    Publication,
+)
 from resume_agent.profile.validate import validate_profile
 
 
@@ -20,18 +26,26 @@ def test_missing_name_is_flagged():
 
 
 def test_experience_without_bullets_is_flagged():
-    facts = ProfileFacts(contact=Contact(name="Ada"), experience=[Experience(company="AE", title="Eng")])
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"), experience=[Experience(company="AE", title="Eng")]
+    )
     report = validate_profile(facts, raw_text="x")
     assert any("no bullets" in warning for warning in report.warnings)
 
 
 def test_publications_in_text_but_not_extracted_is_flagged():
     facts = ProfileFacts(contact=Contact(name="Ada"))
-    report = validate_profile(facts, raw_text="PUBLICATIONS\nSmith, A. Great Paper. 2022.")
+    report = validate_profile(
+        facts, raw_text="PUBLICATIONS\nSmith, A. Great Paper. 2022."
+    )
     assert any("publication" in warning.lower() for warning in report.warnings)
 
 
 def test_publications_present_when_extracted():
-    facts = ProfileFacts(contact=Contact(name="Ada"), publications=[Publication(title="Great Paper")])
-    report = validate_profile(facts, raw_text="PUBLICATIONS\nSmith, A. Great Paper. 2022.")
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"), publications=[Publication(title="Great Paper")]
+    )
+    report = validate_profile(
+        facts, raw_text="PUBLICATIONS\nSmith, A. Great Paper. 2022."
+    )
     assert not any("publication" in warning.lower() for warning in report.warnings)

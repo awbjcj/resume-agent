@@ -21,4 +21,4 @@ def test_zero_disables_event_reminders() -> None:
 )
 def test_negative_event_reminder_leads_are_rejected(field: str) -> None:
     with pytest.raises(ValidationError):
-        Settings(**{field: -1})
+        Settings.model_validate({field: -1})

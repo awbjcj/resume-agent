@@ -19,9 +19,7 @@ def test_parses_iso_with_offset():
 
 
 def test_parses_iso_date_as_utc_midnight():
-    assert parse_iso_datetime("2026-06-01") == datetime(
-        2026, 6, 1, tzinfo=timezone.utc
-    )
+    assert parse_iso_datetime("2026-06-01") == datetime(2026, 6, 1, tzinfo=timezone.utc)
 
 
 def test_returns_none_on_garbage_or_empty():

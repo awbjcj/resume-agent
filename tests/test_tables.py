@@ -26,7 +26,10 @@ def test_job_defaults_and_json_column_round_trip():
         job = Job(
             source="linkedin",
             jd_text="We need a Python engineer",
-            criteria_json={"sponsorship_signal": "silent", "must_have_skills": ["Python"]},
+            criteria_json={
+                "sponsorship_signal": "silent",
+                "must_have_skills": ["Python"],
+            },
         )
         s.add(job)
         s.commit()
@@ -74,5 +77,7 @@ def test_application_status_default_is_ready():
         s.refresh(app)
         assert app.status == ApplicationStatus.ready.value
 
-        rows = s.exec(select(Application).where(Application.job_id == _require_id(job.id))).all()
+        rows = s.exec(
+            select(Application).where(Application.job_id == _require_id(job.id))
+        ).all()
         assert len(rows) == 1

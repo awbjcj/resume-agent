@@ -175,7 +175,9 @@ def ok_handler(request: httpx.Request) -> httpx.Response:
 
 
 def reject_handler(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(403, json={"message": "The example.com domain is not verified"})
+    return httpx.Response(
+        403, json={"message": "The example.com domain is not verified"}
+    )
 
 
 def test_resend_key_alone_configures_mail() -> None:

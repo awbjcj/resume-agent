@@ -39,8 +39,12 @@ def test_repull_replaces_frozen_jd_text_on_a_tailored_job(session, monkeypatch):
         redo,
         "job_from_url",
         lambda url, agent, allow_browser: RawJob(
-            source="url", url=url, company="Acme", title="Staff Engineer",
-            location="Remote", jd_text="fresh text",
+            source="url",
+            url=url,
+            company="Acme",
+            title="Staff Engineer",
+            location="Remote",
+            jd_text="fresh text",
         ),
     )
 
@@ -107,8 +111,12 @@ def test_repull_recomputes_dedup_key_when_title_changes(session, monkeypatch):
         redo,
         "job_from_url",
         lambda url, agent, allow_browser: RawJob(
-            source="url", url=url, company="Acme", title="Principal Engineer",
-            location=None, jd_text="fresh text",
+            source="url",
+            url=url,
+            company="Acme",
+            title="Principal Engineer",
+            location=None,
+            jd_text="fresh text",
         ),
     )
 
@@ -122,21 +130,29 @@ def test_repull_keeps_identity_when_the_new_key_would_collide(session, monkeypat
     job = _tailored_job(session)
     original_key = job.dedup_key
     colliding_key = compute_dedup_key("Acme", "Principal Engineer")
-    _tailored_job(session, company="Acme", title="Principal Engineer",
-                  dedup_key=colliding_key,
-                  url="https://boards.greenhouse.io/acme/jobs/2")
+    _tailored_job(
+        session,
+        company="Acme",
+        title="Principal Engineer",
+        dedup_key=colliding_key,
+        url="https://boards.greenhouse.io/acme/jobs/2",
+    )
     monkeypatch.setattr(
         redo,
         "job_from_url",
         lambda url, agent, allow_browser: RawJob(
-            source="url", url=url, company="Acme", title="Principal Engineer",
-            location=None, jd_text="fresh text",
+            source="url",
+            url=url,
+            company="Acme",
+            title="Principal Engineer",
+            location=None,
+            jd_text="fresh text",
         ),
     )
 
     outcome, _ = redo.repull_job(session, job, agent=object(), allow_browser=False)
 
     assert outcome.status == "ok"
-    assert job.jd_text == "fresh text"   # text still taken
+    assert job.jd_text == "fresh text"  # text still taken
     assert job.title == "Staff Engineer"  # identity untouched
     assert job.dedup_key == original_key

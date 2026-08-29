@@ -64,7 +64,12 @@ def test_recruitee_reads_the_structured_place_not_the_typed_label():
                 "remote": True,
                 "department": "Sales",
                 "employment_type_code": "fulltime_permanent",
-                "salary": {"min": 120000, "max": 160000, "currency": "USD", "period": "year"},
+                "salary": {
+                    "min": 120000,
+                    "max": 160000,
+                    "currency": "USD",
+                    "period": "year",
+                },
             }
         ]
     }
@@ -85,7 +90,11 @@ def test_recruitee_keeps_every_office_of_a_multi_location_posting():
                 "title": "Engineer",
                 "location": "Remote job",
                 "locations": [
-                    {"city": "Boston", "state": "Massachusetts", "country": "United States"},
+                    {
+                        "city": "Boston",
+                        "state": "Massachusetts",
+                        "country": "United States",
+                    },
                     {"city": "Warsaw", "state": "Mazowieckie", "country": "Poland"},
                 ],
             }

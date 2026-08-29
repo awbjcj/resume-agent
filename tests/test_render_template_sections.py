@@ -15,7 +15,9 @@ from resume_agent.render.renderer import render_pdf
 
 def _rich_content() -> ResumeContent:
     return ResumeContent(
-        contact=Contact(name="Jiajin Wu", email="x@example.com", location="Ann Arbor, MI"),
+        contact=Contact(
+            name="Jiajin Wu", email="x@example.com", location="Ann Arbor, MI"
+        ),
         summary="Vehicle systems engineer.",
         experience=[
             TailoredExperience(
@@ -25,7 +27,9 @@ def _rich_content() -> ResumeContent:
                 end="Present",
                 location="Troy, MI",
                 provenance="e1",
-                bullets=[TailoredBullet(text="Triaged L1-L3 ADAS issues", provenance="b1")],
+                bullets=[
+                    TailoredBullet(text="Triaged L1-L3 ADAS issues", provenance="b1")
+                ],
             )
         ],
         education=[
@@ -39,9 +43,13 @@ def _rich_content() -> ResumeContent:
             )
         ],
         publications=[
-            TailoredPublication(title="On ADAS Triage", venue="SAE", date="2022", provenance="pub1")
+            TailoredPublication(
+                title="On ADAS Triage", venue="SAE", date="2022", provenance="pub1"
+            )
         ],
-        certifications=[TailoredCertification(name="Six Sigma", issuer="ASQ", provenance="cer1")],
+        certifications=[
+            TailoredCertification(name="Six Sigma", issuer="ASQ", provenance="cer1")
+        ],
         awards=[TailoredAward(name="Best Intern", provenance="awa1")],
         languages=[Language(language="English", proficiency="native")],
         volunteer=[
@@ -49,7 +57,9 @@ def _rich_content() -> ResumeContent:
                 organization="Robotics Club",
                 role="Mentor",
                 provenance="vol1",
-                bullets=[TailoredBullet(text="Coached FIRST teams", provenance="volb1")],
+                bullets=[
+                    TailoredBullet(text="Coached FIRST teams", provenance="volb1")
+                ],
             )
         ],
         section_order=[
@@ -66,7 +76,9 @@ def _rich_content() -> ResumeContent:
 
 
 def _text_of(pdf_path) -> str:
-    return "\n".join((page.extract_text() or "") for page in PdfReader(str(pdf_path)).pages)
+    return "\n".join(
+        (page.extract_text() or "") for page in PdfReader(str(pdf_path)).pages
+    )
 
 
 def test_template_renders_all_new_sections(tmp_path):

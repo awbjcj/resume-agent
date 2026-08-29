@@ -9,11 +9,7 @@ from resume_agent.tracking.dedup import compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
 
 CONFIG = ConnectorsConfig.model_validate(
-    {
-        "greenhouse": {
-            "boards": [{"token": "acmecorp", "company": "Acme Corp"}]
-        }
-    }
+    {"greenhouse": {"boards": [{"token": "acmecorp", "company": "Acme Corp"}]}}
 )
 
 

@@ -14,7 +14,9 @@ def test_archive_and_restore_preserve_status():
     from resume_agent.tracking.repository import archive_job, restore_job
 
     with _session() as s:
-        job = save_job(s, Job(source="m", jd_text="a", status=JobStatus.shortlisted.value))
+        job = save_job(
+            s, Job(source="m", jd_text="a", status=JobStatus.shortlisted.value)
+        )
         jid = _require_id(job.id)
 
         archived = archive_job(s, jid)
@@ -45,7 +47,9 @@ def _require_id(value: int | None) -> int:
 def test_save_and_query_by_status():
     with _session() as s:
         save_job(s, Job(source="manual", jd_text="a", status=JobStatus.raw.value))
-        save_job(s, Job(source="manual", jd_text="b", status=JobStatus.shortlisted.value))
+        save_job(
+            s, Job(source="manual", jd_text="b", status=JobStatus.shortlisted.value)
+        )
         raw = jobs_by_status(s, JobStatus.raw.value)
         assert len(raw) == 1
         assert raw[0].jd_text == "a"
@@ -63,7 +67,7 @@ def test_find_existing_by_url_then_jd_text():
             ),
         )
         assert find_existing(s, "http://x/1", "different") is not None  # url match
-        assert find_existing(s, None, "hello") is not None             # jd_text match
+        assert find_existing(s, None, "hello") is not None  # jd_text match
         assert find_existing(s, "http://x/2", "nope") is None
 
 
@@ -82,7 +86,10 @@ def test_get_resume_version_roundtrip():
     from resume_agent.tracking.tables import ResumeVersion
 
     with _session() as s:
-        v = save_resume_version(s, ResumeVersion(job_id=1, round=1, content_json={"contact": {"name": "Ada"}}))
+        v = save_resume_version(
+            s,
+            ResumeVersion(job_id=1, round=1, content_json={"contact": {"name": "Ada"}}),
+        )
         fetched = get_resume_version(s, _require_id(v.id))
         assert fetched is not None
         assert fetched.content_json is not None
@@ -92,15 +99,23 @@ def test_get_resume_version_roundtrip():
 
 def test_has_progress_true_for_advanced_status_and_children():
     from resume_agent.tracking.repository import (
-        has_progress, save_application, save_resume_version,
+        has_progress,
+        save_application,
+        save_resume_version,
     )
     from resume_agent.tracking.tables import Application, ResumeVersion
 
     with _session() as s:
         raw = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
-        approved = save_job(s, Job(source="m", jd_text="b", status=JobStatus.approved.value))
-        with_version = save_job(s, Job(source="m", jd_text="c", status=JobStatus.raw.value))
-        save_resume_version(s, ResumeVersion(job_id=_require_id(with_version.id), round=1))
+        approved = save_job(
+            s, Job(source="m", jd_text="b", status=JobStatus.approved.value)
+        )
+        with_version = save_job(
+            s, Job(source="m", jd_text="c", status=JobStatus.raw.value)
+        )
+        save_resume_version(
+            s, ResumeVersion(job_id=_require_id(with_version.id), round=1)
+        )
         with_app = save_job(s, Job(source="m", jd_text="d", status=JobStatus.raw.value))
         save_application(
             s, Application(job_id=_require_id(with_app.id), status="submitted")
@@ -108,7 +123,9 @@ def test_has_progress_true_for_advanced_status_and_children():
         # ADR-0013: a bare `ready` application is not investment. Opening the
         # Tracking tab writes one unconditionally, so counting it would block
         # delete_job for a job the user never actually worked on.
-        empty_app = save_job(s, Job(source="m", jd_text="e", status=JobStatus.raw.value))
+        empty_app = save_job(
+            s, Job(source="m", jd_text="e", status=JobStatus.raw.value)
+        )
         save_application(s, Application(job_id=_require_id(empty_app.id)))
 
         assert has_progress(s, _require_id(raw.id)) is False
@@ -120,7 +137,11 @@ def test_has_progress_true_for_advanced_status_and_children():
 
 
 def test_archived_jobs_excluded_from_status_views():
-    from resume_agent.tracking.repository import archive_job, jobs_by_status, status_counts
+    from resume_agent.tracking.repository import (
+        archive_job,
+        jobs_by_status,
+        status_counts,
+    )
 
     with _session() as s:
         a = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
@@ -133,13 +154,19 @@ def test_archived_jobs_excluded_from_status_views():
 
 def test_delete_job_cascades_children_and_refuses_progress():
     from resume_agent.tracking.repository import (
-        delete_job, get_job, save_application, save_cover_letter, save_resume_version,
+        delete_job,
+        get_job,
+        save_application,
+        save_cover_letter,
+        save_resume_version,
     )
     from resume_agent.tracking.tables import Application, CoverLetter, ResumeVersion
     from sqlmodel import select
 
     with _session() as s:
-        junk = save_job(s, Job(source="m", jd_text="a", status=JobStatus.rejected.value))
+        junk = save_job(
+            s, Job(source="m", jd_text="a", status=JobStatus.rejected.value)
+        )
         jid = _require_id(junk.id)
         assert delete_job(s, jid) is True
         assert get_job(s, jid) is None
@@ -152,4 +179,7 @@ def test_delete_job_cascades_children_and_refuses_progress():
         save_cover_letter(s, CoverLetter(job_id=kid))
         assert delete_job(s, kid) is False
         assert get_job(s, kid) is not None
-        assert s.exec(select(ResumeVersion).where(ResumeVersion.job_id == kid)).first() is not None
+        assert (
+            s.exec(select(ResumeVersion).where(ResumeVersion.job_id == kid)).first()
+            is not None
+        )

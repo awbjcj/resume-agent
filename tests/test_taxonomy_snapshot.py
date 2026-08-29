@@ -54,9 +54,7 @@ def test_ban_and_retirement_are_exposed_as_semantic_sets():
 def test_category_and_group_are_projections_not_identity():
     snap = EffectiveTaxonomy.from_parts(
         ClusterMap(),
-        overrides=Overrides(
-            category={"rust": "hard"}, group={"rust": "languages"}
-        ),
+        overrides=Overrides(category={"rust": "hard"}, group={"rust": "languages"}),
     )
 
     assert snap.category_overrides == {"rust": "hard"}
@@ -99,10 +97,12 @@ def test_semantic_revision_ignores_grouping_timestamps_and_history():
 
 def test_retirement_reason_is_manifest_only_but_the_key_is_semantic():
     first = EffectiveTaxonomy.from_parts(
-        ClusterMap(), state=TaxonomyState(retired_skills={"x": RetiredSkill(reason="a")})
+        ClusterMap(),
+        state=TaxonomyState(retired_skills={"x": RetiredSkill(reason="a")}),
     )
     reworded = EffectiveTaxonomy.from_parts(
-        ClusterMap(), state=TaxonomyState(retired_skills={"x": RetiredSkill(reason="b")})
+        ClusterMap(),
+        state=TaxonomyState(retired_skills={"x": RetiredSkill(reason="b")}),
     )
     added = EffectiveTaxonomy.from_parts(
         ClusterMap(), state=TaxonomyState(retired_skills={"y": RetiredSkill()})
@@ -126,9 +126,7 @@ def test_category_and_group_move_projection_not_semantic():
     plain = EffectiveTaxonomy.from_parts(ClusterMap(domain_of={"rust": "systems"}))
     styled = EffectiveTaxonomy.from_parts(
         ClusterMap(domain_of={"rust": "systems"}),
-        overrides=Overrides(
-            category={"rust": "hard"}, group={"rust": "languages"}
-        ),
+        overrides=Overrides(category={"rust": "hard"}, group={"rust": "languages"}),
     )
 
     assert plain.semantic_revision == styled.semantic_revision

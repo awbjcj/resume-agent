@@ -25,7 +25,10 @@ def test_extract_body_prefers_text_plain_in_multipart():
 
 
 def test_extract_body_falls_back_to_html():
-    payload = {"mimeType": "text/html", "body": {"data": _b64("<p>Hello <b>there</b></p>")}}
+    payload = {
+        "mimeType": "text/html",
+        "body": {"data": _b64("<p>Hello <b>there</b></p>")},
+    }
     assert "Hello" in extract_body(payload)
     assert "<p>" not in extract_body(payload)
 
@@ -41,7 +44,9 @@ class _FakeMessages:
 
     def get(self, userId, id, format):
         payload = self._payload
-        return type("Req", (), {"execute": staticmethod(lambda: {"payload": payload})})()
+        return type(
+            "Req", (), {"execute": staticmethod(lambda: {"payload": payload})}
+        )()
 
 
 class _FakeService:

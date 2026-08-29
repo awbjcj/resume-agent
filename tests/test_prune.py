@@ -14,11 +14,23 @@ from resume_agent.tracking.tables import JobStatus
 NOW = datetime(2026, 6, 20, tzinfo=timezone.utc)
 
 
-def _row(job_id=1, status=JobStatus.raw.value, fit=None, posted=None,
-         created=NOW, archived=None, progress=False) -> PruneRow:
+def _row(
+    job_id=1,
+    status=JobStatus.raw.value,
+    fit=None,
+    posted=None,
+    created=NOW,
+    archived=None,
+    progress=False,
+) -> PruneRow:
     return PruneRow(
-        job_id=job_id, status=status, fit_score=fit, posted_at=posted,
-        created_at=created, archived_at=archived, has_progress=progress,
+        job_id=job_id,
+        status=status,
+        fit_score=fit,
+        posted_at=posted,
+        created_at=created,
+        archived_at=archived,
+        has_progress=progress,
     )
 
 
@@ -29,7 +41,10 @@ def test_prune_candidates_match_each_enabled_rule():
     stale = _row(job_id=3, posted=NOW - timedelta(days=90))
     fresh_good = _row(job_id=4, fit=95, posted=NOW)
 
-    ids = {r.job_id for r in prune_candidates([rejected, low_fit, stale, fresh_good], cfg, NOW)}
+    ids = {
+        r.job_id
+        for r in prune_candidates([rejected, low_fit, stale, fresh_good], cfg, NOW)
+    }
     assert ids == {1, 2, 3}
 
 
@@ -52,7 +67,9 @@ def test_prune_reason_counts_uses_primary_reason_without_double_counting():
 
 def test_prune_skips_jobs_with_progress():
     cfg = PruneConfig()
-    matched_but_progress = _row(job_id=5, status=JobStatus.rejected.value, progress=True)
+    matched_but_progress = _row(
+        job_id=5, status=JobStatus.rejected.value, progress=True
+    )
     assert prune_candidates([matched_but_progress], cfg, NOW) == []
     assert {r.job_id for r in prune_skipped([matched_but_progress], cfg, NOW)} == {5}
 
@@ -74,8 +91,15 @@ def test_expire_candidates_only_old_archived_zero_progress():
     cfg = PruneConfig()
     old = _row(job_id=9, archived=NOW - timedelta(days=45))
     recent = _row(job_id=10, archived=NOW - timedelta(days=5))
-    old_with_progress = _row(job_id=11, archived=NOW - timedelta(days=45), progress=True)
+    old_with_progress = _row(
+        job_id=11, archived=NOW - timedelta(days=45), progress=True
+    )
     never_archived = _row(job_id=12, archived=None)
 
-    ids = {r.job_id for r in expire_candidates([old, recent, old_with_progress, never_archived], cfg, NOW)}
+    ids = {
+        r.job_id
+        for r in expire_candidates(
+            [old, recent, old_with_progress, never_archived], cfg, NOW
+        )
+    }
     assert ids == {9}

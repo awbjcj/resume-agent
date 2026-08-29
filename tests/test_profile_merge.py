@@ -33,7 +33,9 @@ def test_merge_appends_github_projects_and_sets_profile():
     gh_projects = [Project(name="from-github", source=Source.github)]
     gh_profile = GitHubProfile(username="ada", total_stars=5)
 
-    merged = merge_facts(resume_facts, github_projects=gh_projects, github_profile=gh_profile)
+    merged = merge_facts(
+        resume_facts, github_projects=gh_projects, github_profile=gh_profile
+    )
 
     names = [p.name for p in merged.projects]
     assert names == ["from-resume", "from-github"]
@@ -72,7 +74,9 @@ def test_merge_dedupes_github_project_by_normalized_name_and_enriches():
 
 
 def test_merge_keeps_distinct_github_project():
-    resume_facts = ProfileFacts(contact=Contact(name="Ada"), projects=[Project(name="from-resume")])
+    resume_facts = ProfileFacts(
+        contact=Contact(name="Ada"), projects=[Project(name="from-resume")]
+    )
     gh = [Project(name="totally-different", source=Source.github)]
     merged = merge_facts(resume_facts, github_projects=gh)
     assert [p.name for p in merged.projects] == ["from-resume", "totally-different"]
@@ -148,7 +152,15 @@ def _doc(doc_id, primary=False):
     )
 
 
-def _exp(company="Acme", title="Engineer", start=None, end=None, current=False, bullets=(), tech=()):
+def _exp(
+    company="Acme",
+    title="Engineer",
+    start=None,
+    end=None,
+    current=False,
+    bullets=(),
+    tech=(),
+):
     return Experience(
         company=company,
         title=title,
@@ -260,7 +272,9 @@ def test_duplicate_projects_merge_all_fields_and_report_conflicts():
     assert project.start == "2024"
     assert project.tech == ["Python", "Rust"]
     assert [highlight.text for highlight in project.highlights] == ["Published"]
-    assert any("project Compiler: description" in conflict for conflict in report.conflicts)
+    assert any(
+        "project Compiler: description" in conflict for conflict in report.conflicts
+    )
 
 
 def test_duplicate_other_entities_merge_scalars_and_collections():
@@ -365,36 +379,61 @@ def test_merge_fragments_requires_exactly_one_primary_first():
 
 
 def _deck_doc():
-    return SourceDoc(id="deck-1", filename="deck.pptx", sha256="0" * 64,
-                     added_at="2026-07-03T00:00:00+00:00", mode="synthesis")
+    return SourceDoc(
+        id="deck-1",
+        filename="deck.pptx",
+        sha256="0" * 64,
+        added_at="2026-07-03T00:00:00+00:00",
+        mode="synthesis",
+    )
 
 
 def _merged():
     return ProfileFacts(
         contact=Contact(name="Ada"),
-        experience=[Experience(
-            id="exp1", company="Acme", title="Engineer",
-            bullets=[Bullet(id="b1", text="Shipped the billing rewrite")],
-            tech=["Python"],
-        )],
+        experience=[
+            Experience(
+                id="exp1",
+                company="Acme",
+                title="Engineer",
+                bullets=[Bullet(id="b1", text="Shipped the billing rewrite")],
+                tech=["Python"],
+            )
+        ],
     )
 
 
 def _synth_fragment(anchor_id="exp1"):
     return ProfileFacts(
         contact=Contact(name=""),
-        experience=[Experience(
-            id=anchor_id, company="Acme", title="Engineer", synthesized=True,
-            bullets=[
-                Bullet(id="sb1", text="Cut p99 latency 30%", synthesized=True),
-                Bullet(id="sb2", text="Shipped the billing rewrite", synthesized=True),
-            ],
-            tech=["Kubernetes", "Python"],
-        )],
-        skills={"hard": [Skill(id="sk1", name="Kubernetes", category="hard",
-                               synthesized=True)]},
-        projects=[Project(id="sp1", name="Side tool", synthesized=True,
-                          highlights=[Bullet(text="Built a CLI")])],
+        experience=[
+            Experience(
+                id=anchor_id,
+                company="Acme",
+                title="Engineer",
+                synthesized=True,
+                bullets=[
+                    Bullet(id="sb1", text="Cut p99 latency 30%", synthesized=True),
+                    Bullet(
+                        id="sb2", text="Shipped the billing rewrite", synthesized=True
+                    ),
+                ],
+                tech=["Kubernetes", "Python"],
+            )
+        ],
+        skills={
+            "hard": [
+                Skill(id="sk1", name="Kubernetes", category="hard", synthesized=True)
+            ]
+        },
+        projects=[
+            Project(
+                id="sp1",
+                name="Side tool",
+                synthesized=True,
+                highlights=[Bullet(text="Built a CLI")],
+            )
+        ],
     )
 
 
@@ -423,17 +462,19 @@ def test_unresolvable_anchor_falls_back_to_project():
     )
     assert touched == set()
     assert len(merged.experience[0].bullets) == 1  # untouched
-    fallback = next(p for p in merged.projects if p.synthesized and p.name != "Side tool")
-    assert "Cut p99 latency 30%" in [highlight.text for highlight in fallback.highlights]
+    fallback = next(
+        p for p in merged.projects if p.synthesized and p.name != "Side tool"
+    )
+    assert "Cut p99 latency 30%" in [
+        highlight.text for highlight in fallback.highlights
+    ]
     assert any("not found" in line for line in decisions)
 
 
 def test_synthesis_project_merges_by_repo_url_when_names_differ():
     merged = ProfileFacts(
         contact=Contact(name="Ada"),
-        projects=[
-            Project(name="Tool CLI", repo_url="https://github.com/me/tool")
-        ],
+        projects=[Project(name="Tool CLI", repo_url="https://github.com/me/tool")],
     )
     fragment = ProfileFacts(
         contact=Contact(name=""),
@@ -466,10 +507,19 @@ def _synth_fragment_all_dupes(anchor_id="exp1"):
     present on the anchor target, so applying it appends zero new bullets."""
     return ProfileFacts(
         contact=Contact(name=""),
-        experience=[Experience(
-            id=anchor_id, company="Acme", title="Engineer", synthesized=True,
-            bullets=[Bullet(id="sb1", text="Shipped the billing rewrite", synthesized=True)],
-        )],
+        experience=[
+            Experience(
+                id=anchor_id,
+                company="Acme",
+                title="Engineer",
+                synthesized=True,
+                bullets=[
+                    Bullet(
+                        id="sb1", text="Shipped the billing rewrite", synthesized=True
+                    )
+                ],
+            )
+        ],
     )
 
 
@@ -503,12 +553,19 @@ def test_dedup_experience_bullets_only_ids_skips_untouched_experiences():
         contact=Contact(name="Ada"),
         experience=[
             Experience(
-                id="exp-touched", company="Acme", title="Engineer",
+                id="exp-touched",
+                company="Acme",
+                title="Engineer",
                 bullets=[Bullet(text="Shipped v1"), Bullet(text="Shipped v1 again")],
             ),
             Experience(
-                id="exp-untouched", company="Globex", title="Analyst",
-                bullets=[Bullet(text="Analyzed reports"), Bullet(text="Analyzed more reports")],
+                id="exp-untouched",
+                company="Globex",
+                title="Analyst",
+                bullets=[
+                    Bullet(text="Analyzed reports"),
+                    Bullet(text="Analyzed more reports"),
+                ],
             ),
         ],
     )

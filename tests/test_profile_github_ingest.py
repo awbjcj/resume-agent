@@ -7,7 +7,13 @@ from resume_agent.profile.github_ingest import (
 
 
 def test_build_github_profile_aggregates_signals():
-    profile = {"login": "ada", "bio": "math", "followers": 42, "public_repos": 2, "created_at": "2010-01-01T00:00:00Z"}
+    profile = {
+        "login": "ada",
+        "bio": "math",
+        "followers": 42,
+        "public_repos": 2,
+        "created_at": "2010-01-01T00:00:00Z",
+    }
     repos = [
         {"language": "Python", "stargazers_count": 10},
         {"language": "Python", "stargazers_count": 5},

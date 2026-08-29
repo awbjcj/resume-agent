@@ -116,8 +116,9 @@ def test_linkedin_fetch_skips_known_cards_before_detail_scrape():
 
     result = _RecordingScraper().fetch(
         SearchConfig(),
-        skip_seen=lambda row: row.url
-        == "https://www.linkedin.com/jobs/view/3700000001/",
+        skip_seen=lambda row: (
+            row.url == "https://www.linkedin.com/jobs/view/3700000001/"
+        ),
     )
 
     assert scraped == ["https://www.linkedin.com/jobs/view/3700000002/"]
@@ -245,7 +246,9 @@ def test_search_url_omits_location_when_only_non_geographic_labels_exist():
 
 
 def test_search_url_joins_multiple_remote_policies():
-    cfg = SearchConfig(titles=["AI Engineer"], remote_policy=["remote", "hybrid", "remote"])
+    cfg = SearchConfig(
+        titles=["AI Engineer"], remote_policy=["remote", "hybrid", "remote"]
+    )
     url = _search_url(cfg, geo_resolver=lambda loc: None)
     params = parse_qs(urlsplit(url).query)
     assert params["f_WT"] == ["2,3"]

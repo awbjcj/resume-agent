@@ -1,4 +1,8 @@
-from resume_agent.discovery.connectors.detect import AtsTarget, identify_host, targets_from_html
+from resume_agent.discovery.connectors.detect import (
+    AtsTarget,
+    identify_host,
+    targets_from_html,
+)
 from resume_agent.discovery.connectors.registry import discoverable_board_families
 from resume_agent.discovery.source_resolution.catalog import (
     BOARD_FAMILIES,
@@ -51,7 +55,9 @@ def test_generated_guidance_and_three_queries_cover_every_supported_host_once():
 
 def test_smartrecruiters_posting_canonicalizes_to_public_careers_board():
     target = AtsTarget("smartrecruiters", "Intuitive")
-    assert canonical_target_url(target) == "https://careers.smartrecruiters.com/Intuitive"
+    assert (
+        canonical_target_url(target) == "https://careers.smartrecruiters.com/Intuitive"
+    )
 
 
 def test_html_extraction_returns_every_supported_target_not_only_the_first_marker():

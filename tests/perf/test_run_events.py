@@ -66,7 +66,10 @@ async def _drain(mgr, *, after: float) -> tuple[list[dict], float]:
         mgr.finish()
 
     task = asyncio.create_task(finish_soon())
-    events = [json.loads(event["data"]) async for event in run_events(mgr, "r1", poll_interval=POLL)]
+    events = [
+        json.loads(event["data"])
+        async for event in run_events(mgr, "r1", poll_interval=POLL)
+    ]
     await task
     return events, time.monotonic() - started
 

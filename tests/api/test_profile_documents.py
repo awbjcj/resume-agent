@@ -11,8 +11,12 @@ from resume_agent.services.profile_documents import DocumentStore
 
 @pytest.fixture()
 def client(tmp_path):
-    app = create_app(db_url="sqlite://", config_dir=tmp_path / "config",
-                     env_path=tmp_path / ".env", data_dir=tmp_path / "data")
+    app = create_app(
+        db_url="sqlite://",
+        config_dir=tmp_path / "config",
+        env_path=tmp_path / ".env",
+        data_dir=tmp_path / "data",
+    )
     with TestClient(app) as c:
         yield c
 

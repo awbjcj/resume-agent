@@ -12,28 +12,57 @@ def _proposal(pid, label, *, kind="source"):
     return {
         "id": pid,
         "kind": kind,
-        "source": {"company": label, "url": f"https://{label}.example/jobs", "ats": "greenhouse", "roleCount": 4} if kind == "source" else None,
-        "term": {"value": label, "termKind": "keyword"} if kind == "search_term" else None,
+        "source": {
+            "company": label,
+            "url": f"https://{label}.example/jobs",
+            "ats": "greenhouse",
+            "roleCount": 4,
+        }
+        if kind == "source"
+        else None,
+        "term": {"value": label, "termKind": "keyword"}
+        if kind == "search_term"
+        else None,
         "fitScore": 80,
         "check": "validated" if kind == "source" else "new",
         "status": "pending",
     }
 
 
-def test_scout_command_snapshots_indexes_and_uses_shared_services(monkeypatch, tmp_path):
+def test_scout_command_snapshots_indexes_and_uses_shared_services(
+    monkeypatch, tmp_path
+):
     view = {
         "sessionId": "s1",
         "status": "active",
         "turns": [{"role": "scout", "text": "Found three."}],
-        "proposals": [_proposal("p1", "Modal"), _proposal("p2", "Baseten"), _proposal("p3", "inference serving", kind="search_term")],
+        "proposals": [
+            _proposal("p1", "Modal"),
+            _proposal("p2", "Baseten"),
+            _proposal("p3", "inference serving", kind="search_term"),
+        ],
         "recap": None,
     }
     approved = []
     dismissed = []
-    monkeypatch.setattr(cli, "get_settings", lambda: SimpleNamespace(mid_model="x", cheap_model="y", search_mode="auto", stream_enabled=False, browser_enabled=False))
+    monkeypatch.setattr(
+        cli,
+        "get_settings",
+        lambda: SimpleNamespace(
+            mid_model="x",
+            cheap_model="y",
+            search_mode="auto",
+            stream_enabled=False,
+            browser_enabled=False,
+        ),
+    )
     monkeypatch.setattr(cli, "missing_model_keys", lambda settings: [])
-    monkeypatch.setattr(cli, "plan_search", lambda *args: SimpleNamespace(strategy="tool"))
-    monkeypatch.setattr(cli, "_tenant_cli_path", lambda value: Path(tmp_path) / Path(value).name)
+    monkeypatch.setattr(
+        cli, "plan_search", lambda *args: SimpleNamespace(strategy="tool")
+    )
+    monkeypatch.setattr(
+        cli, "_tenant_cli_path", lambda value: Path(tmp_path) / Path(value).name
+    )
     monkeypatch.setattr(scout_store, "active_session", lambda root: None)
     monkeypatch.setattr(scout_service, "run_start_turn", lambda *args, **kwargs: view)
 
@@ -44,12 +73,18 @@ def test_scout_command_snapshots_indexes_and_uses_shared_services(monkeypatch, t
 
     def dismiss(_root, _sid, pid, **kwargs):
         dismissed.append((pid, kwargs["reason"]))
-        next(row for row in view["proposals"] if row["id"] == pid)["status"] = "dismissed"
+        next(row for row in view["proposals"] if row["id"] == pid)["status"] = (
+            "dismissed"
+        )
         return view
 
     monkeypatch.setattr(scout_service, "approve_proposal", approve)
     monkeypatch.setattr(scout_service, "dismiss_proposal", dismiss)
-    monkeypatch.setattr(scout_service, "run_recap_turn", lambda *args, **kwargs: view | {"status": "ended", "recap": "Done"})
+    monkeypatch.setattr(
+        scout_service,
+        "run_recap_turn",
+        lambda *args, **kwargs: view | {"status": "ended", "recap": "Done"},
+    )
 
     result = CliRunner().invoke(
         cli.app,
@@ -64,14 +99,40 @@ def test_scout_command_snapshots_indexes_and_uses_shared_services(monkeypatch, t
 
 
 def test_scout_resumes_active_session_and_quit_leaves_it_open(monkeypatch, tmp_path):
-    view = {"sessionId": "s1", "status": "active", "turns": [], "proposals": [], "recap": None}
-    monkeypatch.setattr(cli, "get_settings", lambda: SimpleNamespace(mid_model="x", cheap_model="y", search_mode="auto", stream_enabled=False, browser_enabled=False))
+    view = {
+        "sessionId": "s1",
+        "status": "active",
+        "turns": [],
+        "proposals": [],
+        "recap": None,
+    }
+    monkeypatch.setattr(
+        cli,
+        "get_settings",
+        lambda: SimpleNamespace(
+            mid_model="x",
+            cheap_model="y",
+            search_mode="auto",
+            stream_enabled=False,
+            browser_enabled=False,
+        ),
+    )
     monkeypatch.setattr(cli, "missing_model_keys", lambda settings: [])
-    monkeypatch.setattr(cli, "plan_search", lambda *args: SimpleNamespace(strategy="tool"))
-    monkeypatch.setattr(cli, "_tenant_cli_path", lambda value: Path(tmp_path) / Path(value).name)
-    monkeypatch.setattr(scout_store, "active_session", lambda root: {"session_id": "s1"})
+    monkeypatch.setattr(
+        cli, "plan_search", lambda *args: SimpleNamespace(strategy="tool")
+    )
+    monkeypatch.setattr(
+        cli, "_tenant_cli_path", lambda value: Path(tmp_path) / Path(value).name
+    )
+    monkeypatch.setattr(
+        scout_store, "active_session", lambda root: {"session_id": "s1"}
+    )
     monkeypatch.setattr(scout_service, "session_view", lambda *args, **kwargs: view)
-    monkeypatch.setattr(scout_service, "run_recap_turn", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not end")))
+    monkeypatch.setattr(
+        scout_service,
+        "run_recap_turn",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not end")),
+    )
 
     result = CliRunner().invoke(cli.app, ["scout"], input="quit\n")
     assert result.exit_code == 0, result.output

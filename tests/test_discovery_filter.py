@@ -5,7 +5,9 @@ from resume_agent.models.job import JobCriteria, SalaryRange, SponsorshipSignal
 
 def test_sponsorship_denied_is_rejected():
     cfg = SearchConfig(sponsorship_required=True)
-    decision = apply_filters(JobCriteria(sponsorship_signal=SponsorshipSignal.denied), cfg)
+    decision = apply_filters(
+        JobCriteria(sponsorship_signal=SponsorshipSignal.denied), cfg
+    )
     assert decision.keep is False
     assert decision.reject_reason is not None
     assert "sponsorship" in decision.reject_reason
@@ -13,7 +15,9 @@ def test_sponsorship_denied_is_rejected():
 
 def test_sponsorship_silent_is_kept_and_flagged():
     cfg = SearchConfig(sponsorship_required=True)
-    decision = apply_filters(JobCriteria(sponsorship_signal=SponsorshipSignal.silent), cfg)
+    decision = apply_filters(
+        JobCriteria(sponsorship_signal=SponsorshipSignal.silent), cfg
+    )
     assert decision.keep is True
     assert "sponsorship_uncertain" in decision.flags
 

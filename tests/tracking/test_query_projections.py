@@ -49,16 +49,19 @@ def test_known_job_index_projects_only_matching_fields():
     def build_and_match():
         with Session(engine) as session:
             index = build_known_index(session)
-            assert index.match(
-                RawJob(
-                    source="lever",
-                    url="https://example.test/jobs/42",
-                    company="Acme",
-                    title="Engineer",
-                    location="Boston, MA",
-                    jd_text="new",
+            assert (
+                index.match(
+                    RawJob(
+                        source="lever",
+                        url="https://example.test/jobs/42",
+                        company="Acme",
+                        title="Engineer",
+                        location="Boston, MA",
+                        jd_text="new",
+                    )
                 )
-            ) is not None
+                is not None
+            )
 
     assert _count_job_loads(build_and_match) == 0
 

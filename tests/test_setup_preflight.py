@@ -27,9 +27,14 @@ def test_check_uv_uses_injected_which():
 
 def test_check_examples_present(tmp_path):
     (tmp_path / "config").mkdir()
-    for name in ("search.yaml.example", "connectors.yaml.example",
-                 "profile_sources.yaml.example", "review.yaml.example",
-                 "review_deep.yaml.example", "render.yaml.example"):
+    for name in (
+        "search.yaml.example",
+        "connectors.yaml.example",
+        "profile_sources.yaml.example",
+        "review.yaml.example",
+        "review_deep.yaml.example",
+        "render.yaml.example",
+    ):
         (tmp_path / "config" / name).write_text("x", encoding="utf-8")
     assert check_examples_present(root=tmp_path).ok is True
     (tmp_path / "config" / "search.yaml.example").unlink()

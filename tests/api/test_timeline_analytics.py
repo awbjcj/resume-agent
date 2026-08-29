@@ -49,7 +49,9 @@ def test_timeline_endpoint_returns_flow_cycle_pipeline_and_offer_payloads():
         dead = _job(client, "Dead")
         _event(client, dead, "rejected", 10)
         body = client.get("/api/analytics/timeline").json()
-    assert next(flow for flow in body["flows"] if flow["source"] == "application_submitted") == {
+    assert next(
+        flow for flow in body["flows"] if flow["source"] == "application_submitted"
+    ) == {
         "source": "application_submitted",
         "target": "recruiter_screen",
         "count": 1,

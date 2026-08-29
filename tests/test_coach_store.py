@@ -65,7 +65,9 @@ def test_turn_delta_records_topic_and_research_actions(tmp_path):
             text="Draft ready.",
             topic_id="t1",
             research_actions=[
-                ResearchAction(kind="request_url", target="portfolio", why="More evidence")
+                ResearchAction(
+                    kind="request_url", target="portfolio", why="More evidence"
+                )
             ],
         ),
         new_topics=[CoachTopic(id="t3", gap="CI migration")],
@@ -92,10 +94,14 @@ def test_end_blocks_turns_but_allows_pending_draft_resolution(tmp_path):
         tmp_path,
         sid,
         user_text="evidence",
-        coach_turn=CoachTurnRecord(role="coach", kind="draft_note", text="d", topic_id="t1"),
+        coach_turn=CoachTurnRecord(
+            role="coach", kind="draft_note", text="d", topic_id="t1"
+        ),
         new_topics=[],
         skipped_topic_ids=[],
-        draft=CoachDraftNote(topic_id="t1", title="T", summary="S", quotes=["evidence"]),
+        draft=CoachDraftNote(
+            topic_id="t1", title="T", summary="S", quotes=["evidence"]
+        ),
     )
     state = end_session(tmp_path, sid, "We covered t1.")
     assert state["status"] == "ended"
@@ -104,7 +110,9 @@ def test_end_blocks_turns_but_allows_pending_draft_resolution(tmp_path):
             tmp_path,
             sid,
             user_text="more",
-            coach_turn=CoachTurnRecord(role="coach", kind="question", text="q", topic_id="t1"),
+            coach_turn=CoachTurnRecord(
+                role="coach", kind="question", text="q", topic_id="t1"
+            ),
             new_topics=[],
             skipped_topic_ids=[],
             draft=None,
@@ -123,7 +131,9 @@ def test_concurrent_deltas_do_not_lose_updates(tmp_path):
             tmp_path,
             sid,
             user_text=f"answer {index}",
-            coach_turn=CoachTurnRecord(role="coach", kind="question", text=f"q{index}", topic_id="t1"),
+            coach_turn=CoachTurnRecord(
+                role="coach", kind="question", text=f"q{index}", topic_id="t1"
+            ),
             new_topics=[],
             skipped_topic_ids=[],
             draft=None,
@@ -144,8 +154,7 @@ def test_archive_unarchive_and_delete_session(tmp_path):
     assert archived["archived_at"]
     assert list_sessions(tmp_path) == []
     assert [
-        row["session_id"]
-        for row in list_sessions(tmp_path, include_archived=True)
+        row["session_id"] for row in list_sessions(tmp_path, include_archived=True)
     ] == [sid]
 
     assert unarchive_session(tmp_path, sid)["archived_at"] is None

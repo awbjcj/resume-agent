@@ -14,9 +14,14 @@ def _seed(db_url):
     engine = make_engine(db_url)
     init_db(engine)
     with get_session(engine) as session:
-        job = add_job(session, source="manual", jd_text="jd", company="Acme", title="Eng")
+        job = add_job(
+            session, source="manual", jd_text="jd", company="Acme", title="Eng"
+        )
         assert job is not None and job.id is not None
-        save_application(session, Application(job_id=job.id, status=ApplicationStatus.submitted.value))
+        save_application(
+            session,
+            Application(job_id=job.id, status=ApplicationStatus.submitted.value),
+        )
 
 
 def test_sync_status_lists_then_applies(tmp_path, monkeypatch):

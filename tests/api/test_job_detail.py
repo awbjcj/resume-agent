@@ -277,7 +277,9 @@ def test_pdf_preview_404_when_no_file(tmp_path):
             s.commit()
             s.refresh(job)
             assert job.id is not None
-            v = ResumeVersion(job_id=job.id, round=0, pdf_path=str(tmp_path / "gone.pdf"))
+            v = ResumeVersion(
+                job_id=job.id, round=0, pdf_path=str(tmp_path / "gone.pdf")
+            )
             s.add(v)
             s.commit()
             s.refresh(v)

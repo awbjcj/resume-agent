@@ -183,5 +183,7 @@ def test_every_model_default_is_a_catalogued_id():
 
     for field in ("cheap_model", "mid_model", "premium_model", "transcribe_model"):
         default = Settings.model_fields[field].default
-        assert catalog_entry(default) is not None, f"{field}={default} is not catalogued"
+        assert catalog_entry(default) is not None, (
+            f"{field}={default} is not catalogued"
+        )
     assert Settings.model_fields["speech_model"].default == "openai:gpt-4o-mini-tts"

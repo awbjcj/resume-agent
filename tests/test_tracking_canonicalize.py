@@ -33,7 +33,9 @@ def test_classification_agent_policy_builds_every_phase_runner(monkeypatch):
 
 
 def test_clusters_to_mapping_uses_first_member_as_canonical():
-    mapping = clusters_to_mapping([["kubernetes", "k8s"]], {"kubernetes", "k8s", "python"})
+    mapping = clusters_to_mapping(
+        [["kubernetes", "k8s"]], {"kubernetes", "k8s", "python"}
+    )
 
     assert mapping == {
         "kubernetes": "kubernetes",
@@ -91,9 +93,7 @@ class _FakeRunner:
         self._clusters = clusters
 
     def run(self, prompt):
-        return _FakeResult(
-            SkillClusters.model_validate({"clusters": self._clusters})
-        )
+        return _FakeResult(SkillClusters.model_validate({"clusters": self._clusters}))
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -125,7 +125,9 @@ def test_canonicalizer_short_circuits_on_empty():
 
 def _capture_default_model(monkeypatch, factory):
     captured = {}
-    settings = SimpleNamespace(cheap_model="cheap", mid_model="mid", premium_model="premium")
+    settings = SimpleNamespace(
+        cheap_model="cheap", mid_model="mid", premium_model="premium"
+    )
     monkeypatch.setattr(canonicalize_module, "get_settings", lambda: settings)
     monkeypatch.setattr(
         canonicalize_module,
@@ -145,11 +147,17 @@ def _capture_default_model(monkeypatch, factory):
 
 
 def test_default_canonicalizer_uses_premium_model(monkeypatch):
-    assert _capture_default_model(monkeypatch, canonicalize_module._default_agent) == "premium"
+    assert (
+        _capture_default_model(monkeypatch, canonicalize_module._default_agent)
+        == "premium"
+    )
 
 
 def test_default_themer_uses_mid_model(monkeypatch):
-    assert _capture_default_model(monkeypatch, canonicalize_module._default_themer_agent) == "mid"
+    assert (
+        _capture_default_model(monkeypatch, canonicalize_module._default_themer_agent)
+        == "mid"
+    )
 
 
 def test_incremental_domain_schema_distinguishes_existing_id_from_new_domain():

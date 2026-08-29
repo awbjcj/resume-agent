@@ -27,9 +27,20 @@ def test_scout_enrichment_accepts_shared_citations_and_new_kinds():
         citations=[citation],
     )
     suggestions = [
-        ScoutProposal(kind="search_term", term=TermPayload(value="Berlin", term_kind="location"), fit_score=80),
-        ScoutProposal(kind="search_term", term=TermPayload(value="mid-senior", term_kind="seniority"), fit_score=70),
-        ScoutProposal(kind="search_term", term=TermPayload(value="Platform Architect", term_kind="adjacent_role")),
+        ScoutProposal(
+            kind="search_term",
+            term=TermPayload(value="Berlin", term_kind="location"),
+            fit_score=80,
+        ),
+        ScoutProposal(
+            kind="search_term",
+            term=TermPayload(value="mid-senior", term_kind="seniority"),
+            fit_score=70,
+        ),
+        ScoutProposal(
+            kind="search_term",
+            term=TermPayload(value="Platform Architect", term_kind="adjacent_role"),
+        ),
     ]
 
     assert source.citations[0] == citation
@@ -43,9 +54,13 @@ def test_scout_enrichment_accepts_shared_citations_and_new_kinds():
 @pytest.mark.parametrize("score", [-1, 101])
 def test_fit_scores_are_bounded(score):
     with pytest.raises(ValidationError):
-        ScoutProposal(kind="source", source=SourcePayload(company="Acme"), fit_score=score)
+        ScoutProposal(
+            kind="source", source=SourcePayload(company="Acme"), fit_score=score
+        )
     with pytest.raises(ValidationError):
-        ScoutProposal(kind="search_term", term=TermPayload(value="python"), fit_score=score)
+        ScoutProposal(
+            kind="search_term", term=TermPayload(value="python"), fit_score=score
+        )
 
 
 def test_seniority_uses_existing_search_config_vocabulary():

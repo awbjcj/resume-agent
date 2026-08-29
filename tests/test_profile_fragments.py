@@ -52,7 +52,9 @@ def _setup(tmp_path):
 def test_extracts_and_caches(tmp_path):
     profile_dir = _setup(tmp_path)
     agent = _FakeAgent(
-        ProfileFacts(contact=Contact(name="Ada"), skills={"hard": [Skill(name="Python")]})
+        ProfileFacts(
+            contact=Contact(name="Ada"), skills={"hard": [Skill(name="Python")]}
+        )
     )
     manifest = load_manifest(profile_dir)
     doc_id = manifest.docs[0].id
@@ -184,16 +186,34 @@ def _corpus_with_deck(tmp_path):
     return profile_dir, doc
 
 
-_SKELETON = [{"id": "exp1", "kind": "experience", "company": "Acme",
-              "title": "Engineer", "start": None, "end": None}]
+_SKELETON = [
+    {
+        "id": "exp1",
+        "kind": "experience",
+        "company": "Acme",
+        "title": "Engineer",
+        "start": None,
+        "end": None,
+    }
+]
 
 
 def _synth_agent():
-    return _FakeAgent(SynthesizedFragment(entries=[SynthesizedEntry(
-        kind="experience_bullets", anchor_id="exp1",
-        claims=[SynthesizedClaim(text="Cut latency 30%",
-                                 support=["Cut latency 30%"])],
-    )]))
+    return _FakeAgent(
+        SynthesizedFragment(
+            entries=[
+                SynthesizedEntry(
+                    kind="experience_bullets",
+                    anchor_id="exp1",
+                    claims=[
+                        SynthesizedClaim(
+                            text="Cut latency 30%", support=["Cut latency 30%"]
+                        )
+                    ],
+                )
+            ]
+        )
+    )
 
 
 class _ApproveAll:
@@ -202,9 +222,13 @@ class _ApproveAll:
     def run(self, prompt):
         self.calls += 1
         claims = json.loads(prompt)
-        return _FakeResult(ClaimVerdicts(verdicts=[
-            ClaimVerdict(index=c["index"], verdict="supported") for c in claims
-        ]))
+        return _FakeResult(
+            ClaimVerdicts(
+                verdicts=[
+                    ClaimVerdict(index=c["index"], verdict="supported") for c in claims
+                ]
+            )
+        )
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -259,7 +283,11 @@ def test_anchor_change_invalidates_synthesis_cache(tmp_path):
 def test_synthesis_failure_keeps_previous_fragment(tmp_path):
     profile_dir, doc = _corpus_with_deck(tmp_path)
     extract_synthesis_fragments(
-        profile_dir, load_manifest(profile_dir), _SKELETON, _synth_agent(), _ApproveAll()
+        profile_dir,
+        load_manifest(profile_dir),
+        _SKELETON,
+        _synth_agent(),
+        _ApproveAll(),
     )
     deck = profile_dir / "sources" / "deck.md"
     deck.write_text("Different text now.", encoding="utf-8")
@@ -275,7 +303,11 @@ def test_synthesis_failure_keeps_previous_fragment(tmp_path):
 def test_remove_source_deletes_evidence_sidecar(tmp_path):
     profile_dir, doc = _corpus_with_deck(tmp_path)
     extract_synthesis_fragments(
-        profile_dir, load_manifest(profile_dir), _SKELETON, _synth_agent(), _ApproveAll()
+        profile_dir,
+        load_manifest(profile_dir),
+        _SKELETON,
+        _synth_agent(),
+        _ApproveAll(),
     )
     evidence_path = profile_dir / "fragments" / f"{doc.id}.evidence.json"
     assert evidence_path.exists()
@@ -387,9 +419,7 @@ def test_project_walk_is_source_aware_cached_and_skipped_by_literal_walk(tmp_pat
     assert agent.calls == 1
 
 
-def test_project_prompt_version_bump_invalidates_project_cache(
-    tmp_path, monkeypatch
-):
+def test_project_prompt_version_bump_invalidates_project_cache(tmp_path, monkeypatch):
     from resume_agent.profile.project_extractor import ProjectDocFacts
 
     profile_dir = _setup(tmp_path)
@@ -402,9 +432,7 @@ def test_project_prompt_version_bump_invalidates_project_cache(
     assert agent.calls == 1
 
     monkeypatch.setattr("resume_agent.profile.fragments.PROJECT_PROMPT_VERSION", 99)
-    result = extract_project_fragments(
-        profile_dir, load_manifest(profile_dir), agent
-    )
+    result = extract_project_fragments(profile_dir, load_manifest(profile_dir), agent)
 
     assert agent.calls == 2
     assert result.status[project_doc.id] == "extracted"

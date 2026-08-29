@@ -87,9 +87,9 @@ def test_download_link_is_purpose_bound(mu_client):
 
 def test_admin_export_accepts_an_admin_download_link(mu_client):
     _login(mu_client)
-    token = mu_client.post(
-        "/api/auth/link-token", json={"purpose": "download"}
-    ).json()["token"]
+    token = mu_client.post("/api/auth/link-token", json={"purpose": "download"}).json()[
+        "token"
+    ]
     mu_client.cookies.clear()
 
     response = mu_client.get(f"/api/admin/export?token={token}")

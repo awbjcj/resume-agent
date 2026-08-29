@@ -50,7 +50,9 @@ def test_event_download_is_scoped_to_its_job() -> None:
         first = _job(client, "First")
         second = _job(client, "Second")
         event_id = _event(client, first)
-        assert client.get(f"/api/jobs/{second}/events/{event_id}.ics").status_code == 404
+        assert (
+            client.get(f"/api/jobs/{second}/events/{event_id}.ics").status_code == 404
+        )
 
 
 def test_undated_custom_event_cannot_be_exported() -> None:

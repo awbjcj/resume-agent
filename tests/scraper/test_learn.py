@@ -2,8 +2,16 @@ from datetime import datetime, timezone
 
 import pytest
 
-from resume_agent.discovery.scraper.learn import MAX_LEARN_CHARS, learn_recipe, prune_html
-from resume_agent.discovery.scraper.recipe import Pagination, RECIPE_SCHEMA_VERSION, ScrapeRecipe
+from resume_agent.discovery.scraper.learn import (
+    MAX_LEARN_CHARS,
+    learn_recipe,
+    prune_html,
+)
+from resume_agent.discovery.scraper.recipe import (
+    Pagination,
+    RECIPE_SCHEMA_VERSION,
+    ScrapeRecipe,
+)
 
 
 def _recipe(**overrides):

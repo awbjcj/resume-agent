@@ -20,17 +20,28 @@ from resume_agent.tracking.tables import Application, Job
 
 @pytest.fixture()
 def client(tmp_path):
-    app = create_app(db_url="sqlite://", config_dir=tmp_path / "config",
-                     env_path=tmp_path / ".env", data_dir=tmp_path / "data")
+    app = create_app(
+        db_url="sqlite://",
+        config_dir=tmp_path / "config",
+        env_path=tmp_path / ".env",
+        data_dir=tmp_path / "data",
+    )
     with TestClient(app) as c:
         yield c
 
 
 def _seed(engine):
     with Session(engine) as session:
+
         def job(status, archived=False, **kw):
-            j = Job(source="manual", company="Acme", title=f"{status}-role",
-                    status=status, dedup_key=f"acme|{status}{archived}", **kw)
+            j = Job(
+                source="manual",
+                company="Acme",
+                title=f"{status}-role",
+                status=status,
+                dedup_key=f"acme|{status}{archived}",
+                **kw,
+            )
             if archived:
                 j.archived_at = datetime.now(timezone.utc)
             session.add(j)
@@ -58,8 +69,11 @@ def test_summary_counts_and_queues(client):
 def test_applied_excludes_archived_jobs(client):
     with Session(client.app.state.engine) as session:
         archived_rendered = Job(
-            source="manual", company="Acme", title="rendered-archived-role",
-            status="rendered", dedup_key="acme|rendered-archived",
+            source="manual",
+            company="Acme",
+            title="rendered-archived-role",
+            status="rendered",
+            dedup_key="acme|rendered-archived",
             archived_at=datetime.now(timezone.utc),
         )
         session.add(archived_rendered)
@@ -74,9 +88,7 @@ def test_applied_excludes_archived_jobs(client):
 
 def test_summary_includes_active_sessions_and_open_error_count(client):
     with Session(client.app.state.engine) as session:
-        record_error(
-            session, kind="run", source_label="pull", message="failed"
-        )
+        record_error(session, kind="run", source_label="pull", message="failed")
     create_session(
         client.app.state.data_dir / "interview",
         "active01",

@@ -62,9 +62,7 @@ def test_connector_filters_by_search():
 
 
 def test_adzuna_configured_limit_overrides_global(monkeypatch):
-    connector = AdzunaConnector(
-        "id", "key", enrich_details=False, configured_limit=1
-    )
+    connector = AdzunaConnector("id", "key", enrich_details=False, configured_limit=1)
     payload = {
         "results": [
             {

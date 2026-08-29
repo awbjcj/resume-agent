@@ -16,11 +16,17 @@ from resume_agent.discovery.scout_store import (
     replace_pending_source_resolution,
     set_proposal_status,
 )
-from resume_agent.discovery.source_resolution.models import CompanySourceResolution, SourceEvidence
+from resume_agent.discovery.source_resolution.models import (
+    CompanySourceResolution,
+    SourceEvidence,
+)
 
 
 def source(company: str) -> ScoutProposal:
-    return ScoutProposal(kind="source", source=SourcePayload(company=company, url=f"https://{company}.example/jobs"))
+    return ScoutProposal(
+        kind="source",
+        source=SourcePayload(company=company, url=f"https://{company}.example/jobs"),
+    )
 
 
 def term(value: str) -> ScoutProposal:
@@ -114,7 +120,9 @@ def _verified_resolution(url: str) -> CompanySourceResolution:
 
 
 def test_legacy_source_payload_defaults_resolution_fields():
-    payload = SourcePayload.model_validate({"company": "Acme", "url": "https://acme.test"})
+    payload = SourcePayload.model_validate(
+        {"company": "Acme", "url": "https://acme.test"}
+    )
     assert payload.resolution_status is None
     assert payload.evidence == []
     assert payload.searched_families == []
@@ -127,7 +135,12 @@ def test_replacement_requires_the_pending_exact_url(tmp_path):
         goal="AI infra",
         user_text="AI infra",
         scout_turn=ScoutTurnRecord(role="scout", text="First"),
-        proposals=[ScoutProposal(kind="source", source=SourcePayload(company="Acme", url="https://old.example/jobs"))],
+        proposals=[
+            ScoutProposal(
+                kind="source",
+                source=SourcePayload(company="Acme", url="https://old.example/jobs"),
+            )
+        ],
     )
     with pytest.raises(ScoutProposalChangedError, match="source URL changed"):
         replace_pending_source_resolution(
@@ -137,7 +150,10 @@ def test_replacement_requires_the_pending_exact_url(tmp_path):
             expected_url="https://stale.example/jobs",
             resolution=_verified_resolution("https://new.example/jobs"),
         )
-    assert load_session(tmp_path, "s1")["proposals"][0]["source"]["url"] == "https://old.example/jobs"
+    assert (
+        load_session(tmp_path, "s1")["proposals"][0]["source"]["url"]
+        == "https://old.example/jobs"
+    )
 
 
 def test_added_override_persists_exact_confirmation(tmp_path):

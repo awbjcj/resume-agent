@@ -390,9 +390,7 @@ def test_google_login_creates_passwordless_account_when_registration_is_open(
     assert me.json()["email"] == "new-open@example.com"
     with Session(mu_app.state.system_engine) as session:
         user = (
-            session.execute(
-                select(User).where(User.google_sub == "google-open-signup")
-            )
+            session.execute(select(User).where(User.google_sub == "google-open-signup"))
             .scalars()
             .one()
         )

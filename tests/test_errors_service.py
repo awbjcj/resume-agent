@@ -50,15 +50,11 @@ def test_record_error_deduplicates_open_records(session):
 
 
 def test_terminal_record_does_not_absorb_a_new_failure(session):
-    first = record_error(
-        session, kind="run", source_label="pull", message="boom"
-    )
+    first = record_error(session, kind="run", source_label="pull", message="boom")
     assert first.id is not None
     set_error_status(session, first.id, "resolved")
 
-    fresh = record_error(
-        session, kind="run", source_label="pull", message="boom again"
-    )
+    fresh = record_error(session, kind="run", source_label="pull", message="boom again")
 
     assert fresh.id != first.id
     assert fresh.status == "open"
@@ -66,9 +62,7 @@ def test_terminal_record_does_not_absorb_a_new_failure(session):
 
 
 def test_set_status_validates_identity_state_and_value(session):
-    record = record_error(
-        session, kind="run", source_label="tailor", message="x"
-    )
+    record = record_error(session, kind="run", source_label="tailor", message="x")
     assert record.id is not None
     with pytest.raises(ValueError, match="unknown error record"):
         set_error_status(session, record.id + 99, "dismissed")

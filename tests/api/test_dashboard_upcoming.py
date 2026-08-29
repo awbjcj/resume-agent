@@ -37,7 +37,9 @@ def test_dashboard_upcoming_events_are_chronological_and_bounded() -> None:
         _job_with_event(client, "Too far", timedelta(days=30))
         _job_with_event(client, "Past", timedelta(days=-1))
         _job_with_event(client, "Cancelled", timedelta(days=2), result="cancelled")
-        _job_with_event(client, "Unrelated", timedelta(days=2), kind="application_submitted")
+        _job_with_event(
+            client, "Unrelated", timedelta(days=2), kind="application_submitted"
+        )
         body = client.get("/api/dashboard/summary").json()
     assert [entry["company"] for entry in body["upcomingEvents"]] == ["Sooner", "Later"]
     assert body["upcomingEvents"][0]["kind"] == "offer_deadline"

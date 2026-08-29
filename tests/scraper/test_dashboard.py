@@ -305,7 +305,9 @@ def test_card_deduplication_uses_url_before_mutable_card_fields():
     """
     updated = first.replace("Backend Engineer", "Senior Backend Engineer")
 
-    cards = DashboardScraper._cards(_recipe(), [first, updated], "https://acme.com/careers")
+    cards = DashboardScraper._cards(
+        _recipe(), [first, updated], "https://acme.com/careers"
+    )
 
     assert len(cards) == 1
 

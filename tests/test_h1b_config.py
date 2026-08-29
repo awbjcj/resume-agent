@@ -43,7 +43,9 @@ def test_disabled_h1b_ignores_transport_targets():
     assert settings.h1b_mcp_enabled is False
 
 
-@pytest.mark.parametrize("url", ["ftp://example.com", "https://user:pass@example.com/mcp", "/relative"])
+@pytest.mark.parametrize(
+    "url", ["ftp://example.com", "https://user:pass@example.com/mcp", "/relative"]
+)
 def test_enabled_http_h1b_rejects_unsafe_urls(url):
     with pytest.raises(ValidationError):
         Settings(

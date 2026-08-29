@@ -51,16 +51,18 @@ class _Formatter:
 
     def run(self, prompt: str) -> _Response:
         if self.reject:
-            return _Response(SimpleNamespace(
-                artifact_type="offer_comparison", title="", summary=""
-            ))
+            return _Response(
+                SimpleNamespace(artifact_type="offer_comparison", title="", summary="")
+            )
         from resume_agent.career_lab.models import CareerLabArtifactMeta
 
-        return _Response(CareerLabArtifactMeta(
-            artifact_type="offer_comparison",
-            title="Offer comparison",
-            summary="Review base, equity, and downside risk.",
-        ))
+        return _Response(
+            CareerLabArtifactMeta(
+                artifact_type="offer_comparison",
+                title="Offer comparison",
+                summary="Review base, equity, and downside risk.",
+            )
+        )
 
     async def arun(self, prompt: str) -> _Response:
         return self.run(prompt)
@@ -96,7 +98,10 @@ def _meta(skill):
 
 
 def _turn_kwargs(
-    tmp_path: Path, *, reporter: _Reporter | None = None, formatter: _Formatter | None = None
+    tmp_path: Path,
+    *,
+    reporter: _Reporter | None = None,
+    formatter: _Formatter | None = None,
 ) -> _TurnKwargs:
     skill = _skill()
     return {
@@ -114,8 +119,12 @@ def _turn_kwargs(
     }
 
 
-def test_start_turn_persists_user_and_assistant_only_after_validation(tmp_path, monkeypatch):
-    monkeypatch.setattr(career_lab, "get_settings", lambda: SimpleNamespace(stream_enabled=False))
+def test_start_turn_persists_user_and_assistant_only_after_validation(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        career_lab, "get_settings", lambda: SimpleNamespace(stream_enabled=False)
+    )
     result = career_lab.run_start_turn(**_turn_kwargs(tmp_path))
     session = load_session(tmp_path, result["sessionId"])
     assert [turn["role"] for turn in session["turns"]] == ["user", "assistant"]
@@ -124,7 +133,9 @@ def test_start_turn_persists_user_and_assistant_only_after_validation(tmp_path, 
 
 
 def test_formatter_retry_exhaustion_degrades_to_visible_persona(tmp_path, monkeypatch):
-    monkeypatch.setattr(career_lab, "get_settings", lambda: SimpleNamespace(stream_enabled=False))
+    monkeypatch.setattr(
+        career_lab, "get_settings", lambda: SimpleNamespace(stream_enabled=False)
+    )
     result = career_lab.run_start_turn(
         **_turn_kwargs(tmp_path, formatter=_Formatter(reject=True))
     )
@@ -136,7 +147,9 @@ def test_formatter_retry_exhaustion_degrades_to_visible_persona(tmp_path, monkey
 
 
 def test_cancel_before_commit_keeps_transcript_byte_identical(tmp_path, monkeypatch):
-    monkeypatch.setattr(career_lab, "get_settings", lambda: SimpleNamespace(stream_enabled=False))
+    monkeypatch.setattr(
+        career_lab, "get_settings", lambda: SimpleNamespace(stream_enabled=False)
+    )
     create_session(tmp_path, session_id="s1")
     path = tmp_path / "session-s1.json"
     before = path.read_bytes()

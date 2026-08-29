@@ -24,7 +24,12 @@ def test_cover_letter_command_generates_and_renders(tmp_path, monkeypatch):
         cli,
         "write_cover_letters",
         lambda session, job_ids=None, approved=False, facts_path=None: [
-            CoverLetterResult(job_id=1, cover_letter_id=1, fact_check_passed=True, pdf_path="output/x.pdf")
+            CoverLetterResult(
+                job_id=1,
+                cover_letter_id=1,
+                fact_check_passed=True,
+                pdf_path="output/x.pdf",
+            )
         ],
     )
 

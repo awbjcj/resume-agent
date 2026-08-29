@@ -19,6 +19,6 @@ def test_managed_env_omits_empty_and_maps_keys():
     s = WizardState(anthropic_api_key="sk-test", github_token="")
     env = s.managed_env()
     assert env["ANTHROPIC_API_KEY"] == "sk-test"
-    assert "GITHUB_TOKEN" not in env          # empty → omitted
+    assert "GITHUB_TOKEN" not in env  # empty → omitted
     assert env["DB_URL"] == "sqlite:///data/resume_agent.db"
-    assert "OPENAI_API_KEY" not in env         # never managed
+    assert "OPENAI_API_KEY" not in env  # never managed

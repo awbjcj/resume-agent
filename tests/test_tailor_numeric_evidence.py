@@ -114,9 +114,7 @@ def test_a_sibling_bullets_number_does_not_license_the_claim():
 
 
 def test_summary_numbers_check_against_summary_provenance():
-    content = _resume(
-        summary="3+ years building automation", summary_provenance=["b2"]
-    )
+    content = _resume(summary="3+ years building automation", summary_provenance=["b2"])
 
     critique = numeric_evidence_critique(content, _facts())
 

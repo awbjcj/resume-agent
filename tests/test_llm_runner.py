@@ -173,7 +173,9 @@ def test_build_model_deepseek_branch():
     # DeepSeek speaks the Responses API at its own base_url, so it is built from
     # the OpenAI Responses adapter rather than agno.models.deepseek.DeepSeek --
     # which is why `provider` has to be overridden back to "DeepSeek".
-    OpenAIResponses = pytest.importorskip("agno.models.openai.responses").OpenAIResponses
+    OpenAIResponses = pytest.importorskip(
+        "agno.models.openai.responses"
+    ).OpenAIResponses
     model = build_model("deepseek:deepseek-v4-flash", api_key="sk-test")
     assert isinstance(model, OpenAIResponses)
     assert model.id == "deepseek-v4-flash"
@@ -407,7 +409,9 @@ def test_unparsed_output_keeps_the_tail_so_truncation_is_visible():
                 truncated,
                 model="gemini-3.5-flash",
                 model_provider="Google",
-                metrics=_Metrics(input_tokens=12000, output_tokens=8192, reasoning_tokens=7900),
+                metrics=_Metrics(
+                    input_tokens=12000, output_tokens=8192, reasoning_tokens=7900
+                ),
             ),
             ResumeContent,
             source="tailor",

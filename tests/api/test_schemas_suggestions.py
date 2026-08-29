@@ -62,7 +62,9 @@ def test_suggestion_envelope_allows_empty_cache():
 
 
 def test_suggestion_runs_request_trims_keys_and_forbids_extra_context():
-    request = SuggestionRunsRequest(targets=[SuggestionTarget(kind="skill", key="  python  ")])
+    request = SuggestionRunsRequest(
+        targets=[SuggestionTarget(kind="skill", key="  python  ")]
+    )
 
     assert request.targets[0].key == "python"
     with pytest.raises(ValidationError):

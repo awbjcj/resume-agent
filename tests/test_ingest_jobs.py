@@ -96,19 +96,54 @@ def test_ingest_jobs_dedupes_same_posting_across_sources():
 def test_cross_run_upgrade_not_counted_as_new_add():
     # Run 1: aggregator claims the job.
     with _session() as s:
-        summary1 = ingest_jobs_with_outcomes(s, [RawJob("adzuna", "http://adz/1", "Acme Corp",
-                                                        "Backend Engineer", "Remote", "thin jd")])
+        summary1 = ingest_jobs_with_outcomes(
+            s,
+            [
+                RawJob(
+                    "adzuna",
+                    "http://adz/1",
+                    "Acme Corp",
+                    "Backend Engineer",
+                    "Remote",
+                    "thin jd",
+                )
+            ],
+        )
         assert summary1.added == {"adzuna": 1}
         assert summary1.upgraded == {}
 
         # Run 2 (same session/db): the canonical Workday copy upgrades, is NOT a new add.
-        summary2 = ingest_jobs_with_outcomes(s, [RawJob("workday", "http://wd/1", "Acme Corp",
-                                                        "Senior Backend Engineer", "Remote",
-                                                        "full canonical jd")])
+        summary2 = ingest_jobs_with_outcomes(
+            s,
+            [
+                RawJob(
+                    "workday",
+                    "http://wd/1",
+                    "Acme Corp",
+                    "Senior Backend Engineer",
+                    "Remote",
+                    "full canonical jd",
+                )
+            ],
+        )
         assert summary2.added == {}
         assert summary2.upgraded == {"workday": 1}
-        assert ingest_jobs(s, [RawJob("workday", "http://wd/1", "Acme Corp",
-                                      "Senior Backend Engineer", "Remote", "full canonical jd")]) == {}
+        assert (
+            ingest_jobs(
+                s,
+                [
+                    RawJob(
+                        "workday",
+                        "http://wd/1",
+                        "Acme Corp",
+                        "Senior Backend Engineer",
+                        "Remote",
+                        "full canonical jd",
+                    )
+                ],
+            )
+            == {}
+        )
 
         rows = jobs_by_status(s, JobStatus.raw.value)
         assert len(rows) == 1
@@ -120,8 +155,12 @@ def test_cross_run_upgrade_not_counted_as_new_add():
 def test_ingest_batch_commits_once():
     raws = [
         RawJob(
-            source="greenhouse", url=None, company="Acme", title=f"Engineer {i}",
-            location=None, jd_text=f"jd {i}",
+            source="greenhouse",
+            url=None,
+            company="Acme",
+            title=f"Engineer {i}",
+            location=None,
+            jd_text=f"jd {i}",
         )
         for i in range(3)
     ]
@@ -142,8 +181,12 @@ def test_ingest_batch_commits_once():
 
 def test_ingest_dedupes_within_uncommitted_batch():
     raw = RawJob(
-        source="greenhouse", url=None, company="Acme", title="Engineer",
-        location=None, jd_text="same jd",
+        source="greenhouse",
+        url=None,
+        company="Acme",
+        title="Engineer",
+        location=None,
+        jd_text="same jd",
     )
     with _session() as session:
         counts = ingest_jobs_with_outcomes(session, [raw, raw])

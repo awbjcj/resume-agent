@@ -32,9 +32,7 @@ def test_native_search_forwards_safe_provider_options():
 
 
 def test_search_builder_gates_incapable_reasoning_request():
-    model, _ = build_search_equipped(
-        "openai:gpt-4o", mode="native", reasoning=True
-    )
+    model, _ = build_search_equipped("openai:gpt-4o", mode="native", reasoning=True)
     assert model.reasoning is None
 
 

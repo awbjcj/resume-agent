@@ -65,11 +65,15 @@ def _seed(session: Session) -> None:
                 company=f"Company {index:02d}",
                 title=f"Engineer {47 - index:02d}",
                 location=("Boston_US", "Toronto%CA")[index % 2],
-                jd_text=("Literal_percent Python systems" if index % 2 else "Rust systems"),
+                jd_text=(
+                    "Literal_percent Python systems" if index % 2 else "Rust systems"
+                ),
                 status=statuses[index % len(statuses)],
                 fit_score=40 + index,
                 reject_reason=(
-                    "salary below minimum" if index % 7 == 0 else "sponsorship unavailable"
+                    "salary below minimum"
+                    if index % 7 == 0
+                    else "sponsorship unavailable"
                 ),
                 posted_at=NOW - timedelta(days=index, hours=6),
                 archived_at=NOW if index % 17 == 0 else None,
@@ -134,18 +138,31 @@ def _passes(row: Any, board_filter: BoardFilter, exclude: str | None = None) -> 
         return False
     reason = getattr(row, "reject_reason", None)
     if board_filter.reject_reason and (
-        reason is None or board_filter.reject_reason.strip().lower() not in reason.lower()
+        reason is None
+        or board_filter.reject_reason.strip().lower() not in reason.lower()
     ):
         return False
     score = getattr(row, "fit_score", None)
-    if board_filter.min_fit is not None and score is not None and score < board_filter.min_fit:
+    if (
+        board_filter.min_fit is not None
+        and score is not None
+        and score < board_filter.min_fit
+    ):
         return False
-    if board_filter.max_fit is not None and score is not None and score > board_filter.max_fit:
+    if (
+        board_filter.max_fit is not None
+        and score is not None
+        and score > board_filter.max_fit
+    ):
         return False
     if board_filter.min_salary is not None:
         salary = _salary(row) or None
         currency = (getattr(row, "salary_currency", None) or "USD").upper()
-        if currency == "USD" and salary is not None and salary < board_filter.min_salary:
+        if (
+            currency == "USD"
+            and salary is not None
+            and salary < board_filter.min_salary
+        ):
             return False
     posted_at = getattr(row, "posted_at", None)
     if board_filter.stale_days is not None:
@@ -292,7 +309,9 @@ def _legacy_facets(rows: list[Any], board_filter: BoardFilter):
         BoardFilter(sort="composite", preset="freshest"),
     ],
 )
-def test_pipeline_statement_matches_legacy_filter_and_order(board_session, board_filter):
+def test_pipeline_statement_matches_legacy_filter_and_order(
+    board_session, board_filter
+):
     session, aliases_path, facts_path = board_session
 
     jobs, total = board_page(

@@ -154,9 +154,7 @@ def test_bulk_operation_targets_tiers_and_canonicalizes_all_members(mu_app, mu_c
         == 125_000
     )
     assert (
-        mu_client.get(f"/api/admin/quota-accounts/{bob}").json()[
-            "creditBalanceMicros"
-        ]
+        mu_client.get(f"/api/admin/quota-accounts/{bob}").json()["creditBalanceMicros"]
         == 25_000
     )
 

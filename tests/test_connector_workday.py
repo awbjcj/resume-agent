@@ -28,10 +28,18 @@ FACETED_PAGE = json.loads(
 LIST_PAGE = {
     "total": 2,
     "jobPostings": [
-        {"title": "Software Engineer", "externalPath": "/job/Austin/Software-Engineer_R-1",
-         "locationsText": "Austin, TX", "postedOn": "Posted Today"},
-        {"title": "Data Scientist", "externalPath": "/job/Remote/Data-Scientist_R-2",
-         "locationsText": "Remote", "postedOn": "Posted 3 Days Ago"},
+        {
+            "title": "Software Engineer",
+            "externalPath": "/job/Austin/Software-Engineer_R-1",
+            "locationsText": "Austin, TX",
+            "postedOn": "Posted Today",
+        },
+        {
+            "title": "Data Scientist",
+            "externalPath": "/job/Remote/Data-Scientist_R-2",
+            "locationsText": "Remote",
+            "postedOn": "Posted 3 Days Ago",
+        },
     ],
 }
 
@@ -70,12 +78,20 @@ def test_default_facets_dir_resolves_per_tenant_workspace(tmp_path):
 
 
 def test_cxs_jobs_url_is_built_from_triple():
-    assert cxs_jobs_url(TARGET) == "https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/Careers/jobs"
+    assert (
+        cxs_jobs_url(TARGET)
+        == "https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/Careers/jobs"
+    )
 
 
 def test_list_request_body_shapes_search_text():
     body = list_request_body(SearchConfig(titles=["Software Engineer"]), offset=20)
-    assert body == {"appliedFacets": {}, "limit": 20, "offset": 20, "searchText": "Software Engineer"}
+    assert body == {
+        "appliedFacets": {},
+        "limit": 20,
+        "offset": 20,
+        "searchText": "Software Engineer",
+    }
 
 
 def test_list_request_body_empty_search_text_when_no_terms():
@@ -89,7 +105,10 @@ def test_parse_list_rows_yields_partial_rawjobs():
     assert first.source == "workday"
     assert first.company == "acme"
     assert first.location == "Austin, TX"
-    assert first.url == "https://acme.wd5.myworkdayjobs.com/job/Austin/Software-Engineer_R-1"
+    assert (
+        first.url
+        == "https://acme.wd5.myworkdayjobs.com/job/Austin/Software-Engineer_R-1"
+    )
     assert first.jd_text == ""
     assert first.external_path == "/job/Austin/Software-Engineer_R-1"
 
@@ -143,7 +162,9 @@ def test_fetch_workday_list_gates_before_detail(monkeypatch):
     detail_calls = []
 
     def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
-        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        return _Resp(
+            LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []}
+        )
 
     def fake_get(url: str, **kwargs: object) -> _Resp:
         detail_calls.append(url)
@@ -163,7 +184,9 @@ def test_fetch_workday_applies_keyword_filter_after_detail(monkeypatch):
     detail_calls = []
 
     def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
-        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        return _Resp(
+            LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []}
+        )
 
     def fake_get(url: str, **kwargs: object) -> _Resp:
         detail_calls.append(url)
@@ -191,11 +214,15 @@ def test_fetch_workday_request_is_search_shaped(monkeypatch):
 
     def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
         sent.setdefault("searchText", json["searchText"])
-        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        return _Resp(
+            LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []}
+        )
 
     monkeypatch.setattr(workday.board, "post", fake_post)
     monkeypatch.setattr(workday.board, "get", lambda url, **kwargs: _Resp(DETAIL))
-    workday.fetch_workday(TARGET, SearchConfig(titles=["Software Engineer"], role_anchors=["Engineer"]))
+    workday.fetch_workday(
+        TARGET, SearchConfig(titles=["Software Engineer"], role_anchors=["Engineer"])
+    )
     assert sent["searchText"] == "Software Engineer"
 
 
@@ -221,7 +248,9 @@ def test_fetch_workday_isolates_failed_detail_fetch(monkeypatch):
     }
 
     def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
-        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        return _Resp(
+            LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []}
+        )
 
     def fake_get(url: str, **kwargs: object) -> _Resp:
         if "Software-Engineer" in url:
@@ -314,7 +343,13 @@ def test_fetch_workday_recovers_when_list_page_throttled(monkeypatch):
 def test_apply_detail_updates_company_name(monkeypatch):
     row = parse_list_rows(TARGET, LIST_PAGE)[0]
     assert row.company == "acme"
-    apply_detail(row, {**DETAIL, "jobPostingInfo": {**DETAIL["jobPostingInfo"], "companyName": "Acme Corp"}})
+    apply_detail(
+        row,
+        {
+            **DETAIL,
+            "jobPostingInfo": {**DETAIL["jobPostingInfo"], "companyName": "Acme Corp"},
+        },
+    )
     assert row.company == "Acme Corp"
 
 
@@ -325,9 +360,10 @@ def test_resolve_location_facets_matches_location_descriptors():
 
 
 def test_resolve_location_facets_requires_every_requested_location():
-    assert workday.resolve_location_facets(
-        FACETED_PAGE, ["Austin, TX", "Boston, MA"]
-    ) == {}
+    assert (
+        workday.resolve_location_facets(FACETED_PAGE, ["Austin, TX", "Boston, MA"])
+        == {}
+    )
 
 
 def test_resolve_location_facets_ignores_non_location_facets():
@@ -344,12 +380,11 @@ def test_resolve_location_facets_rejects_short_ambiguous_substrings():
 def test_facet_cache_roundtrip_and_location_invalidation(tmp_path):
     applied = {"locations": ["loc-austin"]}
     workday.save_cached_facets(TARGET, ["Austin, TX"], applied, base_dir=tmp_path)
-    assert workday.load_cached_facets(
-        TARGET, ["Austin, TX"], base_dir=tmp_path
-    ) == applied
     assert (
-        workday.load_cached_facets(TARGET, ["Detroit, MI"], base_dir=tmp_path)
-        is None
+        workday.load_cached_facets(TARGET, ["Austin, TX"], base_dir=tmp_path) == applied
+    )
+    assert (
+        workday.load_cached_facets(TARGET, ["Detroit, MI"], base_dir=tmp_path) is None
     )
 
 
@@ -404,9 +439,7 @@ def test_fetch_workday_cached_miss_stays_plain(monkeypatch, tmp_path):
     assert len(jobs) == 1
 
 
-def test_fetch_workday_empty_faceted_restart_reuses_plain_page(
-    monkeypatch, tmp_path
-):
+def test_fetch_workday_empty_faceted_restart_reuses_plain_page(monkeypatch, tmp_path):
     bodies = []
 
     def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
@@ -424,9 +457,7 @@ def test_fetch_workday_empty_faceted_restart_reuses_plain_page(
     )
     assert len(bodies) == 2
     assert [job.title for job in jobs] == ["Software Engineer"]
-    assert workday.load_cached_facets(
-        TARGET, ["Austin, TX"], base_dir=tmp_path
-    ) == {}
+    assert workday.load_cached_facets(TARGET, ["Austin, TX"], base_dir=tmp_path) == {}
 
 
 def test_fetch_workday_cache_write_failure_falls_back_plain(monkeypatch, tmp_path):
@@ -462,7 +493,9 @@ def test_apply_detail_reads_top_level_hiring_organization():
     """
     row = parse_list_rows(TARGET, LIST_PAGE)[0]
     assert row.company == "acme"
-    apply_detail(row, {**DETAIL, "hiringOrganization": {"name": "Acme Corp LLC", "url": ""}})
+    apply_detail(
+        row, {**DETAIL, "hiringOrganization": {"name": "Acme Corp LLC", "url": ""}}
+    )
     assert row.company == "Acme Corp LLC"
     assert row.company_provenance == "provider"
     assert row.stale_company == "acme"
@@ -497,8 +530,12 @@ def test_workday_detail_renders_time_and_remote_type():
     from resume_agent.discovery.connectors.workday import WorkdayRow, apply_detail
 
     row = WorkdayRow(
-        source="workday", url=None, company="GM", title="Engineer",
-        location="2 Locations", jd_text="",
+        source="workday",
+        url=None,
+        company="GM",
+        title="Engineer",
+        location="2 Locations",
+        jd_text="",
     )
     apply_detail(
         row,

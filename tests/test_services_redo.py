@@ -24,8 +24,13 @@ def _no_budget(monkeypatch):
 def _rendered_job(session) -> Job:
     return save_job(
         session,
-        Job(source="manual", jd_text="jd", company="Acme", title="Staff",
-            status=JobStatus.rendered.value),
+        Job(
+            source="manual",
+            jd_text="jd",
+            company="Acme",
+            title="Staff",
+            status=JobStatus.rendered.value,
+        ),
     )
 
 
@@ -33,22 +38,15 @@ def test_stages_run_in_pipeline_order_whatever_order_was_asked(session, monkeypa
     job = _rendered_job(session)
     assert job.id is not None
     seen: list[str] = []
+    monkeypatch.setattr(redo, "_run_pull", lambda *a, **k: seen.append("pull") or [])
     monkeypatch.setattr(
-        redo, "_run_pull",
-        lambda *a, **k: (seen.append("pull") or [])
+        redo, "_run_extract", lambda *a, **k: seen.append("extract") or []
     )
     monkeypatch.setattr(
-        redo, "_run_extract",
-        lambda *a, **k: (seen.append("extract") or [])
-    )
-    monkeypatch.setattr(
-        redo, "_run_tailor",
-        lambda *a, **k: (seen.append("tailor") or [])
+        redo, "_run_tailor", lambda *a, **k: seen.append("tailor") or []
     )
 
-    redo.redo_jobs(
-        session, job_ids=[job.id], stages=["tailor", "extract", "pull"]
-    )
+    redo.redo_jobs(session, job_ids=[job.id], stages=["tailor", "extract", "pull"])
 
     assert seen == ["pull", "extract", "tailor"]
 
@@ -104,14 +102,16 @@ def test_tailor_success_resolves_an_earlier_failure(session, monkeypatch):
     job_id = job.id
     failure = StageFailure(error_type="ValueError", message="boom", traceback_tail="")
     monkeypatch.setattr(
-        redo, "tailor",
+        redo,
+        "tailor",
         lambda *a, **k: TailorOutcome(versions={}, failures={job_id: failure}),
     )
     redo.redo_jobs(session, job_ids=[job_id], stages=["tailor"])
     assert len(list_error_records(session, "open")) == 1
 
     monkeypatch.setattr(
-        redo, "tailor",
+        redo,
+        "tailor",
         lambda *a, **k: TailorOutcome(versions={job_id: []}, failures={}),
     )
     outcomes = redo.redo_jobs(session, job_ids=[job_id], stages=["tailor"])
@@ -125,7 +125,8 @@ def test_missing_job_is_skipped_not_fatal(session, monkeypatch):
     assert job.id is not None
     job_id = job.id
     monkeypatch.setattr(
-        redo, "tailor",
+        redo,
+        "tailor",
         lambda *a, **k: TailorOutcome(versions={job_id: []}, failures={}),
     )
 
@@ -159,11 +160,18 @@ def test_extract_stage_reports_the_real_per_job_outcome(session, monkeypatch):
     monkeypatch.setattr(redo, "load_facts", lambda p: object())
     monkeypatch.setattr(redo, "_skill_artifacts", lambda p, f: (None, None))
     monkeypatch.setattr(
-        redo, "build_discovery_bundle",
-        lambda: type("B", (), {
-            "extract": None, "fit": None, "canonicalizer": None,
-            "industry_classifier": None,
-        })(),
+        redo,
+        "build_discovery_bundle",
+        lambda: type(
+            "B",
+            (),
+            {
+                "extract": None,
+                "fit": None,
+                "canonicalizer": None,
+                "industry_classifier": None,
+            },
+        )(),
     )
     monkeypatch.setattr(redo, "run_extract", lambda *a, **k: {bad.id: failure})
     monkeypatch.setattr(redo, "run_filter", lambda *a, **k: None)
@@ -184,7 +192,8 @@ def test_redo_never_regresses_a_rendered_job(session, monkeypatch):
     assert job.id is not None
     job_id = job.id
     monkeypatch.setattr(
-        redo, "tailor",
+        redo,
+        "tailor",
         lambda *a, **k: TailorOutcome(versions={job_id: []}, failures={}),
     )
     monkeypatch.setattr(redo, "_run_extract", lambda *a, **k: [])

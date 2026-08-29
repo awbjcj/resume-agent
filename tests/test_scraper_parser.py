@@ -121,7 +121,9 @@ def test_parse_job_detail_returns_clean_text():
 
 def test_parse_job_detail_returns_empty_when_container_missing():
     # No recognized JD container: must not dump whole-page chrome as the JD.
-    html = "<html><body><nav>People also viewed</nav><footer>About</footer></body></html>"
+    html = (
+        "<html><body><nav>People also viewed</nav><footer>About</footer></body></html>"
+    )
     assert parse_job_detail(html) == ""
 
 
@@ -192,7 +194,7 @@ def test_parse_detail_meta_page_title_with_pipe_in_company_name():
 
 def test_parse_detail_meta_prefers_legacy_topcard_over_page_title():
     html = (
-        '<html><head><title>Wrong Title | Wrong Co | LinkedIn</title></head>'
+        "<html><head><title>Wrong Title | Wrong Co | LinkedIn</title></head>"
         '<body><h1 class="top-card-layout__title">Staff Data Engineer</h1>'
         '<a class="topcard__org-name-link">Acme Corp</a></body></html>'
     )

@@ -149,12 +149,8 @@ def test_dossier_filename_slugs_and_dodges_upload_conflicts(tmp_path):
 def test_dossier_filename_keeps_sanitized_stem_collisions_distinct(tmp_path):
     profile_dir = profile(tmp_path)
     value = repo("mono")
-    first = _dossier_filename(
-        value, "api dossier.md", profile_dir, force_suffix=True
-    )
-    second = _dossier_filename(
-        value, "api-dossier.md", profile_dir, force_suffix=True
-    )
+    first = _dossier_filename(value, "api dossier.md", profile_dir, force_suffix=True)
+    second = _dossier_filename(value, "api-dossier.md", profile_dir, force_suffix=True)
     assert first.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-")
     assert second.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-")
     assert second != first
@@ -192,7 +188,9 @@ def test_dossiers_replace_readme_doc_and_yield_one_doc_each(tmp_path):
     )
     report = sync_github_sources(profile_dir, "me", client=gh)
     filenames = {
-        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+        doc.filename
+        for doc in load_manifest(profile_dir).docs
+        if doc.origin == "github"
     }
     assert filenames == {
         f"{GITHUB_DOC_PREFIX}mono--api-dossier.md",
@@ -218,12 +216,14 @@ def test_dossier_without_frontmatter_falls_back_to_readme(tmp_path):
     )
     sync_github_sources(profile_dir, "me", client=gh)
     filenames = {
-        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+        doc.filename
+        for doc in load_manifest(profile_dir).docs
+        if doc.origin == "github"
     }
     assert filenames == {f"{GITHUB_DOC_PREFIX}mono.md"}
-    content = (
-        profile_dir / "sources" / f"{GITHUB_DOC_PREFIX}mono.md"
-    ).read_text(encoding="utf-8")
+    content = (profile_dir / "sources" / f"{GITHUB_DOC_PREFIX}mono.md").read_text(
+        encoding="utf-8"
+    )
     assert "notes-dossier" not in content
     http.close()
 
@@ -241,7 +241,9 @@ def test_foreign_repo_url_dossier_skipped_with_warning(tmp_path):
     )
     report = sync_github_sources(profile_dir, "me", client=gh)
     filenames = {
-        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+        doc.filename
+        for doc in load_manifest(profile_dir).docs
+        if doc.origin == "github"
     }
     assert filenames == {f"{GITHUB_DOC_PREFIX}mono.md"}
     assert any("stolen-dossier.md" in warning for warning in report.warnings)
@@ -255,7 +257,9 @@ def test_dossier_overflow_warns_and_keeps_first_five(tmp_path):
         files[f"{letter}-dossier.md"] = dossier("mono", letter)
     gh, http = github(mono_handler([repo("mono")], files))
     report = sync_github_sources(profile_dir, "me", client=gh)
-    github_docs = [doc for doc in load_manifest(profile_dir).docs if doc.origin == "github"]
+    github_docs = [
+        doc for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    ]
     assert len(github_docs) == 5
     assert not any("f-dossier" in doc.filename for doc in github_docs)
     assert any("f-dossier.md" in warning for warning in report.warnings)
@@ -265,9 +269,7 @@ def test_dossier_overflow_warns_and_keeps_first_five(tmp_path):
 def test_per_repo_failure_keeps_previous_dossier_docs(tmp_path):
     profile_dir = profile(tmp_path)
     gh, http = github(
-        mono_handler(
-            [repo("mono")], {"api-dossier.md": dossier("mono", "API Gateway")}
-        )
+        mono_handler([repo("mono")], {"api-dossier.md": dossier("mono", "API Gateway")})
     )
     sync_github_sources(profile_dir, "me", client=gh)
     http.close()
@@ -282,7 +284,9 @@ def test_per_repo_failure_keeps_previous_dossier_docs(tmp_path):
     assert "mono" in report.failures
     assert report.removed == []
     filenames = {
-        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+        doc.filename
+        for doc in load_manifest(profile_dir).docs
+        if doc.origin == "github"
     }
     assert filenames == {f"{GITHUB_DOC_PREFIX}mono--api-dossier.md"}
     broken_http.close()
@@ -314,11 +318,15 @@ def test_sanitized_dossier_stem_collisions_write_distinct_stable_docs(tmp_path):
     )
     first = sync_github_sources(profile_dir, "me", client=gh)
     filenames = sorted(
-        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+        doc.filename
+        for doc in load_manifest(profile_dir).docs
+        if doc.origin == "github"
     )
     assert len(filenames) == 2
     assert filenames[0] != filenames[1]
-    assert all(name.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-") for name in filenames)
+    assert all(
+        name.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-") for name in filenames
+    )
     assert len(first.written) == 2
     assert sync_github_sources(profile_dir, "me", client=gh).written == []
     http.close()
@@ -368,7 +376,9 @@ def test_render_virtual_doc_is_deterministic_sorted_and_byte_bounded():
     files = [("CONTEXT.md", "context"), ("README.md", "é" * 20_000)]
     value = repo("r", topics=["zeta", "alpha"])
     one = render_virtual_doc(value, files, {"TypeScript": 1, "Python": 9})
-    two = render_virtual_doc(value, list(reversed(files)), {"Python": 9, "TypeScript": 1})
+    two = render_virtual_doc(
+        value, list(reversed(files)), {"Python": 9, "TypeScript": 1}
+    )
     assert one == two
     assert one.startswith("---\nrepo_url: https://github.com/me/r")
     assert one.index("Python") < one.index("TypeScript")
@@ -377,12 +387,16 @@ def test_render_virtual_doc_is_deterministic_sorted_and_byte_bounded():
     assert len(one.encode("utf-8")) <= 120_000
 
 
-def test_sync_writes_registers_refreshes_stably_and_does_not_close_injected_client(tmp_path):
+def test_sync_writes_registers_refreshes_stably_and_does_not_close_injected_client(
+    tmp_path,
+):
     profile_dir = profile(tmp_path)
     gh, http = github(standard_handler([repo("my.repo")]))
     first = sync_github_sources(profile_dir, "me", client=gh)
     assert first.written == [f"{GITHUB_DOC_PREFIX}my.repo.md"]
-    document = next(doc for doc in load_manifest(profile_dir).docs if doc.origin == "github")
+    document = next(
+        doc for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    )
     assert document.mode == "project"
 
     again = sync_github_sources(profile_dir, "me", client=gh)
@@ -391,7 +405,9 @@ def test_sync_writes_registers_refreshes_stably_and_does_not_close_injected_clie
 
     changed_gh, changed_http = github(standard_handler([repo("my.repo")], "# changed"))
     changed = sync_github_sources(profile_dir, "me", client=changed_gh)
-    refreshed = next(doc for doc in load_manifest(profile_dir).docs if doc.origin == "github")
+    refreshed = next(
+        doc for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    )
     assert changed.written == [f"{GITHUB_DOC_PREFIX}my.repo.md"]
     assert refreshed.id == document.id
     assert fragment_cache_status(profile_dir, refreshed) == "source-changed"

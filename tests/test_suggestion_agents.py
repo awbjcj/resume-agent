@@ -48,7 +48,9 @@ def test_builders_return_runners(monkeypatch):
         "build_search_equipped",
         lambda *_args, **_kwargs: (object(), []),
     )
-    monkeypatch.setattr(agents_module, "build_model", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        agents_module, "build_model", lambda *_args, **_kwargs: object()
+    )
     monkeypatch.setattr(agents_module, "Agent", lambda **_kwargs: object())
 
     assert hasattr(build_search_agent(), "run")

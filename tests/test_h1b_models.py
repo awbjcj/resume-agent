@@ -31,8 +31,12 @@ def test_rollup_overwrites_totals_that_disagree_with_their_parts():
         certified_count=999,
         denied_count=999,
         periods=[
-            H1BPeriodStat(period="FY2026-Q1", filing_count=10, certified_count=9, denied_count=1),
-            H1BPeriodStat(period="FY2025-Q4", filing_count=4, certified_count=3, denied_count=1),
+            H1BPeriodStat(
+                period="FY2026-Q1", filing_count=10, certified_count=9, denied_count=1
+            ),
+            H1BPeriodStat(
+                period="FY2025-Q4", filing_count=4, certified_count=3, denied_count=1
+            ),
         ],
     )
     assert evidence.filing_count == 14

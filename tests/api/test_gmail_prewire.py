@@ -23,15 +23,20 @@ def test_gmail_connect_passes_login_hint_and_incremental_auth(mu_app, monkeypatc
             }
         )
         with Session(mu_app.state.system_engine) as session:
-            user = session.execute(
-                select(User).where(User.username == "owner")
-            ).scalars().one()
+            user = (
+                session.execute(select(User).where(User.username == "owner"))
+                .scalars()
+                .one()
+            )
             user.email = "owner@example.com"
             session.commit()
-        assert client.post(
-            "/api/auth/login",
-            json={"identifier": "owner@example.com", "password": "owner-password"},
-        ).status_code == 200
+        assert (
+            client.post(
+                "/api/auth/login",
+                json={"identifier": "owner@example.com", "password": "owner-password"},
+            ).status_code
+            == 200
+        )
         assert client.get("/api/gmail/connect").status_code == 200
     assert captured["login_hint"] == "owner@example.com"
     assert captured["include_granted_scopes"] == "true"

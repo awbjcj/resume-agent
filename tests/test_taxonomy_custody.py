@@ -72,7 +72,10 @@ def test_read_returns_one_correction_applied_snapshot(tmp_path):
         TaxonomyCorrections(skill_domain={"python": "languages"}),
         corrections_path,
     )
-    assert TaxonomyCustody(cluster_path, corrections_path).read().revision != snapshot.revision
+    assert (
+        TaxonomyCustody(cluster_path, corrections_path).read().revision
+        != snapshot.revision
+    )
 
 
 def test_same_workspace_mutations_serialize(tmp_path):

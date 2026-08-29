@@ -13,9 +13,14 @@ def make_client(tmp_path):
     def _make(env_text=""):
         env = tmp_path / ".env"
         env.write_text(env_text, encoding="utf-8")
-        app = create_app(db_url="sqlite://", config_dir=tmp_path / "config",
-                         env_path=env, data_dir=tmp_path / "data")
+        app = create_app(
+            db_url="sqlite://",
+            config_dir=tmp_path / "config",
+            env_path=env,
+            data_dir=tmp_path / "data",
+        )
         return TestClient(app)
+
     return _make
 
 

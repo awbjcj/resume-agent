@@ -47,7 +47,10 @@ def test_company_mapping_wins_before_alias_lookup():
         companies={"acme": "Healthcare"},
     )
 
-    assert canonical_industry("Acme, Inc.", "Financial Technology", taxonomy) == "Healthcare"
+    assert (
+        canonical_industry("Acme, Inc.", "Financial Technology", taxonomy)
+        == "Healthcare"
+    )
     assert canonical_industry("Other", "Financial Technology", taxonomy) == "Fintech"
 
 

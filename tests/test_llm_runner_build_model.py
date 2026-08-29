@@ -298,8 +298,9 @@ def test_openai_bounds_the_output_budget():
     # tokens are spent out of this same allowance.
     assert build_model("openai:gpt-5.6-terra", api_key="k").max_output_tokens == 32000
     assert (
-        build_model("openai:gpt-5.6-terra", api_key="k", reasoning=True)
-        .max_output_tokens
+        build_model(
+            "openai:gpt-5.6-terra", api_key="k", reasoning=True
+        ).max_output_tokens
         == 64000
     )
 
@@ -341,7 +342,8 @@ def test_openai_reasoning_effort_defaults_to_high_within_the_catalog(monkeypatch
         == "high"
     )
     assert (
-        llm_runner._responses_effort("openai:gpt-5.5-pro", "openai", reasoning=True) == "high"
+        llm_runner._responses_effort("openai:gpt-5.5-pro", "openai", reasoning=True)
+        == "high"
     )
 
 
@@ -357,7 +359,8 @@ def test_openai_reasoning_effort_honours_configured_tier_tuning(monkeypatch):
     monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
 
     assert (
-        llm_runner._responses_effort("openai:gpt-5.6-terra", "openai", reasoning=True) == "max"
+        llm_runner._responses_effort("openai:gpt-5.6-terra", "openai", reasoning=True)
+        == "max"
     )
 
 
@@ -568,7 +571,12 @@ def _run_output(content, *, truncated: bool):
             input_tokens=4200, output_tokens=32000, reasoning_tokens=11000
         ),
         model_provider_data=(
-            {llm_runner.INCOMPLETE_KEY: {"reason": "max_output_tokens", "ceiling": 32000}}
+            {
+                llm_runner.INCOMPLETE_KEY: {
+                    "reason": "max_output_tokens",
+                    "ceiling": 32000,
+                }
+            }
             if truncated
             else {"response_id": "resp_1"}
         ),
@@ -621,7 +629,8 @@ def test_truncated_prose_is_rejected_rather_than_returned_as_a_whole_answer():
 
 def test_complete_prose_is_still_returned():
     assert (
-        llm_runner.expect_text(_run_output("A whole answer.", truncated=False),
-                               source="coach-persona")
+        llm_runner.expect_text(
+            _run_output("A whole answer.", truncated=False), source="coach-persona"
+        )
         == "A whole answer."
     )

@@ -100,16 +100,16 @@ def test_url_ingest_ands_caller_flag_with_browser_setting(monkeypatch):
     )
 
     try:
-        discovery.add_job_from_url(
-            cast(Session, None), url="https://example.test/job"
-        )
+        discovery.add_job_from_url(cast(Session, None), url="https://example.test/job")
     except discovery.UrlFetchError:
         pass
 
     assert seen["allow_browser"] is False
 
 
-def test_linkedin_service_returns_explicit_failure_without_building_scraper(monkeypatch):
+def test_linkedin_service_returns_explicit_failure_without_building_scraper(
+    monkeypatch,
+):
     from resume_agent.services import discovery
 
     monkeypatch.setattr(

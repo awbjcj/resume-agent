@@ -91,39 +91,61 @@ def _wait(client, run_id):
 
 
 def _fake_agents(monkeypatch):
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
-    monkeypatch.setattr(service, "build_interviewer_agent", lambda style: FakeRunner(["notes"]))
-    monkeypatch.setattr(service, "build_debrief_agent", lambda: FakeRunner(["debrief notes"]))
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
+    monkeypatch.setattr(
+        service, "build_interviewer_agent", lambda style: FakeRunner(["notes"])
+    )
+    monkeypatch.setattr(
+        service, "build_debrief_agent", lambda: FakeRunner(["debrief notes"])
+    )
 
     def formatter(schema):
         if schema is OpeningInterview:
-            return FakeRunner([
-                OpeningInterview(
-                    message="Welcome. Tell me about yourself.",
-                    hints=["Use a concrete example.", "Connect it to the role."],
-                    plan=[
-                        NewPlanItem(competency="Python", question_type="role_specific"),
-                        NewPlanItem(competency="Ownership", question_type="behavioral"),
+            return FakeRunner(
+                [
+                    OpeningInterview(
+                        message="Welcome. Tell me about yourself.",
+                        hints=["Use a concrete example.", "Connect it to the role."],
+                        plan=[
+                            NewPlanItem(
+                                competency="Python", question_type="role_specific"
+                            ),
+                            NewPlanItem(
+                                competency="Ownership", question_type="behavioral"
+                            ),
+                        ],
+                    )
+                ]
+            )
+        if schema is InterviewTurn:
+            return FakeRunner(
+                [
+                    InterviewTurn(
+                        message="That's all from me, thank you.", action="conclude"
+                    )
+                ]
+            )
+        return FakeRunner(
+            [
+                DebriefTurn(
+                    summary="Solid rehearsal.",
+                    question_reviews=[
+                        ReviewItem(question_id="q1", question="Intro", score=4)
                     ],
                 )
-            ])
-        if schema is InterviewTurn:
-            return FakeRunner([
-                InterviewTurn(message="That's all from me, thank you.", action="conclude")
-            ])
-        return FakeRunner([
-            DebriefTurn(
-                summary="Solid rehearsal.",
-                question_reviews=[ReviewItem(question_id="q1", question="Intro", score=4)],
-            )
-        ])
+            ]
+        )
 
     monkeypatch.setattr(service, "build_interview_formatter_agent", formatter)
 
 
 def test_start_requires_known_job(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     with client:
         response = client.post(
             "/api/interview/sessions",
@@ -134,7 +156,9 @@ def test_start_requires_known_job(monkeypatch, tmp_path):
 
 def test_start_rejects_version_from_other_job(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     with client:
         job_id, _ = _seed(client)
         other_job_id, other_version_id = _seed(client)
@@ -147,7 +171,9 @@ def test_start_rejects_version_from_other_job(monkeypatch, tmp_path):
 
 def test_start_rejects_job_without_jd(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+    )
     with client:
         job_id, version_id = _seed(client, jd_text="")
         response = client.post(
@@ -164,7 +190,11 @@ def test_full_lifecycle_and_singleton(monkeypatch, tmp_path):
         job_id, version_id = _seed(client)
         start = client.post(
             "/api/interview/sessions",
-            json={"jobId": job_id, "resumeVersionId": version_id, "style": {"questionCount": 4}},
+            json={
+                "jobId": job_id,
+                "resumeVersionId": version_id,
+                "style": {"questionCount": 4},
+            },
         )
         assert start.status_code == 202
         session_id = _wait(client, start.json()["runId"])["result"]["sessionId"]
@@ -180,7 +210,8 @@ def test_full_lifecycle_and_singleton(monkeypatch, tmp_path):
         assert detail.json()["plan"] is None  # hidden while active
 
         message = client.post(
-            f"/api/interview/sessions/{session_id}/messages", json={"message": "My answer"}
+            f"/api/interview/sessions/{session_id}/messages",
+            json={"message": "My answer"},
         )
         assert message.status_code == 202
         _wait(client, message.json()["runId"])
@@ -216,7 +247,11 @@ def test_end_without_an_answer_closes_cleanly(monkeypatch, tmp_path):
         job_id, version_id = _seed(client)
         start = client.post(
             "/api/interview/sessions",
-            json={"jobId": job_id, "resumeVersionId": version_id, "style": {"questionCount": 4}},
+            json={
+                "jobId": job_id,
+                "resumeVersionId": version_id,
+                "style": {"questionCount": 4},
+            },
         )
         assert start.status_code == 202
         session_id = _wait(client, start.json()["runId"])["result"]["sessionId"]
@@ -230,7 +265,9 @@ def test_end_without_an_answer_closes_cleanly(monkeypatch, tmp_path):
         assert completed["result"]["debrief"]["questionReviews"] == []
 
 
-def _write_ended_session(interview_dir: Path, job_id: int, session_id: str = "ended01") -> str:
+def _write_ended_session(
+    interview_dir: Path, job_id: int, session_id: str = "ended01"
+) -> str:
     create_session(
         interview_dir,
         session_id,
@@ -239,7 +276,9 @@ def _write_ended_session(interview_dir: Path, job_id: int, session_id: str = "en
         style=InterviewStyle(),
         context=InterviewContext(company="Acme", title="Engineer", jd_text="Build"),
         plan=[PlanItem(id="q1", competency="Python", question_type="role_specific")],
-        opening_turn=InterviewTurnRecord(role="interviewer", text="Hi", question_id="q1"),
+        opening_turn=InterviewTurnRecord(
+            role="interviewer", text="Hi", question_id="q1"
+        ),
     )
     end_with_debrief(interview_dir, session_id, InterviewDebrief(summary="done"))
     return session_id
@@ -330,7 +369,9 @@ def test_interview_archive_filters_unarchive_and_delete(tmp_path):
         assert client.delete(f"/api/interview/sessions/{session_id}").status_code == 404
 
 
-def test_interview_audio_availability_and_protected_turn_delivery(monkeypatch, tmp_path):
+def test_interview_audio_availability_and_protected_turn_delivery(
+    monkeypatch, tmp_path
+):
     client = _client(tmp_path)
     monkeypatch.setattr("resume_agent.llm_runner.speech_available", lambda: True)
     with client:
@@ -341,14 +382,14 @@ def test_interview_audio_availability_and_protected_turn_delivery(monkeypatch, t
         session_id = _write_active_session(interview_dir, 1, "audio01")
         attach_turn_audio(interview_dir, session_id, 0, b"fake-mp3")
 
-        response = client.get(
-            f"/api/interview/sessions/{session_id}/turns/0/audio"
-        )
+        response = client.get(f"/api/interview/sessions/{session_id}/turns/0/audio")
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("audio/mpeg")
         assert response.content == b"fake-mp3"
         assert (
-            client.get(f"/api/interview/sessions/{session_id}/turns/9/audio").status_code
+            client.get(
+                f"/api/interview/sessions/{session_id}/turns/9/audio"
+            ).status_code
             == 404
         )
 
@@ -364,7 +405,9 @@ def test_interview_archive_rejects_active_and_invalid_status_filter(tmp_path):
             == 409
         )
         assert (
-            client.get("/api/interview/sessions", params={"status": "paused"}).status_code
+            client.get(
+                "/api/interview/sessions", params={"status": "paused"}
+            ).status_code
             == 422
         )
 
@@ -374,7 +417,9 @@ def test_job_delete_removes_interview_sessions(tmp_path):
     with client:
         engine = cast(FastAPI, client.app).state.engine
         with get_session(engine) as db:
-            job = Job(source="manual", company="Acme", title="Engineer", jd_text="Build")
+            job = Job(
+                source="manual", company="Acme", title="Engineer", jd_text="Build"
+            )
             db.add(job)
             db.commit()
             db.refresh(job)

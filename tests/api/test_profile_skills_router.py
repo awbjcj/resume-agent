@@ -54,7 +54,9 @@ def test_add_skill_requires_a_built_profile(client):
 def test_add_skill_creates_a_manual_entry(client):
     test_client, data_dir = client
     _seed_facts(data_dir)
-    resp = test_client.post("/api/profile/skills", json={"name": "Rust", "category": "hard"})
+    resp = test_client.post(
+        "/api/profile/skills", json={"name": "Rust", "category": "hard"}
+    )
     assert resp.status_code == 201
     body = resp.json()
     assert body["kind"] == "new_skill"

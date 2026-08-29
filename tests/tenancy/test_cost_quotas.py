@@ -331,9 +331,7 @@ def test_openai_sol_price_version_preserves_the_pre_reduction_rate(tmp_path):
     before_update = calculate_cost(
         engine, usage, now=datetime(2026, 8, 26, 23, 59, tzinfo=UTC)
     )
-    after_update = calculate_cost(
-        engine, usage, now=datetime(2026, 8, 27, tzinfo=UTC)
-    )
+    after_update = calculate_cost(engine, usage, now=datetime(2026, 8, 27, tzinfo=UTC))
 
     assert before_update.total_micros == 35_000_000
     assert after_update.total_micros == 24_000_000
@@ -350,9 +348,7 @@ def test_gemini_price_version_preserves_the_pre_update_flash_rate(tmp_path):
     )
 
     before_update = calculate_cost(engine, usage, now=NOW)
-    after_update = calculate_cost(
-        engine, usage, now=datetime(2026, 8, 15, tzinfo=UTC)
-    )
+    after_update = calculate_cost(engine, usage, now=datetime(2026, 8, 15, tzinfo=UTC))
 
     assert before_update.total_micros == 9_000_000
     assert after_update.total_micros == 4_500_000

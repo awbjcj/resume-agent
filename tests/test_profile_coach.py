@@ -44,11 +44,25 @@ def _session(user_texts=("I cut deploy time from 40 min to 6 min.",), n_topics=2
         "session_id": "s1",
         "status": "active",
         "turns": [
-            {"role": "user", "kind": "", "text": text, "topic_id": "t1", "at": "", "research_actions": []}
+            {
+                "role": "user",
+                "kind": "",
+                "text": text,
+                "topic_id": "t1",
+                "at": "",
+                "research_actions": [],
+            }
             for text in user_texts
         ],
         "topics": [
-            {"id": f"t{i}", "gap": f"g{i}", "why_it_matters": "", "related_ref": "", "status": "open", "note_doc_id": None}
+            {
+                "id": f"t{i}",
+                "gap": f"g{i}",
+                "why_it_matters": "",
+                "related_ref": "",
+                "status": "open",
+                "note_doc_id": None,
+            }
             for i in range(1, n_topics + 1)
         ],
         "draft_notes": [],
@@ -68,11 +82,15 @@ def test_opening_requires_ask_and_known_topic():
     assert validated.coach_turn.topic_id == "t1"
     with pytest.raises(TurnRejected, match="opening action"):
         normalize_opening(
-            OpeningTurn(message="bad", action="recap", topic_id="t1", topics=[NewTopic(gap="g")])
+            OpeningTurn(
+                message="bad", action="recap", topic_id="t1", topics=[NewTopic(gap="g")]
+            )
         )
     with pytest.raises(TurnRejected, match="unknown topic"):
         normalize_opening(
-            OpeningTurn(message="bad", action="ask", topic_id="t9", topics=[NewTopic(gap="g")])
+            OpeningTurn(
+                message="bad", action="ask", topic_id="t9", topics=[NewTopic(gap="g")]
+            )
         )
 
 
@@ -114,10 +132,18 @@ def test_opening_renumbers_seeded_and_model_topics_as_one_agenda():
 def test_message_action_state_machine_and_single_draft():
     session = _session()
     with pytest.raises(TurnRejected, match="recap"):
-        normalize_turn(CoachTurn(message="done", action="recap", topic_id="t1"), session)
+        normalize_turn(
+            CoachTurn(message="done", action="recap", topic_id="t1"), session
+        )
     session["topics"][0]["status"] = "drafted"
     session["draft_notes"] = [
-        {"topic_id": "t1", "title": "T", "summary": "S", "quotes": ["q"], "status": "pending"}
+        {
+            "topic_id": "t1",
+            "title": "T",
+            "summary": "S",
+            "quotes": ["q"],
+            "status": "pending",
+        }
     ]
     with pytest.raises(TurnRejected, match="open topic"):
         normalize_turn(
@@ -125,7 +151,9 @@ def test_message_action_state_machine_and_single_draft():
                 message="again",
                 action="draft",
                 topic_id="t1",
-                draft_note=DraftNote(title="T", summary="S", quotes=["I cut deploy time"]),
+                draft_note=DraftNote(
+                    title="T", summary="S", quotes=["I cut deploy time"]
+                ),
             ),
             session,
         )
@@ -207,7 +235,10 @@ def test_add_and_skip_updates_are_bounded_and_consistent():
             message="Noted.",
             action="ask",
             topic_id="t1",
-            topic_updates=[TopicUpdate(op="add", gap="CI"), TopicUpdate(op="skip", topic_id="t2")],
+            topic_updates=[
+                TopicUpdate(op="add", gap="CI"),
+                TopicUpdate(op="skip", topic_id="t2"),
+            ],
         ),
         _session(),
     )
@@ -216,20 +247,48 @@ def test_add_and_skip_updates_are_bounded_and_consistent():
 
 
 def test_recap_requires_recap_action_and_nonempty_message():
-    assert normalize_recap(CoachTurn(message="Covered Acme.", action="recap", topic_id="t1"), _session()) == "Covered Acme."
+    assert (
+        normalize_recap(
+            CoachTurn(message="Covered Acme.", action="recap", topic_id="t1"),
+            _session(),
+        )
+        == "Covered Acme."
+    )
     with pytest.raises(TurnRejected, match="recap action"):
-        normalize_recap(CoachTurn(message="Question?", action="ask", topic_id="t1"), _session())
+        normalize_recap(
+            CoachTurn(message="Question?", action="ask", topic_id="t1"), _session()
+        )
 
 
 def test_transcript_is_topic_aware_and_never_exceeds_cap():
     session = _session(user_texts=())
     session["topics"][0]["status"] = "saved"
     session["draft_notes"] = [
-        {"topic_id": "t1", "title": "Old", "summary": "Old summary", "quotes": ["old"], "status": "saved"}
+        {
+            "topic_id": "t1",
+            "title": "Old",
+            "summary": "Old summary",
+            "quotes": ["old"],
+            "status": "saved",
+        }
     ]
     session["turns"] = [
-        {"role": "coach", "kind": "question", "text": "old " + "x" * 500, "topic_id": "t1", "at": "", "research_actions": []},
-        {"role": "user", "kind": "", "text": "active " + "y" * 2000, "topic_id": "t2", "at": "", "research_actions": []},
+        {
+            "role": "coach",
+            "kind": "question",
+            "text": "old " + "x" * 500,
+            "topic_id": "t1",
+            "at": "",
+            "research_actions": [],
+        },
+        {
+            "role": "user",
+            "kind": "",
+            "text": "active " + "y" * 2000,
+            "topic_id": "t2",
+            "at": "",
+            "research_actions": [],
+        },
     ]
     rendered = render_transcript(session, char_cap=500)
     assert len(rendered) <= 500

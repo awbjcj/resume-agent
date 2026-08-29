@@ -131,8 +131,7 @@ def test_maintenance_keeps_user_pinned_domains_and_aliases_unchanged(tmp_path):
     assert result["changed"] is False
     assert after.domain_of["python"] == "backend-a"
     assert any(
-        "pinned" in reason
-        for reason in cast(list[str], result["rejectedActions"])
+        "pinned" in reason for reason in cast(list[str], result["rejectedActions"])
     )
 
 

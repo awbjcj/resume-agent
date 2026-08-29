@@ -88,7 +88,10 @@ def test_read_progress_corrupt_json_returns_none_without_retry(monkeypatch, tmp_
     (tmp_path / "pull.json").write_text("{ not json", encoding="utf-8")
 
     sleeps = {"n": 0}
-    monkeypatch.setattr("resume_agent.progress.time.sleep", lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1))
+    monkeypatch.setattr(
+        "resume_agent.progress.time.sleep",
+        lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1),
+    )
 
     assert read_progress("pull", tmp_path) is None
     assert sleeps["n"] == 0  # JSONDecodeError did not trigger a retry/backoff
@@ -166,9 +169,15 @@ def test_progress_stats_computes_percentage_and_eta():
     start = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     # 10s elapsed for 10/40 done → 1s/item → 30 remaining → ~30s ETA.
     record = {
-        "process": "discover", "state": "running", "label": "Scoring fit",
-        "phase_index": 3, "phase_count": 3, "current": 10, "total": 40,
-        "started_at": start.isoformat(), "updated_at": (start + timedelta(seconds=10)).isoformat(),
+        "process": "discover",
+        "state": "running",
+        "label": "Scoring fit",
+        "phase_index": 3,
+        "phase_count": 3,
+        "current": 10,
+        "total": 40,
+        "started_at": start.isoformat(),
+        "updated_at": (start + timedelta(seconds=10)).isoformat(),
     }
     stats = progress_stats(record)
     assert stats.pct == 25
@@ -177,13 +186,17 @@ def test_progress_stats_computes_percentage_and_eta():
 
 
 def test_progress_stats_done_is_full_and_no_eta():
-    stats = progress_stats({"process": "tailor", "state": "done", "current": 4, "total": 4})
+    stats = progress_stats(
+        {"process": "tailor", "state": "done", "current": 4, "total": 4}
+    )
     assert stats.pct == 100
     assert stats.eta_text is None
 
 
 def test_progress_stats_zero_total_does_not_divide():
-    stats = progress_stats({"process": "pull", "state": "running", "current": 0, "total": 0})
+    stats = progress_stats(
+        {"process": "pull", "state": "running", "current": 0, "total": 0}
+    )
     assert stats.pct == 0
     assert stats.eta_text is None
 

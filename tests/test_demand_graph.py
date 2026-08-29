@@ -84,7 +84,9 @@ def test_build_demand_graph_reads_all_sources_coverage_and_job_facets():
                 job_count=1,
             ),
             SkillNode("Linux", None, False, "linux", {"Linux": 1}, tech=1, job_count=1),
-            SkillNode("Python", None, True, "python", {"Python": 1}, must=1, job_count=1),
+            SkillNode(
+                "Python", None, True, "python", {"Python": 1}, must=1, job_count=1
+            ),
         ]
         assert graph.edges == [
             DemandEdge(job.id, "Python", "must", "python"),
@@ -173,9 +175,7 @@ def test_build_demand_graph_applies_aliases_to_profile_skill_coverage():
             session,
             criteria={"must_have_skills": ["Kubernetes"]},
         )
-        cmap = ClusterMap(
-            aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"}
-        )
+        cmap = ClusterMap(aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"})
 
         graph = build_demand_graph(
             session,

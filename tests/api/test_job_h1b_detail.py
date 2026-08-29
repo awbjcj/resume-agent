@@ -76,9 +76,12 @@ def test_expired_evidence_is_stale():
 def test_stale_flips_exactly_at_expiry():
     evidence = _evidence(expires_in_days=1)
     assert evidence.expires_at is not None
-    assert _h1b_sponsorship_response(
-        evidence, now=evidence.expires_at - timedelta(microseconds=1)
-    ).stale is False
+    assert (
+        _h1b_sponsorship_response(
+            evidence, now=evidence.expires_at - timedelta(microseconds=1)
+        ).stale
+        is False
+    )
     assert _h1b_sponsorship_response(evidence, now=evidence.expires_at).stale is True
 
 

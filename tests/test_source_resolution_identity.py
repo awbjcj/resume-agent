@@ -34,5 +34,9 @@ def test_page_claims_and_company_match_read_only_identity_metadata():
         "Intuitive Surgical",
         "Intuitive Surgical Careers",
     )
-    assert page_matches_company("Intuitive Surgical", "https://careers.intuitive.com/en/", html)
-    assert not page_matches_company("Intuitive Machines", "https://careers.intuitive.com/en/", html)
+    assert page_matches_company(
+        "Intuitive Surgical", "https://careers.intuitive.com/en/", html
+    )
+    assert not page_matches_company(
+        "Intuitive Machines", "https://careers.intuitive.com/en/", html
+    )

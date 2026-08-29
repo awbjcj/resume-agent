@@ -37,7 +37,9 @@ def test_golden_company_resolves_the_expected_board(
     resolver = CompanySourceResolver(
         "search.yaml",
         crawler=crawler.crawl,
-        previewer=lambda url, **kwargs: SourcePreview(ok=True, url=url, kind=expected_ats),
+        previewer=lambda url, **kwargs: SourcePreview(
+            ok=True, url=url, kind=expected_ats
+        ),
     )
 
     result = resolver.resolve(company, official_url)

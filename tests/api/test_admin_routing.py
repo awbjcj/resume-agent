@@ -37,7 +37,10 @@ def test_routing_configuration_is_admin_only(mu_app, mu_client):
     _add_member(mu_app)
     assert _login(mu_client, "member", "member-password").status_code == 200
     assert mu_client.get("/api/admin/routing").status_code == 403
-    assert mu_client.put("/api/admin/routing", json={"baseUrl": "https://x"}).status_code == 403
+    assert (
+        mu_client.put("/api/admin/routing", json={"baseUrl": "https://x"}).status_code
+        == 403
+    )
 
 
 def test_admin_can_write_routes_without_reading_back_secrets(mu_app, mu_client):
@@ -57,7 +60,9 @@ def test_admin_can_write_routes_without_reading_back_secrets(mu_app, mu_client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["baseUrl"] == "https://sub2api.example.com"
-    anthropic = next(row for row in payload["providers"] if row["provider"] == "anthropic")
+    anthropic = next(
+        row for row in payload["providers"] if row["provider"] == "anthropic"
+    )
     assert anthropic["routeMode"] == "subscription"
     assert anthropic["effectiveMode"] == "subscription"
     assert anthropic["key"] == {"isSet": True, "hint": "1234"}

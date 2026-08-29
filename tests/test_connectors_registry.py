@@ -250,9 +250,7 @@ def _sample_config() -> ConnectorsConfig:
             "ashby": {"enabled": True, "boards": [{"token": "ash"}]},
             "workday": {
                 "enabled": True,
-                "boards": [
-                    {"url": "https://acme.wd5.myworkdayjobs.com/External"}
-                ],
+                "boards": [{"url": "https://acme.wd5.myworkdayjobs.com/External"}],
             },
             "companies": {
                 "enabled": True,
@@ -301,9 +299,7 @@ def test_new_unit_produces_addressable_units():
             "https://job-boards.greenhouse.io/acme",
         ),
         "workday": (
-            AtsTarget(
-                ats="workday", tenant="acme", datacenter="wd5", site="Ext"
-            ),
+            AtsTarget(ats="workday", tenant="acme", datacenter="wd5", site="Ext"),
             "https://acme.wd5.myworkdayjobs.com/Ext",
         ),
         "companies": (AtsTarget(ats="companies"), "https://example.com/careers"),

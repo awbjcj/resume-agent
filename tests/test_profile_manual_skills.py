@@ -21,7 +21,9 @@ def _facts():
 
 def test_new_skill_entry_adds_a_skill_to_its_real_category_bucket():
     facts = _facts()
-    entry = ManualSkillEntry(name="Rust", category="hard", added_at="2026-07-16T00:00:00+00:00")
+    entry = ManualSkillEntry(
+        name="Rust", category="hard", added_at="2026-07-16T00:00:00+00:00"
+    )
 
     updated, warning = apply_manual_skill_entry(facts, entry)
 

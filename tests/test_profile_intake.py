@@ -34,7 +34,9 @@ def test_add_url_source_follows_public_redirect_and_records_provenance(tmp_path)
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/start":
-            return httpx.Response(302, headers={"location": "https://example.com/final"})
+            return httpx.Response(
+                302, headers={"location": "https://example.com/final"}
+            )
         return httpx.Response(
             200,
             headers={"content-type": "text/html; charset=utf-8"},
@@ -99,7 +101,9 @@ def test_add_url_source_pins_the_validated_address_against_dns_rebinding(tmp_pat
         )
 
     http = httpx.Client(transport=httpx.MockTransport(handler))
-    add_url_source(profile_dir, "https://example.com/page", client=http, resolver=public_ips)
+    add_url_source(
+        profile_dir, "https://example.com/page", client=http, resolver=public_ips
+    )
     assert seen_hosts == ["93.184.216.34"]
     http.close()
 
@@ -136,7 +140,9 @@ def test_add_url_source_rejects_binary_oversized_and_empty_pages(tmp_path):
                 headers={"content-type": "text/html"},
                 content=b"x" * (1_000_001),
             ),
-            httpx.Response(200, headers={"content-type": "text/html"}, text="<html></html>"),
+            httpx.Response(
+                200, headers={"content-type": "text/html"}, text="<html></html>"
+            ),
         ]
     )
     http = httpx.Client(transport=httpx.MockTransport(lambda _request: next(responses)))
@@ -185,6 +191,8 @@ def test_add_url_source_stops_streaming_at_the_response_limit(tmp_path):
 
     assert stream.yielded == 2
     http.close()
+
+
 def test_note_source_uses_pinned_synthesis_only_when_an_owner_anchor_is_given(tmp_path):
     from resume_agent.profile.corpus import add_source
     from resume_agent.profile.intake import add_note_source
@@ -192,7 +200,9 @@ def test_note_source_uses_pinned_synthesis_only_when_an_owner_anchor_is_given(tm
     resume = tmp_path / "resume.txt"
     resume.write_text("Ada", encoding="utf-8")
     add_source(tmp_path, resume, primary=True)
-    anchored = add_note_source(tmp_path, "Acme", "I cut deploy time.", anchor="exp-acme")
+    anchored = add_note_source(
+        tmp_path, "Acme", "I cut deploy time.", anchor="exp-acme"
+    )
     unanchored = add_note_source(tmp_path, "Other", "I wrote a tool.")
 
     assert (anchored.mode, anchored.anchor) == ("synthesis", "exp-acme")

@@ -73,8 +73,12 @@ def test_generate_persists_draft_without_thread(tmp_path):
         assert job.id is not None
         save_application(session, Application(job_id=job.id, status="submitted"))
         draft = generate_email_draft(
-            session, job.id, "follow_up",
-            facts_path=_facts(tmp_path), agent=agent, service=None,
+            session,
+            job.id,
+            "follow_up",
+            facts_path=_facts(tmp_path),
+            agent=agent,
+            service=None,
         )
     assert draft.id is not None
     assert draft.subject == "Following up on Eng"
@@ -121,8 +125,12 @@ def test_generate_uses_matched_thread(tmp_path):
         job = save_job(session, Job(source="manual", company="Acme", title="Eng"))
         assert job.id is not None
         draft = generate_email_draft(
-            session, job.id, "follow_up",
-            facts_path=_facts(tmp_path), agent=agent, service=service,
+            session,
+            job.id,
+            "follow_up",
+            facts_path=_facts(tmp_path),
+            agent=agent,
+            service=service,
         )
     assert draft.to_addr == "jane@acme.com"
     assert draft.gmail_thread_id == "t1"

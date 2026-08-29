@@ -25,8 +25,14 @@ def test_get_missing_file_returns_defaults(store):
 
 
 def test_put_then_get_round_trips(store, tmp_path):
-    doc = PruneConfigDoc(fit_threshold=55, stale_days=30, retention_days=7,
-                         enable_rejected=False, enable_low_fit=True, enable_stale=True)
+    doc = PruneConfigDoc(
+        fit_threshold=55,
+        stale_days=30,
+        retention_days=7,
+        enable_rejected=False,
+        enable_low_fit=True,
+        enable_stale=True,
+    )
     store.put("prune", doc)
     assert (tmp_path / "prune.yaml").exists()
     again = store.get("prune")
@@ -43,7 +49,9 @@ def test_yaml_on_disk_is_snake_case(store, tmp_path):
 
 def test_style_guide_is_plain_text(store, tmp_path):
     store.put("style_guide", StyleGuideDoc(content="# Voice\nBe terse."))
-    assert (tmp_path / "style_guide.md").read_text(encoding="utf-8") == "# Voice\nBe terse."
+    assert (tmp_path / "style_guide.md").read_text(
+        encoding="utf-8"
+    ) == "# Voice\nBe terse."
     assert store.get("style_guide").content == "# Voice\nBe terse."
 
 
@@ -59,7 +67,9 @@ def test_search_doc_covers_search_config_fields():
     bookkeeping, not a search field) and is deliberately absent from the wire
     doc, so exclude it from the comparison — otherwise the subset check fails.
     """
-    assert set(SearchConfig.model_fields) - {"schema_version"} <= set(SearchConfigDoc.model_fields)
+    assert set(SearchConfig.model_fields) - {"schema_version"} <= set(
+        SearchConfigDoc.model_fields
+    )
 
 
 def test_domain_registry_contents():
