@@ -30,6 +30,7 @@ def test_only_allowlisted_h1b_tools_are_exposed():
         "get_company_stats",
         "search_h1b_jobs",
         "get_available_data",
+        "get_company_sponsorship_trend",
     }
 
 

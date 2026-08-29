@@ -8,7 +8,11 @@ import pytest
 
 from resume_agent.career_lab.models import CareerLabContextRefs, CareerLabRoute
 from resume_agent.career_lab.store import create_session, load_session
-from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.models import (
+    AgentFamily,
+    AgentRunMeta,
+    CareerLabSkillName,
+)
 from resume_agent.career_skills.registry import CareerSkillRegistry
 from resume_agent.services import career_lab
 from resume_agent.sessions.stream import NullSink
@@ -203,7 +207,7 @@ def test_ambiguous_request_asks_then_reroutes_from_the_same_transcript(
                 question="What should the company research help you accomplish?",
             ),
             CareerLabRoute(
-                skill="salary-negotiation-prep",
+                skill=CareerLabSkillName.SALARY_NEGOTIATION_PREP,
                 needs_selection=False,
                 reason="The user wants negotiation preparation.",
             ),
