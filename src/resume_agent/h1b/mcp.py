@@ -8,6 +8,7 @@ from typing import Any, AsyncIterator, Callable
 
 H1B_INCLUDE_TOOLS = [
     "get_company_stats",
+    "get_company_sponsorship_trend",
     "search_h1b_jobs",
     "get_available_data",
 ]

@@ -76,15 +76,12 @@ def test_duplicate_period_labels_reject():
         )
 
 
-def test_more_than_four_periods_is_truncated_to_the_newest_four():
+def test_more_than_twelve_periods_is_truncated_to_the_newest_twelve():
     evidence = _evidence(
-        periods=[{"period": f"FY-Q{i}", "filing_count": 1} for i in range(5)],
+        periods=[{"period": f"FY-Q{i}", "filing_count": 1} for i in range(13)],
     )
     assert [period.period for period in evidence.periods] == [
-        "FY-Q0",
-        "FY-Q1",
-        "FY-Q2",
-        "FY-Q3",
+        *(f"FY-Q{i}" for i in range(12)),
     ]
 
 

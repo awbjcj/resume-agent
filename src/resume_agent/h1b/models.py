@@ -95,7 +95,7 @@ class H1BSponsorshipEvidence(BaseModel):
     filing_count: int | None = Field(default=None, ge=0)
     certified_count: int | None = Field(default=None, ge=0)
     denied_count: int | None = Field(default=None, ge=0)
-    periods: list[H1BPeriodStat] = Field(default_factory=list, max_length=4)
+    periods: list[H1BPeriodStat] = Field(default_factory=list, max_length=12)
     wage_summary: dict[str, float] | None = None
     source_url: str | None = None
     data_version: str | None = None
@@ -108,14 +108,14 @@ class H1BSponsorshipEvidence(BaseModel):
     @field_validator("periods", mode="before")
     @classmethod
     def _cap_periods(cls, value: Any) -> Any:
-        """Keep the newest four quarters instead of rejecting an over-long list.
+        """Keep the newest twelve quarters instead of rejecting an over-long list.
 
-        The agent is instructed to return at most four quarters, newest first,
+        The agent is instructed to return at most twelve quarters, newest first,
         but a provider that over-reports should not lose an otherwise-valid
         response to the ``max_length`` constraint below -- truncate instead.
         """
-        if isinstance(value, list) and len(value) > 4:
-            return value[:4]
+        if isinstance(value, list) and len(value) > 12:
+            return value[:12]
         return value
 
     @field_validator("retrieved_at", "expires_at")

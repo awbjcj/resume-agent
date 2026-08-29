@@ -412,7 +412,7 @@ def test_enrichment_closes_runner_before_mcp_context(monkeypatch):
     assert events == ["tools_enter", "runner_close", "tools_close"]
 
 
-def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
+def test_sponsorship_agent_is_instructed_to_collect_three_years():
     settings = Settings(
         _env_file=None,  # type: ignore[call-arg]
         anthropic_api_key="test-key",
@@ -426,11 +426,13 @@ def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
     # AgentRunner intentionally narrows the public runner API; tests in this
     # repository inspect its wrapped agent for prompt-contract assertions.
     instructions = " ".join(runner._agent.instructions)
-    assert "get_available_data" in instructions
-    assert "four most recent" in instructions
+    assert "get_company_stats" in instructions
+    assert "get_company_sponsorship_trend" in instructions
+    assert "three-year" in instructions
+    assert "twelve periods" in instructions
     assert "periods" in instructions
     assert runner.run_meta is not None
-    assert runner.run_meta.prompt_policy_version == "h1b-sponsorship-research-v2"
+    assert runner.run_meta.prompt_policy_version == "h1b-sponsorship-research-v3"
 
 
 def test_persisted_rows_are_written_at_schema_version_two():
