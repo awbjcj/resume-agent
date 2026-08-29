@@ -45,7 +45,7 @@ def _reporter(tmp_path):
     return ProgressReporter("test-run", root=tmp_path)
 
 
-def test_run_gmail_sync_creates_notifications_and_reminders(tmp_path):
+def test_run_gmail_sync_creates_notifications_without_owning_reminders(tmp_path):
     engine = make_engine("sqlite://")
     init_db(engine)
     with Session(engine) as session:
@@ -71,7 +71,7 @@ def test_run_gmail_sync_creates_notifications_and_reminders(tmp_path):
     )
     result = run_gmail_sync(engine, _reporter(tmp_path), service=service, llm=None)
     assert result["pending"] >= 1
-    assert result["reminders"] == 1
+    assert set(result) == {"pending"}
 
 
 def test_run_gmail_sync_disconnected_raises(tmp_path, monkeypatch):

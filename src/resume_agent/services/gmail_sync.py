@@ -1,4 +1,4 @@
-"""One sync pass: fetch inbox → propose status changes → follow-up reminders.
+"""One sync pass: fetch inbox → propose status changes.
 
 Shared by the manual POST /api/gmail/sync run and the scheduler tick, so
 the two can never drift. Never auto-applies a status change.
@@ -15,7 +15,7 @@ from resume_agent.gmail.classify import build_classifier_llm, hydrating_classifi
 from resume_agent.gmail.client import fetch_recent_messages
 from resume_agent.llm_runner import Runner
 from resume_agent.services.notifications import sync_notifications
-from resume_agent.services.reminders import create_follow_up_reminders
+
 
 class _Unset:
     __slots__ = ()
@@ -41,7 +41,6 @@ def run_gmail_sync(
     classify = hydrating_classifier(service, resolved_llm)
     with get_session(engine) as session:
         pending = sync_notifications(session, emails, classify=classify)
-        reporter.step(1, label="Checking follow-ups")
-        reminders = create_follow_up_reminders(session)
+        reporter.step(1, label="Classifying")
     reporter.step(2, label="Done")
-    return {"pending": len(pending), "reminders": len(reminders)}
+    return {"pending": len(pending)}

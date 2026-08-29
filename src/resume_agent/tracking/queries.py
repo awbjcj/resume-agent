@@ -1,11 +1,11 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
 from sqlalchemy.orm import defer
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.h1b.cache import load_company_evidence
@@ -28,7 +28,15 @@ from resume_agent.tracking.repository import (
     resume_versions_for_job,
     versions_by_job,
 )
-from resume_agent.tracking.tables import Application, CoverLetter, Job, JobStatus, ResumeVersion
+from resume_agent.tracking.tables import (
+    Application,
+    ApplicationEvent,
+    CoverLetter,
+    Job,
+    JobStatus,
+    ResumeVersion,
+    utcnow,
+)
 
 
 def _require_job_id(job: Job) -> int:
@@ -434,6 +442,85 @@ def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
         .where(archived_col.is_(None))
     )
     return [(app, job) for app, job in session.exec(statement).all()]
+
+
+def application_event_job_rows(
+    session: Session,
+) -> list[tuple[ApplicationEvent, Application, Job]]:
+    """Dated event rows with their active application and unarchived job."""
+    statement = (
+        select(ApplicationEvent, Application, Job)
+        .join(Application, col(ApplicationEvent.application_id) == Application.id)
+        .join(Job, col(Application.job_id) == Job.id)
+        .where(
+            col(ApplicationEvent.occurred_at).is_not(None),
+            col(Job.archived_at).is_(None),
+        )
+    )
+    return [(event, application, job) for event, application, job in session.exec(statement).all()]
+
+
+def reminder_event_job_rows(
+    session: Session,
+    *,
+    after: datetime,
+    before: datetime,
+    kinds: set[str],
+    dead_results: set[str],
+) -> list[tuple[ApplicationEvent, Application, Job]]:
+    """Only live reminder candidates in the scheduler's widest time window."""
+    statement = (
+        select(ApplicationEvent, Application, Job)
+        .join(Application, col(ApplicationEvent.application_id) == Application.id)
+        .join(Job, col(Application.job_id) == Job.id)
+        .where(
+            col(ApplicationEvent.occurred_at) > after,
+            col(ApplicationEvent.occurred_at) <= before,
+            col(ApplicationEvent.kind).in_(kinds),
+            col(ApplicationEvent.result).not_in(dead_results),
+            col(Application.status).not_in({"rejected", "closed"}),
+            col(Job.archived_at).is_(None),
+        )
+    )
+    return [
+        (event, application, job)
+        for event, application, job in session.exec(statement).all()
+    ]
+
+
+def upcoming_events(
+    session: Session,
+    *,
+    within_days: int = 7,
+    now: datetime | None = None,
+    kinds: set[str] | frozenset[str] | None = None,
+) -> list[tuple[ApplicationEvent, Job]]:
+    """Live, actionable events in ``(now, now + within_days]``."""
+    current = now or utcnow()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    limit = current + timedelta(days=within_days)
+    rows: list[tuple[ApplicationEvent, Job]] = []
+    for event, application, job in application_event_job_rows(session):
+        if application.status in {"rejected", "closed"}:
+            continue
+        if kinds is not None and event.kind not in kinds:
+            continue
+        if event.result in {"cancelled", "withdrew"} or event.occurred_at is None:
+            continue
+        occurred = event.occurred_at
+        if occurred.tzinfo is None:
+            occurred = occurred.replace(tzinfo=timezone.utc)
+        if current < occurred <= limit:
+            rows.append((event, job))
+    return sorted(
+        rows,
+        key=lambda row: (
+            (row[0].occurred_at or current).replace(tzinfo=timezone.utc)
+            if (row[0].occurred_at or current).tzinfo is None
+            else row[0].occurred_at or current
+        ),
+    )
 
 
 _TRIAGE_STATUSES = (
