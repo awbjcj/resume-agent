@@ -5,7 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from resume_agent.career_skills.models import AgentRunMeta, SkillUse, SkillUseStage, read_skill_uses
+from resume_agent.career_skills.models import (
+    AgentRunMeta,
+    SkillUse,
+    SkillUseStage,
+    read_skill_uses,
+)
 
 
 def require_run_meta(runner: Any) -> AgentRunMeta:
@@ -15,7 +20,9 @@ def require_run_meta(runner: Any) -> AgentRunMeta:
     return meta
 
 
-def append_skill_use(raw: object, runner: Any, stage: SkillUseStage) -> list[dict[str, object]]:
+def append_skill_use(
+    raw: object, runner: Any, stage: SkillUseStage
+) -> list[dict[str, object]]:
     uses = read_skill_uses(raw)
     meta = require_run_meta(runner)
     if meta.skill_ref is not None:

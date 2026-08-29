@@ -43,9 +43,7 @@ def _model(model_id: str, settings: Settings):
     return build_model(
         model_id,
         api_key=resolve_api_key(model_id, settings=settings) or None,
-        cache_system_prompt=provider_capabilities(
-            model_id
-        ).supports_prompt_cache,
+        cache_system_prompt=provider_capabilities(model_id).supports_prompt_cache,
     )
 
 

@@ -13,7 +13,12 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.career_skills.models import SkillUse
-from resume_agent.sessions.store import SessionModel, SessionStore, now_iso, valid_session_id
+from resume_agent.sessions.store import (
+    SessionModel,
+    SessionStore,
+    now_iso,
+    valid_session_id,
+)
 from resume_agent.security.paths import confined_path
 
 STYLE_EXTRA_CAP = 2_000
@@ -21,9 +26,9 @@ _AUDIO_REF = re.compile(r"[a-f0-9]{32}\Z")
 
 
 class InterviewStyle(ExtensibleModel):
-    stage: Literal[
-        "recruiter_screen", "hiring_manager", "technical", "behavioral"
-    ] = "hiring_manager"
+    stage: Literal["recruiter_screen", "hiring_manager", "technical", "behavioral"] = (
+        "hiring_manager"
+    )
     demeanor: Literal["warm", "neutral", "stress"] = "neutral"
     difficulty: Literal["easy", "standard", "hard"] = "standard"
     question_count: int = Field(default=8, ge=4, le=12)
@@ -90,7 +95,9 @@ class InterviewSession(SessionModel):
     skill_uses: list[SkillUse] = Field(default_factory=list)
 
 
-_STORE: SessionStore[InterviewSession] = SessionStore(InterviewSession, label="interview")
+_STORE: SessionStore[InterviewSession] = SessionStore(
+    InterviewSession, label="interview"
+)
 
 
 def _valid_session_id(session_id: str) -> bool:
@@ -167,7 +174,11 @@ def create_session(
         now = _now()
         opened = [
             item.model_copy(
-                update={"status": "asked" if item.id == opening_turn.question_id else item.status}
+                update={
+                    "status": "asked"
+                    if item.id == opening_turn.question_id
+                    else item.status
+                }
             )
             for item in plan
         ]
@@ -307,7 +318,8 @@ def apply_answer_delta(
         )
         if skill_uses:
             session["skill_uses"].extend(
-                SkillUse.model_validate(use).model_dump(mode="json") for use in skill_uses
+                SkillUse.model_validate(use).model_dump(mode="json")
+                for use in skill_uses
             )
         session["turns"].append(
             interviewer_turn.model_copy(update={"at": now}).model_dump(mode="json")
@@ -341,7 +353,8 @@ def end_with_debrief(
         session["debrief"] = debrief.model_dump(mode="json")
         if skill_uses:
             session["skill_uses"].extend(
-                SkillUse.model_validate(use).model_dump(mode="json") for use in skill_uses
+                SkillUse.model_validate(use).model_dump(mode="json")
+                for use in skill_uses
             )
         for item in session["plan"]:
             if item["status"] == "asked":

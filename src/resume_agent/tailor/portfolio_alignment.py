@@ -39,9 +39,7 @@ def portfolio_alignment_critique(
         bullet.text
         for experience in content.experience
         for bullet in experience.bullets
-    ] + [
-        bullet.text for project in content.projects for bullet in project.bullets
-    ]
+    ] + [bullet.text for project in content.projects for bullet in project.bullets]
     selected_context_ids = {
         fact_id
         for selection in portfolio.selections
@@ -99,4 +97,3 @@ def portfolio_alignment_critique(
         passed=True,
         issues=issues,
     )
-

@@ -28,7 +28,9 @@ def _nonnegative_int(payload: dict, field: str, label: str) -> None:
     if field in payload and (
         not isinstance(value, int) or isinstance(value, bool) or value < 0
     ):
-        raise ValueError(f"GitHub {label} field {field!r} must be a non-negative integer")
+        raise ValueError(
+            f"GitHub {label} field {field!r} must be a non-negative integer"
+        )
 
 
 def _validated_profile(payload: dict) -> dict:
@@ -67,7 +69,9 @@ def _validated_repo(payload: dict) -> dict:
 class GitHubClient:
     """Thin wrapper over the GitHub REST API. Pass ``client`` to inject a test transport."""
 
-    def __init__(self, token: str | None = None, client: httpx.Client | None = None) -> None:
+    def __init__(
+        self, token: str | None = None, client: httpx.Client | None = None
+    ) -> None:
         self._token = token if token is not None else get_settings().github_token
         if client is not None:
             self._client = client
@@ -75,7 +79,9 @@ class GitHubClient:
             headers = {"Accept": "application/vnd.github+json"}
             if self._token:
                 headers["Authorization"] = f"Bearer {self._token}"
-            self._client = httpx.Client(base_url=GITHUB_API, headers=headers, timeout=20.0)
+            self._client = httpx.Client(
+                base_url=GITHUB_API, headers=headers, timeout=20.0
+            )
         self._login: str | None = None
         self._login_resolved = False
 
@@ -89,7 +95,9 @@ class GitHubClient:
     @staticmethod
     def _objects(response: httpx.Response, label: str) -> list[dict]:
         payload = response.json()
-        if not isinstance(payload, list) or not all(isinstance(item, dict) for item in payload):
+        if not isinstance(payload, list) or not all(
+            isinstance(item, dict) for item in payload
+        ):
             raise ValueError(f"GitHub {label} response must be a list of objects")
         return payload
 
@@ -132,8 +140,7 @@ class GitHubClient:
             resp = self._client.get(url, params=params)
             resp.raise_for_status()
             repos.extend(
-                _validated_repo(repo)
-                for repo in self._objects(resp, "repositories")
+                _validated_repo(repo) for repo in self._objects(resp, "repositories")
             )
             next_link = resp.links.get("next", {}).get("url")
             url = next_link if isinstance(next_link, str) else None

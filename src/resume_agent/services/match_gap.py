@@ -410,7 +410,10 @@ def refresh_clusters(
             # the bound defers is not "unplaceable" -- it simply has not been
             # tried yet, so it must not be swept up by the placement floor.  It
             # keeps its status and escalates first on the next run.
-            leftovers, deferred = pending[:escalation_cap], set(pending[escalation_cap:])
+            leftovers, deferred = (
+                pending[:escalation_cap],
+                set(pending[escalation_cap:]),
+            )
             if not leftovers:
                 return first, None, after_first, deferred
             # These are canonical already; pinning identity aliases keeps the
@@ -542,6 +545,7 @@ def refresh_clusters(
                     phase="domain",
                 ),
             )
+
         def commit_refresh(_current: TaxonomySnapshot) -> object:
             save_cluster_map(final, path)
             return set_grouping_statuses(

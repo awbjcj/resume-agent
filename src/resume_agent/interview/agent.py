@@ -381,7 +381,11 @@ def build_interviewer_agent(
             else "interview_turn"
         ),
     )
-    use = "interview_prep" if resolved_skill.ref.name == "interview-prep-generator" else "interview_turn"
+    use = (
+        "interview_prep"
+        if resolved_skill.ref.name == "interview-prep-generator"
+        else "interview_turn"
+    )
     model = build_model(
         settings.mid_model,
         cache_system_prompt=provider_capabilities(
@@ -399,7 +403,9 @@ def build_interviewer_agent(
         run_meta=AgentRunMeta(
             agent_family=AgentFamily.INTERVIEW,
             prompt_policy_version=(
-                "interview-prep-v1" if use == "interview_prep" else "mock-interview-coach-v1"
+                "interview-prep-v1"
+                if use == "interview_prep"
+                else "mock-interview-coach-v1"
             ),
             model_id=settings.mid_model,
             skill_ref=resolved_skill.ref,

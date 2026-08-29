@@ -35,7 +35,9 @@ def split_name(name: str) -> list[str]:
     # must split at the parenthesis, and substituting a space would leave
     # "Unit Testing  pytest" as one segment.
     flattened = _BRACKETS.sub(",", name)
-    return [segment.strip() for segment in _SEPARATORS.split(flattened) if segment.strip()]
+    return [
+        segment.strip() for segment in _SEPARATORS.split(flattened) if segment.strip()
+    ]
 
 
 def _legal_tokens(fact: Skill) -> set[str]:

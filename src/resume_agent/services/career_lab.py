@@ -168,9 +168,7 @@ def _resolve_context(engine, root: Path, refs: CareerLabContextRefs) -> str:
         for application_id in refs.offer_application_ids:
             application = database.get(Application, application_id)
             if application is None or application.status != "offer":
-                raise ValueError(
-                    f"offer application is unavailable: {application_id}"
-                )
+                raise ValueError(f"offer application is unavailable: {application_id}")
             offers.append(
                 {
                     "application_id": application.id,

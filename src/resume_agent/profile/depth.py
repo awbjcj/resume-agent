@@ -115,9 +115,7 @@ class OwnerSupply(ExtensibleModel):
     meets_target: bool
 
 
-def owner_depth(
-    facts: ProfileFacts, target: int = SUPPLY_TARGET
-) -> list[OwnerSupply]:
+def owner_depth(facts: ProfileFacts, target: int = SUPPLY_TARGET) -> list[OwnerSupply]:
     """Measure profile supply without considering a job or rendered resume."""
     rows: list[OwnerSupply] = []
     for owner in evidence_owners(facts):
@@ -130,9 +128,7 @@ def owner_depth(
                 source_total=len(owner.bullets),
                 aspects_present=[aspect for aspect in ASPECTS if aspect in present],
                 aspects_missing=[aspect for aspect in ASPECTS if aspect not in present],
-                unclassified=sum(
-                    bullet.aspect is None for bullet in owner.bullets
-                ),
+                unclassified=sum(bullet.aspect is None for bullet in owner.bullets),
                 meets_target=len(owner.bullets) >= target,
             )
         )

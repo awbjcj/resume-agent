@@ -89,9 +89,15 @@ def _pick_doc_entries(listing: list[dict]) -> list[str]:
         for entry in listing
         if entry.get("type") == "file"
         and isinstance((name := entry.get("name")), str)
-        and (name.casefold().startswith("readme") or name.casefold() in _CONTEXT_DOC_NAMES)
+        and (
+            name.casefold().startswith("readme")
+            or name.casefold() in _CONTEXT_DOC_NAMES
+        )
     ]
-    return sorted(names, key=lambda name: (not name.casefold().startswith("readme"), name.casefold()))
+    return sorted(
+        names,
+        key=lambda name: (not name.casefold().startswith("readme"), name.casefold()),
+    )
 
 
 def _is_dossier_name(name: str) -> bool:
@@ -116,7 +122,9 @@ def _pick_dossier_entries(listing: list[dict]) -> tuple[list[str], list[str]]:
 
 def _truncate_utf8(value: str, limit: int) -> str:
     data = value.encode("utf-8")
-    return value if len(data) <= limit else data[:limit].decode("utf-8", errors="ignore")
+    return (
+        value if len(data) <= limit else data[:limit].decode("utf-8", errors="ignore")
+    )
 
 
 def render_virtual_doc(
@@ -169,7 +177,9 @@ def dossier_repo_urls(profile_dir: str | Path) -> set[str]:
         if doc.origin != "upload" or not doc.filename.casefold().endswith(".md"):
             continue
         try:
-            url = normalize_repo_url(frontmatter_repo_url(doc_path(profile_dir, doc).read_bytes()))
+            url = normalize_repo_url(
+                frontmatter_repo_url(doc_path(profile_dir, doc).read_bytes())
+            )
         except OSError:
             continue
         if url:
@@ -225,7 +235,8 @@ def _unique_filename(
         (
             doc
             for doc in load_manifest(profile_dir).docs
-            if doc.filename.casefold() == candidate.casefold() and doc.origin != "github"
+            if doc.filename.casefold() == candidate.casefold()
+            and doc.origin != "github"
         ),
         None,
     )
@@ -288,7 +299,9 @@ def _remove_local_superseded(
         if doc.origin != "github":
             continue
         try:
-            repo_url = normalize_repo_url(frontmatter_repo_url(doc_path(profile_dir, doc).read_bytes()))
+            repo_url = normalize_repo_url(
+                frontmatter_repo_url(doc_path(profile_dir, doc).read_bytes())
+            )
         except OSError:
             continue
         if repo_url not in dossiers:

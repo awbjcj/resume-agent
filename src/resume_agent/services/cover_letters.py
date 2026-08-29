@@ -57,14 +57,16 @@ def write_cover_letters(
     reporter: ProgressReporter | None = None,
     skill: CoverLetterSkillName | str | None = None,
 ) -> list[CoverLetterResult]:
-    targets = resolve_cover_letter_targets(
-        session, job_ids=job_ids, approved=approved
-    )
+    targets = resolve_cover_letter_targets(session, job_ids=job_ids, approved=approved)
     if not targets:
         return []
     enforce_active_budget()
     facts = load_facts(facts_path)
-    bundle = build_cover_letter_bundle(skill=skill) if skill is not None else build_cover_letter_bundle()
+    bundle = (
+        build_cover_letter_bundle(skill=skill)
+        if skill is not None
+        else build_cover_letter_bundle()
+    )
     results: list[CoverLetterResult] = []
     if reporter:
         reporter.begin(len(targets), "Starting")

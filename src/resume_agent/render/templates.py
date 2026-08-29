@@ -54,7 +54,9 @@ def custom_template_path(stem: str) -> Path:
     try:
         return confined_path(directory, f"{safe_stem}.typ")
     except ValueError as exc:
-        raise TemplateNotFoundError("Custom template path escapes the workspace.") from exc
+        raise TemplateNotFoundError(
+            "Custom template path escapes the workspace."
+        ) from exc
 
 
 def _custom_info(stem: str, path: Path) -> TemplateInfo:

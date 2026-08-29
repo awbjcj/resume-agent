@@ -99,7 +99,9 @@ def _persist_rounds(
                 else None
             ),
             gate_reviewers_json=gate_reviewers,
-            taxonomy_revision=(taxonomy.semantic_revision if taxonomy is not None else None),
+            taxonomy_revision=(
+                taxonomy.semantic_revision if taxonomy is not None else None
+            ),
             taxonomy_manifest_json=(
                 asdict(taxonomy.manifest) if taxonomy is not None else None
             ),
@@ -164,9 +166,7 @@ def tailor_job(
                 TailorRequest(
                     job.jd_text, criteria, profile_facts, config, skill_context
                 ),
-                TailorAgents(
-                    tailor_agent, reviewer_agents, reviser_agent, planner
-                ),
+                TailorAgents(tailor_agent, reviewer_agents, reviser_agent, planner),
                 sem=sem,
             ),
             *runners,
@@ -231,9 +231,7 @@ def tailor_jobs(
                     config,
                     _skill_context(criteria),
                 ),
-                TailorAgents(
-                    tailor_agent, reviewer_agents, reviser_agent, planner
-                ),
+                TailorAgents(tailor_agent, reviewer_agents, reviser_agent, planner),
                 sem=sem,
             )
 

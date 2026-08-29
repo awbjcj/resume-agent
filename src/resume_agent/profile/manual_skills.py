@@ -76,9 +76,7 @@ class ManualSkillsLedger(ExtensibleModel):
     entries: list[ManualEntry] = Field(default_factory=list)
 
 
-def _find_skill(
-    facts: ProfileFacts, token: str
-) -> tuple[str, Skill] | None:
+def _find_skill(facts: ProfileFacts, token: str) -> tuple[str, Skill] | None:
     for bucket, skills in facts.skills.items():
         for skill in skills:
             if normalize_skill(skill.name) == token:
@@ -96,7 +94,8 @@ def _drop_token(facts: ProfileFacts, token: str) -> None:
 
 
 def apply_manual_skill_entry(
-    facts: ProfileFacts, entry: ManualSkillEntry | ManualAliasEntry | ManualSuppressEntry
+    facts: ProfileFacts,
+    entry: ManualSkillEntry | ManualAliasEntry | ManualSuppressEntry,
 ) -> tuple[ProfileFacts, str | None]:
     """Apply one ledger entry to ``facts``, returning (facts, warning|None).
 

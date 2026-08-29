@@ -29,7 +29,9 @@ def collect_fact_ids(facts: ProfileFacts) -> set[str]:
     return ids
 
 
-def unsupported_provenance(content: CoverLetterContent, fact_ids: set[str]) -> list[str]:
+def unsupported_provenance(
+    content: CoverLetterContent, fact_ids: set[str]
+) -> list[str]:
     """Provenance ids cited by the letter that do not exist in the profile."""
     return [
         pid

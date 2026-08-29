@@ -156,9 +156,7 @@ def normalize_opening(
     )
 
 
-def _build_draft(
-    turn: CoachTurn, session: dict
-) -> CoachDraftNote:
+def _build_draft(turn: CoachTurn, session: dict) -> CoachDraftNote:
     note = turn.draft_note
     if note is None or not note.title.strip() or not note.summary.strip():
         raise DraftRejected("draft turn without a complete draft note")

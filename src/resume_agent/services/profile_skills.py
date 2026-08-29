@@ -60,9 +60,7 @@ def _load_facts_or_raise(profile_dir: str | Path) -> ProfileFacts:
     try:
         return load_facts(_facts_path(profile_dir))
     except FileNotFoundError as exc:
-        raise ProfileNotBuiltError(
-            "Build your profile before adding skills"
-        ) from exc
+        raise ProfileNotBuiltError("Build your profile before adding skills") from exc
 
 
 def _known_tokens(facts: ProfileFacts) -> set[str]:
@@ -192,9 +190,7 @@ def delete_skill(profile_dir: str | Path, key: str) -> None:
             for e in ledger.entries
         ):
             ledger.entries.append(
-                ManualSuppressEntry(
-                    token=token, display=match.name, added_at=_utcnow()
-                )
+                ManualSuppressEntry(token=token, display=match.name, added_at=_utcnow())
             )
         updated_facts, _warnings = apply_manual_skills(facts, ledger)
         save_facts(updated_facts, _facts_path(profile_dir))

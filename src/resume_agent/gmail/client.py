@@ -50,9 +50,12 @@ def extract_body(payload: dict) -> str:
 
 
 def fetch_message_body(service, message_id: str) -> str:
-    msg = service.users().messages().get(
-        userId="me", id=message_id, format="full"
-    ).execute()
+    msg = (
+        service.users()
+        .messages()
+        .get(userId="me", id=message_id, format="full")
+        .execute()
+    )
     return extract_body(msg.get("payload", {}))
 
 
@@ -71,17 +74,25 @@ def _domain(sender: str) -> str:
 
 def fetch_recent_messages(service, max_results: int = 50) -> list[EmailMessage]:
     """Fetch recent inbox messages as EmailMessages (read-only)."""
-    listing = service.users().messages().list(
-        userId="me", maxResults=max_results, labelIds=["INBOX"]
-    ).execute()
+    listing = (
+        service.users()
+        .messages()
+        .list(userId="me", maxResults=max_results, labelIds=["INBOX"])
+        .execute()
+    )
     messages: list[EmailMessage] = []
     for ref in listing.get("messages", []):
-        msg = service.users().messages().get(
-            userId="me",
-            id=ref["id"],
-            format="metadata",
-            metadataHeaders=["From", "Subject"],
-        ).execute()
+        msg = (
+            service.users()
+            .messages()
+            .get(
+                userId="me",
+                id=ref["id"],
+                format="metadata",
+                metadataHeaders=["From", "Subject"],
+            )
+            .execute()
+        )
         headers = msg.get("payload", {}).get("headers", [])
         sender = _header(headers, "From")
         messages.append(

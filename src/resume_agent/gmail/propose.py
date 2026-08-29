@@ -31,7 +31,9 @@ def _is_forward(current: str, proposed: str) -> bool:
     return _RANK.get(proposed, 0) > _RANK.get(current, 0)
 
 
-def propose_transitions(emails, pairs: list[tuple[Application, Job]], classify) -> list[Proposal]:
+def propose_transitions(
+    emails, pairs: list[tuple[Application, Job]], classify
+) -> list[Proposal]:
     """Match emails to applications and propose forward status changes. Applies nothing.
 
     Emails are expected newest-first. At most one proposal is emitted per

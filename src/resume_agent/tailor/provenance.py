@@ -60,10 +60,11 @@ def _referenced_uses(content: ResumeContent) -> list[tuple[str, ProvenanceUse]]:
         uses.extend((bullet.provenance, "bullet") for bullet in proj.bullets)
     for skills in content.skills.values():
         uses.extend((skill.provenance, "skill") for skill in skills)
-    uses.extend((publication.provenance, "entity") for publication in content.publications)
     uses.extend(
-        (certification.provenance, "entity")
-        for certification in content.certifications
+        (publication.provenance, "entity") for publication in content.publications
+    )
+    uses.extend(
+        (certification.provenance, "entity") for certification in content.certifications
     )
     uses.extend((award.provenance, "entity") for award in content.awards)
     for vol in content.volunteer:
@@ -129,7 +130,9 @@ def check_provenance(content: ResumeContent, facts: ProfileFacts) -> ProvenanceR
     stricter rule without breaking legacy deserialization.
     """
     index = index_facts(facts)
-    missing = sorted(fact_id for fact_id in referenced_ids(content) if fact_id not in index)
+    missing = sorted(
+        fact_id for fact_id in referenced_ids(content) if fact_id not in index
+    )
     invalid: set[str] = set()
     if content.summary and not content.summary_provenance:
         invalid.add("summary: nonempty summary has no summary_provenance ids")

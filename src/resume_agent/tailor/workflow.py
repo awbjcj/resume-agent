@@ -293,9 +293,7 @@ def run_tailor_review(
     if config.portfolio_enabled:
         started = time.monotonic()
         portfolio = plan_portfolio(
-            _portfolio_request(
-                jd_text, criteria, profile_facts, config, skill_context
-            ),
+            _portfolio_request(jd_text, criteria, profile_facts, config, skill_context),
             evidence_portfolio_agent or match_plan_agent,
         )
         pending["evidence_portfolio"] = time.monotonic() - started
@@ -314,9 +312,7 @@ def run_tailor_review(
     )
     pending["draft"] = time.monotonic() - started
     state = _WorkflowState(
-        request=TailorRequest(
-            jd_text, criteria, profile_facts, config, skill_context
-        ),
+        request=TailorRequest(jd_text, criteria, profile_facts, config, skill_context),
         content=content,
         coverage=coverage,
         portfolio=portfolio,
@@ -367,9 +363,7 @@ async def arun_tailor_review(
     if config.portfolio_enabled:
         started = time.monotonic()
         portfolio = await aplan_portfolio(
-            _portfolio_request(
-                jd_text, criteria, profile_facts, config, skill_context
-            ),
+            _portfolio_request(jd_text, criteria, profile_facts, config, skill_context),
             evidence_portfolio_agent or match_plan_agent,
             sem=sem,
         )
@@ -390,9 +384,7 @@ async def arun_tailor_review(
     )
     pending["draft"] = time.monotonic() - started
     state = _WorkflowState(
-        request=TailorRequest(
-            jd_text, criteria, profile_facts, config, skill_context
-        ),
+        request=TailorRequest(jd_text, criteria, profile_facts, config, skill_context),
         content=content,
         coverage=coverage,
         portfolio=portfolio,

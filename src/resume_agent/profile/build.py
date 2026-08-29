@@ -176,7 +176,9 @@ def build_corpus_profile(
             )
             report.conflicts = merge_report.conflicts
             if dedup_agent is not None and touched:
-                dedup_experience_bullets(merged, dedup_agent, merge_report, only_ids=touched)
+                dedup_experience_bullets(
+                    merged, dedup_agent, merge_report, only_ids=touched
+                )
                 report.dropped_bullets = merge_report.dropped_bullets
 
     if github_username:
@@ -184,7 +186,11 @@ def build_corpus_profile(
         github = github_client if github_client is not None else GitHubClient()
         try:
             profile_data = github.fetch_profile(github_username)
-            repos = harvest.repos if harvest is not None else github.fetch_repos(github_username)
+            repos = (
+                harvest.repos
+                if harvest is not None
+                else github.fetch_repos(github_username)
+            )
             languages = harvest.languages if harvest is not None else {}
             merged = merge_facts(
                 merged,
@@ -199,7 +205,14 @@ def build_corpus_profile(
                 ],
                 github_profile=build_github_profile(profile_data, repos),
             )
-        except (httpx.HTTPError, OSError, UnicodeError, ValueError, TypeError, KeyError) as error:
+        except (
+            httpx.HTTPError,
+            OSError,
+            UnicodeError,
+            ValueError,
+            TypeError,
+            KeyError,
+        ) as error:
             report.warnings.append(f"GitHub metadata merge skipped: {error}")
         finally:
             if owns_client:

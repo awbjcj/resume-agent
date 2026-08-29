@@ -51,7 +51,9 @@ class NullMailer(_NotifyBySend):
 
     def send(self, *, to: str, subject: str, body: str) -> None:
         self.sent.append((to, subject, body))
-        logger.warning("MAIL NOT CONFIGURED - would send to %s: %s\n%s", to, subject, body)
+        logger.warning(
+            "MAIL NOT CONFIGURED - would send to %s: %s\n%s", to, subject, body
+        )
 
 
 class ResendMailer(_NotifyBySend):
@@ -116,11 +118,15 @@ class SmtpMailer(_NotifyBySend):
         implicit_tls = self.settings.smtp_port == 465
         opener = smtplib.SMTP_SSL if implicit_tls else smtplib.SMTP
         try:
-            with opener(self.settings.smtp_host, self.settings.smtp_port, timeout=10) as client:
+            with opener(
+                self.settings.smtp_host, self.settings.smtp_port, timeout=10
+            ) as client:
                 if self.settings.smtp_starttls and not implicit_tls:
                     client.starttls()
                 if self.settings.smtp_username:
-                    client.login(self.settings.smtp_username, self.settings.smtp_password)
+                    client.login(
+                        self.settings.smtp_username, self.settings.smtp_password
+                    )
                 client.send_message(message)
         except (OSError, smtplib.SMTPException) as error:
             # Callers turn this into a fixed "503 MAIL_UNAVAILABLE" body, so the

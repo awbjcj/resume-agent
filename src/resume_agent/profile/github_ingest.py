@@ -46,9 +46,7 @@ def normalize_repo_url(url: str | None) -> str | None:
     return f"{host.casefold()}/{normalized_path.casefold()}"
 
 
-def repo_to_project(
-    repo: dict, languages: dict[str, int] | None = None
-) -> Project:
+def repo_to_project(repo: dict, languages: dict[str, int] | None = None) -> Project:
     """Map a single GitHub repo dict into a Project fact (source=github)."""
     language = repo.get("language")
     ordered_languages = (

@@ -79,7 +79,10 @@ class DocumentStore:
         target_dir.mkdir(parents=True, exist_ok=True)
         self._document_path(doc_id, name).write_bytes(content)  # file first…
         record = DocumentRecord(
-            id=doc_id, filename=name, doc_type=doc_type, size_bytes=len(content),
+            id=doc_id,
+            filename=name,
+            doc_type=doc_type,
+            size_bytes=len(content),
             uploaded_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         )
         rows = self._read_manifest()
@@ -109,5 +112,7 @@ class DocumentStore:
             return None
         # uploaded_at has second precision, so ties are possible; break ties by
         # manifest order (later appends win) instead of silently keeping the first.
-        _, newest = max(enumerate(resumes), key=lambda pair: (pair[1]["uploaded_at"], pair[0]))
+        _, newest = max(
+            enumerate(resumes), key=lambda pair: (pair[1]["uploaded_at"], pair[0])
+        )
         return self._document_path(newest["id"], newest["filename"])

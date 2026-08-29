@@ -7,7 +7,10 @@ from resume_agent.cover_letter.drafting import (
     draft_cover_letter,
     revise_cover_letter,
 )
-from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_agent.cover_letter.provenance import (
+    collect_fact_ids,
+    unsupported_provenance,
+)
 from resume_agent.llm_runner import Runner
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
@@ -25,7 +28,9 @@ def generate_cover_letter(
 ) -> CoverLetter:
     """Draft a cover letter, revise until provenance is clean or max_rounds is reached."""
     if job.id is None:
-        raise ValueError("Cannot write a cover letter for a job that has not been persisted")
+        raise ValueError(
+            "Cannot write a cover letter for a job that has not been persisted"
+        )
     fact_ids = collect_fact_ids(profile_facts)
     criteria = JobCriteria.model_validate(job.criteria_json or {})
 
@@ -40,7 +45,8 @@ def generate_cover_letter(
         if not bad:
             break
         content = revise_cover_letter(
-            compose_revise_input(content, bad, profile_facts, job.jd_text), reviser_agent
+            compose_revise_input(content, bad, profile_facts, job.jd_text),
+            reviser_agent,
         )
         if getattr(reviser_agent, "run_meta", None) is not None:
             skill_uses = append_skill_use(skill_uses, reviser_agent, "revised")

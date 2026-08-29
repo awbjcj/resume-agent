@@ -30,7 +30,9 @@ def read_document_text(path: str | Path) -> str:
     if suffix in SUPPORTED_SUFFIXES:
         return _markitdown().convert(str(p)).text_content
     supported = ", ".join(sorted(SUPPORTED_SUFFIXES))
-    raise ValueError(f"Unsupported document format: {suffix or '(none)'} (use {supported})")
+    raise ValueError(
+        f"Unsupported document format: {suffix or '(none)'} (use {supported})"
+    )
 
 
 read_resume_text = read_document_text

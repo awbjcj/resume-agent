@@ -71,7 +71,9 @@ def resolve_suggestion_context(
         members = tuple(sorted(skill.members, key=lambda item: (item.casefold(), item)))
         edge_keys = {skill.key}
     else:
-        theme = next((candidate for candidate in graph.domains if candidate.id == key), None)
+        theme = next(
+            (candidate for candidate in graph.domains if candidate.id == key), None
+        )
         if theme is None:
             raise SuggestionTargetNotFound(kind, key)
         label = theme.label
@@ -120,7 +122,9 @@ def suggestion_statuses(
     coverage: set[str],
 ) -> list[SuggestionStatus]:
     purge_legacy_theme_suggestions(session)
-    selected: dict[tuple[SuggestionKind, str], tuple[SkillSuggestion, SuggestionContext]] = {}
+    selected: dict[
+        tuple[SuggestionKind, str], tuple[SkillSuggestion, SuggestionContext]
+    ] = {}
     for row in session.exec(select(SkillSuggestion)).all():
         if row.kind not in ("skill", "domain"):
             continue

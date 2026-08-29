@@ -135,7 +135,10 @@ _DEDUP_INSTRUCTIONS = [
 
 def build_bullet_dedup_agent(model_id: str | None = None) -> Runner:
     settings = get_settings()
-    model = build_model(model_id or settings.cheap_model, cache_system_prompt=prompt_cache_for(model_id or settings.cheap_model))
+    model = build_model(
+        model_id or settings.cheap_model,
+        cache_system_prompt=prompt_cache_for(model_id or settings.cheap_model),
+    )
     return AgentRunner(
         Agent(
             model=model,
@@ -539,7 +542,9 @@ def apply_synthesis_fragments(
                     Project(
                         id=deterministic_id(doc.id, "synth-fallback", stub.id),
                         name=stub.title or Path(doc.filename).stem,
-                        highlights=[bullet.model_copy(deep=True) for bullet in stub.bullets],
+                        highlights=[
+                            bullet.model_copy(deep=True) for bullet in stub.bullets
+                        ],
                         tech=list(stub.tech),
                         source_ref=doc.id,
                         synthesized=True,

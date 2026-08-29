@@ -96,4 +96,3 @@ async def aplan_evidence_portfolio(
 ) -> EvidencePortfolio:
     result = await acall(agent, input_text, sem=sem)
     return expect_schema(result, EvidencePortfolio, source="evidence-portfolio")
-

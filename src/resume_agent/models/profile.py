@@ -40,7 +40,9 @@ class Skill(FactItem):
     @model_validator(mode="after")
     def inferred_has_evidence(self) -> "Skill":
         if self.inferred and (self.category is None or not self.evidence_fact_ids):
-            raise ValueError("an inferred skill requires category and evidence_fact_ids")
+            raise ValueError(
+                "an inferred skill requires category and evidence_fact_ids"
+            )
         return self
 
 

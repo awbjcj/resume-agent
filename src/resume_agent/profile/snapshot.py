@@ -40,12 +40,16 @@ def profile_snapshot(profile_dir: Path | str) -> dict:
 
 def snapshot_diff(before: dict, after: dict) -> dict:
     before_ids = set(before["factIds"])
-    new_fact_ids = sorted(fact_id for fact_id in after["factIds"] if fact_id not in before_ids)
+    new_fact_ids = sorted(
+        fact_id for fact_id in after["factIds"] if fact_id not in before_ids
+    )
     gained_metrics = sorted(
         (
             {
                 "experienceId": experience_id,
-                "before": before["bullets"].get(experience_id, {}).get("withMetrics", 0),
+                "before": before["bullets"]
+                .get(experience_id, {})
+                .get("withMetrics", 0),
                 "after": counts["withMetrics"],
             }
             for experience_id, counts in after["bullets"].items()

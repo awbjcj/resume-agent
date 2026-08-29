@@ -11,7 +11,12 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.profile.interview import ResearchAction
-from resume_agent.sessions.store import SessionModel, SessionStore, now_iso, valid_session_id
+from resume_agent.sessions.store import (
+    SessionModel,
+    SessionStore,
+    now_iso,
+    valid_session_id,
+)
 
 
 class CoachTopic(ExtensibleModel):

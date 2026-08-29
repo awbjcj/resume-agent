@@ -62,7 +62,9 @@ def resume_json_name(version: ResumeVersion) -> str:
 
 
 def cover_letter_pdf_name(cover_letter: CoverLetter) -> str:
-    return f"cover-letter-v{cover_letter.id}-{_origin(cover_letter.origin, 'draft')}.pdf"
+    return (
+        f"cover-letter-v{cover_letter.id}-{_origin(cover_letter.origin, 'draft')}.pdf"
+    )
 
 
 def cover_letter_json_name(cover_letter: CoverLetter) -> str:
@@ -91,7 +93,9 @@ def _cover_letter_entry(cover_letter: CoverLetter) -> dict[str, Any]:
         "instruction": cover_letter.instruction,
         "parentId": cover_letter.parent_id,
         "factCheckPassed": cover_letter.fact_check_passed,
-        "createdAt": cover_letter.created_at.isoformat() if cover_letter.created_at else None,
+        "createdAt": cover_letter.created_at.isoformat()
+        if cover_letter.created_at
+        else None,
         "file": cover_letter_pdf_name(cover_letter),
         "contentFile": cover_letter_json_name(cover_letter),
     }
@@ -112,7 +116,9 @@ def build_manifest(
             "status": job.status,
         },
         "resumeVersions": [_version_entry(v) for v in sorted(versions, key=_row_id)],
-        "coverLetters": [_cover_letter_entry(cl) for cl in sorted(cover_letters, key=_row_id)],
+        "coverLetters": [
+            _cover_letter_entry(cl) for cl in sorted(cover_letters, key=_row_id)
+        ],
         "applied": {
             "resumeVersionId": application.resume_version_id if application else None,
             "coverLetterId": application.cover_letter_id if application else None,
@@ -145,6 +151,10 @@ def export_job_artifacts(
     for version in versions:
         _write_json(out / resume_json_name(version), version.content_json or {})
     for cover_letter in cover_letters:
-        _write_json(out / cover_letter_json_name(cover_letter), cover_letter.content_json or {})
-    _write_json(out / "manifest.json", build_manifest(job, versions, cover_letters, application))
+        _write_json(
+            out / cover_letter_json_name(cover_letter), cover_letter.content_json or {}
+        )
+    _write_json(
+        out / "manifest.json", build_manifest(job, versions, cover_letters, application)
+    )
     return out

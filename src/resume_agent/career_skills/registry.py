@@ -128,9 +128,7 @@ class CareerSkillRegistry:
         return registry_for_paths(root, manifest)
 
     @classmethod
-    def from_paths(
-        cls, root: Path | str, manifest: Path | str
-    ) -> CareerSkillRegistry:
+    def from_paths(cls, root: Path | str, manifest: Path | str) -> CareerSkillRegistry:
         resolved_root = Path(root).expanduser().resolve(strict=False)
         resolved_manifest = Path(manifest).expanduser().resolve(strict=False)
         return cls._load(resolved_root, resolved_manifest)
@@ -227,17 +225,25 @@ class CareerSkillRegistry:
     def require(self, name: str, *, family: AgentFamily, use: str) -> VerifiedSkill:
         state = self._states.get(name)
         if state is None:
-            raise SkillUnavailable("CAPABILITY_UNAVAILABLE", name, "skill is not in the manifest")
+            raise SkillUnavailable(
+                "CAPABILITY_UNAVAILABLE", name, "skill is not in the manifest"
+            )
         if state.verified is None:
             raise SkillUnavailable(
-                "CAPABILITY_UNAVAILABLE", name, state.unavailable_reason or "skill is unavailable"
+                "CAPABILITY_UNAVAILABLE",
+                name,
+                state.unavailable_reason or "skill is unavailable",
             )
         if state.entry.family != family:
             raise SkillUnavailable(
-                "CAPABILITY_UNAVAILABLE", name, f"skill belongs to {state.entry.family.value}"
+                "CAPABILITY_UNAVAILABLE",
+                name,
+                f"skill belongs to {state.entry.family.value}",
             )
         if use not in state.entry.uses:
-            raise SkillUnavailable("CAPABILITY_UNAVAILABLE", name, f"use is not allowed: {use}")
+            raise SkillUnavailable(
+                "CAPABILITY_UNAVAILABLE", name, f"use is not allowed: {use}"
+            )
         return state.verified
 
 
@@ -250,7 +256,11 @@ def resolve_skill(
 ) -> VerifiedSkill:
     """Validate an injected skill or resolve the approved default skill."""
     if skill is not None:
-        if skill.ref.name != name or skill.ref.family != family or use not in skill.uses:
+        if (
+            skill.ref.name != name
+            or skill.ref.family != family
+            or use not in skill.uses
+        ):
             raise SkillUnavailable(
                 "CAPABILITY_UNAVAILABLE",
                 name,

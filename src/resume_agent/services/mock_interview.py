@@ -78,6 +78,7 @@ def _build_debrief(skill):
             raise
         return build_debrief_agent()
 
+
 # The interviewer writes free-form notes that a cheap formatter then projects into
 # the OpeningInterview schema. The formatter is told to invent nothing, so the plan
 # only survives if these notes spell it out explicitly — otherwise normalize_opening
@@ -210,7 +211,9 @@ def _view(session: dict) -> dict:
             "responseMode": session["style"].get("response_mode", "text"),
         },
         "progress": {
-            "asked": sum(1 for item in session["plan"] if item["status"] in {"asked", "done"}),
+            "asked": sum(
+                1 for item in session["plan"] if item["status"] in {"asked", "done"}
+            ),
             "total": len(session["plan"]),
         },
         "plan": (
@@ -271,8 +274,6 @@ def sessions_view(
             for session in rows
         ]
     }
-
-
 
 
 def _synthesize_turn(
@@ -413,7 +414,13 @@ def run_answer_turn(
         **session,
         "turns": [
             *session["turns"],
-            {"role": "candidate", "text": text, "question_id": "", "is_followup": False, "at": ""},
+            {
+                "role": "candidate",
+                "text": text,
+                "question_id": "",
+                "is_followup": False,
+                "at": "",
+            },
         ],
     }
     try:
@@ -500,7 +507,9 @@ def run_debrief_turn(
     # normalize_debrief rejects ("empty debrief summary"). Close it deterministically.
     if not _has_candidate_answer(session):
         reporter.begin(1, "Closing your interview")
-        end_with_debrief(root, session_id, InterviewDebrief(summary=_EMPTY_DEBRIEF_SUMMARY))
+        end_with_debrief(
+            root, session_id, InterviewDebrief(summary=_EMPTY_DEBRIEF_SUMMARY)
+        )
         reporter.step(1)
         return session_view(root, session_id)
     reporter.begin(1, "Writing your debrief")

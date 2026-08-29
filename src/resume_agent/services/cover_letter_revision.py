@@ -5,9 +5,15 @@ from __future__ import annotations
 from sqlmodel import Session
 
 from resume_agent.career_skills.provenance import append_skill_use
-from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_agent.cover_letter.provenance import (
+    collect_fact_ids,
+    unsupported_provenance,
+)
 from resume_agent.cover_letter.render import render_cover_letter
-from resume_agent.cover_letter.revision import apply_revision, compose_user_revision_input
+from resume_agent.cover_letter.revision import (
+    apply_revision,
+    compose_user_revision_input,
+)
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.profile.store import load_facts
 from resume_agent.services.agents import CoverLetterBundle, build_cover_letter_bundle

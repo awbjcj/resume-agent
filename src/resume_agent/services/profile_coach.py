@@ -179,7 +179,11 @@ def run_opening_turn(
     reporter.begin(1, "Reviewing your profile")
     coach, formatter = _agents(root, coach_agent, formatter_agent, OpeningTurn)
     facts_path = root / "facts.json"
-    seeded = depth_topics(load_facts(facts_path), cap=AGENDA_CAP) if facts_path.exists() else []
+    seeded = (
+        depth_topics(load_facts(facts_path), cap=AGENDA_CAP)
+        if facts_path.exists()
+        else []
+    )
     seeded_context = (
         "SEEDED DEPTH AGENDA (deterministic; already included in the session):\n"
         + "\n".join(
@@ -252,7 +256,20 @@ def run_message_turn(
     prose, notes = persona_output(
         coach, prompt, output_sink, reporter, source="coach notes"
     )
-    preview = {**session, "turns": [*session["turns"], {"role": "user", "kind": "", "text": text, "topic_id": "", "at": "", "research_actions": []}]}
+    preview = {
+        **session,
+        "turns": [
+            *session["turns"],
+            {
+                "role": "user",
+                "kind": "",
+                "text": text,
+                "topic_id": "",
+                "at": "",
+                "research_actions": [],
+            },
+        ],
+    }
     try:
         validated = format_with_retry(
             formatter,
@@ -289,9 +306,7 @@ def run_message_turn(
 
 
 def _degraded_turn(session: dict, prose: str) -> ValidatedTurn:
-    open_ids = {
-        topic["id"] for topic in session["topics"] if topic["status"] == "open"
-    }
+    open_ids = {topic["id"] for topic in session["topics"] if topic["status"] == "open"}
     topic_id = next(
         (
             turn["topic_id"]
@@ -357,9 +372,7 @@ def approve_draft(
             raise ValueError(f"unknown draft: {topic_id}")
         if draft["status"] != "pending":
             raise ValueError("draft already resolved")
-        topic = next(
-            (row for row in session["topics"] if row["id"] == topic_id), None
-        )
+        topic = next((row for row in session["topics"] if row["id"] == topic_id), None)
         anchor = (topic or {}).get("owner_id") or None
         doc = add_note_source(
             root, f"Coach — {title.strip() or topic_id}", body, anchor=anchor
@@ -395,7 +408,11 @@ def run_recap_turn(
         return session_view(root, session_id)
     reporter.begin(1, "Writing your recap")
     coach, formatter = _agents(root, coach_agent, formatter_agent, CoachTurn)
-    pending = [draft["title"] for draft in session["draft_notes"] if draft["status"] == "pending"]
+    pending = [
+        draft["title"]
+        for draft in session["draft_notes"]
+        if draft["status"] == "pending"
+    ]
     prompt = "\n\n".join(
         [
             render_agenda(session),

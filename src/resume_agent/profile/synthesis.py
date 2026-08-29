@@ -134,7 +134,10 @@ _SYNTHESIS_INSTRUCTIONS = [
 
 def build_synthesis_agent(model_id: str | None = None) -> Runner:
     settings = get_settings()
-    model = build_model(model_id or settings.mid_model, cache_system_prompt=prompt_cache_for(model_id or settings.mid_model))
+    model = build_model(
+        model_id or settings.mid_model,
+        cache_system_prompt=prompt_cache_for(model_id or settings.mid_model),
+    )
     return AgentRunner(
         Agent(
             model=model,
@@ -161,7 +164,10 @@ _ENTAILMENT_INSTRUCTIONS = [
 
 def build_entailment_agent(model_id: str | None = None) -> Runner:
     settings = get_settings()
-    model = build_model(model_id or settings.cheap_model, cache_system_prompt=prompt_cache_for(model_id or settings.cheap_model))
+    model = build_model(
+        model_id or settings.cheap_model,
+        cache_system_prompt=prompt_cache_for(model_id or settings.cheap_model),
+    )
     return AgentRunner(
         Agent(
             model=model,
@@ -445,10 +451,8 @@ async def asynthesize_document(
     sem: asyncio.Semaphore,
 ) -> tuple[SynthesizedFragment, list[str]]:
     """Async sibling of synthesize_document for the fragment fan-out."""
-    content = (
-        await acall(
-            synthesis_agent, compose_synthesis_input(doc_text, skeleton), sem=sem
-        )
+    content = await acall(
+        synthesis_agent, compose_synthesis_input(doc_text, skeleton), sem=sem
     )
     fragment = _expect_fragment(content).model_copy(deep=True)
     _apply_pinned_anchor(fragment, doc)

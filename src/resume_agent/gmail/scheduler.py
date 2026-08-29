@@ -34,7 +34,9 @@ async def _wait_terminal(run_manager: Any, run_id: str) -> None:
         await asyncio.sleep(_POLL_SECONDS)
 
 
-def _submit(state: Any, engine: Any, work: Callable[..., dict], user_id: str | None) -> str:
+def _submit(
+    state: Any, engine: Any, work: Callable[..., dict], user_id: str | None
+) -> str:
     def run(reporter):
         return work(engine, reporter)
 
@@ -47,7 +49,9 @@ def _submit(state: Any, engine: Any, work: Callable[..., dict], user_id: str | N
     )
 
 
-async def tick(state: Any, *, work: Callable[..., dict] = run_gmail_sync) -> dict[str, str]:
+async def tick(
+    state: Any, *, work: Callable[..., dict] = run_gmail_sync
+) -> dict[str, str]:
     """One serial pass over every connected owner. Never raises per-user errors."""
     results: dict[str, str] = {}
     if state.system_engine is None:

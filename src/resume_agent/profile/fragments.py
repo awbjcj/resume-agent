@@ -63,7 +63,9 @@ def evidence_path(profile_dir: str | Path, doc_id: str) -> Path:
 def load_fragment(profile_dir: str | Path, doc_id: str) -> ProfileFacts | None:
     fragment_path, _ = _paths(profile_dir, doc_id)
     try:
-        return ProfileFacts.model_validate_json(fragment_path.read_text(encoding="utf-8"))
+        return ProfileFacts.model_validate_json(
+            fragment_path.read_text(encoding="utf-8")
+        )
     except (OSError, ValueError):
         return None
 
@@ -135,7 +137,9 @@ def _expected_meta(doc: SourceDoc, sha256: str) -> dict:
 def fragment_cache_status(profile_dir: str | Path, doc: SourceDoc) -> CacheStatus:
     fragment_path, meta_path = _paths(profile_dir, doc.id)
     try:
-        observed_sha = hashlib.sha256(doc_path(profile_dir, doc).read_bytes()).hexdigest()
+        observed_sha = hashlib.sha256(
+            doc_path(profile_dir, doc).read_bytes()
+        ).hexdigest()
     except OSError:
         return "stale" if fragment_path.exists() else "missing"
     if observed_sha != doc.sha256:
@@ -207,7 +211,9 @@ def _apply_produced(
 ) -> None:
     _save_produced(profile_dir, item.doc.id, produced, item.meta)
     result.fragments[item.doc.id] = produced.facts
-    result.status[item.doc.id] = "source-changed" if item.source_changed else "extracted"
+    result.status[item.doc.id] = (
+        "source-changed" if item.source_changed else "extracted"
+    )
     if produced.drops is not None:
         result.drops[item.doc.id] = produced.drops
 
@@ -265,7 +271,9 @@ def _walk_fragments(
                     result,
                     profile_dir,
                     item.doc,
-                    res.error if res.error is not None else RuntimeError("produce failed"),
+                    res.error
+                    if res.error is not None
+                    else RuntimeError("produce failed"),
                 )
                 continue
             _apply_produced(result, profile_dir, item, res.value)
@@ -281,7 +289,9 @@ def extract_fragments(
     """Extract literal-mode documents, reusing valid cached fragments."""
 
     async def _produce(doc: SourceDoc, text: str, sem: asyncio.Semaphore) -> Produced:
-        facts = assign_fact_ids(await aextract_profile_facts(text, agent, sem=sem), doc.id)
+        facts = assign_fact_ids(
+            await aextract_profile_facts(text, agent, sem=sem), doc.id
+        )
         return Produced(facts=facts)
 
     return _walk_fragments(
