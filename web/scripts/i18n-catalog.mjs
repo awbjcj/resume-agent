@@ -561,46 +561,6 @@ function stableKey(source) {
   return `ui_${createHash("sha256").update(source).digest("hex").slice(0, 12)}`;
 }
 
-async function translate(source) {
-  const query = new URLSearchParams({ q: source, langpair: "en|zh-CN" });
-  let lastError;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      const response = await fetch(`https://api.mymemory.translated.net/get?${query}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      const translated = payload?.responseData?.translatedText?.trim();
-      if (!translated) throw new Error("empty translation");
-      return translated;
-    } catch (error) {
-      lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
-    }
-  }
-  throw lastError;
-}
-
-async function syncMachineTranslations() {
-  const queue = missing.map(([source]) => source);
-  let completed = 0;
-  const workers = Array.from({ length: Math.min(4, queue.length) }, async () => {
-    while (queue.length) {
-      const source = queue.shift();
-      if (!source) return;
-      const zhCN = await translate(source);
-      catalog[source] = { key: stableKey(source), en: source, "zh-CN": refineTranslation(source, zhCN) };
-      completed += 1;
-      if (completed % 50 === 0 || completed === missing.length) {
-        console.log(`Translated ${completed}/${missing.length}`);
-      }
-    }
-  });
-  await Promise.all(workers);
-  const sorted = Object.fromEntries(Object.entries(catalog).sort(([left], [right]) => left.localeCompare(right)));
-  fs.writeFileSync(catalogPath, `${JSON.stringify(sorted, null, 2)}\n`);
-  console.log(`Wrote ${Object.keys(sorted).length} catalog entries to ${path.relative(root, catalogPath)}.`);
-}
-
 function refineCatalog() {
   for (const [source, entry] of Object.entries(catalog)) {
     entry["zh-CN"] = refineTranslation(source, entry["zh-CN"]);
@@ -637,6 +597,8 @@ function validateCatalog() {
   return [...new Set(invalid)];
 }
 
+const keyFlagIndex = process.argv.indexOf("--key");
+
 if (process.argv.includes("--refine")) {
   refineCatalog();
 } else if (process.argv.includes("--prune")) {
@@ -644,14 +606,24 @@ if (process.argv.includes("--refine")) {
 } else if (process.argv.includes("--unclassified")) {
   const unclassified = collectUnclassified();
   process.stdout.write(`${JSON.stringify(Object.fromEntries(unclassified), null, 2)}\n`);
-} else if (process.argv.includes("--sync-machine")) {
-  await syncMachineTranslations();
+} else if (keyFlagIndex !== -1) {
+  const source = process.argv[keyFlagIndex + 1];
+  if (!source) {
+    console.error("Usage: node scripts/i18n-catalog.mjs --key \"<source text>\"");
+    process.exitCode = 1;
+  } else {
+    console.log(stableKey(source));
+  }
 } else if (process.argv.includes("--json")) {
   process.stdout.write(`${JSON.stringify(Object.fromEntries(candidates), null, 2)}\n`);
 } else {
   const invalid = validateCatalog();
   if (missing.length) {
-    console.error(`Missing ${missing.length} UI translations:`);
+    console.error(`Missing ${missing.length} UI translations. Every entry is a fixed, hand-written`);
+    console.error(`translation — there is no machine-translation fallback. For each string below,`);
+    console.error(`run \`node scripts/i18n-catalog.mjs --key "<source text>"\` to get its key, then`);
+    console.error(`add { "key": "...", "en": "<source text>", "zh-CN": "<hand-written translation>" }`);
+    console.error(`to src/i18n/auto-catalog.json:`);
     for (const [source, locations] of missing) {
       console.error(`- ${JSON.stringify(source)} (${locations.slice(0, 3).join(", ")})`);
     }

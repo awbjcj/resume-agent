@@ -108,7 +108,7 @@ export function AgendaRail({ topics, currentTopicId, currentQuestion }: AgendaRa
               <div className="mb-1 flex items-center justify-between gap-3 px-1">
                 <h3 className="text-xs font-semibold text-foreground">Agenda</h3>
                 <span className="text-[11px] tabular-nums text-muted-foreground">
-                  {queuedTopics.length} item{queuedTopics.length === 1 ? "" : "s"}
+                  {`${queuedTopics.length} item${queuedTopics.length === 1 ? "" : "s"}`}
                 </span>
               </div>
               <ol className="divide-y">

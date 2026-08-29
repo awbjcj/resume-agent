@@ -65,7 +65,7 @@ export function CareerLabTab({
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {row.status === "ended" ? "Completed" : "Open"} ·{" "}
-                  {row.turnCount} turn{row.turnCount === 1 ? "" : "s"} ·{" "}
+                  {`${row.turnCount} turn${row.turnCount === 1 ? "" : "s"}`} ·{" "}
                   {new Date(row.startedAt).toLocaleDateString()}
                 </span>
               </Link>

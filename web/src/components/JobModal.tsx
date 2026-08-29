@@ -308,8 +308,7 @@ export function JobModal({
                         </p>
                       </div>
                       <Badge variant="outline" className="tabular-nums">
-                        {job.resumeVersions.length} version
-                        {job.resumeVersions.length === 1 ? "" : "s"}
+                        {`${job.resumeVersions.length} version${job.resumeVersions.length === 1 ? "" : "s"}`}
                       </Badge>
                     </div>
                     {job.resumeVersions.length === 0 && (

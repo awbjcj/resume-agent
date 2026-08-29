@@ -755,7 +755,7 @@ function QuotaOperationCard({
             <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden="true" />
             <div className="flex-1">
               <div className="text-sm font-medium">
-                {preview.affectedCount} account{preview.affectedCount === 1 ? "" : "s"} frozen for review
+                {`${preview.affectedCount} account${preview.affectedCount === 1 ? "" : "s"} frozen for review`}
               </div>
               <div className="mt-0.5 text-xs text-muted-foreground">
                 Total effect {usd(preview.totalEffectMicros)} · preview expires {new Date(preview.expiresAt).toLocaleTimeString()}

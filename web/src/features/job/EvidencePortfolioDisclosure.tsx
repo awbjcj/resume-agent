@@ -162,7 +162,7 @@ export function EvidencePortfolioDisclosure({
                   <div>
                     <p className="font-semibold text-foreground">How this version was tailored</p>
                     <p className="mt-1 max-w-2xl leading-6 text-muted-foreground">
-                      It prioritizes {selections.length} work or project entr{selections.length === 1 ? "y" : "ies"} that best support {supportedRequirements} of {requirements.length} ranked job requirement{requirements.length === 1 ? "" : "s"}.
+                      {`It prioritizes ${selections.length} work or project entr${selections.length === 1 ? "y" : "ies"} that best support ${supportedRequirements} of ${requirements.length} ranked job requirement${requirements.length === 1 ? "" : "s"}.`}
                     </p>
                   </div>
                   <Badge variant="outline">
@@ -225,7 +225,7 @@ export function EvidencePortfolioDisclosure({
                                 {selection.ownerKind} {selection.rank}
                               </span>
                               <Badge variant="outline">
-                                Up to {selection.bulletBudget} bullet{selection.bulletBudget === 1 ? "" : "s"}
+                                {`Up to ${selection.bulletBudget} bullet${selection.bulletBudget === 1 ? "" : "s"}`}
                               </Badge>
                               {selection.bridge ? <Badge variant="secondary">Connects related skills</Badge> : null}
                             </div>
@@ -258,7 +258,7 @@ export function EvidencePortfolioDisclosure({
                                 </ul>
                                 {!showAllDetails && allSelectedExcerpts.length > selectedExcerpts.length ? (
                                   <p className="mt-1 text-xs text-muted-foreground">
-                                    +{allSelectedExcerpts.length - selectedExcerpts.length} more supporting fact{allSelectedExcerpts.length - selectedExcerpts.length === 1 ? "" : "s"}
+                                    {`+${allSelectedExcerpts.length - selectedExcerpts.length} more supporting fact${allSelectedExcerpts.length - selectedExcerpts.length === 1 ? "" : "s"}`}
                                   </p>
                                 ) : null}
                               </div>
@@ -274,7 +274,7 @@ export function EvidencePortfolioDisclosure({
                   )}
                   {!showAllDetails && selections.length > visibleSelections.length ? (
                     <p className="mt-2 text-xs text-muted-foreground">
-                      +{selections.length - visibleSelections.length} more selected experience entr{selections.length - visibleSelections.length === 1 ? "y" : "ies"}
+                      {`+${selections.length - visibleSelections.length} more selected experience entr${selections.length - visibleSelections.length === 1 ? "y" : "ies"}`}
                     </p>
                   ) : null}
                 </div>
@@ -308,7 +308,7 @@ export function EvidencePortfolioDisclosure({
                     </ol>
                     {!showAllDetails && requirements.length > visibleRequirements.length ? (
                       <p className="mt-2 text-xs text-muted-foreground">
-                        +{requirements.length - visibleRequirements.length} lower-priority requirement{requirements.length - visibleRequirements.length === 1 ? "" : "s"}
+                        {`+${requirements.length - visibleRequirements.length} lower-priority requirement${requirements.length - visibleRequirements.length === 1 ? "" : "s"}`}
                       </p>
                     ) : null}
                   </div>
@@ -329,7 +329,7 @@ export function EvidencePortfolioDisclosure({
                       </ul>
                       {!showAllDetails && omissions.length > visibleOmissions.length ? (
                         <p className="mt-2 text-xs text-muted-foreground">
-                          +{omissions.length - visibleOmissions.length} more omitted entr{omissions.length - visibleOmissions.length === 1 ? "y" : "ies"}
+                          {`+${omissions.length - visibleOmissions.length} more omitted entr${omissions.length - visibleOmissions.length === 1 ? "y" : "ies"}`}
                         </p>
                       ) : null}
                     </div>
@@ -339,7 +339,7 @@ export function EvidencePortfolioDisclosure({
 
               {outsideFactIds.length ? (
                 <p className="border-t bg-background/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
-                  This revision also includes {outsideFactIds.length} fact{outsideFactIds.length === 1 ? "" : "s"} you added after the original evidence plan.
+                  {`This revision also includes ${outsideFactIds.length} fact${outsideFactIds.length === 1 ? "" : "s"} you added after the original evidence plan.`}
                 </p>
               ) : null}
 
