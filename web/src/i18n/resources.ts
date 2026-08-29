@@ -1,4 +1,11 @@
+import autoCatalog from "./auto-catalog.json";
+
+const autoEntries = Object.values(autoCatalog);
+const autoEn = Object.fromEntries(autoEntries.map((entry) => [entry.key, entry.en]));
+const autoZhCN = Object.fromEntries(autoEntries.map((entry) => [entry.key, entry["zh-CN"]]));
+
 const en = {
+  auto: autoEn,
   common: {
     language: "Language",
     english: "English",
@@ -203,6 +210,7 @@ type TranslationShape<T> = {
 };
 
 const zhCN = {
+  auto: autoZhCN,
   common: {
     language: "语言",
     english: "English",

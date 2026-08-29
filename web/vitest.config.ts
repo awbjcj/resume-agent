@@ -1,9 +1,10 @@
 import path from "node:path";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { i18nTransform } from "./i18n-vite-plugin";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [i18nTransform(), react()],
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   test: {
     environment: "jsdom",
