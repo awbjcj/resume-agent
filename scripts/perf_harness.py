@@ -40,8 +40,16 @@ __all__ = [
 # Statement prefixes worth separating. ``BEGIN IMMEDIATE`` takes SQLite's
 # exclusive write lock, so it is counted apart from ordinary reads: ten selects
 # and ten exclusive transactions are very different costs under concurrency.
-_KINDS = ("BEGIN IMMEDIATE", "BEGIN DEFERRED", "BEGIN", "SELECT", "INSERT", "UPDATE",
-          "DELETE", "PRAGMA")
+_KINDS = (
+    "BEGIN IMMEDIATE",
+    "BEGIN DEFERRED",
+    "BEGIN",
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "PRAGMA",
+)
 
 
 def _kind(statement: str) -> str:
@@ -242,9 +250,9 @@ def count_prompt_tokens() -> Iterator[TokenCounts]:
             counts.input_tokens += _token(metrics, "input_tokens")
             counts.output_tokens += _token(metrics, "output_tokens")
             counts.cache_read_tokens += _token(metrics, "cache_read_tokens")
-            counts.cache_write_tokens += _token(metrics, "cache_write_tokens") or _token(
-                metrics, "cache_creation_tokens"
-            )
+            counts.cache_write_tokens += _token(
+                metrics, "cache_write_tokens"
+            ) or _token(metrics, "cache_creation_tokens")
         original(agent, response)
 
     usage_module.record_call = _record  # type: ignore[assignment]

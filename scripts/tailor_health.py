@@ -98,7 +98,9 @@ def collect(db_path: Path) -> dict[str, Any]:
     reviewer_scores: dict[str, list[int]] = collections.defaultdict(list)
     coverage_rendered = coverage_covered = 0
     coverage_has_totals = False
-    per_job: dict[int, list[tuple[int, int | None, bool]]] = collections.defaultdict(list)
+    per_job: dict[int, list[tuple[int, int | None, bool]]] = collections.defaultdict(
+        list
+    )
     unscored = zeros = 0
 
     for _vid, job_id, round_num, score, clean, critique_json in rows:

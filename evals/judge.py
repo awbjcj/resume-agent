@@ -49,9 +49,7 @@ _JUDGE_INSTRUCTIONS = [
 ]
 
 
-def compose_judge_input(
-    content: ResumeContent, jd_text: str, rubric: list[str]
-) -> str:
+def compose_judge_input(content: ResumeContent, jd_text: str, rubric: list[str]) -> str:
     return (
         "RESUME UNDER REVIEW (JSON):\n"
         f"{content.model_dump_json()}\n\n"
@@ -65,9 +63,7 @@ def compose_judge_input(
 def validate_judge_verdict(verdict: JudgeVerdict, rubric: list[str]) -> None:
     actual = [dimension.dimension for dimension in verdict.dimensions]
     if len(actual) != len(set(actual)) or set(actual) != set(rubric):
-        raise ValueError(
-            f"judge dimensions {actual!r} do not match rubric {rubric!r}"
-        )
+        raise ValueError(f"judge dimensions {actual!r} do not match rubric {rubric!r}")
 
 
 def judge_prompt_hash() -> str:

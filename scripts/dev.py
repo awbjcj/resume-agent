@@ -20,7 +20,9 @@ def commands(
 ) -> tuple[list[str], list[str]]:
     npm = shutil.which("npm")
     if npm is None:
-        raise SystemExit("Required tool 'npm' was not found on PATH. Run bootstrap first.")
+        raise SystemExit(
+            "Required tool 'npm' was not found on PATH. Run bootstrap first."
+        )
     backend = [
         sys.executable,
         "-m",

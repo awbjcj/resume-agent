@@ -57,11 +57,7 @@ class UsageCollector:
             self._cost += cost
 
     def snapshot(self) -> UsageTotals:
-        cost = (
-            self._cost
-            if self._metrics_calls > 0 and self._cost_complete
-            else None
-        )
+        cost = self._cost if self._metrics_calls > 0 and self._cost_complete else None
         return UsageTotals(
             calls=self._calls,
             failed_calls=self._failed_calls,

@@ -92,9 +92,7 @@ def seed(session: Session, n: int) -> None:
 def _payload_sizes(result, board: str) -> tuple[int, int, int]:
     response = to_board_page(result.page, ITEM_MODELS[board], result.facets)
     payload = response.model_dump(by_alias=True, mode="json")
-    total_bytes = len(
-        response.model_dump_json(by_alias=True).encode("utf-8")
-    )
+    total_bytes = len(response.model_dump_json(by_alias=True).encode("utf-8"))
     jd_text_bytes = sum(
         len(str(item.get("jdText", "")).encode("utf-8")) for item in payload["data"]
     )

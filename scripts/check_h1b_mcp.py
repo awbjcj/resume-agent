@@ -67,11 +67,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    print(
-        "H1B MCP connection OK: "
-        + ", ".join(sorted(discovered))
-        + f" at {args.url}"
-    )
+    print("H1B MCP connection OK: " + ", ".join(sorted(discovered)) + f" at {args.url}")
     return 0
 
 

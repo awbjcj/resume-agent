@@ -23,7 +23,9 @@ async def probe(base_url: str, session_id: str, message: str) -> None:
     token = os.environ.get("RESUME_AGENT_TOKEN", "")
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     started = time.perf_counter()
-    async with httpx.AsyncClient(base_url=base_url, headers=headers, timeout=120) as client:
+    async with httpx.AsyncClient(
+        base_url=base_url, headers=headers, timeout=120
+    ) as client:
         launch = await client.post(
             f"/api/profile/coach/sessions/{session_id}/messages",
             json={"message": message},

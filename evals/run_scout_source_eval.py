@@ -27,8 +27,12 @@ def build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run live, read-only checks for Scout ATS board accuracy."
     )
-    parser.add_argument("--cases", type=Path, default=Path("evals/scout_source_cases.json"))
-    parser.add_argument("--output", type=Path, default=Path(".artifacts/scout-source-eval.json"))
+    parser.add_argument(
+        "--cases", type=Path, default=Path("evals/scout_source_cases.json")
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path(".artifacts/scout-source-eval.json")
+    )
     parser.add_argument("--search-path", default=SEARCH_PATH)
     parser.add_argument("--timeout-seconds", type=float, default=45.0)
     return parser
