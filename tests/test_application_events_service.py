@@ -399,6 +399,7 @@ def test_update_changes_fields_and_can_advance_status():
         _require_id(event.id),
         {"kind": "offer_received", "occurred_at": _at(20)},
     )
+    assert updated is not None
     assert updated.kind == "offer_received"
     assert _application_status(session, job.id) == "offer"
 

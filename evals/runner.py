@@ -58,6 +58,55 @@ class CaseResult:
     portfolio_mandatory_total: int = 0
     portfolio_forbidden_hits: list[str] = field(default_factory=list)
 
+    def __init__(
+        self,
+        *,
+        case_id: str,
+        jd_text: str,
+        criteria: JobCriteria,
+        rubric: list[str],
+        traps: list[Trap],
+        rounds: list[RoundRecord],
+        trap_avoided: bool,
+        provenance_ok: bool,
+        must_cite_covered: bool,
+        budget_ok: bool,
+        judge: JudgeVerdict,
+        final_quality: int,
+        probes: list[ProbeRecord],
+        usage: UsageTotals,
+        surfaced_round_num: int | None = None,
+        needs_attention: bool = False,
+        regressed: bool = False,
+        portfolio_status: str | None = None,
+        portfolio_mandatory_hits: int = 0,
+        portfolio_mandatory_total: int = 0,
+        portfolio_forbidden_hits: list[str] | None = None,
+    ) -> None:
+        self.case_id = case_id
+        self.jd_text = jd_text
+        self.criteria = criteria
+        self.rubric = rubric
+        self.traps = traps
+        self.rounds = rounds
+        self.trap_avoided = trap_avoided
+        self.provenance_ok = provenance_ok
+        self.must_cite_covered = must_cite_covered
+        self.budget_ok = budget_ok
+        self.judge = judge
+        self.final_quality = final_quality
+        self.probes = probes
+        self.usage = usage
+        self.surfaced_round_num = surfaced_round_num
+        self.needs_attention = needs_attention
+        self.regressed = regressed
+        self.portfolio_status = portfolio_status
+        self.portfolio_mandatory_hits = portfolio_mandatory_hits
+        self.portfolio_mandatory_total = portfolio_mandatory_total
+        self.portfolio_forbidden_hits = (
+            [] if portfolio_forbidden_hits is None else portfolio_forbidden_hits
+        )
+
 
 def _surface_round(
     tailor_rounds: list[TailorRound],
