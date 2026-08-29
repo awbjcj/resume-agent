@@ -31,10 +31,21 @@ Migrated from the project root `CLAUDE.md` (2026-08-15, CLAUDE.md split) — loa
   The web callback authenticates via a signed link-token state, never the
   session cookie. An in-process scheduler (`gmail/scheduler.py`, every
   `gmail_sync_interval_hours`) runs `services/gmail_sync.run_gmail_sync`
-  per connected user — sync proposals and deterministic stale-application
-  reminders (`services/reminders.py`, episode-keyed dedupe in
-  `Notification.message_id`) land in the notification bell; nothing
+  per connected user — sync proposals land in the notification bell; nothing
   auto-applies. `services/email_writer.py` grounds drafts in facts.json
   only (human gate, no LLM fact-check round) and saves them as in-thread
   Gmail drafts via `EmailDraft` rows; drafts never gate job deletion but
   cascade on delete. `gmail.send` is permanently out of scope.
+- **Gmail does not own reminders, and used to by accident.**
+  `create_follow_up_reminders` once had exactly one call site — *inside*
+  `run_gmail_sync`, after `build_service()` raises for a user with no token —
+  and `gmail/scheduler.py` only iterates users owning a `gmail_token.json`. So
+  a user who never connected Gmail silently received **no reminders at all**,
+  and nothing said so. `services/reminder_scheduler.py` now owns them on its
+  own hourly tick that runs for every user regardless of Gmail state;
+  `run_gmail_sync` returns `{"pending": n}` and does email classification only.
+  Keep it that way: reminders are a property of having dated events, not of
+  having connected a mailbox. Pinned by
+  `tests/test_reminder_scheduler.py::test_reminder_pass_runs_without_any_gmail_token`
+  and by a source-level assertion that `gmail_sync` no longer imports the
+  reminder helpers.

@@ -22,40 +22,109 @@
 - **Load the `dataviz` skill before writing any chart component** (Task 7). Four independently styled recharts components is exactly the failure this phase must avoid.
 - **After any API schema change**, run `make openapi && make client` and commit `contracts/` plus `web/src/lib/api/schema.ts`.
 
+## Correctness amendments (reviewed 2026-08-29)
+
+These amendments are binding and supersede narrower snippets later in the plan.
+
+- `timeline_pivot.py` loads one canonical application-timeline dataset containing
+  applications, jobs, and their complete ordered event rows. The display pivot,
+  wide CSV, and long CSV are projections of that dataset. The long CSV must not
+  issue an unrelated event query that can drift from the grid/export filters.
+- Event order is deterministic: `occurred_at` ascending, nulls last, then
+  `created_at`, then `id`. Technical-round columns use the stored `sequence`
+  (including manual overrides), not a fresh enumeration that discards Phase 1's
+  sequencing contract. Duplicate keys resolve deterministically and remain a
+  warned, not blocked, condition.
+- Cycle time uses `total_seconds() / 86400`, not `timedelta.days`, so sub-day
+  stages are not silently rounded down to zero. The archived-row test must
+  actually archive a job and prove exclusion.
+- `/applications` is sortable as the approved design requires. Client-side
+  controls cover company, status, and sort order; the default remains newest
+  activity first. Tests pin sorting as well as filtering.
+- Date cells use compact visible dates, but metadata cannot exist only in a
+  native `title` attribute. Each populated cell exposes the same result,
+  modality, platform, and interviewer detail to keyboard and touch users through
+  an accessible disclosure/tooltip. The scroll container is `min-w-0` and owns
+  horizontal overflow so the document never scrolls sideways.
+- Sankey edge rates use the source node's total outgoing count as `n`. Counts and
+  `n=` always render; percentages are muted below `n=10` and omitted below
+  `n=3`. `RateLabel` is consumed by the stage-flow presentation rather than
+  becoming dead code. Custom events stay visibly excluded.
+- Pipeline timeline transforms take an injectable `now`; they do not read
+  `Date.now()` internally. Zero-span date ranges and same-day pipelines have a
+  deterministic centered layout.
+- Offer comparison never implies currency conversion. Bars and tooltips carry
+  their ISO currency, and mixed currencies are identified in the UI rather than
+  plotted against a falsely shared monetary axis without explanation.
+- The referenced `dataviz` skill is optional at execution time. If unavailable,
+  use the repository's semantic CSS variables and the requested Emil/frontend
+  design skills, then verify desktop/mobile layout, focus order, contrast,
+  reduced motion, console, and network behavior in a real browser.
+- Repeated and out-of-order stages are valid timeline facts but cannot be fed as
+  cyclic links to Recharts Sankey. The flow projection collapses self-links and
+  backward canonical-stage links, the web transform repeats that defense, and
+  exit links use semantic colors in the SVG itself.
+- Wide CSV/grid stage columns include terminal `rejected` and `withdrawn` dates.
+  Long CSV preserves numeric zeroes, and every exported string is neutralized
+  when it could be interpreted as a spreadsheet formula.
+- Offer analytics emits every dated `offer_received` event that has at least one
+  compensation component, newest first. It carries stable event/sequence
+  identity so negotiation revisions from the same company remain distinct.
+- Phase 1 sequencing is completed as part of this work: positive manual round
+  overrides are exposed in the form; ordinary inserts are numbered by canonical
+  chronological order; deletion closes gaps for an auto-numbered group; sparse
+  manual groups are preserved; duplicate technical cells are logged and surfaced
+  as visible overflow rather than silently disappearing.
+- Manual round-order provenance is persisted separately from effective order.
+  Automatic events fill the lowest unreserved positive positions in canonical
+  date order; explicit values (including `1`) survive insert/delete. Clearing an
+  override with PATCH `null`, changing date, or moving kind resequences both
+  affected groups transactionally. The form displays only the explicit override,
+  never an effective automatic value as though the user chose it.
+- Event creation and status advancement share one database commit. A failure
+  after the event is staged must roll back both the event and any newly created
+  application instead of leaving status and history inconsistent.
+- Funnel histories are projected once into strictly increasing canonical
+  milestones. Flows, terminal exits, and cycle-time pairs all consume that same
+  projection, so repeated/backward facts cannot split a candidate into
+  disconnected paths or create misleading backward cycle rows.
+
 ---
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/resume_agent/tracking/timeline_pivot.py` | **Create.** Event log → one row per application. The single source the grid, both CSVs, and the exports read. |
-| `src/resume_agent/tracking/funnel.py` | **Create.** Sankey flows + stage cycle times. Aggregation only, no serialization. |
-| `src/resume_agent/api/schemas/timeline_analytics.py` | **Create.** Pivot and analytics response models. |
-| `src/resume_agent/api/routers/applications.py` | **Create.** Grid + both CSVs. |
-| `src/resume_agent/api/routers/analytics.py` | **Modify.** Add `GET /analytics/timeline`. Existing route untouched. |
-| `src/resume_agent/api/app.py` | **Modify.** Register the applications router. |
-| `web/src/features/applications/use-applications.ts` | **Create.** Grid query hook. |
-| `web/src/features/applications/ApplicationsTable.tsx` | **Create.** The pivoted grid. |
-| `web/src/features/applications/ApplicationsPage.tsx` | **Create.** Page shell, filters, export buttons. |
-| `web/src/app/router.tsx` | **Modify.** Add `/applications`. |
-| `web/src/components/layout/*` | **Modify.** Nav entry (locate the sidebar nav list). |
-| `web/src/features/analytics/chart-theme.ts` | **Create.** Shared palette + the small-sample helpers. One place, so four charts cannot drift. |
-| `web/src/features/analytics/RateLabel.tsx` | **Create.** The small-sample rule as a component. |
-| `web/src/features/analytics/StageFlowChart.tsx` | **Create.** Sankey. |
-| `web/src/features/analytics/CycleTimeChart.tsx` | **Create.** Median-days bars. |
-| `web/src/features/analytics/PipelineTimelineChart.tsx` | **Create.** Gantt of live applications. |
-| `web/src/features/analytics/OfferComparisonChart.tsx` | **Create.** Stacked comp bars. |
-| `web/src/features/analytics/AnalyticsContainer.tsx` | **Modify.** Mount the four charts above the existing cohort tables. |
+| File                                                   | Responsibility                                                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `src/resume_agent/tracking/timeline_pivot.py`          | **Create.** Event log → one row per application. The single source the grid, both CSVs, and the exports read. |
+| `src/resume_agent/tracking/funnel.py`                  | **Create.** Sankey flows + stage cycle times. Aggregation only, no serialization.                             |
+| `src/resume_agent/api/schemas/timeline_analytics.py`   | **Create.** Pivot and analytics response models.                                                              |
+| `src/resume_agent/api/routers/applications.py`         | **Create.** Grid + both CSVs.                                                                                 |
+| `src/resume_agent/api/routers/analytics.py`            | **Modify.** Add `GET /analytics/timeline`. Existing route untouched.                                          |
+| `src/resume_agent/api/app.py`                          | **Modify.** Register the applications router.                                                                 |
+| `web/src/features/applications/use-applications.ts`    | **Create.** Grid query hook.                                                                                  |
+| `web/src/features/applications/ApplicationsTable.tsx`  | **Create.** The pivoted grid.                                                                                 |
+| `web/src/features/applications/ApplicationsPage.tsx`   | **Create.** Page shell, filters, export buttons.                                                              |
+| `web/src/app/router.tsx`                               | **Modify.** Add `/applications`.                                                                              |
+| `web/src/components/layout/*`                          | **Modify.** Nav entry (locate the sidebar nav list).                                                          |
+| `web/src/features/analytics/chart-theme.ts`            | **Create.** Shared palette + the small-sample helpers. One place, so four charts cannot drift.                |
+| `web/src/features/analytics/RateLabel.tsx`             | **Create.** The small-sample rule as a component.                                                             |
+| `web/src/features/analytics/StageFlowChart.tsx`        | **Create.** Sankey.                                                                                           |
+| `web/src/features/analytics/CycleTimeChart.tsx`        | **Create.** Median-days bars.                                                                                 |
+| `web/src/features/analytics/PipelineTimelineChart.tsx` | **Create.** Gantt of live applications.                                                                       |
+| `web/src/features/analytics/OfferComparisonChart.tsx`  | **Create.** Stacked comp bars.                                                                                |
+| `web/src/features/analytics/AnalyticsContainer.tsx`    | **Modify.** Mount the four charts above the existing cohort tables.                                           |
 
 ---
 
 ### Task 1: Timeline pivot
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/timeline_pivot.py`
 - Test: `tests/test_timeline_pivot.py`
 
 **Interfaces:**
+
 - Consumes: Phase 1's `ApplicationEvent`, `EventKind`, `REPEATABLE_KINDS`.
 - Produces:
   - `@dataclass PivotCell(occurred_at, all_day, result, modality, platform, platform_other, interviewers, notes)`
@@ -73,7 +142,7 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.timeline_pivot import build_pivot
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
@@ -83,7 +152,7 @@ def _at(day):
 
 
 def _session():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     return Session(engine)
 
@@ -258,10 +327,12 @@ git commit -m "feat(tracking): pivot the event log into application rows"
 ### Task 2: Funnel flows and cycle times
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/funnel.py`
 - Test: `tests/test_funnel.py`
 
 **Interfaces:**
+
 - Consumes: Phase 1's `FUNNEL_KINDS`, `EventResult`.
 - Produces:
   - `@dataclass FlowEdge(source: str, target: str, count: int)`
@@ -281,7 +352,7 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.funnel import stage_cycle_times, stage_flows
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 
@@ -291,7 +362,7 @@ def _at(day):
 
 
 def _session():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     return Session(engine)
 
@@ -463,12 +534,14 @@ git commit -m "feat(tracking): funnel flows and stage cycle times"
 ### Task 3: Grid and CSV routes
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/timeline_analytics.py`
 - Create: `src/resume_agent/api/routers/applications.py`
 - Modify: `src/resume_agent/api/app.py`
 - Test: `tests/api/test_applications_routes.py`
 
 **Interfaces:**
+
 - Consumes: Task 1.
 - Produces: `GET /api/applications`, `GET /api/applications.csv?shape=wide|long`.
 
@@ -592,6 +665,7 @@ Expected: FAIL — 404 on both routes.
 `api/schemas/timeline_analytics.py`: `PivotCellOut`, `PivotRowOut` (with `cells: dict[str, PivotCellOut]`, `overflow_rounds: int`), `PivotTableOut` (`rows`, `technical_round_columns`). All `CamelModel`.
 
 `api/routers/applications.py`:
+
 - `GET /applications` → `PivotTableOut.model_validate(build_pivot(session))`.
 - `GET /applications.csv` with `shape: str = "wide"`:
   - Reject anything but `wide`/`long` with `ApiException(422, "VALIDATION_ERROR", ...)`.
@@ -620,11 +694,13 @@ git commit -m "feat(api): applications grid and wide/long CSV exports"
 ### Task 4: Timeline analytics endpoint
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/analytics.py`
 - Modify: `src/resume_agent/api/schemas/timeline_analytics.py`
 - Test: `tests/api/test_timeline_analytics.py`
 
 **Interfaces:**
+
 - Consumes: Tasks 1 and 2.
 - Produces: `GET /api/analytics/timeline` → `TimelineAnalyticsOut(flows, cycle_times, active_pipeline, offers)`.
 
@@ -768,6 +844,7 @@ git commit -m "feat(api): timeline analytics endpoint"
 ### Task 5: Web — applications grid page
 
 **Files:**
+
 - Create: `web/src/features/applications/use-applications.ts`
 - Create: `web/src/features/applications/ApplicationsTable.tsx`
 - Create: `web/src/features/applications/ApplicationsPage.tsx`
@@ -776,6 +853,7 @@ git commit -m "feat(api): timeline analytics endpoint"
 - Modify: the sidebar nav list (locate with `grep -rn "Analytics" web/src/components web/src/app`)
 
 **Interfaces:**
+
 - Consumes: Task 3.
 - Produces: `useApplications()` (query key `["applications"]`), `<ApplicationsTable table={PivotTable} />`, `<ApplicationsPage />`.
 
@@ -840,8 +918,12 @@ describe("ApplicationsTable", () => {
 
   it("renders a column per observed technical round", () => {
     render(<ApplicationsTable table={table() as never} />);
-    expect(screen.getByRole("columnheader", { name: /Tech 1/ })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /Tech 2/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /Tech 1/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /Tech 2/ }),
+    ).toBeInTheDocument();
   });
 
   it("shows only the date in a cell, with detail in the tooltip", () => {
@@ -864,12 +946,20 @@ describe("ApplicationsTable", () => {
   });
 
   it("shows an empty state when nothing has been tracked", () => {
-    render(<ApplicationsTable table={{ rows: [], technicalRoundColumns: 0 } as never} />);
-    expect(screen.getByText(/no applications tracked yet/i)).toBeInTheDocument();
+    render(
+      <ApplicationsTable
+        table={{ rows: [], technicalRoundColumns: 0 } as never}
+      />,
+    );
+    expect(
+      screen.getByText(/no applications tracked yet/i),
+    ).toBeInTheDocument();
   });
 
   it("keeps horizontal overflow inside the table container", () => {
-    const { container } = render(<ApplicationsTable table={table() as never} />);
+    const { container } = render(
+      <ApplicationsTable table={table() as never} />,
+    );
     expect(container.querySelector(".overflow-x-auto")).not.toBeNull();
   });
 });
@@ -885,6 +975,7 @@ Expected: FAIL — cannot resolve `./ApplicationsTable`.
 `use-applications.ts`: a `useQuery` on `["applications"]` hitting `GET /api/applications`.
 
 `ApplicationsTable.tsx`:
+
 - Empty state: "No applications tracked yet."
 - Wrapper `<div className="overflow-x-auto">` around the `<table>`.
 - Columns: Company (link to the job, reusing the same deep-link pattern as Phase 2's `UpcomingCard`), Title, Status, then Submitted / HR call / OA / Questionnaire / Phone screen / Tech 1..n / Design / Behavioral / HM / Onsite / Team match / Offer, then Deadline, TC, Other.
@@ -920,11 +1011,13 @@ git commit -m "feat(web): applications grid page with CSV exports"
 ### Task 6: Web — the small-sample rule
 
 **Files:**
+
 - Create: `web/src/features/analytics/chart-theme.ts`
 - Create: `web/src/features/analytics/RateLabel.tsx`
 - Create: `web/src/features/analytics/RateLabel.test.tsx`
 
 **Interfaces:**
+
 - Produces:
   - `SUPPRESS_BELOW = 3`, `GREY_BELOW = 10`
   - `rateConfidence(n: number): "suppressed" | "low" | "ok"`
@@ -1049,6 +1142,7 @@ git commit -m "feat(web): shared chart theme and the small-sample rule"
 ### Task 7: Web — the four charts
 
 **Files:**
+
 - Create: `web/src/features/analytics/StageFlowChart.tsx`
 - Create: `web/src/features/analytics/CycleTimeChart.tsx`
 - Create: `web/src/features/analytics/PipelineTimelineChart.tsx`
@@ -1058,6 +1152,7 @@ git commit -m "feat(web): shared chart theme and the small-sample rule"
 - Modify: `web/src/features/analytics/AnalyticsContainer.tsx`
 
 **Interfaces:**
+
 - Consumes: Tasks 4 and 6.
 - Produces: the four chart components, each taking its slice of the timeline payload.
 
@@ -1109,8 +1204,18 @@ describe("CycleTimeChart", () => {
 
   it("keeps low-sample rows but marks them", () => {
     const rows = toCycleRows([
-      { fromKind: "application_submitted", toKind: "recruiter_screen", medianDays: 4, sampleSize: 1 },
-      { fromKind: "recruiter_screen", toKind: "technical_round", medianDays: 6, sampleSize: 12 },
+      {
+        fromKind: "application_submitted",
+        toKind: "recruiter_screen",
+        medianDays: 4,
+        sampleSize: 1,
+      },
+      {
+        fromKind: "recruiter_screen",
+        toKind: "technical_round",
+        medianDays: 6,
+        sampleSize: 12,
+      },
     ]);
     expect(rows).toHaveLength(2);
     expect(rows[0].lowConfidence).toBe(true);
@@ -1119,7 +1224,12 @@ describe("CycleTimeChart", () => {
 
   it("labels each bar with both stages", () => {
     const rows = toCycleRows([
-      { fromKind: "application_submitted", toKind: "recruiter_screen", medianDays: 4, sampleSize: 5 },
+      {
+        fromKind: "application_submitted",
+        toKind: "recruiter_screen",
+        medianDays: 4,
+        sampleSize: 5,
+      },
     ]);
     expect(rows[0].label).toBe("Application submitted → Recruiter screen");
   });
@@ -1138,14 +1248,30 @@ describe("PipelineTimelineChart", () => {
         company: "Later",
         title: "SWE",
         status: "interview",
-        events: [{ kind: "technical_round", sequence: 1, occurredAt: "2026-03-20T12:00:00Z", allDay: false, result: "pending" }],
+        events: [
+          {
+            kind: "technical_round",
+            sequence: 1,
+            occurredAt: "2026-03-20T12:00:00Z",
+            allDay: false,
+            result: "pending",
+          },
+        ],
       },
       {
         jobId: 2,
         company: "Sooner",
         title: "SWE",
         status: "interview",
-        events: [{ kind: "technical_round", sequence: 1, occurredAt: "2026-03-05T12:00:00Z", allDay: false, result: "pending" }],
+        events: [
+          {
+            kind: "technical_round",
+            sequence: 1,
+            occurredAt: "2026-03-05T12:00:00Z",
+            allDay: false,
+            result: "pending",
+          },
+        ],
       },
     ]);
     expect(lanes.map((l) => l.company)).toEqual(["Sooner", "Later"]);
@@ -1153,7 +1279,13 @@ describe("PipelineTimelineChart", () => {
 
   it("drops lanes whose events are all undated", () => {
     const lanes = toLanes([
-      { jobId: 1, company: "Acme", title: "SWE", status: "interview", events: [] },
+      {
+        jobId: 1,
+        company: "Acme",
+        title: "SWE",
+        status: "interview",
+        events: [],
+      },
     ]);
     expect(lanes).toEqual([]);
   });
@@ -1261,6 +1393,7 @@ Expected: all green.
 - [ ] **Step 2: Verify the charts against real data by eye**
 
 Start the app with a workspace holding at least a few applications. Confirm:
+
 - The Sankey shows plausible flows and its exit branches are distinguishable.
 - Cycle-time bars are labelled with both stages and carry `n=`.
 - Low-sample rates are greyed; anything under n=3 shows counts only.
@@ -1273,6 +1406,7 @@ This step exists because none of it is provable in jsdom: recharts measures zero
 - [ ] **Step 3: Document**
 
 Add an "Analytics over the timeline" section to `src/resume_agent/tracking/CLAUDE.md`:
+
 - `timeline_pivot.py` is the single source for the grid, both CSVs, and the exports — presentations must never compute their own pivot.
 - The technical-round cap is display-only; the wide CSV is uncapped, and truncating an export is a data-loss bug.
 - Why median rather than mean for cycle times.
@@ -1281,10 +1415,10 @@ Add an "Analytics over the timeline" section to `src/resume_agent/tracking/CLAUD
 
 Add to the root `CLAUDE.md` hot-paths table:
 
-| Path | Role |
-| --- | --- |
+| Path                                          | Role                                                                 |
+| --------------------------------------------- | -------------------------------------------------------------------- |
 | `src/resume_agent/tracking/timeline_pivot.py` | Event log → application rows; the one source for grid, CSVs, exports |
-| `src/resume_agent/tracking/funnel.py` | Sankey flow edges + median stage cycle times |
+| `src/resume_agent/tracking/funnel.py`         | Sankey flow edges + median stage cycle times                         |
 
 - [ ] **Step 4: Commit**
 

@@ -61,6 +61,7 @@ into this one.
 | Session substrate (coach, interview, Career Lab adapters)                         | `src/resume_agent/sessions/CLAUDE.md`             |
 | Career Lab                                                                        | `src/resume_agent/career_lab/CLAUDE.md`           |
 | Gmail integration                                                                 | `src/resume_agent/gmail/CLAUDE.md`                |
+| Calendar export (`.ics`, RFC 5545, reminder lead-time split)                      | `src/resume_agent/calendar/CLAUDE.md`             |
 | Services layer: settings bundle                                                   | `src/resume_agent/services/CLAUDE.md`             |
 | Agent-quality evals: how to run them, what the numbers mean                       | `evals/README.md`                                 |
 
@@ -132,3 +133,8 @@ before changing code near the invariant.
 | `src/resume_agent/tracking/dedup.py`                 | `compute_dedup_key` — `company                                                                                            | normalized_title` |
 | `tests/test_discovery_ingest.py`                     | Ingest + dedup + priority tests                                                                                           |
 | `src/resume_agent/settings_sections.py`              | Single enumeration of customizable settings: bundle scope + reset targets                                                 |
+| `src/resume_agent/tracking/event_vocab.py`           | Closed event vocabularies + kind→status mapping + funnel order                                                            |
+| `src/resume_agent/tracking/status_rules.py`          | Progression-vs-terminal application status (ADR-0012)                                                                    |
+| `src/resume_agent/services/application_events.py`    | Timeline event validation, sequencing, status advancement                                                                |
+| `src/resume_agent/tracking/timeline_pivot.py`        | Event log → application rows; the one source for grid, CSVs, exports                                                     |
+| `src/resume_agent/tracking/funnel.py`                | Sankey flow edges + median stage cycle times                                                                             |

@@ -21,6 +21,67 @@
 - **No `webcal://` feed.** Per the spec, a feed needs a capability token, revoke path, and rate limit under ADR-0008. Per-event and bulk download only, behind the existing session auth.
 - **After any API schema change**, run `make openapi && make client` and commit `contracts/` plus `web/src/lib/api/schema.ts`.
 
+## Correctness amendments (reviewed 2026-08-29)
+
+These amendments are binding and supersede narrower snippets later in the plan.
+
+- Finish and verify Phase 1 Tasks 7–13 before starting this phase. Phase 2 routes
+  and UI consume the Phase 1 event API; implementing around a partial Phase 1
+  would create a second, incompatible path.
+- `render_calendar` accepts an injectable `now`. `DTSTAMP` must never read the
+  wall clock internally, and tests assert a fixed stamp rather than comparing
+  two timing-sensitive renders.
+- A timed event stores UTC in `occurred_at`. When `timezone` is present, convert
+  the instant with `zoneinfo.ZoneInfo` before formatting the local wall time;
+  attaching a `TZID` to the original UTC clock reading is incorrect. Invalid
+  IANA names fail event validation with the normal 422 envelope.
+- All-day entries are one-day values unless an explicit exclusive end date is
+  provided. Their serializer never adds a second day to an already exclusive
+  `end`, and duration minutes do not affect an all-day event.
+- The per-event download must load the event through `(job_id, event_id)` (or
+  verify its application belongs to the requested job). Looking up only by
+  `event_id` permits a cross-job download through a mismatched URL.
+- Calendar downloads use the repository's purpose-bound download-link flow
+  (`openDownload` plus `download_guarded`), not a plain anchor. Local/token mode
+  stores its bearer token in JavaScript and a browser navigation cannot attach
+  that Authorization header; claiming a direct `<a>` is universally
+  authenticated is incompatible with the existing deployment modes.
+- “Upcoming pipeline” means non-terminal applications only. Bulk calendar and
+  dashboard queries exclude archived jobs, past/cancelled/withdrawn events, and
+  applications in `rejected` or `closed`.
+- The production reminder loop runs one pass immediately on startup, then waits
+  one hour between passes. In-memory test apps do not start the background loop;
+  scheduler tests exercise `run_reminder_pass`/`reminder_tick` directly so app
+  startup remains deterministic.
+- The `.ics` tests cover multibyte UTF-8 folding, timezone conversion across a
+  DST boundary, exclusive all-day `DTEND`, stable `UID`, fixed `DTSTAMP`, and
+  event/job ownership. The generated file is also checked as bytes with CRLF
+  endings before browser/UI verification.
+- Event request datetimes must carry an offset and are normalized to UTC before
+  SQLite persistence. The web form edits all-day values as calendar dates and
+  timed values in their named IANA timezone; converting either through the
+  browser's incidental local timezone is a data-corruption bug.
+- Calendar text escaping handles bare CR as well as CRLF/LF, and URI properties
+  encode CR/LF so user-controlled locations or links cannot inject new iCalendar
+  properties.
+- The dashboard's “Next 7 days” dataset is restricted to interview kinds plus
+  `offer_deadline`. The bulk calendar deliberately remains broader and includes
+  every live upcoming pipeline event.
+- The hourly scheduler pushes its time, kind, result, application-status, and
+  archive filters into SQL, preloads existing episode keys, and commits new
+  notifications as one batch. It must not scan all historical events or perform
+  a lookup and commit for every candidate each hour.
+- Timed form conversion round-trips the requested wall clock through the named
+  timezone. Nonexistent spring-forward times are rejected instead of silently
+  moving one hour; ambiguous fall-back times consistently choose the earlier
+  occurrence. Both DST boundaries have regression coverage.
+- A timed form computes one effective timezone (the field value, otherwise the
+  browser's IANA timezone) and persists that exact zone used for conversion;
+  clearing the field must not save a zone-less instant.
+- Event create/update callbacks are awaited. A rejected API mutation leaves the
+  dialog and completed draft open, displays the failure, and disables duplicate
+  submission while the request is pending.
+
 ---
 
 ## File Structure
@@ -139,7 +200,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.services.reminders import (
     DEADLINE_KIND,
     INTERVIEW_KIND,
@@ -151,7 +212,7 @@ NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def _session_with_event(**event_kwargs):
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     session = Session(engine)
     job = Job(source="test", company="Acme", title="SWE")
@@ -421,7 +482,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.services.reminder_scheduler import (
     REMINDER_INTERVAL_SECONDS,
     run_reminder_pass,
@@ -437,7 +498,7 @@ NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def _session():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     return Session(engine)
 
@@ -915,7 +976,7 @@ git commit -m "feat(calendar): RFC 5545 ics writer"
 from datetime import datetime, timedelta, timezone
 
 from resume_agent.calendar.events import entries_for_upcoming, entry_for_event
-from resume_agent.db import create_db_engine, init_db
+from resume_agent.db import init_db, make_engine
 from resume_agent.tracking.tables import Application, ApplicationEvent, Job
 from sqlmodel import Session
 
@@ -992,7 +1053,7 @@ def test_timed_events_alarm_one_hour_before():
 
 
 def test_upcoming_excludes_past_and_undated_events():
-    engine = create_db_engine("sqlite://")
+    engine = make_engine("sqlite://")
     init_db(engine)
     with Session(engine) as session:
         job = Job(source="test", company="Acme", title="SWE")
@@ -1173,8 +1234,7 @@ from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.calendar.events import entries_for_upcoming, entry_for_event
 from resume_agent.calendar.ics import render_calendar
-from resume_agent.tracking.queries import get_job
-from resume_agent.tracking.repository import get_application_event
+from resume_agent.tracking.repository import get_application_event, get_job
 
 router = APIRouter()
 

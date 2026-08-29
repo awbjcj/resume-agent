@@ -126,3 +126,28 @@ reaches the run result, the log, and the dashboard.
 - **Board bulk actions are transactional.** `bulk_apply` uses one batched load plus the
   `progressed_job_ids` gate, then one commit. `delete_job_row` is the unguarded cascade shared
   with guarded `delete_job` and prune.
+
+---
+
+## Application timeline and analytics
+
+`ApplicationEvent` is the canonical employer-side history. Event kinds advance
+`Application.status` through `tracking/status_rules.py`; manual overrides may
+move the status independently, but deleting an event never rewinds it. All
+event mutations go through `services/application_events.py`, which owns kind,
+sequence, timezone, compensation, and ownership validation.
+
+`timeline_pivot.py` is the single batched source for the `/applications` grid
+and both CSV exports. The display caps technical-round columns at six and shows
+overflow as `+N`; the wide export is deliberately uncapped. The long export
+projects the same complete ordered event rows—never issue a second unrelated
+event query for it.
+
+`funnel.py` excludes custom, deadline, and terminal marker events from flow and
+cycle-time math. Cycle times use fractional days and medians. Each result keeps
+its sample size; the web chart theme always shows counts and `n=`, mutes rates
+below 10, and suppresses percentages below 3.
+
+Calendar downloads are finite, purpose-bound files rather than subscribable
+feeds. The production app runs an immediate reminder pass and then one pass per
+hour; the in-memory/test app never starts that background loop.
