@@ -10,6 +10,7 @@ from resume_agent.taxonomy.location import (
     location_instances_from_criteria,
 )
 from resume_agent.taxonomy.industries import clean_industry_label
+from resume_agent.tracking.tables import utcnow
 
 
 def ensure_job_location_instances(engine: Engine) -> None:
@@ -414,4 +415,55 @@ def ensure_agent_metadata_columns(engine: Engine) -> None:
         if covers and "skill_uses_json" not in covers:
             conn.execute(
                 text("ALTER TABLE cover_letters ADD COLUMN skill_uses_json JSON")
+            )
+
+
+def ensure_application_submitted_events(engine: Engine) -> None:
+    """Turn each Application.submitted_at into a real timeline event.
+
+    Every submitted application already carries one true, unambiguous date;
+    dropping it would make the first cycle-time chart wrong for no reason.
+    Status is NOT backfilled: an `interview` status implies an interview
+    happened but carries no date, and an undated synthetic event corrupts the
+    very numbers the timeline exists to produce. `source="migration"` keeps
+    backfilled rows distinguishable forever.
+
+    No companion table-creation migration exists: `init_db` calls
+    `SQLModel.metadata.create_all` before the ensure_* sequence, which builds
+    `application_events` and its indexes. `ensure_*` is only for ALTER-shaped
+    changes to tables already present in deployed databases.
+    """
+    with engine.begin() as conn:
+        tables = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            )
+        }
+        if not {"applications", "application_events"}.issubset(tables):
+            return
+        rows = conn.execute(
+            text(
+                "SELECT a.id, a.submitted_at FROM applications a "
+                "WHERE a.submitted_at IS NOT NULL AND NOT EXISTS ("
+                "  SELECT 1 FROM application_events e "
+                "  WHERE e.application_id = a.id "
+                "    AND e.kind = 'application_submitted')"
+            )
+        ).fetchall()
+        for application_id, submitted_at in rows:
+            conn.execute(
+                text(
+                    "INSERT INTO application_events ("
+                    "  application_id, kind, sequence, occurred_at, all_day, "
+                    "  result, source, schema_version, created_at, updated_at"
+                    ") VALUES ("
+                    "  :application_id, 'application_submitted', 1, :occurred_at, 1, "
+                    "  'advanced', 'migration', 1, :now, :now)"
+                ),
+                {
+                    "application_id": application_id,
+                    "occurred_at": submitted_at,
+                    "now": utcnow(),
+                },
             )
