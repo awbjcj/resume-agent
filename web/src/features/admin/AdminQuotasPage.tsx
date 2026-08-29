@@ -45,6 +45,19 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMe } from "@/features/auth/AuthGate";
+import { useModelCatalog } from "@/features/settings/use-model-catalog";
+import {
+  groupAndSortRates,
+  latestVersion,
+  RATE_COST_BAND_STYLES,
+  RATE_SORT_LABELS,
+  rateCostBand,
+  rateVersionStatus,
+  type LlmRate,
+  type RateCostBand,
+  type RateSortKey,
+  type SortDirection,
+} from "@/features/admin/admin-quota-rates";
 import { api, unwrap } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
@@ -52,17 +65,16 @@ import { cn } from "@/lib/utils";
 type QuotaAccount = components["schemas"]["QuotaAccountOut"];
 type QuotaPreview = components["schemas"]["QuotaOperationPreviewOut"];
 type QuotaTier = components["schemas"]["QuotaTierOut"];
-type LlmRate = components["schemas"]["LlmRateOut"];
+type QuotaOperationCreate = components["schemas"]["QuotaOperationPreviewCreate"];
 
-type QuotaTargetType = "USER" | "TIER" | "ALL_MEMBERS";
-type QuotaActionType = "RESET_CURRENT_PERIOD" | "GRANT_CREDIT" | "DEBIT_CREDIT";
+type QuotaTargetType = QuotaOperationCreate["targetType"];
+type QuotaActionType = QuotaOperationCreate["actionType"];
 type CycleUnit = "WEEK" | "MONTH";
 type RatePeriodChoice = "all" | "peak" | "off_peak";
 
 const MICROS_PER_USD = 1_000_000;
 const CUSTOM_MODEL = "__custom__";
 const ALL_BALANCES = "ALL";
-const PROVIDERS = ["anthropic", "openai", "gemini", "deepseek"] as const;
 const CYCLE_COUNTS = Array.from({ length: 52 }, (_, index) => index + 1);
 
 const TARGET_LABELS: Record<QuotaTargetType, string> = {
@@ -231,97 +243,6 @@ function Metric({
   );
 }
 
-type RateCostBand = "economical" | "standard" | "premium";
-
-const ECONOMICAL_RATE_LIMIT_MICROS = 5_000_000;
-const PREMIUM_RATE_LIMIT_MICROS = 20_000_000;
-
-const RATE_COST_BAND_STYLES: Record<RateCostBand, {
-  label: string;
-  detail: string;
-  rail: string;
-  badge: string;
-}> = {
-  economical: {
-    label: "Economical",
-    detail: "Up to $5 / 1M",
-    rail: "bg-chart-2",
-    badge: "border-chart-2/30 bg-chart-2/10 text-chart-2",
-  },
-  standard: {
-    label: "Standard",
-    detail: "$5–$20 / 1M",
-    rail: "bg-primary",
-    badge: "border-primary/30 bg-primary/10 text-primary",
-  },
-  premium: {
-    label: "Premium",
-    detail: "Over $20 / 1M",
-    rail: "bg-ready",
-    badge: "border-ready/30 bg-ready/10 text-ready",
-  },
-};
-
-function rateCostBand(rate: LlmRate): RateCostBand {
-  // Compare the two non-cache token prices so the visual band stays useful
-  // across providers with different cache and tool pricing contracts.
-  const referenceMicros = rate.inputMicrosPerMillion + rate.outputMicrosPerMillion;
-  if (referenceMicros <= ECONOMICAL_RATE_LIMIT_MICROS) return "economical";
-  if (referenceMicros > PREMIUM_RATE_LIMIT_MICROS) return "premium";
-  return "standard";
-}
-
-function rateVersionStatus(rate: LlmRate): "Active" | "Scheduled" | "Historical" {
-  const now = Date.now();
-  if (new Date(rate.effectiveFrom).getTime() > now) return "Scheduled";
-  if (rate.effectiveTo && new Date(rate.effectiveTo).getTime() <= now) return "Historical";
-  return "Active";
-}
-
-type RateSortKey = "model" | "context" | "input" | "cache" | "output" | "tool" | "hours" | "effective";
-type SortDirection = "asc" | "desc";
-type RateGroup = { key: string; provider: string; model: string; versions: LlmRate[] };
-
-const RATE_SORT_LABELS: Record<RateSortKey, string> = {
-  model: "Provider and model",
-  context: "Context band",
-  input: "Input rate",
-  cache: "Cache rate",
-  output: "Output rate",
-  tool: "Tool fee",
-  hours: "Billing hours",
-  effective: "Effective date",
-};
-
-function compareNullable(a: number | null, b: number | null, direction: SortDirection): number {
-  if (a == null && b == null) return 0;
-  if (a == null) return 1;
-  if (b == null) return -1;
-  return (a - b) * (direction === "asc" ? 1 : -1);
-}
-
-function latestVersion(group: RateGroup): LlmRate {
-  return group.versions[0];
-}
-
-function compareRateGroups(a: RateGroup, b: RateGroup, key: RateSortKey, direction: SortDirection): number {
-  const left = latestVersion(a);
-  const right = latestVersion(b);
-  const multiplier = direction === "asc" ? 1 : -1;
-  let result = 0;
-
-  if (key === "model") result = `${a.provider} ${a.model}`.localeCompare(`${b.provider} ${b.model}`);
-  if (key === "context") result = left.contextMinTokens - right.contextMinTokens;
-  if (key === "input") result = left.inputMicrosPerMillion - right.inputMicrosPerMillion;
-  if (key === "cache") return compareNullable(left.cacheReadMicrosPerMillion, right.cacheReadMicrosPerMillion, direction) || a.model.localeCompare(b.model);
-  if (key === "output") result = left.outputMicrosPerMillion - right.outputMicrosPerMillion;
-  if (key === "tool") return compareNullable(left.toolMicrosPerUnit, right.toolMicrosPerUnit, direction) || a.model.localeCompare(b.model);
-  if (key === "hours") result = (left.ratePeriod ?? "all").localeCompare(right.ratePeriod ?? "all");
-  if (key === "effective") result = new Date(left.effectiveFrom).getTime() - new Date(right.effectiveFrom).getTime();
-
-  return result * multiplier || a.model.localeCompare(b.model);
-}
-
 function SortableRateHead({
   sortKey,
   activeKey,
@@ -353,23 +274,10 @@ function SortableRateHead({
 function RateVersionsTable({ rates }: { rates: LlmRate[] }) {
   const [sortKey, setSortKey] = useState<RateSortKey>("effective");
   const [direction, setDirection] = useState<SortDirection>("desc");
-  const groups = useMemo(() => {
-    const grouped = new Map<string, RateGroup>();
-    for (const rate of rates) {
-      const key = `${rate.provider}\u0000${rate.model}`;
-      const group = grouped.get(key) ?? { key, provider: rate.provider, model: rate.model, versions: [] };
-      group.versions.push(rate);
-      grouped.set(key, group);
-    }
-    return [...grouped.values()]
-      .map((group) => ({
-        ...group,
-        versions: [...group.versions].sort(
-          (a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime(),
-        ),
-      }))
-      .sort((a, b) => compareRateGroups(a, b, sortKey, direction));
-  }, [direction, rates, sortKey]);
+  const groups = useMemo(
+    () => groupAndSortRates(rates, sortKey, direction),
+    [direction, rates, sortKey],
+  );
 
   const onSort = (nextKey: RateSortKey) => {
     if (nextKey === sortKey) {
@@ -1330,7 +1238,8 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
 
 function RateCreator({ rates }: { rates: LlmRate[] }) {
   const queryClient = useQueryClient();
-  const [provider, setProvider] = useState<(typeof PROVIDERS)[number]>("anthropic");
+  const modelCatalog = useModelCatalog();
+  const [providerChoice, setProviderChoice] = useState<string | null>(null);
   const [modelChoice, setModelChoice] = useState(CUSTOM_MODEL);
   const [customModel, setCustomModel] = useState("");
   const [input, setInput] = useState("");
@@ -1344,6 +1253,15 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
   const [cacheWrite, setCacheWrite] = useState("");
   const [toolFee, setToolFee] = useState("");
 
+  const providers = useMemo(() => {
+    if (modelCatalog.data?.length) {
+      return modelCatalog.data.map(({ provider, label }) => ({ provider, label }));
+    }
+    return Array.from(new Set(rates.map((rate) => rate.provider)))
+      .sort()
+      .map((provider) => ({ provider, label: provider }));
+  }, [modelCatalog.data, rates]);
+  const provider = providerChoice ?? providers[0]?.provider ?? "";
   const models = useMemo(
     () => Array.from(new Set(rates.filter((rate) => rate.provider === provider).map((rate) => rate.model))).sort(),
     [provider, rates],
@@ -1367,8 +1285,8 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
     && optionalRatesAreValid,
   );
 
-  function changeProvider(value: (typeof PROVIDERS)[number]) {
-    setProvider(value);
+  function changeProvider(value: string) {
+    setProviderChoice(value);
     const nextModels = Array.from(new Set(rates.filter((rate) => rate.provider === value).map((rate) => rate.model)));
     setModelChoice(nextModels[0] ?? CUSTOM_MODEL);
     setCustomModel("");
@@ -1427,10 +1345,10 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Provider" htmlFor="rate-provider" className="w-full sm:w-40">
-            <Select value={provider} onValueChange={(value) => changeProvider(value as (typeof PROVIDERS)[number])}>
+            <Select value={provider} onValueChange={(value) => changeProvider(value ?? "")}>
               <SelectTrigger id="rate-provider" size="compact" className={CONTROL_TRIGGER} aria-label="Rate provider"><SelectValue>{(value) => String(value ?? "")}</SelectValue></SelectTrigger>
               <SelectContent>
-                {PROVIDERS.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                {providers.map((item) => <SelectItem key={item.provider} value={item.provider}>{item.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </Field>
