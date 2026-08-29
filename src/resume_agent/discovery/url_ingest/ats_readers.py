@@ -92,7 +92,9 @@ _API_ERRORS = (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError)
 
 
 def _extracted_from_row(row: RawJob) -> ExtractedJob:
-    return ExtractedJob(company=row.company, title=row.title, location=row.location, jd_text=row.jd_text)
+    return ExtractedJob(
+        company=row.company, title=row.title, location=row.location, jd_text=row.jd_text
+    )
 
 
 def _path_segments(url: str) -> list[str]:
@@ -196,13 +198,16 @@ def _prefer(*candidates: ExtractedJob | None) -> ExtractedJob | None:
         field: value
         for field in ("company", "title", "location")
         if getattr(winner, field) is None
-        and (value := next((getattr(o, field) for o in usable if getattr(o, field)), None))
+        and (
+            value := next(
+                (getattr(o, field) for o in usable if getattr(o, field)), None
+            )
+        )
     }
     return winner.model_copy(update=gaps) if gaps else winner
 
 
 # -- schema.org JobPosting ---------------------------------------------------
-
 
 
 def _from_json_ld(html: str) -> ExtractedJob | None:
@@ -307,7 +312,9 @@ def _read_greenhouse(target: AtsTarget, url: str, html: str) -> ExtractedJob | N
         if job_id is None or not target.token:
             return None
         item = fetch_greenhouse_job(target.token, job_id)
-        rows = parse_greenhouse({"jobs": [item]}, _greenhouse_company_name(target.token))
+        rows = parse_greenhouse(
+            {"jobs": [item]}, _greenhouse_company_name(target.token)
+        )
         return _extracted_from_row(rows[0]) if rows else None
 
     return _prefer(_api(api), _from_json_ld(html), read_greenhouse_posting(html))
@@ -317,7 +324,9 @@ def _read_ashby(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
     def api() -> ExtractedJob | None:
         job_id = _last_segment(url)
         payload = fetch_ashby_board(target.token)
-        item = next((job for job in payload.get("jobs", []) if job.get("id") == job_id), None)
+        item = next(
+            (job for job in payload.get("jobs", []) if job.get("id") == job_id), None
+        )
         if item is None:
             return None
         return _extracted_from_row(parse_ashby({"jobs": [item]}, target.token)[0])
@@ -357,7 +366,9 @@ def _smartrecruiters_posting_id(url: str) -> str | None:
     return leading_digits.group(1) if leading_digits else candidate or None
 
 
-def _read_smartrecruiters(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
+def _read_smartrecruiters(
+    target: AtsTarget, url: str, html: str
+) -> ExtractedJob | None:
     def api() -> ExtractedJob | None:
         posting_id = _smartrecruiters_posting_id(url)
         if posting_id is None:
@@ -365,7 +376,12 @@ def _read_smartrecruiters(target: AtsTarget, url: str, html: str) -> ExtractedJo
         company = _smartrecruiters_company(target, url)
         detail = _get_json(sr_detail_url(company, posting_id))
         sections = ((detail.get("jobAd") or {}).get("sections")) or {}
-        names = ("companyDescription", "jobDescription", "qualifications", "additionalInformation")
+        names = (
+            "companyDescription",
+            "jobDescription",
+            "qualifications",
+            "additionalInformation",
+        )
         body = html_to_markdown(
             "\n".join((sections.get(name) or {}).get("text") or "" for name in names)
         )
@@ -396,11 +412,18 @@ def _read_workable(target: AtsTarget, url: str, html: str) -> ExtractedJob | Non
             follow_redirects=True,
         )
         item = next(
-            (job for job in payload.get("jobs") or [] if job.get("shortcode") == shortcode), None
+            (
+                job
+                for job in payload.get("jobs") or []
+                if job.get("shortcode") == shortcode
+            ),
+            None,
         )
         if item is None:
             return None
-        row = parse_workable({"name": payload.get("name"), "jobs": [item]}, target.token)[0]
+        row = parse_workable(
+            {"name": payload.get("name"), "jobs": [item]}, target.token
+        )[0]
         return _extracted_from_row(row)
 
     return _prefer(_api(api), _from_json_ld(html))
@@ -417,7 +440,8 @@ def _read_personio(target: AtsTarget, url: str, html: str) -> ExtractedJob | Non
         resp.raise_for_status()
         rows = parse_personio(resp.text, target.token, target.country)
         match = next(
-            (row for row in rows if row.url and _last_segment(row.url) == position_id), None
+            (row for row in rows if row.url and _last_segment(row.url) == position_id),
+            None,
         )
         return _extracted_from_row(match) if match is not None else None
 
@@ -437,7 +461,12 @@ def _read_recruitee(target: AtsTarget, url: str, html: str) -> ExtractedJob | No
         payload = _get_json(offers_url(target.token), follow_redirects=True)
         rows = parse_recruitee(payload, target.token)
         match = next(
-            (row for row in rows if row.url and slug and _recruitee_slug(row.url) == slug), None
+            (
+                row
+                for row in rows
+                if row.url and slug and _recruitee_slug(row.url) == slug
+            ),
+            None,
         )
         return _extracted_from_row(match) if match is not None else None
 

@@ -89,9 +89,7 @@ def fix_company_names(
     dry_run: bool = False,
     resolve: Callable[[str], str | None] | None = None,
 ) -> CompanyFixReport:
-    mapping, unresolved = _token_names(
-        config, resolve or fetch_greenhouse_board_name
-    )
+    mapping, unresolved = _token_names(config, resolve or fetch_greenhouse_board_name)
     renamed: dict[str, int] = {}
     conflicts: list[tuple[int, int]] = []
     for token, name in mapping.items():
@@ -100,9 +98,7 @@ def fix_company_names(
         ).all()
         for row in rows:
             new_key = compute_dedup_key(name, row.title)
-            keeper = company_rename_collision(
-                session, existing=row, dedup_key=new_key
-            )
+            keeper = company_rename_collision(session, existing=row, dedup_key=new_key)
             if keeper is not None:
                 conflicts.append((keeper.id or -1, row.id or -1))
                 continue

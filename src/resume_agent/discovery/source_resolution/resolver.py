@@ -45,7 +45,10 @@ class CompanySourceResolver:
 
     def resolve(self, company: str, candidate_url: str) -> CompanySourceResolution:
         report = self._crawler(company, candidate_url)
-        inspected = [self._inspect(company, candidate_url, candidate) for candidate in report.candidates]
+        inspected = [
+            self._inspect(company, candidate_url, candidate)
+            for candidate in report.candidates
+        ]
         for status in ("verified", "unverified", "conflict", "failed"):
             if result := next((row for row in inspected if row.status == status), None):
                 return result

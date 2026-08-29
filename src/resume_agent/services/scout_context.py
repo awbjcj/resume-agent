@@ -6,9 +6,15 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 from resume_agent.config import Settings
-from resume_agent.discovery.connectors.config import ConnectorsConfig, load_connectors_config
+from resume_agent.discovery.connectors.config import (
+    ConnectorsConfig,
+    load_connectors_config,
+)
 from resume_agent.discovery.connectors.detect import identify_host
-from resume_agent.discovery.connectors.sources import NATIVE_URL_KINDS, list_source_views
+from resume_agent.discovery.connectors.sources import (
+    NATIVE_URL_KINDS,
+    list_source_views,
+)
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
@@ -33,7 +39,9 @@ def _load_connectors(path: str) -> ConnectorsConfig:
 
 
 def _block(name: str, values: list[str]) -> str:
-    return f"{name}:\n" + ("\n".join(f"- {value}" for value in values) if values else "(none)")
+    return f"{name}:\n" + (
+        "\n".join(f"- {value}" for value in values) if values else "(none)"
+    )
 
 
 def scout_context(connectors_path: str, search_path: str, profile_dir: Path) -> str:
@@ -49,13 +57,16 @@ def scout_context(connectors_path: str, search_path: str, profile_dir: Path) -> 
     search_values = {field: [] for field in set(_EXISTING_FIELD.values())}
     try:
         search = load_search_config(search_path)
-        search_values = {field: list(getattr(search, field, [])) for field in search_values}
+        search_values = {
+            field: list(getattr(search, field, [])) for field in search_values
+        }
     except (OSError, ValueError):
         pass
     existing = [
         f"{view.kind}: {view.display_name}"
         for view in list_source_views(
-            _load_connectors(connectors_path), Settings.model_construct(browser_enabled=True)
+            _load_connectors(connectors_path),
+            Settings.model_construct(browser_enabled=True),
         )
     ]
     return "\n\n".join(
@@ -88,7 +99,13 @@ def _canonical_url(url: str) -> str:
     )
     netloc = host if port is None or default_port else f"{host}:{port}"
     return urlunsplit(
-        (parsed.scheme.casefold(), netloc, parsed.path.rstrip("/") or "/", parsed.query, "")
+        (
+            parsed.scheme.casefold(),
+            netloc,
+            parsed.path.rstrip("/") or "/",
+            parsed.query,
+            "",
+        )
     )
 
 
@@ -103,7 +120,9 @@ def _candidate_keys(url: str) -> set[str]:
 def _existing_keys(config: ConnectorsConfig) -> set[str]:
     keys: set[str] = set()
     for kind in ("greenhouse", "lever", "ashby"):
-        keys.update(f"{kind}:{row.token.casefold()}" for row in getattr(config, kind).boards)
+        keys.update(
+            f"{kind}:{row.token.casefold()}" for row in getattr(config, kind).boards
+        )
     for kind in NATIVE_URL_KINDS:
         keys.update(_canonical_url(row.url) for row in getattr(config, kind).boards)
     keys.update(_canonical_url(row.url) for row in config.companies.urls)
@@ -117,7 +136,10 @@ def _existing_terms(search_path: str) -> dict[str, set[str]]:
         search = load_search_config(search_path)
     except (OSError, ValueError):
         return {field: set() for field in fields}
-    return {field: {value.casefold() for value in getattr(search, field, [])} for field in fields}
+    return {
+        field: {value.casefold() for value in getattr(search, field, [])}
+        for field in fields
+    }
 
 
 def _company_key(company: str) -> str:

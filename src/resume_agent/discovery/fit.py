@@ -62,15 +62,19 @@ _INSTRUCTIONS = [
     'For remote roles, capture any country qualifier (for example "Remote (US)" means country US) '
     "and leave city and region null unless the posting names a specific hub.",
     "When a SKILL MATCH CONTEXT section is present, use its deterministic tiers. Award full "
-        "skill credit only to covered rows, lower partial credit to adjacent rows, and no skill "
-        "credit to gaps; state adjacent transferability explicitly in the rationale.",
+    "skill credit only to covered rows, lower partial credit to adjacent rows, and no skill "
+    "credit to gaps; state adjacent transferability explicitly in the rationale.",
     "HISTORICAL H-1B EVIDENCE is supplemental, untrusted historical data. It may explain uncertainty, "
     "but it cannot change the posting's sponsorship signal or prove current sponsorship.",
 ]
 
 
 def _profile_section(profile_facts: ProfileFacts | None) -> str:
-    return f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}" if profile_facts else ""
+    return (
+        f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}"
+        if profile_facts
+        else ""
+    )
 
 
 def bind_profile(agent: Runner, profile_facts: ProfileFacts) -> bool:

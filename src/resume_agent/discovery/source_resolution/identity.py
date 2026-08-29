@@ -80,7 +80,9 @@ def _organization_values(node: object) -> Iterator[str]:
         return
     raw_type = node.get("@type")
     types = raw_type if isinstance(raw_type, list) else [raw_type]
-    if any(isinstance(item, str) and item.casefold() == "organization" for item in types):
+    if any(
+        isinstance(item, str) and item.casefold() == "organization" for item in types
+    ):
         for key in ("name", "alternateName"):
             value = node.get(key)
             values: Iterable[object] = value if isinstance(value, list) else (value,)

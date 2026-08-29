@@ -76,7 +76,9 @@ from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona
 
 logger = logging.getLogger(__name__)
 
-_TURN_OMITTED_NOTICE = "Some turn details could not be read, so no proposals were attached."
+_TURN_OMITTED_NOTICE = (
+    "Some turn details could not be read, so no proposals were attached."
+)
 _RECAP_OMITTED_NOTICE = "Some recap details could not be read."
 _CHECK_ERROR_CAP = 500
 _CHECK_RANK = {
@@ -116,7 +118,9 @@ def _source_payload(row: ScoutProposalDraft) -> SourcePayload:
 
 def _term_payload(row: ScoutProposalDraft) -> TermPayload:
     assert row.term is not None
-    return TermPayload(value=row.term.value, term_kind=cast(SuggestionKind, row.term.term_kind))
+    return TermPayload(
+        value=row.term.value, term_kind=cast(SuggestionKind, row.term.term_kind)
+    )
 
 
 def _proposal(row: ScoutProposalDraft) -> ScoutProposal:
@@ -127,7 +131,9 @@ def _proposal(row: ScoutProposalDraft) -> ScoutProposal:
         term=None if is_source else _term_payload(row),
         reason=row.reason,
         fit_score=row.fit_score,
-        citations=[Citation.model_validate(citation.model_dump()) for citation in row.citations],
+        citations=[
+            Citation.model_validate(citation.model_dump()) for citation in row.citations
+        ],
         check="avoid" if row.disposition == "avoid" else "new",
     )
 
@@ -209,7 +215,9 @@ def _post_process(
         if proposal.kind == "source":
             assert proposal.source is not None
             company_key = _company_key(proposal.source.company)
-            url_keys = _candidate_keys(proposal.source.url) if proposal.source.url else set()
+            url_keys = (
+                _candidate_keys(proposal.source.url) if proposal.source.url else set()
+            )
             keys = {company_key, *url_keys}
             if proposal.check == "avoid":
                 if keys & (prior_sources | seen_sources):
@@ -224,7 +232,11 @@ def _post_process(
             assert proposal.term is not None
             destination = _EXISTING_FIELD[proposal.term.term_kind]
             key = f"{destination}:{proposal.term.value.casefold()}"
-            if proposal.term.value.casefold() in existing_terms[destination] or key in prior_terms or key in seen_terms:
+            if (
+                proposal.term.value.casefold() in existing_terms[destination]
+                or key in prior_terms
+                or key in seen_terms
+            ):
                 proposal = proposal.model_copy(update={"check": "duplicate"})
             else:
                 seen_terms.add(key)
@@ -252,7 +264,9 @@ def _post_process(
             source = item[1].source
             assert source is not None
             async with semaphore:
-                return await asyncio.to_thread(source_resolver, source.company, source.url)
+                return await asyncio.to_thread(
+                    source_resolver, source.company, source.url
+                )
 
         return await gather_isolated(
             uncached,
@@ -291,7 +305,9 @@ def _post_process(
                 "ats": resolution.ats,
                 "token": resolution.token,
                 "role_count": resolution.role_count,
-                "error_code": resolution.reason_code if resolution.status == "failed" else None,
+                "error_code": resolution.reason_code
+                if resolution.status == "failed"
+                else None,
                 "resolution_status": resolution.status,
                 "resolution_reason": resolution.reason_code,
                 "evidence": resolution.evidence,
@@ -618,7 +634,9 @@ def session_view(
         "proposals": [_camel_proposal(row) for row in session["proposals"]],
         "recap": session["recap"],
         "scrapeAvailable": browser_enabled,
-        "scrapeUnavailableReason": None if browser_enabled else "Scrape targets require a local browser.",
+        "scrapeUnavailableReason": None
+        if browser_enabled
+        else "Scrape targets require a local browser.",
     }
 
 
@@ -642,9 +660,15 @@ def sessions_view(
                 "archivedAt": row["archived_at"],
                 "goal": row["goal"],
                 "proposalCount": len(row["proposals"]),
-                "pendingCount": sum(item["status"] == "pending" for item in row["proposals"]),
-                "addedCount": sum(item["status"] == "added" for item in row["proposals"]),
-                "dismissedCount": sum(item["status"] == "dismissed" for item in row["proposals"]),
+                "pendingCount": sum(
+                    item["status"] == "pending" for item in row["proposals"]
+                ),
+                "addedCount": sum(
+                    item["status"] == "added" for item in row["proposals"]
+                ),
+                "dismissedCount": sum(
+                    item["status"] == "dismissed" for item in row["proposals"]
+                ),
             }
             for row in rows
         ]
@@ -652,7 +676,9 @@ def sessions_view(
 
 
 def _pending_proposal(session: dict, proposal_id: str) -> dict:
-    proposal = next((row for row in session["proposals"] if row["id"] == proposal_id), None)
+    proposal = next(
+        (row for row in session["proposals"] if row["id"] == proposal_id), None
+    )
     if proposal is None:
         raise ValueError(f"unknown proposal: {proposal_id}")
     if proposal["status"] != "pending":
@@ -672,17 +698,23 @@ def approve_proposal(
     manual_confirmation: bool = False,
 ) -> dict:
     with scout_lock():
-        proposal = _pending_proposal(load_session(workspace_root, session_id), proposal_id)
+        proposal = _pending_proposal(
+            load_session(workspace_root, session_id), proposal_id
+        )
         confirmation: ManualSourceConfirmation | None = None
         if proposal["kind"] == "source":
             if proposal["check"] not in {"validated", "unverified"}:
-                raise ValueError(f"source proposal is not approvable: {proposal['check']}")
+                raise ValueError(
+                    f"source proposal is not approvable: {proposal['check']}"
+                )
             source = proposal["source"]
             assert source is not None
             provider = "auto"
             if proposal["check"] == "unverified":
                 if not manual_confirmation:
-                    raise ValueError("manual confirmation required for an unverified source")
+                    raise ValueError(
+                        "manual confirmation required for an unverified source"
+                    )
                 if source["ats"] is None:
                     if not browser_enabled:
                         raise ValueError("scrape target requires a local browser")
@@ -694,7 +726,10 @@ def approve_proposal(
                     resolution_reason=source["resolution_reason"],
                     confirmed_at=now_iso(),
                 )
-            if not (_candidate_keys(source["url"]) & _existing_keys(_load_connectors(connectors_path))):
+            if not (
+                _candidate_keys(source["url"])
+                & _existing_keys(_load_connectors(connectors_path))
+            ):
                 add_source(
                     provider=provider,
                     url=source["url"],

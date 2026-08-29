@@ -74,9 +74,7 @@ def bamboohr_meta_lines(
         # An explicit false is authoritative even though it renders no line.
         present_labels.add("Workplace Type")
     lines.extend(
-        line
-        for line in fallback or []
-        if line.partition(":")[0] not in present_labels
+        line for line in fallback or [] if line.partition(":")[0] not in present_labels
     )
     return lines
 
@@ -116,9 +114,7 @@ def apply_detail(row: BambooHrRow, detail: dict) -> None:
     elif opening.get("isRemote") is False and row.location == "Remote":
         row.location = None
     row.jd_text = with_meta_lines(
-        bamboohr_meta_lines(
-            opening, location=row.location, fallback=row.meta_lines
-        ),
+        bamboohr_meta_lines(opening, location=row.location, fallback=row.meta_lines),
         html_to_markdown(opening.get("description") or ""),
     )
 

@@ -54,7 +54,9 @@ def _rows(filename: str, data: bytes) -> list[object]:
                 raise InvalidJobsFileError("JSON must contain an array of jobs")
             return value
     except (csv.Error, json.JSONDecodeError) as exc:
-        raise InvalidJobsFileError(f"could not parse {suffix[1:].upper()} file") from exc
+        raise InvalidJobsFileError(
+            f"could not parse {suffix[1:].upper()} file"
+        ) from exc
     raise UnsupportedJobsFormatError("only .csv and .json files are supported")
 
 
@@ -81,9 +83,7 @@ def import_jobs_file(
         if not isinstance(raw, dict):
             report.errors.append((row_number, "row must be an object"))
             continue
-        values = {
-            column: str(raw.get(column) or "").strip() for column in _COLUMNS
-        }
+        values = {column: str(raw.get(column) or "").strip() for column in _COLUMNS}
         if any(len(value) > _MAX_FIELD_CHARS for value in values.values()):
             report.errors.append((row_number, "row contains an oversized field"))
             continue

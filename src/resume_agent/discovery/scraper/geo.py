@@ -50,7 +50,9 @@ def resolve_geo_id(
             for hit in (hits if isinstance(hits, list) else [])
             if hit.get("type") == "GEO" and hit.get("id")
         ]
-        preferred = next((hit for hit in geo_hits if not _looks_like_postal_variant(hit)), None)
+        preferred = next(
+            (hit for hit in geo_hits if not _looks_like_postal_variant(hit)), None
+        )
         chosen = preferred or (geo_hits[0] if geo_hits else None)
         if chosen:
             geo_id = str(chosen["id"])

@@ -31,9 +31,7 @@ _HEADERS = {
 
 _CALLBACK = re.compile(r"AF_initDataCallback\((\{.*?\})\);", re.DOTALL)
 _JOBS_KEY = re.compile(r"\bkey:\s*['\"]ds:1['\"]")
-_CALLBACK_DATA = re.compile(
-    r"\bdata:\s*(\[.*\])\s*,\s*sideChannel\s*:", re.DOTALL
-)
+_CALLBACK_DATA = re.compile(r"\bdata:\s*(\[.*\])\s*,\s*sideChannel\s*:", re.DOTALL)
 
 
 def extract_job_rows(html: str) -> list[list]:
@@ -71,11 +69,7 @@ def _locations(row: list) -> str | None:
     cell = row[9] if len(row) > 9 else None
     if not isinstance(cell, list):
         return None
-    return join_locations(
-        item[0]
-        for item in cell
-        if isinstance(item, list) and item
-    )
+    return join_locations(item[0] for item in cell if isinstance(item, list) and item)
 
 
 def _posted_at(row: list) -> datetime | None:

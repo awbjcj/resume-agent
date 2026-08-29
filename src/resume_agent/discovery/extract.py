@@ -69,7 +69,9 @@ def build_extract_agent(
         family=AgentFamily.JOB_ANALYSIS,
         use="extract",
     )
-    model = build_model(resolved_model_id, cache_system_prompt=prompt_cache_for(resolved_model_id))
+    model = build_model(
+        resolved_model_id, cache_system_prompt=prompt_cache_for(resolved_model_id)
+    )
     return AgentRunner(
         Agent(
             model=model,

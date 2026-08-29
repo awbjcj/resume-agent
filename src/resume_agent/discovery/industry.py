@@ -159,7 +159,9 @@ def classify_industries(
 
 def build_industry_classifier() -> AgentRunner:
     settings = get_settings()
-    model = build_model(settings.cheap_model, cache_system_prompt=prompt_cache_for(settings.cheap_model))
+    model = build_model(
+        settings.cheap_model, cache_system_prompt=prompt_cache_for(settings.cheap_model)
+    )
     return AgentRunner(
         Agent(
             model=model,

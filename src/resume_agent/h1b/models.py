@@ -174,7 +174,9 @@ class H1BSponsorshipEvidence(BaseModel):
             and self.denied_count is not None
             and self.certified_count + self.denied_count > self.filing_count
         ):
-            raise ValueError("certified_count + denied_count cannot exceed filing_count")
+            raise ValueError(
+                "certified_count + denied_count cannot exceed filing_count"
+            )
         return self
 
     def is_fresh(self, now: datetime) -> bool:

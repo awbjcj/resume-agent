@@ -134,7 +134,10 @@ class FirstPartyCrawler:
             if not strong:
                 continue
             for link in self._career_links(page.final_url, page.text):
-                if registrable_domain(link) == first_party_domain and link not in visited:
+                if (
+                    registrable_domain(link) == first_party_domain
+                    and link not in visited
+                ):
                     queue.append(link)
         if candidates:
             return CrawlReport(
@@ -165,7 +168,9 @@ class FirstPartyCrawler:
             for tag in soup.select(selector):
                 href = str(tag.get(attr) or "")
                 text = tag.get_text(" ", strip=True)
-                if not any(word in f"{href} {text}".casefold() for word in _CAREER_WORDS):
+                if not any(
+                    word in f"{href} {text}".casefold() for word in _CAREER_WORDS
+                ):
                     continue
                 url = urljoin(base_url, href)
                 parsed = urlsplit(url)

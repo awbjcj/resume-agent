@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 _RATE_TTL = timedelta(hours=24)
 _RATE_URL = "https://api.frankfurter.dev/v2/rates"
-_rates: dict[str, tuple[float, datetime]] = {"USD": (1.0, datetime.max.replace(tzinfo=UTC))}
+_rates: dict[str, tuple[float, datetime]] = {
+    "USD": (1.0, datetime.max.replace(tzinfo=UTC))
+}
 _rates_lock = threading.Lock()
 
 

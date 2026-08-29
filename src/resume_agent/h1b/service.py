@@ -221,7 +221,9 @@ async def _resolve_company_name(runner: Runner | None, display: str) -> str:
         return display
 
 
-def _fresh_cached(row: H1BCompanyEvidence | None, now: datetime) -> H1BSponsorshipEvidence | None:
+def _fresh_cached(
+    row: H1BCompanyEvidence | None, now: datetime
+) -> H1BSponsorshipEvidence | None:
     if row is None:
         return None
     try:
@@ -362,7 +364,10 @@ async def enrich_companies(
 
             results = await run_with_cleanup(
                 asyncio.gather(
-                    *(research(normalized, display) for normalized, display in missing.items())
+                    *(
+                        research(normalized, display)
+                        for normalized, display in missing.items()
+                    )
                 ),
                 runner,
                 resolver_runner,
@@ -409,7 +414,11 @@ async def enrich_companies(
             by_company[normalized] = evidence
             row = existing.get(normalized)
             if row is None:
-                row = H1BCompanyEvidence(normalized_company=normalized, status=evidence.status, expires_at=expires_at)
+                row = H1BCompanyEvidence(
+                    normalized_company=normalized,
+                    status=evidence.status,
+                    expires_at=expires_at,
+                )
             row.display_company = evidence.display_company
             row.status = evidence.status
             row.schema_version = 2

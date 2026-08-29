@@ -177,9 +177,7 @@ def _project_domains(
     rejected: set[str] = set()
     fallback_categories: dict[str, str] = {}
     not_skills = {
-        token
-        for raw in content.not_skills
-        if (token := normalize_skill(raw)) in batch
+        token for raw in content.not_skills if (token := normalize_skill(raw)) in batch
     }
 
     for group in content.domains:
@@ -439,7 +437,9 @@ async def classify_incrementally(
         )
         status = getattr(response, "status", None)
         if str(getattr(status, "value", status) or "").casefold() == "error":
-            raise RuntimeError(str(getattr(response, "content", "") or "model call failed"))
+            raise RuntimeError(
+                str(getattr(response, "content", "") or "model call failed")
+            )
         return _project_aliases(
             response.content,
             batch=set(batch),

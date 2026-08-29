@@ -52,6 +52,7 @@ class JobCriteria(ExtensibleModel):
     must_have_skills: list[str] = Field(default_factory=list)
     nice_to_have_skills: list[str] = Field(default_factory=list)
 
+
 class SalaryRangeExtract(BaseModel):
     """LLM-facing salary schema: every field required, nullable for unknown.
 
@@ -97,7 +98,9 @@ class JobCriteriaExtract(BaseModel):
     must_have_skills: list[str]
     nice_to_have_skills: list[str]
 
-    @field_validator("tech_stack", "must_have_skills", "nice_to_have_skills", mode="before")
+    @field_validator(
+        "tech_stack", "must_have_skills", "nice_to_have_skills", mode="before"
+    )
     @classmethod
     def _null_list_to_empty(cls, value: object) -> object:
         """Coerce ``null`` -> ``[]`` for required list fields.

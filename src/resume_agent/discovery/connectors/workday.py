@@ -97,9 +97,7 @@ def _facet_values(node: object):
             yield from _facet_values(value)
 
 
-def resolve_location_facets(
-    page: dict, locations: list[str]
-) -> dict[str, list[str]]:
+def resolve_location_facets(page: dict, locations: list[str]) -> dict[str, list[str]]:
     """Resolve every requested location under location-only facet parameters."""
     wanted = [location.strip().casefold() for location in locations if location.strip()]
     facets = page.get("facets")
@@ -159,9 +157,9 @@ def load_cached_facets(
         )
     except (OSError, ValueError):
         return None
-    if not isinstance(payload, dict) or payload.get("locations") != _normalized_locations(
-        locations
-    ):
+    if not isinstance(payload, dict) or payload.get(
+        "locations"
+    ) != _normalized_locations(locations):
         return None
     applied = payload.get("appliedFacets")
     if not isinstance(applied, dict):

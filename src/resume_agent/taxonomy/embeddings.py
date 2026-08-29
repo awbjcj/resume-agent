@@ -435,9 +435,7 @@ class _LexicalCorpus:
             term: math.log(1 + total / (1 + count))
             for term, count in document_frequency.items()
         }
-        self._postings = {
-            term: tuple(sorted(keys)) for term, keys in postings.items()
-        }
+        self._postings = {term: tuple(sorted(keys)) for term, keys in postings.items()}
 
     def _weight(self, term: str) -> float:
         # A term no candidate holds is maximally specific: it can only ever
@@ -495,9 +493,9 @@ def _rank(
         ]
         return [
             key
-            for _score, key in sorted(
-                scored, key=lambda item: (-item[0], item[1])
-            )[:limit]
+            for _score, key in sorted(scored, key=lambda item: (-item[0], item[1]))[
+                :limit
+            ]
         ]
 
     # Lexical scoring is positive only when a query term occurs in a candidate,
@@ -543,13 +541,10 @@ def _skill_descriptor_text(token: str, forms: Sequence[str]) -> str:
     )
 
 
-def _domain_descriptor_text(
-    category: str, label: str, members: Sequence[str]
-) -> str:
+def _domain_descriptor_text(category: str, label: str, members: Sequence[str]) -> str:
     member_text = ", ".join(members[:MEMBER_PREVIEW])
     return (
-        f"skill taxonomy category: {category}; domain: {label}; "
-        f"members: {member_text}"
+        f"skill taxonomy category: {category}; domain: {label}; members: {member_text}"
     )
 
 
@@ -571,7 +566,9 @@ def _alias_forms(token: str, aliases: Mapping[str, str]) -> list[str]:
 
 
 def _domain_members(domain_id: str, cmap: ClusterMap) -> list[str]:
-    return sorted(token for token, value in cmap.domain_of.items() if value == domain_id)
+    return sorted(
+        token for token, value in cmap.domain_of.items() if value == domain_id
+    )
 
 
 def skill_descriptor(token: str, aliases: Mapping[str, str]) -> str:
@@ -645,9 +642,7 @@ class CandidateIndex:
             domain_id: tuple(sorted(tokens)) for domain_id, tokens in members.items()
         }
 
-        canonical_ids = tuple(
-            sorted(set(cmap.aliases.values()) | set(cmap.domain_of))
-        )
+        canonical_ids = tuple(sorted(set(cmap.aliases.values()) | set(cmap.domain_of)))
         domain_ids = tuple(
             sorted(set(cmap.domain_of.values()) | set(cmap.domain_label))
         )
@@ -660,9 +655,7 @@ class CandidateIndex:
             )
 
         canonical_descriptors = {
-            token: _skill_descriptor_text(
-                token, aliases_by_canonical.get(token, ())
-            )
+            token: _skill_descriptor_text(token, aliases_by_canonical.get(token, ()))
             for token in canonical_ids
         }
         domain_descriptors = {
@@ -802,9 +795,7 @@ async def build_candidate_context(
     domain_ids = index.domain_ids
     canonical_descriptors = index.canonical_descriptors
     domain_descriptors = index.domain_descriptors
-    new_descriptors = {
-        token: index.skill_descriptor(token) for token in normalized
-    }
+    new_descriptors = {token: index.skill_descriptor(token) for token in normalized}
     resolved_provider = provider or _provider_from_settings()
     vectors: dict[str, Sequence[float]] = {}
     mode = "lexical"
@@ -931,8 +922,7 @@ async def domain_neighbor_candidates(
         outcome = await embed_descriptors(
             cluster_path=cluster_path,
             descriptors={
-                f"maintenance-domain:{key}": value
-                for key, value in descriptors.items()
+                f"maintenance-domain:{key}": value for key, value in descriptors.items()
             },
             provider=resolved_provider,
             batch_size=get_settings().skill_embedding_batch_size,

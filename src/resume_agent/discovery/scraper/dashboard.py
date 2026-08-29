@@ -5,7 +5,13 @@ from pathlib import Path
 from typing import Callable, Protocol, Sequence
 from urllib.parse import urljoin, urlsplit
 
-from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
+from playwright.sync_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
+    sync_playwright,
+)
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
@@ -15,7 +21,11 @@ from resume_agent.discovery.connectors.text import (
     relevance_gate,
     title_relevance_gate,
 )
-from resume_agent.discovery.scraper.learn import build_learn_agent, learn_recipe, prune_html
+from resume_agent.discovery.scraper.learn import (
+    build_learn_agent,
+    learn_recipe,
+    prune_html,
+)
 from resume_agent.discovery.scraper.models import ScrapedCard
 from resume_agent.discovery.scraper.recipe import ScrapeRecipe
 from resume_agent.discovery.scraper.recipe_parse import (
@@ -165,7 +175,9 @@ class DashboardScraper:
         return page.content()
 
     @staticmethod
-    def _card_signature(html: str, recipe: ScrapeRecipe) -> tuple[tuple[str | None, ...], ...]:
+    def _card_signature(
+        html: str, recipe: ScrapeRecipe
+    ) -> tuple[tuple[str | None, ...], ...]:
         return tuple(
             (card.url, card.title, card.location)
             for card in parse_cards(html, recipe)
@@ -232,7 +244,9 @@ class DashboardScraper:
         host = host_key(target.url)
         recipe = None if self.relearn else load_recipe(host, self.store_dir)
         if recipe is None:
-            recipe = learn_recipe(prune_html(self._learn_source(target)), self._learner())
+            recipe = learn_recipe(
+                prune_html(self._learn_source(target)), self._learner()
+            )
             save_recipe(host, recipe, self.store_dir)
         pages = self._collect_pages(target, search, recipe)
         cards = self._cards(recipe, pages, target.url)
@@ -262,13 +276,18 @@ class DashboardScraper:
                 if not parsed.title:
                     continue
                 resolved_url = urljoin(base_url, parsed.url) if parsed.url else None
-                if resolved_url and urlsplit(resolved_url).scheme not in {"http", "https"}:
+                if resolved_url and urlsplit(resolved_url).scheme not in {
+                    "http",
+                    "https",
+                }:
                     resolved_url = None
                 card = replace(
                     parsed,
                     url=resolved_url,
                 )
-                identity = (card.url,) if card.url else (None, card.title, card.location)
+                identity = (
+                    (card.url,) if card.url else (None, card.title, card.location)
+                )
                 if identity in seen:
                     continue
                 seen.add(identity)
@@ -276,7 +295,11 @@ class DashboardScraper:
         return cards
 
     def _detail_fields(self, card: ScrapedCard, recipe: ScrapeRecipe) -> ExtractedJob:
-        html = card.detail_html if recipe.detail_mode == "inline" else self._detail_html(card, recipe)
+        html = (
+            card.detail_html
+            if recipe.detail_mode == "inline"
+            else self._detail_html(card, recipe)
+        )
         parsed = parse_detail(html or "", recipe).strip()
         if parsed:
             return ExtractedJob(jd_text=parsed)

@@ -16,18 +16,59 @@ from resume_agent.taxonomy.countries import COUNTRY_TO_ISO2 as _COUNTRY_TO_ISO2
 from resume_agent.taxonomy.countries import ISO2_CODES as _ISO2_CODES
 
 _US_STATE_TO_USPS = {
-    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA",
-    "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA",
-    "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
-    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
-    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
-    "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
-    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
-    "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK",
-    "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
-    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT",
-    "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI",
-    "wyoming": "WY", "district of columbia": "DC", "washington dc": "DC", "d.c.": "DC",
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+    "district of columbia": "DC",
+    "washington dc": "DC",
+    "d.c.": "DC",
 }
 _USPS_CODES = set(_US_STATE_TO_USPS.values())
 
@@ -36,13 +77,41 @@ _USPS_CODES = set(_US_STATE_TO_USPS.values())
 # resolve via `_USPS_CODES` after the trailing period is stripped, so they are
 # intentionally absent here. "La." is likewise omitted: "LA" is USPS Louisiana.
 _US_STATE_ABBREV = {
-    "ala": "AL", "ariz": "AZ", "ark": "AR", "cal": "CA", "calif": "CA",
-    "colo": "CO", "conn": "CT", "del": "DE", "fla": "FL", "ill": "IL",
-    "ind": "IN", "kan": "KS", "kans": "KS", "mass": "MA", "mich": "MI",
-    "minn": "MN", "miss": "MS", "mont": "MT", "neb": "NE", "nebr": "NE",
-    "nev": "NV", "n mex": "NM", "n.mex": "NM", "okla": "OK", "ore": "OR",
-    "oreg": "OR", "penn": "PA", "penna": "PA", "tenn": "TN", "tex": "TX",
-    "wash": "WA", "wis": "WI", "wisc": "WI", "wva": "WV", "wyo": "WY",
+    "ala": "AL",
+    "ariz": "AZ",
+    "ark": "AR",
+    "cal": "CA",
+    "calif": "CA",
+    "colo": "CO",
+    "conn": "CT",
+    "del": "DE",
+    "fla": "FL",
+    "ill": "IL",
+    "ind": "IN",
+    "kan": "KS",
+    "kans": "KS",
+    "mass": "MA",
+    "mich": "MI",
+    "minn": "MN",
+    "miss": "MS",
+    "mont": "MT",
+    "neb": "NE",
+    "nebr": "NE",
+    "nev": "NV",
+    "n mex": "NM",
+    "n.mex": "NM",
+    "okla": "OK",
+    "ore": "OR",
+    "oreg": "OR",
+    "penn": "PA",
+    "penna": "PA",
+    "tenn": "TN",
+    "tex": "TX",
+    "wash": "WA",
+    "wis": "WI",
+    "wisc": "WI",
+    "wva": "WV",
+    "wyo": "WY",
 }
 
 # Unambiguous US metro shorthands -> (canonical_city | None, USPS region). Each
@@ -256,7 +325,7 @@ def _strip_workplace_suffix(raw: str) -> str:
     """
     stripped = raw
     # Loop: a label can carry two of them ("New York, NY (HQ) - Hybrid").
-    while (shorter := _WORKPLACE_SUFFIX_RE.sub("", stripped).strip().strip(",-–— ")):
+    while shorter := _WORKPLACE_SUFFIX_RE.sub("", stripped).strip().strip(",-–— "):
         if shorter == stripped:
             break
         stripped = shorter
@@ -282,11 +351,7 @@ def _country_suffix(parts: list[str]) -> tuple[str, int] | None:
         candidate = ", ".join(parts[start:])
         if normalize_country(candidate) is None:
             continue
-        if (
-            len(parts) == 2
-            and start == 1
-            and _region_to_usps(candidate) is not None
-        ):
+        if len(parts) == 2 and start == 1 and _region_to_usps(candidate) is not None:
             return None
         return candidate, start
     return None

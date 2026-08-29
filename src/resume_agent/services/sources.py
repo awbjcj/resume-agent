@@ -216,7 +216,12 @@ def board_root_url(url: str) -> str:
         return raw
     try:
         if not target.token:
-            if target.ats == "workday" and target.tenant and target.datacenter and target.site:
+            if (
+                target.ats == "workday"
+                and target.tenant
+                and target.datacenter
+                and target.site
+            ):
                 return _connection_url(
                     provider="workday",
                     tenant=target.tenant,
@@ -398,7 +403,9 @@ def preview_source(
             dict.fromkeys(
                 job.company.strip()
                 for job in result.jobs
-                if job.company_provenance == "provider" and job.company and job.company.strip()
+                if job.company_provenance == "provider"
+                and job.company
+                and job.company.strip()
             )
         ),
     )

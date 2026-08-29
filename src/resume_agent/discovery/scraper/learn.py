@@ -47,7 +47,10 @@ def prune_html(html: str) -> str:
 
 def build_learn_agent(model_id: str | None = None) -> Runner:
     settings = get_settings()
-    model = build_model(model_id or settings.mid_model, cache_system_prompt=prompt_cache_for(model_id or settings.mid_model))
+    model = build_model(
+        model_id or settings.mid_model,
+        cache_system_prompt=prompt_cache_for(model_id or settings.mid_model),
+    )
     return AgentRunner(
         Agent(
             model=model,

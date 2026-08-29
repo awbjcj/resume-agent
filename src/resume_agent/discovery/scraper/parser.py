@@ -65,9 +65,7 @@ def parse_search_cards(html: str, now: datetime | None = None) -> list[ScrapedCa
         url = _strip_query(_href(link))
         posted_at = None
         date_node = card.select_one(
-            "time.job-search-card__listdate, "
-            "time.job-search-card__listdate--new, "
-            "time"
+            "time.job-search-card__listdate, time.job-search-card__listdate--new, time"
         )
         if date_node is not None:
             date_value = date_node.get("datetime")
@@ -126,7 +124,9 @@ def parse_job_detail(html: str) -> str:
     return "\n".join(line for line in lines if line)
 
 
-def _title_company_from_page_title(soup: BeautifulSoup) -> tuple[str | None, str | None]:
+def _title_company_from_page_title(
+    soup: BeautifulSoup,
+) -> tuple[str | None, str | None]:
     """Fall back to ``<title>Job Title | Company | LinkedIn</title>``.
 
     The authenticated flagship3 job-details view renders its top card through

@@ -116,8 +116,7 @@ def normalize_company(value: object | None) -> str | None:
             phrase_length = next(
                 len(phrase)
                 for phrase in _LEGAL_SUFFIX_PHRASES
-                if len(words) >= len(phrase)
-                and tuple(words[-len(phrase) :]) == phrase
+                if len(words) >= len(phrase) and tuple(words[-len(phrase) :]) == phrase
             )
             del words[-phrase_length:]
             continue

@@ -163,7 +163,9 @@ def add_skill(
         )
         if token not in ledger.added_skills:
             ledger.added_skills.append(token)
-        ledger.removed_skills = [item for item in ledger.removed_skills if item != token]
+        ledger.removed_skills = [
+            item for item in ledger.removed_skills if item != token
+        ]
 
     with TaxonomyCustody(cluster_path, corrections_path).mutation():
         update_taxonomy_corrections(corrections_path, mutate)
@@ -260,9 +262,7 @@ def merge_domains(
         if target_id not in known:
             raise UnknownDomainError(f"Unknown domain {target_id!r}")
         ledger.domain_merges = {
-            source: target
-            for source, target in flattened.items()
-            if source != target
+            source: target for source, target in flattened.items() if source != target
         }
 
     with TaxonomyCustody(cluster_path, corrections_path).mutation():

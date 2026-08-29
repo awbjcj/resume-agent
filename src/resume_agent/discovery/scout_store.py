@@ -58,8 +58,13 @@ class TermPayload(ExtensibleModel):
 
     @model_validator(mode="after")
     def validate_seniority(self) -> Self:
-        if self.term_kind == "seniority" and self.value.casefold() not in SENIORITY_VALUES:
-            raise ValueError("seniority must use the configured experience-level vocabulary")
+        if (
+            self.term_kind == "seniority"
+            and self.value.casefold() not in SENIORITY_VALUES
+        ):
+            raise ValueError(
+                "seniority must use the configured experience-level vocabulary"
+            )
         return self
 
 
@@ -147,7 +152,9 @@ def _append_turn(
         raise ValueError(f"a turn may contain at most {PROPOSAL_CAP} proposals")
     pending = sum(row["status"] == "pending" for row in session["proposals"])
     if pending + len(proposals) > PENDING_CAP:
-        raise ValueError(f"a session may contain at most {PENDING_CAP} pending proposals")
+        raise ValueError(
+            f"a session may contain at most {PENDING_CAP} pending proposals"
+        )
     now = now_iso()
     first_id = len(session["proposals"]) + 1
     stored = [
@@ -157,8 +164,12 @@ def _append_turn(
     proposal_ids = [proposal.id for proposal in stored]
     session["turns"].extend(
         [
-            ScoutTurnRecord(role="user", text=user_text, at=now).model_dump(mode="json"),
-            scout_turn.model_copy(update={"at": now, "proposal_ids": proposal_ids}).model_dump(mode="json"),
+            ScoutTurnRecord(role="user", text=user_text, at=now).model_dump(
+                mode="json"
+            ),
+            scout_turn.model_copy(
+                update={"at": now, "proposal_ids": proposal_ids}
+            ).model_dump(mode="json"),
         ]
     )
     session["proposals"].extend(row.model_dump(mode="json") for row in stored)
@@ -224,18 +235,25 @@ def set_proposal_status(
     confirmation: ManualSourceConfirmation | None = None,
 ) -> dict:
     def apply(session: dict) -> None:
-        proposal = next((row for row in session["proposals"] if row["id"] == proposal_id), None)
+        proposal = next(
+            (row for row in session["proposals"] if row["id"] == proposal_id), None
+        )
         if proposal is None:
             raise ValueError(f"unknown proposal: {proposal_id}")
         if proposal["status"] != "pending":
             raise ValueError("proposal already resolved")
         if confirmation is not None:
             if status != "added":
-                raise ValueError("manual confirmation is only valid when adding a proposal")
+                raise ValueError(
+                    "manual confirmation is only valid when adding a proposal"
+                )
             if proposal["kind"] != "source" or proposal["source"] is None:
                 raise ValueError("manual confirmation requires a source proposal")
             source = proposal["source"]
-            if confirmation.company != source["company"] or confirmation.url != source["url"]:
+            if (
+                confirmation.company != source["company"]
+                or confirmation.url != source["url"]
+            ):
                 raise ScoutProposalChangedError("source URL or company changed")
         proposal["status"] = status
         proposal["dismiss_reason"] = reason if status == "dismissed" else ""
@@ -285,7 +303,9 @@ def replace_pending_source_resolution(
     """Atomically replace a displayed source only when its URL is still current."""
 
     def apply(session: dict) -> None:
-        proposal = next((row for row in session["proposals"] if row["id"] == proposal_id), None)
+        proposal = next(
+            (row for row in session["proposals"] if row["id"] == proposal_id), None
+        )
         if proposal is None:
             raise ValueError(f"unknown proposal: {proposal_id}")
         if proposal["status"] != "pending":
@@ -300,7 +320,9 @@ def replace_pending_source_resolution(
         ).model_dump(mode="json")
         proposal["check"] = _RESOLUTION_CHECK[resolution.status]
         proposal["check_error"] = (
-            resolution.reason_code if resolution.status in {"conflict", "failed"} else ""
+            resolution.reason_code
+            if resolution.status in {"conflict", "failed"}
+            else ""
         )
         proposal["manual_confirmation"] = None
 

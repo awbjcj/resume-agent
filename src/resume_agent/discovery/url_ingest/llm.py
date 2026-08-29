@@ -31,7 +31,10 @@ _INSTRUCTIONS = [
 
 def build_url_extract_agent(model_id: str | None = None) -> Runner:
     s = get_settings()
-    model = build_model(model_id or s.cheap_model, cache_system_prompt=prompt_cache_for(model_id or s.cheap_model))
+    model = build_model(
+        model_id or s.cheap_model,
+        cache_system_prompt=prompt_cache_for(model_id or s.cheap_model),
+    )
     return AgentRunner(
         Agent(
             model=model,

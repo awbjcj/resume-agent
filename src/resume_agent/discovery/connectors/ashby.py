@@ -97,7 +97,9 @@ def _sidebar_lines(item: dict) -> list[str]:
 
     location = _completed_location(item)
     secondary = [
-        loc.get("location") for loc in item.get("secondaryLocations") or [] if loc.get("location")
+        loc.get("location")
+        for loc in item.get("secondaryLocations") or []
+        if loc.get("location")
     ]
     if location and secondary:
         lines.append(f"Location: {location} (also: {', '.join(secondary)})")
@@ -110,7 +112,9 @@ def _sidebar_lines(item: dict) -> list[str]:
 
     employment_type = item.get("employmentType")
     if employment_type:
-        lines.append(f"Employment Type: {_EMPLOYMENT_TYPE_LABELS.get(employment_type, employment_type)}")
+        lines.append(
+            f"Employment Type: {_EMPLOYMENT_TYPE_LABELS.get(employment_type, employment_type)}"
+        )
 
     department = item.get("department")
     team = item.get("team")

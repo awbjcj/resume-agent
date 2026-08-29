@@ -1,4 +1,3 @@
-
 from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen

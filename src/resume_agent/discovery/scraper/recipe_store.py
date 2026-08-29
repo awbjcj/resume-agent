@@ -21,7 +21,9 @@ def default_recipes_dir() -> Path:
     (which provisioning creates and reset targets) instead of a shared cwd path.
     """
     context = current_context()
-    return context.paths.scraper_recipes_dir if context is not None else Path(RECIPES_DIR)
+    return (
+        context.paths.scraper_recipes_dir if context is not None else Path(RECIPES_DIR)
+    )
 
 
 def host_key(url: str) -> str:

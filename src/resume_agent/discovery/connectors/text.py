@@ -42,7 +42,9 @@ def _icon_token_at(text: str, start: int, *, escaped: bool) -> tuple[int, str] |
     """
 
     delimiter = "\\_" if escaped else "_"
-    if not text.startswith(delimiter, start) or (start and not text[start - 1].isspace()):
+    if not text.startswith(delimiter, start) or (
+        start and not text[start - 1].isspace()
+    ):
         return None
     cursor = start + len(delimiter)
     if cursor >= len(text) or not ("a" <= text[cursor] <= "z"):

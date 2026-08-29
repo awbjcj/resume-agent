@@ -160,7 +160,9 @@ def run_h1b_enrichment(
 
     report = H1BEnrichmentReport(by_company={})
     if selected and enricher is not None:
-        outcome = enricher.enrich(session.get_bind(), [companies[key] for key in selected])
+        outcome = enricher.enrich(
+            session.get_bind(), [companies[key] for key in selected]
+        )
         if inspect.isawaitable(outcome):
             outcome = asyncio.run(outcome)
         report = H1BEnrichmentReport.model_validate(outcome)
@@ -226,7 +228,9 @@ def _save_with_active_job_limit(session: Session, **values) -> Job | None:
             session.execute(text("BEGIN IMMEDIATE"))
         active_count = int(
             session.execute(
-                select(func.count()).select_from(Job).where(col(Job.archived_at).is_(None))
+                select(func.count())
+                .select_from(Job)
+                .where(col(Job.archived_at).is_(None))
             ).scalar_one()
         )
         allow_insert = active_count < maximum
@@ -241,9 +245,7 @@ def _skill_artifacts(
 ) -> tuple[SkillMatrix | None, ClusterMap]:
     profile_dir = resolve_tenant_path(facts_path).parent
     taxonomy = build_effective_taxonomy(profile_dir)
-    matrix = load_matrix(
-        profile_dir / "matrix.json", facts=facts, taxonomy=taxonomy
-    )
+    matrix = load_matrix(profile_dir / "matrix.json", facts=facts, taxonomy=taxonomy)
     return matrix, taxonomy.cluster_map
 
 
@@ -326,7 +328,9 @@ def discover_jobs(
         "canonicalizer": bundle.canonicalizer,
         "industry_classifier": bundle.industry_classifier,
         "reporter": reporter,
-        "scope": StageScope(job_ids=frozenset(job_ids)) if job_ids is not None else StageScope(),
+        "scope": StageScope(job_ids=frozenset(job_ids))
+        if job_ids is not None
+        else StageScope(),
         "matrix": matrix,
         "cluster_map": cluster_map,
     }

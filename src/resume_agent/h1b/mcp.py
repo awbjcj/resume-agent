@@ -89,7 +89,9 @@ def build_h1b_tools(settings: Any, *, mcp_type: Any | None = None) -> Any:
 
 
 @asynccontextmanager
-async def h1b_tools(settings: Any, *, mcp_type: Any | None = None) -> AsyncIterator[Any]:
+async def h1b_tools(
+    settings: Any, *, mcp_type: Any | None = None
+) -> AsyncIterator[Any]:
     """Connect and close the owned toolkit on the same event loop.
 
     ``connect()`` deliberately runs *outside* the ``try``. Closing a toolkit that

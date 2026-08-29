@@ -31,7 +31,9 @@ def read_linkedin_posting(html: str) -> ExtractedJob:
     )
 
 
-def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJob | None:
+def job_from_url(
+    url: str, *, agent: Runner, allow_browser: bool = True
+) -> RawJob | None:
     """Fetch a posting URL, route to the right reader, and build a RawJob.
 
     A host ``identify_host`` recognizes as a known ATS is fetched *statically*

@@ -34,6 +34,8 @@ def apply_filters(criteria: JobCriteria, config: SearchConfig) -> FilterDecision
         and criteria.yoe_min is not None
         and criteria.yoe_min > config.yoe_max
     ):
-        return FilterDecision(keep=False, reject_reason="requires more experience than yoe_max")
+        return FilterDecision(
+            keep=False, reject_reason="requires more experience than yoe_max"
+        )
 
     return FilterDecision(keep=True, flags=flags)

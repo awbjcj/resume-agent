@@ -1,4 +1,3 @@
-
 from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen, provenance_for
@@ -32,7 +31,10 @@ def _address(source: dict) -> str | None:
         source.get("state_name") or source.get("state"),
         source.get("country") or source.get("country_code"),
     )
-    return ", ".join(part for part in parts if isinstance(part, str) and part.strip()) or None
+    return (
+        ", ".join(part for part in parts if isinstance(part, str) and part.strip())
+        or None
+    )
 
 
 def _location(item: dict) -> str | None:
@@ -84,7 +86,11 @@ def _workplace_type(item: dict) -> str | None:
     """Recruitee models the three placements as independent booleans."""
     kinds = [
         name
-        for name, flag in (("Remote", "remote"), ("Hybrid", "hybrid"), ("On-site", "on_site"))
+        for name, flag in (
+            ("Remote", "remote"),
+            ("Hybrid", "hybrid"),
+            ("On-site", "on_site"),
+        )
         if item.get(flag)
     ]
     return ", ".join(kinds) or None
@@ -98,13 +104,17 @@ def _salary(item: dict) -> str | None:
     span = (
         f"{low:,.0f} - {high:,.0f}"
         if isinstance(low, int | float) and isinstance(high, int | float)
-        else next((f"{v:,.0f}" for v in (low, high) if isinstance(v, int | float)), None)
+        else next(
+            (f"{v:,.0f}" for v in (low, high) if isinstance(v, int | float)), None
+        )
     )
     if not span:
         return None
     period = salary.get("period")
     return " ".join(
-        str(part) for part in (salary.get("currency"), span, period and f"per {period}") if part
+        str(part)
+        for part in (salary.get("currency"), span, period and f"per {period}")
+        if part
     )
 
 

@@ -164,9 +164,7 @@ def _write_taxonomy_corrections(
     return clean
 
 
-def save_taxonomy_corrections(
-    ledger: TaxonomyCorrections, path: str | Path
-) -> None:
+def save_taxonomy_corrections(ledger: TaxonomyCorrections, path: str | Path) -> None:
     with _LEDGER_LOCK:
         _write_taxonomy_corrections(ledger, Path(path))
 
@@ -207,9 +205,7 @@ def apply_taxonomy_corrections(
     domain_label = dict(cmap.domain_label)
     category_of = dict(cmap.category_of)
 
-    reconstructible = set(corrections.domain_renames) & set(
-        corrections.domain_category
-    )
+    reconstructible = set(corrections.domain_renames) & set(corrections.domain_category)
     for domain_id in reconstructible:
         domain_label.setdefault(domain_id, corrections.domain_renames[domain_id])
         category_of.setdefault(domain_id, corrections.domain_category[domain_id])

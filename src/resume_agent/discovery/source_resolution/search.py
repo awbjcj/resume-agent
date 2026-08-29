@@ -9,7 +9,12 @@ from typing import Literal
 from ddgs.exceptions import DDGSException, RatelimitException, TimeoutException
 
 from resume_agent.discovery.source_resolution.catalog import BOARD_FAMILIES
-from resume_agent.sessions.stream import StreamEvent, StreamSink, ToolCompleted, ToolStarted
+from resume_agent.sessions.stream import (
+    StreamEvent,
+    StreamSink,
+    ToolCompleted,
+    ToolStarted,
+)
 
 SearchInterruption = Literal["SEARCH_RATE_LIMITED", "SEARCH_BUDGET_EXHAUSTED"]
 
@@ -35,9 +40,7 @@ def _error_payload(code: SearchInterruption) -> str:
     return json.dumps({"ok": False, "error_code": code, "results": []})
 
 
-def make_budgeted_web_search_tool(
-    budget: SearchBudget, *, backend=None
-):
+def make_budgeted_web_search_tool(budget: SearchBudget, *, backend=None):
     """Return a five-use web search function suitable for an Agno tool list."""
 
     if backend is None:
@@ -100,7 +103,9 @@ class SearchCoverageSink:
         searched = [kind for kind in kinds if kind in self._searched_families]
         return SearchCoverage(
             searched_families=searched,
-            unsearched_families=[kind for kind in kinds if kind not in self._searched_families],
+            unsearched_families=[
+                kind for kind in kinds if kind not in self._searched_families
+            ],
             interruption_reason=self._interruption_reason,
         )
 
@@ -114,8 +119,5 @@ class SearchCoverageSink:
         result = result.casefold()
         if "search_rate_limited" in result or "rate limit" in result:
             self._interruption_reason = "SEARCH_RATE_LIMITED"
-        elif (
-            "search_budget_exhausted" in result
-            and self._interruption_reason is None
-        ):
+        elif "search_budget_exhausted" in result and self._interruption_reason is None:
             self._interruption_reason = "SEARCH_BUDGET_EXHAUSTED"

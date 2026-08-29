@@ -76,9 +76,9 @@ class ConnectorSpec:
     pullable: Callable[[Settings], bool] = field(default=lambda settings: True)
     unit_items: Callable[[ConnectorsConfig], list[Any]] | None = None
     admits: Callable[[AtsTarget | None], bool] = field(default=lambda target: True)
-    new_unit: (
-        Callable[[AtsTarget | None, str, str | None], tuple[str, Any]] | None
-    ) = None
+    new_unit: Callable[[AtsTarget | None, str, str | None], tuple[str, Any]] | None = (
+        None
+    )
     discovery: BoardFamily | None = None
 
 
@@ -241,9 +241,7 @@ _SPEC_BY_KIND = {spec.kind: spec for spec in CONNECTOR_SPECS}
 def discoverable_board_families() -> tuple[BoardFamily, ...]:
     """Catalog-backed generic ATS families that have a connector registration."""
     return tuple(
-        family
-        for spec in CONNECTOR_SPECS
-        if (family := spec.discovery) is not None
+        family for spec in CONNECTOR_SPECS if (family := spec.discovery) is not None
     )
 
 
