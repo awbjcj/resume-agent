@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useDashboardSummary, type DashboardSummary } from "@/features/dashboard/use-dashboard-summary";
 import { useSetupStatus, type SetupStatus } from "@/features/settings/use-setup-status";
@@ -115,6 +116,39 @@ export const JOURNEY_STAGES: readonly JourneyStageDef[] = [
   },
 ];
 
+const JOURNEY_COPY = {
+  profile: {
+    label: "journey.stages.profile.label",
+    task: "journey.stages.profile.task",
+    hint: "journey.stages.profile.hint",
+    cta: "journey.stages.profile.cta",
+  },
+  sources: {
+    label: "journey.stages.sources.label",
+    task: "journey.stages.sources.task",
+    hint: "journey.stages.sources.hint",
+    cta: "journey.stages.sources.cta",
+  },
+  pull: {
+    label: "journey.stages.pull.label",
+    task: "journey.stages.pull.task",
+    hint: "journey.stages.pull.hint",
+    cta: "journey.stages.pull.cta",
+  },
+  shortlist: {
+    label: "journey.stages.shortlist.label",
+    task: "journey.stages.shortlist.task",
+    hint: "journey.stages.shortlist.hint",
+    cta: "journey.stages.shortlist.cta",
+  },
+  tailor: {
+    label: "journey.stages.tailor.label",
+    task: "journey.stages.tailor.task",
+    hint: "journey.stages.tailor.hint",
+    cta: "journey.stages.tailor.cta",
+  },
+} as const;
+
 /** Pure derivation — exported for unit tests and reused by the hook. */
 export function deriveJourney(s: SetupStatus, d: DashboardSummary): Journey {
   const currentStep = JOURNEY_STAGES.find((stage) => !stage.done(s, d))?.id ?? null;
@@ -148,9 +182,29 @@ export function deriveJourney(s: SetupStatus, d: DashboardSummary): Journey {
 
 /** React hook: returns the derived journey, or null while either query loads. */
 export function useJourney(): Journey | null {
+  const { t } = useTranslation();
   const setup = useSetupStatus();
   const summary = useDashboardSummary();
   const s = setup.data;
   const d = summary.data;
-  return useMemo(() => (s && d ? deriveJourney(s, d) : null), [s, d]);
+  return useMemo(() => {
+    if (!s || !d) return null;
+    const journey = deriveJourney(s, d);
+    return {
+      ...journey,
+      stages: journey.stages.map((stage) => {
+        const copy = JOURNEY_COPY[stage.id];
+        const cta = "pull" in stage.cta
+          ? { label: t(copy.cta), pull: true as const }
+          : { label: t(copy.cta), to: stage.cta.to };
+        return {
+          ...stage,
+          label: t(copy.label),
+          task: t(copy.task),
+          hint: t(copy.hint),
+          cta,
+        };
+      }),
+    };
+  }, [d, s, t]);
 }

@@ -20,14 +20,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { launchers, useLaunchRun, type ReprocessScope } from "./use-launch-run";
 
-export function PullDialog() {
+export function PullDialog({ triggerLabel = "Pull" }: { triggerLabel?: string } = {}) {
   const [open, setOpen] = useState(false);
   const [limit, setLimit] = useState("");
   const { launch } = useLaunchRun();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm">Pull</Button>} />
+      <DialogTrigger render={<Button size="sm">{triggerLabel}</Button>} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pull from connectors</DialogTitle>

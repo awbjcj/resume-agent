@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { useJourney, type JourneyCta, type JourneyStage } from "./use-journey";
 const DISMISS_KEY = "resume-agent-getting-started-dismissed";
 
 function RowAction({ cta }: { cta: JourneyCta }) {
-  if ("pull" in cta) return <PullDialog />;
+  if ("pull" in cta) return <PullDialog triggerLabel={cta.label} />;
   return (
     <Button size="sm" variant="outline" render={<Link to={cta.to}>{cta.label}</Link>} />
   );
@@ -57,6 +58,7 @@ function Row({ stage, index }: { stage: JourneyStage; index: number }) {
 }
 
 export function GettingStartedChecklist() {
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(DISMISS_KEY) === "1",
   );
@@ -73,16 +75,19 @@ export function GettingStartedChecklist() {
   return (
     <Card className="gap-0 p-0">
       <div className="flex items-center gap-3 border-b px-4 py-3">
-        <h2 className="text-sm font-semibold">Getting started</h2>
+        <h2 className="text-sm font-semibold">{t("journey.gettingStarted")}</h2>
         <span className="text-xs tabular-nums text-muted-foreground">
-          {journey.completedCount} of {journey.total}
+          {t("journey.completedCount", {
+            completed: journey.completedCount,
+            total: journey.total,
+          })}
         </span>
         <Button
           size="icon-sm"
           variant="ghost"
           className="ml-auto"
           onClick={dismiss}
-          aria-label="Dismiss getting started"
+          aria-label={t("journey.dismiss")}
         >
           <X className="size-4" aria-hidden="true" />
         </Button>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,12 +22,14 @@ export function JobFailureRow({
   onResolve,
   isBusy,
 }: JobFailureRowProps) {
+  const { t, i18n } = useTranslation();
+  const [now] = useState(Date.now);
   const details = record.jobDetails;
   const [showTraceback, setShowTraceback] = useState(false);
   // A job record without details is a legacy or unparseable row; fall back to
   // the flat message rather than rendering an empty shell.
   const heading = details
-    ? `${details.company ?? "Unknown company"} — ${details.title ?? "Untitled role"}`
+    ? `${details.company ?? t("dashboard.unknownCompany")} — ${details.title ?? t("dashboard.untitledRole")}`
     : record.sourceLabel;
 
   return (
@@ -51,7 +54,7 @@ export function JobFailureRow({
       <p className="text-xs text-muted-foreground">{record.message}</p>
       <p className="text-xs text-muted-foreground">
         {details?.model ? `${details.model} · ` : ""}
-        {timeAgo(Date.parse(record.lastSeenAt))}
+        {timeAgo(Date.parse(record.lastSeenAt), now, i18n.resolvedLanguage)}
       </p>
 
       {details?.tracebackTail && showTraceback && (
@@ -69,21 +72,21 @@ export function JobFailureRow({
             className="flex-1 justify-start px-0 text-xs text-muted-foreground hover:bg-transparent"
             onClick={() => setShowTraceback((current) => !current)}
           >
-            Technical details
+            {t("dashboard.technicalDetails")}
           </Button>
         ) : (
           <span className="flex-1" />
         )}
         {details && (
           <Button size="sm" variant="outline" disabled={isBusy} onClick={onRetry}>
-            Retry
+            {t("dashboard.retry")}
           </Button>
         )}
         <Button size="sm" variant="ghost" disabled={isBusy} onClick={onDismiss}>
-          Dismiss
+          {t("dashboard.dismiss")}
         </Button>
         <Button size="sm" variant="outline" disabled={isBusy} onClick={onResolve}>
-          Resolve
+          {t("dashboard.resolve")}
         </Button>
       </div>
     </li>

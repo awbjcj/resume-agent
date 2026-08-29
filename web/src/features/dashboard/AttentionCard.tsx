@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CircleAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +26,11 @@ import { useRedoRun, type RedoStage } from "@/features/runs/use-redo-run";
 import { JobFailureRow } from "./JobFailureRow";
 
 const VISIBLE_LIMIT = 8;
-const GROUPS: { kind: string; heading: string }[] = [
-  { kind: "job", heading: "Jobs" },
-  { kind: "source", heading: "Sources" },
-  { kind: "run", heading: "Runs" },
-];
+const GROUPS = [
+  { kind: "job", heading: "Jobs", headingKey: "dashboard.errorGroups.jobs" },
+  { kind: "source", heading: "Sources", headingKey: "dashboard.errorGroups.sources" },
+  { kind: "run", heading: "Runs", headingKey: "dashboard.errorGroups.runs" },
+] as const;
 
 interface RetryTarget {
   jobId: number;
@@ -57,6 +58,7 @@ function distributeVisibleBudget<T extends { items: unknown[] }>(
 }
 
 export function AttentionCard() {
+  const { t } = useTranslation();
   const records = useErrorRecords("open");
   const dismiss = useDismissError();
   const resolve = useResolveError();
@@ -85,7 +87,7 @@ export function AttentionCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <CircleAlert className="text-destructive" aria-hidden="true" />
-          Attention needed
+          {t("dashboard.attentionNeeded")}
           {rows.length ? <Badge variant="destructive">{rows.length}</Badge> : null}
         </CardTitle>
         {rows.length ? (
@@ -97,7 +99,7 @@ export function AttentionCard() {
               onClick={() => clearAll.mutate()}
             >
               {clearAll.isPending ? <Spinner data-icon="inline-start" /> : null}
-              Clear all
+              {t("dashboard.clearAll")}
             </Button>
           </CardAction>
         ) : null}
@@ -107,30 +109,30 @@ export function AttentionCard() {
         {records.isPending ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner />
-            Loading errors…
+            {t("dashboard.loadingErrors")}
           </div>
         ) : null}
 
         {records.isError ? (
           <Alert variant="destructive">
-            <AlertTitle>Could not load errors</AlertTitle>
+            <AlertTitle>{t("dashboard.loadErrorsFailed")}</AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-3">
-              <span>Recent failures are temporarily unavailable.</span>
+              <span>{t("dashboard.errorsUnavailable")}</span>
               <Button size="sm" variant="outline" onClick={() => void records.refetch()}>
-                Try again
+                {t("common.retry")}
               </Button>
             </AlertDescription>
           </Alert>
         ) : null}
 
         {!records.isPending && !records.isError && !rows.length ? (
-          <p className="text-sm text-muted-foreground">No open errors.</p>
+          <p className="text-sm text-muted-foreground">{t("dashboard.noOpenErrors")}</p>
         ) : null}
 
         {grouped.map((group) => (
           <section key={group.kind} className="flex flex-col gap-2">
             <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {group.heading}
+              {t(group.headingKey)}
             </h3>
             <ul className="flex flex-col gap-3">
               {group.items.map((row) =>
@@ -159,7 +161,7 @@ export function AttentionCard() {
 
         {!showAll && rows.length > VISIBLE_LIMIT ? (
           <Button size="sm" variant="ghost" onClick={() => setShowAll(true)}>
-            Show all {rows.length}
+            {t("dashboard.showAll", { count: rows.length })}
           </Button>
         ) : null}
       </CardContent>
@@ -199,20 +201,21 @@ function PlainErrorRow({
   onDismiss: () => void;
   onResolve: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
       <div className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{record.sourceLabel}</span>
         <span className="text-xs text-muted-foreground">
           {record.message}
-          {record.count > 1 ? ` · seen ${record.count}×` : ""}
+          {record.count > 1 ? ` · ${t("dashboard.seenCount", { count: record.count })}` : ""}
         </span>
       </div>
       <Button size="sm" variant="ghost" disabled={isBusy} onClick={onDismiss}>
-        Dismiss
+        {t("dashboard.dismiss")}
       </Button>
       <Button size="sm" variant="outline" disabled={isBusy} onClick={onResolve}>
-        Resolve
+        {t("dashboard.resolve")}
       </Button>
     </li>
   );

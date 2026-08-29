@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { PullDialog } from "@/features/runs/RunLaunchDialogs";
@@ -10,7 +11,7 @@ import { useJourney, type JourneyCta, type JourneyStage } from "./use-journey";
 /** Renders a stage's call-to-action: the Pull step reuses the real launcher
  *  dialog; every other step is a route link. */
 function StageAction({ cta }: { cta: JourneyCta }) {
-  if ("pull" in cta) return <PullDialog />;
+  if ("pull" in cta) return <PullDialog triggerLabel={cta.label} />;
   return (
     <Button size="sm" render={<Link to={cta.to}>{cta.label}</Link>} />
   );
@@ -25,6 +26,7 @@ function Node({
   index: number;
   connectorDone: boolean;
 }) {
+  const { t } = useTranslation();
   const isDone = stage.state === "done";
   const isCurrent = stage.state === "current";
   return (
@@ -60,7 +62,7 @@ function Node({
             {stage.label}
           </span>
           {isCurrent && stage.count != null && stage.count > 0 && (
-            <span className="text-[0.68rem] tabular-nums text-muted-foreground">{stage.count} waiting</span>
+            <span className="text-[0.68rem] tabular-nums text-muted-foreground">{t("journey.waiting", { count: stage.count })}</span>
           )}
         </span>
       </span>
@@ -69,6 +71,7 @@ function Node({
 }
 
 export function JourneyRail() {
+  const { t } = useTranslation();
   const journey = useJourney();
   if (!journey) return null;
 
@@ -77,14 +80,14 @@ export function JourneyRail() {
   if (journey.complete) {
     return (
       <div
-        aria-label="Job-search journey"
+        aria-label={t("journey.label")}
         className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground shadow-card"
       >
         <span className="flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
           <Check className="size-3" aria-hidden="true" />
         </span>
-        <span className="font-medium text-foreground">You&apos;re running the full loop.</span>
-        <span>Profile · Sources · Pull · Shortlist · Tailor — all set.</span>
+        <span className="font-medium text-foreground">{t("journey.completeTitle")}</span>
+        <span>{t("journey.completeSummary")}</span>
       </div>
     );
   }
@@ -92,7 +95,7 @@ export function JourneyRail() {
   const current = journey.stages.find((s) => s.state === "current");
 
   return (
-    <section aria-label="Job-search journey" className="rounded-lg border bg-card p-4 shadow-card sm:p-5">
+    <section aria-label={t("journey.label")} className="rounded-lg border bg-card p-4 shadow-card sm:p-5">
       <ol className="flex items-start">
         {journey.stages.map((stage, i) => (
           <Node
@@ -107,7 +110,7 @@ export function JourneyRail() {
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-4">
           <ArrowRight className="size-4 shrink-0 text-primary" aria-hidden="true" />
           <p className="min-w-0 flex-1 text-sm text-foreground">
-            <span className="font-medium">Next:</span> {current.hint}
+            <span className="font-medium">{t("journey.next")}</span> {current.hint}
           </p>
           <StageAction cta={current.cta} />
         </div>

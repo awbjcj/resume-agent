@@ -1,4 +1,5 @@
 import { Moon, Sun } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { useTheme } from "@/app/theme";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -13,7 +15,7 @@ export function ThemeToggle() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Toggle theme"
+            aria-label={t("shell.toggleTheme")}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
             <Sun className="h-4 w-4 dark:hidden" />
@@ -21,7 +23,7 @@ export function ThemeToggle() {
           </Button>
         }
       />
-      <TooltipContent>Toggle light / dark</TooltipContent>
+      <TooltipContent>{t("shell.toggleLightDark")}</TooltipContent>
     </Tooltip>
   );
 }
