@@ -81,7 +81,9 @@ def import_jobs_endpoint(
         added=report.added,
         upgraded=report.upgraded,
         skipped=report.skipped,
-        errors=[JobsImportError(row=row, reason=reason) for row, reason in report.errors],
+        errors=[
+            JobsImportError(row=row, reason=reason) for row, reason in report.errors
+        ],
     )
 
 

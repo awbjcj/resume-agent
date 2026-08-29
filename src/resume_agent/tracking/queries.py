@@ -180,7 +180,9 @@ def _company_evidence(
     return load_company_evidence(session, [job.company for job in jobs])
 
 
-def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> list[SkillTag]:
+def _skill_tags(
+    criteria: dict, tokens: set[str], aliases: dict[str, str]
+) -> list[SkillTag]:
     # tech_stack (techs the post names) is also surfaced as non-required tags so
     # the skill cloud and "Skills (any match)" filter can match on it. Compound
     # entries are split into atomic skills, then deduped by canonical token (the
@@ -200,13 +202,19 @@ def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> li
                 continue
             seen.add(canonical)
             tags.append(
-                SkillTag(name=canonical, covered=canonical in profile_canonical, required=required)
+                SkillTag(
+                    name=canonical,
+                    covered=canonical in profile_canonical,
+                    required=required,
+                )
             )
     return tags
 
 
 def _location_payload(criteria: dict[str, Any]) -> list[dict[str, Any]]:
-    return [location.as_dict() for location in location_instances_from_criteria(criteria)]
+    return [
+        location.as_dict() for location in location_instances_from_criteria(criteria)
+    ]
 
 
 def _shortlist_row(
@@ -268,9 +276,7 @@ def shortlist_rows(
         .where(Job.status == JobStatus.shortlisted.value, archived_col.is_(None))
         .order_by(fit_score_col.desc().nullslast())
     ).all()
-    return project_shortlist_jobs(
-        session, jobs, facts=facts, aliases_path=aliases_path
-    )
+    return project_shortlist_jobs(session, jobs, facts=facts, aliases_path=aliases_path)
 
 
 def project_shortlist_jobs(
@@ -284,9 +290,7 @@ def project_shortlist_jobs(
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
     evidence_by_company = _company_evidence(session, jobs)
-    return [
-        _shortlist_row(job, tokens, aliases, evidence_by_company) for job in jobs
-    ]
+    return [_shortlist_row(job, tokens, aliases, evidence_by_company) for job in jobs]
 
 
 def job_facets(
@@ -332,7 +336,11 @@ def job_detail_row(
         jd_text=clean_job_description_text(job.jd_text),
         status=job.status,
         criteria_json=(
-            {key: value for key, value in job.criteria_json.items() if key != "_industry_candidate"}
+            {
+                key: value
+                for key, value in job.criteria_json.items()
+                if key != "_industry_candidate"
+            }
             if job.criteria_json is not None
             else None
         ),
@@ -457,7 +465,10 @@ def application_event_job_rows(
             col(Job.archived_at).is_(None),
         )
     )
-    return [(event, application, job) for event, application, job in session.exec(statement).all()]
+    return [
+        (event, application, job)
+        for event, application, job in session.exec(statement).all()
+    ]
 
 
 def reminder_event_job_rows(

@@ -30,8 +30,6 @@ class DashboardSummaryOut(CamelModel):
     queues: dict[str, int]
     applied: int
     open_error_count: int = 0
-    active_interviews: list[InterviewSessionSummaryOut] = Field(
-        default_factory=list
-    )
+    active_interviews: list[InterviewSessionSummaryOut] = Field(default_factory=list)
     active_coach_session: CoachSessionSummaryOut | None = None
     upcoming_events: list[UpcomingEventOut] = Field(default_factory=list)

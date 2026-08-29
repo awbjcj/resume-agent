@@ -101,7 +101,9 @@ def create_event_reminders(
         else interview_hours
     )
     deadline_days = (
-        settings.offer_deadline_reminder_days if deadline_days is None else deadline_days
+        settings.offer_deadline_reminder_days
+        if deadline_days is None
+        else deadline_days
     )
     current = _aware(now or utcnow())
     created: list[Notification] = []
@@ -121,7 +123,9 @@ def create_event_reminders(
     if not active_windows:
         return []
     widest = max(window for _, _, window in active_windows)
-    kinds = {event_kind for _, event_kinds, _ in active_windows for event_kind in event_kinds}
+    kinds = {
+        event_kind for _, event_kinds, _ in active_windows for event_kind in event_kinds
+    }
     rows = reminder_event_job_rows(
         session,
         after=current,
@@ -131,11 +135,7 @@ def create_event_reminders(
     )
     candidate_rows: list[tuple[int, str, Notification]] = []
     for event, application, job in rows:
-        if (
-            event.id is None
-            or application.id is None
-            or event.occurred_at is None
-        ):
+        if event.id is None or application.id is None or event.occurred_at is None:
             continue
         occurred = _aware(event.occurred_at)
         if occurred <= current:

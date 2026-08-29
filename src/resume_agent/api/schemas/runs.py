@@ -7,7 +7,10 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
-from resume_agent.career_skills.models import CoverLetterSkillName, ResumeAuthoringSkillName
+from resume_agent.career_skills.models import (
+    CoverLetterSkillName,
+    ResumeAuthoringSkillName,
+)
 from resume_agent.api.runs.models import RunState
 from resume_agent.api.schemas.base import CamelModel
 from resume_agent.services.redo import RedoStage

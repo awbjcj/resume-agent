@@ -249,7 +249,11 @@ def quota_snapshot(
         if account is not None and account.active_period_id:
             period = session.get(QuotaPeriod, account.active_period_id)
             tier = session.get(QuotaTier, account.tier_id)
-            if period is not None and tier is not None and moment < _aware(period.ends_at):
+            if (
+                period is not None
+                and tier is not None
+                and moment < _aware(period.ends_at)
+            ):
                 return _snapshot(account, period, tier)
     return ensure_quota_account(engine, user_id, now=moment)
 

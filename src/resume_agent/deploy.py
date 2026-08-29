@@ -16,7 +16,11 @@ def prepare_data_root(
 ) -> None:
     data_root.mkdir(parents=True, exist_ok=True)
     config_target = data_root / "config"
-    if defaults_dir is not None and defaults_dir.is_dir() and not config_target.exists():
+    if (
+        defaults_dir is not None
+        and defaults_dir.is_dir()
+        and not config_target.exists()
+    ):
         shutil.copytree(defaults_dir, config_target)
     config_target.mkdir(exist_ok=True)
     if defaults_dir is not None and defaults_dir.is_dir():

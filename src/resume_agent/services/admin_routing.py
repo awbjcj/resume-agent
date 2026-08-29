@@ -75,7 +75,9 @@ def update_routing_settings(
     env_path: Path,
 ) -> Settings:
     candidate = current.model_copy(
-        update={BODY_TO_SETTING[field]: value or "" for field, value in provided.items()}
+        update={
+            BODY_TO_SETTING[field]: value or "" for field, value in provided.items()
+        }
     )
     errors: list[str] = []
     for provider in SUB2API_KEY_FIELDS:

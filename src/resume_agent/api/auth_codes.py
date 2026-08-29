@@ -51,4 +51,6 @@ def check_code(
     if hmac.compare_digest(row.code_hash, hash_code(code, settings)):
         return CodeVerdict.OK
     row.attempts += 1
-    return CodeVerdict.EXHAUSTED if row.attempts >= MAX_ATTEMPTS else CodeVerdict.INVALID
+    return (
+        CodeVerdict.EXHAUSTED if row.attempts >= MAX_ATTEMPTS else CodeVerdict.INVALID
+    )

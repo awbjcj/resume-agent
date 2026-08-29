@@ -163,9 +163,7 @@ class SessionStore(Generic[M]):
                 raise ValueError(f"unknown session: {session_id}")
             path.unlink()
 
-    def delete_where(
-        self, root: Path | str, predicate: Callable[[dict], bool]
-    ) -> int:
+    def delete_where(self, root: Path | str, predicate: Callable[[dict], bool]) -> int:
         """Remove every session matching ``predicate``. Returns how many went.
 
         Bulk removal is custody, not kind-specific behavior: the lock must span

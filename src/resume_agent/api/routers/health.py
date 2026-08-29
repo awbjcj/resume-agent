@@ -16,4 +16,3 @@ def health(request: Request) -> HealthOut:
             settings.google_oauth_client_id and settings.google_oauth_client_secret
         ),
     )
-

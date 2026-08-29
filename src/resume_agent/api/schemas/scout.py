@@ -39,7 +39,9 @@ class ScoutSourceOut(CamelModel):
     token: str | None = None
     role_count: int | None = None
     error_code: str | None = None
-    resolution_status: Literal["verified", "unverified", "conflict", "failed"] | None = None
+    resolution_status: (
+        Literal["verified", "unverified", "conflict", "failed"] | None
+    ) = None
     resolution_reason: str = ""
     evidence: list["ScoutEvidenceOut"] = Field(default_factory=list)
     searched_families: list[str] = Field(default_factory=list)

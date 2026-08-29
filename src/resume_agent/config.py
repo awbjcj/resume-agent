@@ -139,9 +139,7 @@ class Settings(BaseSettings):
     # mismatch) where every token fails every round and would otherwise
     # dispatch one call per token.  Overflow goes to the identity backstop,
     # which is safe by construction.
-    taxonomy_canonical_repair_max_singletons: int = Field(
-        default=500, ge=0, le=5000
-    )
+    taxonomy_canonical_repair_max_singletons: int = Field(default=500, ge=0, le=5000)
     # Every demanded skill ends a refresh with a home.  Disable only to restore
     # the historical behaviour where an uncertain skill stays unassigned.
     taxonomy_placement_floor: bool = True

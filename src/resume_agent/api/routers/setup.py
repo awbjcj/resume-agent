@@ -82,7 +82,9 @@ def get_setup_status(request: Request):
     sources = SourcesStatus(enabled_count=enabled)
 
     try:
-        skill_capabilities = CareerSkillRegistry.from_settings(settings).public_capabilities()
+        skill_capabilities = CareerSkillRegistry.from_settings(
+            settings
+        ).public_capabilities()
     except Exception as exc:  # a readiness defect must not break the setup gate
         skill_capabilities = []
         skill_error = str(exc)

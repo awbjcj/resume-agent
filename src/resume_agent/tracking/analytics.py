@@ -55,7 +55,9 @@ def _rows(session: Session) -> list[tuple[str, int | None, str]]:
     statement = (
         select(Application.status, Job.fit_score, Job.source)
         .join(Job, Application.job_id == Job.id)  # type: ignore[arg-type]
-        .where(Application.status != ApplicationStatus.ready.value, archived_col.is_(None))
+        .where(
+            Application.status != ApplicationStatus.ready.value, archived_col.is_(None)
+        )
     )
     return list(session.exec(statement).all())
 

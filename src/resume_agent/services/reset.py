@@ -134,15 +134,11 @@ def _scope_targets(paths: ResetPaths, scope: ResetScope) -> tuple[_ResetTarget, 
         ),
         _ResetTarget("taxonomy", paths.taxonomy_file, False),
         *(
-            _ResetTarget(
-                "taxonomy", paths.taxonomy_file.parent / name, False
-            )
+            _ResetTarget("taxonomy", paths.taxonomy_file.parent / name, False)
             for name in _TAXONOMY_GENERATED_FILES
         ),
         *(
-            _ResetTarget(
-                "taxonomy", paths.taxonomy_file.parent / name, True
-            )
+            _ResetTarget("taxonomy", paths.taxonomy_file.parent / name, True)
             for name in _TAXONOMY_GENERATED_DIRECTORIES
         ),
     )

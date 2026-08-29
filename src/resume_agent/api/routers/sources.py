@@ -98,4 +98,6 @@ def discover_search_route_retired():
     # Replaced by the Discovery Scout session API (POST /api/scout/sessions).
     # Kept as an explicit 405 rather than a bare 404 so a stale client gets a
     # clear "this method is gone" signal instead of "this path never existed".
-    raise ApiException(405, "GONE", "Search Scout has moved to the Discovery Scout session API.")
+    raise ApiException(
+        405, "GONE", "Search Scout has moved to the Discovery Scout session API."
+    )

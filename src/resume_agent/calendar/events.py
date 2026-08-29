@@ -60,16 +60,19 @@ def entry_for_event(event: ApplicationEvent, job: Job) -> CalendarEntry:
         if event.platform == "other"
         else PLATFORM_LABELS.get(event.platform or "")
     )
-    description = "\n".join(
-        value
-        for value in (
-            f"Interviewers: {event.interviewers}" if event.interviewers else None,
-            f"Platform: {platform}" if platform else None,
-            f"Modality: {event.modality}" if event.modality else None,
-            event.notes,
+    description = (
+        "\n".join(
+            value
+            for value in (
+                f"Interviewers: {event.interviewers}" if event.interviewers else None,
+                f"Platform: {platform}" if platform else None,
+                f"Modality: {event.modality}" if event.modality else None,
+                event.notes,
+            )
+            if value
         )
-        if value
-    ) or None
+        or None
+    )
     is_url = (event.location_or_link or "").startswith(("http://", "https://"))
     start = _aware(event.occurred_at)
     end = (
@@ -100,7 +103,5 @@ def entries_for_upcoming(
     current = now or utcnow()
     return [
         entry_for_event(event, job)
-        for event, job in upcoming_events(
-            session, within_days=within_days, now=current
-        )
+        for event, job in upcoming_events(session, within_days=within_days, now=current)
     ]

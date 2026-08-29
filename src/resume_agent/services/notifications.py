@@ -26,10 +26,14 @@ def sync_notifications(
     *,
     classify: Callable[[EmailMessage], str] = classify_email,
 ) -> list[Notification]:
-    for proposal in propose_transitions(emails, application_job_pairs(session), classify):
+    for proposal in propose_transitions(
+        emails, application_job_pairs(session), classify
+    ):
         if not proposal.message_id:
             continue
-        existing = notification_by_key(session, proposal.application_id, proposal.message_id)
+        existing = notification_by_key(
+            session, proposal.application_id, proposal.message_id
+        )
         if existing is not None:
             continue
         save_notification(

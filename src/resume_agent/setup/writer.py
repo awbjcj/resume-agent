@@ -31,7 +31,9 @@ def _atomic_write(path: Path, content: str) -> str:
 
 def _env_content(state: WizardState, root: Path) -> str:
     env_path = root / ".env"
-    existing = parse_env(env_path.read_text(encoding="utf-8")) if env_path.exists() else {}
+    existing = (
+        parse_env(env_path.read_text(encoding="utf-8")) if env_path.exists() else {}
+    )
     return format_env(merge_env(existing, state.managed_env()))
 
 
@@ -48,9 +50,15 @@ def atomic_write_all(state: WizardState, root: str | Path = ".") -> dict[str, st
         root / "config" / "profile_sources.yaml": lambda: build_profile_sources(state),
         root / "config" / "search.yaml": lambda: build_search(state),
         root / "config" / "connectors.yaml": lambda: build_connectors(state),
-        root / "config" / "review.yaml": lambda: render_from_example(root / "config" / "review.yaml.example"),
-        root / "config" / "review_deep.yaml": lambda: render_from_example(root / "config" / "review_deep.yaml.example"),
-        root / "config" / "render.yaml": lambda: render_from_example(root / "config" / "render.yaml.example"),
+        root / "config" / "review.yaml": lambda: render_from_example(
+            root / "config" / "review.yaml.example"
+        ),
+        root / "config" / "review_deep.yaml": lambda: render_from_example(
+            root / "config" / "review_deep.yaml.example"
+        ),
+        root / "config" / "render.yaml": lambda: render_from_example(
+            root / "config" / "render.yaml.example"
+        ),
     }
     report: dict[str, str] = {}
     for path, build in builders.items():
@@ -123,7 +131,8 @@ def load_existing_state(root: str | Path = ".") -> WizardState:
             cfg = load_connectors_config(connectors)
             state.greenhouse_enabled = cfg.greenhouse.enabled
             state.greenhouse_boards = [
-                {"token": b.token, "company": b.company or b.token} for b in cfg.greenhouse.boards
+                {"token": b.token, "company": b.company or b.token}
+                for b in cfg.greenhouse.boards
             ]
             state.adzuna_enabled = cfg.adzuna.enabled
             state.adzuna_country = cfg.adzuna.country

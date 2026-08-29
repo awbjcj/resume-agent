@@ -53,9 +53,11 @@ class ApplicationEventOut(CamelModel):
             self.comp_equity_annual,
             self.comp_signing,
         )
-        return sum(value for value in parts if value is not None) if any(
-            value is not None for value in parts
-        ) else None
+        return (
+            sum(value for value in parts if value is not None)
+            if any(value is not None for value in parts)
+            else None
+        )
 
 
 class ApplicationEventCreate(CamelModel):

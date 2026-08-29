@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from resume_agent.api.deps import get_session
-from datetime import timezone
 
 from resume_agent.api.schemas.analytics import AnalyticsOut, CohortOut
 from resume_agent.api.schemas.timeline_analytics import (
@@ -22,6 +23,12 @@ from resume_agent.tracking.funnel import stage_cycle_times, stage_flows
 from resume_agent.tracking.timeline_pivot import build_pivot
 
 router = APIRouter()
+
+
+def _aware_moment(value: datetime | None) -> datetime:
+    if value is None:
+        raise ValueError("dated timeline event is missing occurred_at")
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 @router.get("/analytics", response_model=AnalyticsOut)
@@ -52,11 +59,7 @@ def get_timeline_analytics(
                         LaneEventOut(
                             kind=event.kind,
                             sequence=event.sequence,
-                            occurred_at=(
-                                event.occurred_at.replace(tzinfo=timezone.utc)
-                                if event.occurred_at.tzinfo is None
-                                else event.occurred_at
-                            ),
+                            occurred_at=_aware_moment(event.occurred_at),
                             all_day=event.all_day,
                             result=event.result,
                         )
@@ -92,11 +95,7 @@ def get_timeline_analytics(
                     job_id=row.job_id,
                     company=row.company,
                     sequence=offer.sequence,
-                    occurred_at=(
-                        offer.occurred_at.replace(tzinfo=timezone.utc)
-                        if offer.occurred_at.tzinfo is None
-                        else offer.occurred_at
-                    ),
+                    occurred_at=_aware_moment(offer.occurred_at),
                     comp_base=offer.comp_base,
                     comp_bonus=offer.comp_bonus,
                     comp_equity_annual=offer.comp_equity_annual,

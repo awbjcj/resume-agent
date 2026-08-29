@@ -61,6 +61,8 @@ async def reminder_tick(state: Any, *, now: datetime | None = None) -> dict[str,
                 system_engine=state.system_engine,
                 template_dir=state.template_config_dir,
             )
+            if context.engine is None:
+                raise RuntimeError(f"workspace engine unavailable for user {user.id}")
             with use_context(context), get_session(context.engine) as user_session:
                 counts = run_reminder_pass(user_session, now=now)
             results[user.id] = counts["followUp"] + counts["events"]

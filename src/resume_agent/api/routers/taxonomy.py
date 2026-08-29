@@ -64,9 +64,7 @@ def _translated_errors():
 
 
 @router.put("/taxonomy/skills/{token}/domain", response_model=MatchGapOut)
-def move_skill(
-    token: str, body: MoveSkillIn, session: Session = Depends(get_session)
-):
+def move_skill(token: str, body: MoveSkillIn, session: Session = Depends(get_session)):
     corrections_path, cluster_path = _paths()
     with _translated_errors():
         service.move_skill(
@@ -128,9 +126,7 @@ def merge_domain(
 ):
     corrections_path, cluster_path = _paths()
     with _translated_errors():
-        service.merge_domains(
-            corrections_path, cluster_path, domain_id, body.into
-        )
+        service.merge_domains(corrections_path, cluster_path, domain_id, body.into)
     return build_match_gap_payload(session)
 
 

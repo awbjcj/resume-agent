@@ -135,7 +135,9 @@ def _session_run_active(manager: RunManager, session_id: str) -> bool:
 
 def _guard_lifecycle_idle(manager: RunManager, session_id: str) -> None:
     if _session_run_active(manager, session_id):
-        raise ApiException(409, "SCOUT_BUSY", "A Discovery Scout turn is already running")
+        raise ApiException(
+            409, "SCOUT_BUSY", "A Discovery Scout turn is already running"
+        )
 
 
 @router.post("/scout/sessions", response_model=RunOut, status_code=202)
@@ -212,9 +214,7 @@ def send_message(
     )
 
 
-@router.post(
-    "/scout/sessions/{session_id}/end", response_model=RunOut, status_code=202
-)
+@router.post("/scout/sessions/{session_id}/end", response_model=RunOut, status_code=202)
 def end_scout_session(
     session_id: str,
     request: Request,
@@ -378,7 +378,9 @@ def archive_scout_session(
         archive_session(_workspace_root(request), session_id)
         return ScoutSessionOut.model_validate(
             session_view(
-                _workspace_root(request), session_id, browser_enabled=settings.browser_enabled
+                _workspace_root(request),
+                session_id,
+                browser_enabled=settings.browser_enabled,
             )
         )
     except ValueError as exc:
@@ -398,7 +400,9 @@ def rename_scout_session(
         rename_session(_workspace_root(request), session_id, payload.title)
         return ScoutSessionOut.model_validate(
             session_view(
-                _workspace_root(request), session_id, browser_enabled=settings.browser_enabled
+                _workspace_root(request),
+                session_id,
+                browser_enabled=settings.browser_enabled,
             )
         )
     except ValueError as exc:
@@ -417,7 +421,9 @@ def unarchive_scout_session(
         unarchive_session(_workspace_root(request), session_id)
         return ScoutSessionOut.model_validate(
             session_view(
-                _workspace_root(request), session_id, browser_enabled=settings.browser_enabled
+                _workspace_root(request),
+                session_id,
+                browser_enabled=settings.browser_enabled,
             )
         )
     except ValueError as exc:

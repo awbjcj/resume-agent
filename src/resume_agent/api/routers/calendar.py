@@ -9,7 +9,11 @@ from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.calendar.events import entries_for_upcoming, entry_for_event
 from resume_agent.calendar.ics import render_calendar
-from resume_agent.tracking.repository import application_for_job, get_application_event, get_job
+from resume_agent.tracking.repository import (
+    application_for_job,
+    get_application_event,
+    get_job,
+)
 
 router = APIRouter()
 

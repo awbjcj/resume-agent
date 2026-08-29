@@ -9,7 +9,9 @@ from resume_agent.api.schemas.dashboard import DashboardSummaryOut, UpcomingEven
 from resume_agent.api.schemas.interview import InterviewSessionSummaryOut
 from resume_agent.services.dashboard import summarize_dashboard
 from resume_agent.services.errors import count_open
-from resume_agent.services.mock_interview import sessions_view as interview_sessions_view
+from resume_agent.services.mock_interview import (
+    sessions_view as interview_sessions_view,
+)
 from resume_agent.services.profile_coach import sessions_view as coach_sessions_view
 from resume_agent.tracking.queries import upcoming_events
 from resume_agent.tracking.event_vocab import INTERVIEW_KINDS
@@ -18,9 +20,7 @@ router = APIRouter()
 
 
 @router.get("/dashboard/summary", response_model=DashboardSummaryOut)
-def get_dashboard_summary(
-    request: Request, session: Session = Depends(get_session)
-):
+def get_dashboard_summary(request: Request, session: Session = Depends(get_session)):
     summary = summarize_dashboard(session)
     interview_rows = interview_sessions_view(
         get_interview_dir(request), status="active"
@@ -34,13 +34,10 @@ def get_dashboard_summary(
         applied=summary.applied,
         open_error_count=count_open(session),
         active_interviews=[
-            InterviewSessionSummaryOut.model_validate(row)
-            for row in interview_rows
+            InterviewSessionSummaryOut.model_validate(row) for row in interview_rows
         ],
         active_coach_session=(
-            CoachSessionSummaryOut.model_validate(coach_rows[0])
-            if coach_rows
-            else None
+            CoachSessionSummaryOut.model_validate(coach_rows[0]) if coach_rows else None
         ),
         upcoming_events=[
             UpcomingEventOut(

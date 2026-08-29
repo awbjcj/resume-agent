@@ -43,7 +43,11 @@ def prune_reason(row: PruneRow, config: PruneConfig, now: datetime) -> str | Non
     """Primary archive reason, ordered so preview counts never double-count."""
     if config.enable_rejected and row.status == JobStatus.rejected.value:
         return "rejected"
-    if config.enable_low_fit and row.fit_score is not None and row.fit_score < config.fit_threshold:
+    if (
+        config.enable_low_fit
+        and row.fit_score is not None
+        and row.fit_score < config.fit_threshold
+    ):
         return "low_fit"
     if config.enable_stale:
         ref = row.posted_at or row.created_at
@@ -56,26 +60,35 @@ def _matches(row: PruneRow, config: PruneConfig, now: datetime) -> bool:
     return prune_reason(row, config, now) is not None
 
 
-def prune_candidates(rows: list[PruneRow], config: PruneConfig, now: datetime) -> list[PruneRow]:
+def prune_candidates(
+    rows: list[PruneRow], config: PruneConfig, now: datetime
+) -> list[PruneRow]:
     """Zero-progress, not-yet-archived rows matching any enabled rule."""
     return [
-        r for r in rows
+        r
+        for r in rows
         if r.archived_at is None and is_zero_progress(r) and _matches(r, config, now)
     ]
 
 
-def prune_skipped(rows: list[PruneRow], config: PruneConfig, now: datetime) -> list[PruneRow]:
+def prune_skipped(
+    rows: list[PruneRow], config: PruneConfig, now: datetime
+) -> list[PruneRow]:
     """Rows that match a rule but are kept because they have user progress."""
     return [
-        r for r in rows
+        r
+        for r in rows
         if r.archived_at is None and r.has_progress and _matches(r, config, now)
     ]
 
 
-def expire_candidates(rows: list[PruneRow], config: PruneConfig, now: datetime) -> list[PruneRow]:
+def expire_candidates(
+    rows: list[PruneRow], config: PruneConfig, now: datetime
+) -> list[PruneRow]:
     """Archived, zero-progress rows older than the retention window."""
     return [
-        r for r in rows
+        r
+        for r in rows
         if r.archived_at is not None
         and is_zero_progress(r)
         and _age_days(r.archived_at, now) > config.retention_days

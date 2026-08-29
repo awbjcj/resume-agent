@@ -25,10 +25,14 @@ def anthropic_ping(
         client.models.list()  # type: ignore[attr-defined]
         return CheckResult("anthropic", True, "Key accepted.")
     except Exception as exc:  # noqa: BLE001 — surface any failure as a CheckResult
-        return CheckResult("anthropic", False, str(exc), remedy="Check ANTHROPIC_API_KEY in .env.")
+        return CheckResult(
+            "anthropic", False, str(exc), remedy="Check ANTHROPIC_API_KEY in .env."
+        )
 
 
-def connector_smoke(enabled: list[str], probe: Callable[[str], None]) -> list[CheckResult]:
+def connector_smoke(
+    enabled: list[str], probe: Callable[[str], None]
+) -> list[CheckResult]:
     """Run ``probe(name)`` per enabled connector; capture failures as results."""
     results: list[CheckResult] = []
     for name in enabled:

@@ -63,4 +63,3 @@ class EvidencePortfolioOut(CamelModel):
         payload = portfolio.model_dump(mode="json")
         payload["realized_outside_fact_ids"] = realized_outside_fact_ids or []
         return cls.model_validate(payload)
-

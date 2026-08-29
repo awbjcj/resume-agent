@@ -239,9 +239,7 @@ def end_coach_session(
         ended = run_recap_turn(
             reporter, profile_dir=profile_dir, session_id=session_id, sink=sink
         )
-        saved_count = sum(
-            draft["status"] == "saved" for draft in ended["draftNotes"]
-        )
+        saved_count = sum(draft["status"] == "saved" for draft in ended["draftNotes"])
         build_run_id = None
         skipped_reason = None
         if payload.build and saved_count:
@@ -313,9 +311,7 @@ def archive_coach_session(session_id: str, request: Request):
         raise _value_error(exc) from exc
 
 
-@router.patch(
-    "/profile/coach/sessions/{session_id}", response_model=CoachSessionOut
-)
+@router.patch("/profile/coach/sessions/{session_id}", response_model=CoachSessionOut)
 def rename_coach_session(
     session_id: str, payload: CoachSessionPatchIn, request: Request
 ):

@@ -76,10 +76,7 @@ def normalize_provider(value: str) -> str:
 def _rate_period(moment: datetime) -> str:
     """The time-of-day band ``moment`` falls in, for period-restricted rates."""
     beijing_time = moment.astimezone(_BEIJING_TIMEZONE)
-    if (
-        moment >= _DEEPSEEK_WEEKEND_OFF_PEAK_FROM
-        and beijing_time.weekday() >= 5
-    ):
+    if moment >= _DEEPSEEK_WEEKEND_OFF_PEAK_FROM and beijing_time.weekday() >= 5:
         return RATE_PERIOD_OFF_PEAK
     hour = moment.astimezone(timezone.utc).hour
     if any(start <= hour < end for start, end in _PEAK_HOUR_BANDS):
@@ -582,9 +579,7 @@ def seed_llm_rates(engine: Engine) -> None:
                 )
                 session.add(current_rate)
             current_rate.input_micros_per_million = _micros_per_million(input_rate)
-            current_rate.cache_read_micros_per_million = _micros_per_million(
-                cache_read
-            )
+            current_rate.cache_read_micros_per_million = _micros_per_million(cache_read)
             current_rate.cache_write_micros_per_million = None
             current_rate.output_micros_per_million = _micros_per_million(output_rate)
             # Google Search is $14 / 1,000 paid grounded prompts. The provider's

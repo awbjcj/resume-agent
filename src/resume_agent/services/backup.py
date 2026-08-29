@@ -126,14 +126,18 @@ def _extract_validated(
                 names.add(member.name)
                 if member.isfile():
                     if member.size < 0:
-                        raise InvalidArchiveError("archive contains an oversized member")
+                        raise InvalidArchiveError(
+                            "archive contains an oversized member"
+                        )
                     expanded_bytes += member.size
                     if expanded_bytes > max_expanded_bytes:
                         raise InvalidArchiveError(
                             "archive expands beyond the configured storage limit"
                         )
                     if member.size > max_member_bytes:
-                        raise InvalidArchiveError("archive contains an oversized member")
+                        raise InvalidArchiveError(
+                            "archive contains an oversized member"
+                        )
                 members.append(member)
             if not any(member.isfile() for member in members):
                 raise InvalidArchiveError("archive contains no files")

@@ -26,7 +26,5 @@ def advance_application_status(current: str, implied: str) -> str:
     if implied not in PROGRESSION or current not in PROGRESSION:
         return current
     return (
-        implied
-        if PROGRESSION.index(implied) > PROGRESSION.index(current)
-        else current
+        implied if PROGRESSION.index(implied) > PROGRESSION.index(current) else current
     )

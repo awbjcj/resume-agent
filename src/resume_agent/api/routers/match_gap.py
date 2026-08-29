@@ -79,9 +79,7 @@ def build_match_gap_payload(session: Session) -> MatchGapOut:
                 for key, retired in sorted(taxonomy.state.retired_skills.items())
             ],
             "taxonomy_revision": taxonomy.semantic_revision,
-            "taxonomy_manifest": TaxonomyManifestOut(
-                **asdict(taxonomy.manifest)
-            ),
+            "taxonomy_manifest": TaxonomyManifestOut(**asdict(taxonomy.manifest)),
             "override_conflicts": [
                 OverrideConflictOut(**asdict(conflict))
                 for conflict in taxonomy.conflicts

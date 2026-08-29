@@ -85,7 +85,11 @@ def _comp_total(event: ApplicationEvent) -> int | None:
         event.comp_equity_annual,
         event.comp_signing,
     )
-    return sum(value for value in parts if value is not None) if any(value is not None for value in parts) else None
+    return (
+        sum(value for value in parts if value is not None)
+        if any(value is not None for value in parts)
+        else None
+    )
 
 
 def build_pivot(
@@ -98,7 +102,11 @@ def build_pivot(
         .join(Job, col(Application.job_id) == Job.id)
         .where(col(Job.archived_at).is_(None))
     ).all()
-    application_ids = [application.id for application, _ in application_rows if application.id is not None]
+    application_ids = [
+        application.id
+        for application, _ in application_rows
+        if application.id is not None
+    ]
     events_by_application: dict[int, list[ApplicationEvent]] = defaultdict(list)
     if application_ids:
         events = session.exec(
@@ -134,7 +142,10 @@ def build_pivot(
                 continue
             if event.kind == "technical_round":
                 maximum_round = max(maximum_round, event.sequence)
-                if max_technical_rounds is not None and event.sequence > max_technical_rounds:
+                if (
+                    max_technical_rounds is not None
+                    and event.sequence > max_technical_rounds
+                ):
                     overflow += 1
                     continue
                 key = f"technical_round_{event.sequence}"
@@ -156,7 +167,9 @@ def build_pivot(
         if overflow:
             overflow_by_job[job.id] = overflow
         latest_offer = offers[-1] if offers else None
-        recent = max((event.occurred_at for event in events if event.occurred_at), default=None)
+        recent = max(
+            (event.occurred_at for event in events if event.occurred_at), default=None
+        )
         rows.append(
             (
                 recent,
@@ -180,7 +193,9 @@ def build_pivot(
     rows.sort(
         key=lambda item: (
             item[0] is not None,
-            _sort_moment(item[0]) if item[0] is not None else datetime.min.replace(tzinfo=timezone.utc),
+            _sort_moment(item[0])
+            if item[0] is not None
+            else datetime.min.replace(tzinfo=timezone.utc),
             item[1].job_id,
         ),
         reverse=True,

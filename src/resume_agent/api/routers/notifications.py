@@ -37,7 +37,9 @@ def list_notifications(session: Session = Depends(get_session)):
 def accept(notification_id: int, session: Session = Depends(get_session)):
     notification = accept_notification(session, notification_id)
     if notification is None:
-        raise ApiException(404, "NOT_FOUND", f"Notification #{notification_id} not found")
+        raise ApiException(
+            404, "NOT_FOUND", f"Notification #{notification_id} not found"
+        )
     return _to_out(session, notification)
 
 
@@ -45,5 +47,7 @@ def accept(notification_id: int, session: Session = Depends(get_session)):
 def dismiss(notification_id: int, session: Session = Depends(get_session)):
     notification = dismiss_notification(session, notification_id)
     if notification is None:
-        raise ApiException(404, "NOT_FOUND", f"Notification #{notification_id} not found")
+        raise ApiException(
+            404, "NOT_FOUND", f"Notification #{notification_id} not found"
+        )
     return _to_out(session, notification)

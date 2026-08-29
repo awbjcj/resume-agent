@@ -104,9 +104,7 @@ def repull_job(
         detail = "no job description found"
         return (
             StageOutcome(job_id, "pull", "failed", detail),
-            StageFailure(
-                error_type="UrlFetchError", message=detail, traceback_tail=""
-            ),
+            StageFailure(error_type="UrlFetchError", message=detail, traceback_tail=""),
         )
 
     job.jd_text = raw.jd_text
@@ -179,13 +177,20 @@ def _run_extract(session, jobs, run_id) -> list[StageOutcome]:
         never_regress=True,
     )
     extract_failures = run_extract(
-        session, bundle.extract, scope=scope,
+        session,
+        bundle.extract,
+        scope=scope,
         industry_classifier=bundle.industry_classifier,
     )
     run_filter(session, config, scope)
     score_failures = run_score(
-        session, facts, bundle.fit, canonicalizer=bundle.canonicalizer,
-        scope=scope, matrix=matrix, cluster_map=cluster_map,
+        session,
+        facts,
+        bundle.fit,
+        canonicalizer=bundle.canonicalizer,
+        scope=scope,
+        matrix=matrix,
+        cluster_map=cluster_map,
     )
     # A job that failed extraction never had valid criteria to score against,
     # so an extract failure is the root cause and wins over a later score one.
@@ -197,14 +202,25 @@ def _run_extract(session, jobs, run_id) -> list[StageOutcome]:
         if failure is not None:
             detail = f"{failure.error_type}: {failure.message}"
             outcomes.append(
-                _settle(session, job, "extract",
-                        StageOutcome(job.id, "extract", "failed", detail),
-                        failure, run_id)
+                _settle(
+                    session,
+                    job,
+                    "extract",
+                    StageOutcome(job.id, "extract", "failed", detail),
+                    failure,
+                    run_id,
+                )
             )
         else:
             outcomes.append(
-                _settle(session, job, "extract",
-                        StageOutcome(job.id, "extract", "ok", None), None, run_id)
+                _settle(
+                    session,
+                    job,
+                    "extract",
+                    StageOutcome(job.id, "extract", "ok", None),
+                    None,
+                    run_id,
+                )
             )
     return outcomes
 
@@ -225,14 +241,26 @@ def _run_tailor(session, jobs, run_id, deep) -> list[StageOutcome]:
         if failure is not None:
             detail = f"{failure.error_type}: {failure.message}"
             results.append(
-                _settle(session, job, "tailor",
-                        StageOutcome(job.id, "tailor", "failed", detail),
-                        failure, run_id, model=outcome.model)
+                _settle(
+                    session,
+                    job,
+                    "tailor",
+                    StageOutcome(job.id, "tailor", "failed", detail),
+                    failure,
+                    run_id,
+                    model=outcome.model,
+                )
             )
         else:
             results.append(
-                _settle(session, job, "tailor",
-                        StageOutcome(job.id, "tailor", "ok", None), None, run_id)
+                _settle(
+                    session,
+                    job,
+                    "tailor",
+                    StageOutcome(job.id, "tailor", "ok", None),
+                    None,
+                    run_id,
+                )
             )
     return results
 
@@ -265,16 +293,29 @@ def _run_render(session, jobs, run_id) -> list[StageOutcome]:
             failure = StageFailure.from_exception(exc)
             outcomes.append(
                 _settle(
-                    session, job, "render",
-                    StageOutcome(job.id, "render", "failed",
-                                 f"{failure.error_type}: {failure.message}"),
-                    failure, run_id,
+                    session,
+                    job,
+                    "render",
+                    StageOutcome(
+                        job.id,
+                        "render",
+                        "failed",
+                        f"{failure.error_type}: {failure.message}",
+                    ),
+                    failure,
+                    run_id,
                 )
             )
             continue
         outcomes.append(
-            _settle(session, job, "render",
-                    StageOutcome(job.id, "render", "ok", None), None, run_id)
+            _settle(
+                session,
+                job,
+                "render",
+                StageOutcome(job.id, "render", "ok", None),
+                None,
+                run_id,
+            )
         )
     return outcomes
 
@@ -314,8 +355,12 @@ def redo_jobs(
     }
     for index, stage in enumerate(ordered):
         if reporter:
-            reporter.begin(len(jobs), f"Redo: {stage}",
-                           phase_index=index + 1, phase_count=len(ordered))
+            reporter.begin(
+                len(jobs),
+                f"Redo: {stage}",
+                phase_index=index + 1,
+                phase_count=len(ordered),
+            )
         outcomes.extend(runners[stage]())
         if reporter:
             reporter.step(len(jobs))

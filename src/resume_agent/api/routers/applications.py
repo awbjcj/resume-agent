@@ -33,7 +33,10 @@ def _pivot_out(table: PivotTable) -> PivotTableOut:
                 status=row.status,
                 source=row.source,
                 fit_score=row.fit_score,
-                cells={key: PivotCellOut.model_validate(cell) for key, cell in row.cells.items()},
+                cells={
+                    key: PivotCellOut.model_validate(cell)
+                    for key, cell in row.cells.items()
+                },
                 custom_count=row.custom_count,
                 total_comp=row.total_comp,
                 comp_currency=row.comp_currency,
@@ -61,7 +64,8 @@ def _wide_fields(round_count: int) -> list[str]:
     stages = [
         kind.value
         for kind in EventKind
-        if kind not in {EventKind.technical_round, EventKind.offer_deadline, EventKind.custom}
+        if kind
+        not in {EventKind.technical_round, EventKind.offer_deadline, EventKind.custom}
     ]
     return [
         "job_id",
@@ -163,7 +167,10 @@ def _csv_response(fields: list[str], rows, filename: str) -> Response:
     writer.writeheader()
     writer.writerows(
         {
-            key: f"'{value}" if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")) else value
+            key: f"'{value}"
+            if isinstance(value, str)
+            and value.lstrip().startswith(("=", "+", "-", "@"))
+            else value
             for key, value in row.items()
         }
         for row in rows

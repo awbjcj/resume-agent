@@ -161,9 +161,7 @@ def set_error_status(session: Session, record_id: int, status: str) -> ErrorReco
 
 
 def dismiss_all(session: Session) -> int:
-    rows = session.exec(
-        select(ErrorRecord).where(ErrorRecord.status == "open")
-    ).all()
+    rows = session.exec(select(ErrorRecord).where(ErrorRecord.status == "open")).all()
     now = utcnow()
     for record in rows:
         record.status = "dismissed"
@@ -177,9 +175,9 @@ def dismiss_all(session: Session) -> int:
 def count_open(session: Session) -> int:
     return int(
         session.exec(
-            select(func.count()).select_from(ErrorRecord).where(
-                ErrorRecord.status == "open"
-            )
+            select(func.count())
+            .select_from(ErrorRecord)
+            .where(ErrorRecord.status == "open")
         ).one()
     )
 

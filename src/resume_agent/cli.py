@@ -427,10 +427,14 @@ def profile_coach_cmd(
             typer.echo(f"\nDRAFT NOTE — {draft['title']}\n{draft['summary']}")
             for quote in draft["quotes"]:
                 typer.echo(f'  "{quote}"')
-            choice = typer.prompt(
-                "Resolve this note? [s]ave / [e]dit / [d]iscard / [l]eave",
-                default="l",
-            ).strip().lower()
+            choice = (
+                typer.prompt(
+                    "Resolve this note? [s]ave / [e]dit / [d]iscard / [l]eave",
+                    default="l",
+                )
+                .strip()
+                .lower()
+            )
             title = draft["title"]
             summary = draft["summary"]
             quotes = list(draft["quotes"])
@@ -529,8 +533,12 @@ def profile_coach_cmd(
 
 @app.command("career-lab")
 def career_lab_cmd(
-    goal: str | None = typer.Argument(None, help="The goal for this Career Lab session."),
-    skill: str | None = typer.Option(None, "--skill", help="One approved Career Lab skill."),
+    goal: str | None = typer.Argument(
+        None, help="The goal for this Career Lab session."
+    ),
+    skill: str | None = typer.Option(
+        None, "--skill", help="One approved Career Lab skill."
+    ),
     job_id: int | None = typer.Option(None, "--job-id", min=1),
     resume_version_id: int | None = typer.Option(None, "--resume-version-id", min=1),
     offer_application_id: list[int] = typer.Option(
@@ -541,7 +549,10 @@ def career_lab_cmd(
     """Draft career guidance in an interactive, resumable Career Lab session."""
     from resume_agent.career_lab.store import active_session_for_job
     from resume_agent.career_skills.models import AgentFamily
-    from resume_agent.career_skills.registry import CareerSkillRegistry, SkillUnavailable
+    from resume_agent.career_skills.registry import (
+        CareerSkillRegistry,
+        SkillUnavailable,
+    )
     from resume_agent.services import career_lab as career_service
     from resume_agent.sessions.stream import ConsoleStreamSink, NullSink
     from resume_agent.tenancy.context import current_context
@@ -668,7 +679,6 @@ def career_lab_cmd(
             typer.echo(f"Choose a Career Lab skill: {view['route'].get('reason', '')}")
             continue
         show_latest(view)
-
 
 
 def _engine(db_url: str | None):
@@ -1431,7 +1441,9 @@ def delete_resume_versions_cmd(
 
 @app.command("delete-cover-letters")
 def delete_cover_letters_cmd(
-    cover_letter_ids: list[int] = typer.Argument(..., help="cover_letters.id to delete."),
+    cover_letter_ids: list[int] = typer.Argument(
+        ..., help="cover_letters.id to delete."
+    ),
     db_url: str | None = typer.Option(
         None, "--db-url", help="Override the database URL."
     ),
@@ -1623,9 +1635,7 @@ def serve_cmd(
             "local mode has no authentication and must bind to a loopback host; "
             "use --mode hosted to expose the server"
         )
-    uvicorn.run(
-        create_app(db_url=db_url, app_mode=mode.value), host=host, port=port
-    )
+    uvicorn.run(create_app(db_url=db_url, app_mode=mode.value), host=host, port=port)
 
 
 if __name__ == "__main__":

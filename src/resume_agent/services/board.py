@@ -454,7 +454,9 @@ def _delete_artifacts(
         cast(int, row.id): row
         for row in session.exec(select(model).where(id_column.in_(requested))).all()
     }
-    missing = tuple(artifact_id for artifact_id in requested if artifact_id not in found)
+    missing = tuple(
+        artifact_id for artifact_id in requested if artifact_id not in found
+    )
     selected: set[int] = set()
     if found:
         selected = set(

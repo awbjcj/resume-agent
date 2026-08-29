@@ -123,7 +123,9 @@ class OAuthFlow(SystemBase):
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     state: Mapped[str] = mapped_column(String(2048), nullable=False)
     pkce_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 class LoginAttempt(SystemBase):

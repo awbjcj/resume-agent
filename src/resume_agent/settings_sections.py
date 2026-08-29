@@ -46,9 +46,7 @@ SETTINGS_SECTIONS: tuple[SettingsSection, ...] = (
         "Review panel",
         ("config/review.yaml", "config/review_deep.yaml"),
     ),
-    SettingsSection(
-        "agent_guidance", "Agent prompts", ("config/agent_guidance.yaml",)
-    ),
+    SettingsSection("agent_guidance", "Agent prompts", ("config/agent_guidance.yaml",)),
     SettingsSection("style_guide", "Style guide", ("config/style_guide.md",)),
     SettingsSection("render", "Rendering", ("config/render.yaml",)),
     SettingsSection(

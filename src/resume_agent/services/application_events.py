@@ -302,6 +302,6 @@ def delete_event(session: Session, job_id: int, event_id: int) -> bool:
 
 def list_events(session: Session, job_id: int) -> list[ApplicationEvent]:
     application = application_for_job(session, job_id)
-    return (
-        [] if application is None else events_for_application(session, application.id)
-    )
+    if application is None or application.id is None:
+        return []
+    return events_for_application(session, application.id)

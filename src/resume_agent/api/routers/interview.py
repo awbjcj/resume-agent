@@ -47,6 +47,8 @@ from resume_agent.services.mock_interview import (
 from resume_agent.tracking.tables import Job, ResumeVersion
 
 router = APIRouter()
+
+
 def _guard_keys(settings: Settings) -> None:
     missing = llm_runner.missing_model_keys(settings)
     if missing:
@@ -131,7 +133,9 @@ def start_interview(
     version = db.get(ResumeVersion, payload.resume_version_id)
     if version is None or version.job_id != payload.job_id:
         raise ApiException(
-            422, "VALIDATION_ERROR", f"unknown resume version: {payload.resume_version_id}"
+            422,
+            "VALIDATION_ERROR",
+            f"unknown resume version: {payload.resume_version_id}",
         )
     engine = request.app.state.engine
     style = payload.style.model_dump()
@@ -191,7 +195,9 @@ def send_answer(
     if view["status"] != "active":
         raise ApiException(409, "CONFLICT", "session ended")
     if view["concluded"]:
-        raise ApiException(409, "CONFLICT", "interview concluded; end the session for your debrief")
+        raise ApiException(
+            409, "CONFLICT", "interview concluded; end the session for your debrief"
+        )
     return _submit(
         manager,
         "mock-interview-turn",
@@ -279,7 +285,9 @@ def rename_interview_session(
     interview_dir = get_interview_dir(request)
     try:
         rename_session(interview_dir, session_id, payload.title)
-        return InterviewSessionOut.model_validate(session_view(interview_dir, session_id))
+        return InterviewSessionOut.model_validate(
+            session_view(interview_dir, session_id)
+        )
     except ValueError as exc:
         raise _value_error(exc) from exc
 

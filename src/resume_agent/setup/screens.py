@@ -9,6 +9,7 @@ Screen order (spec §5.2):
   ConfirmScreen        — per-file plan, then atomic_write_all            [step 6]
   HandoffScreen        — write recap + exact next commands               [step 8]
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -75,7 +76,9 @@ class WelcomeScreen(Screen[None]):
                     yield Static("", id="remedy")
             with Horizontal(classes="nav"):
                 yield Button("Quit", id="quit")
-                yield Button("Continue →", id="continue", variant="primary", disabled=True)
+                yield Button(
+                    "Continue →", id="continue", variant="primary", disabled=True
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -93,7 +96,9 @@ class WelcomeScreen(Screen[None]):
         blocking = False
         remedies: list[str] = []
         for r in results:
-            icon = Text("✓", style="bold green") if r.ok else Text("✗", style="bold red")
+            icon = (
+                Text("✓", style="bold green") if r.ok else Text("✗", style="bold red")
+            )
             table.add_row(r.name, icon, r.detail)
             if not r.ok:
                 if r.name in ("python", "examples"):
@@ -144,30 +149,42 @@ class SecretsScreen(Screen[None]):
 
                     yield Static("Required", classes="section")
                     yield Label("Anthropic API key", classes="hint")
-                    yield Input(id="anthropic_key", placeholder="sk-ant-api03-…", password=True)
+                    yield Input(
+                        id="anthropic_key", placeholder="sk-ant-api03-…", password=True
+                    )
 
                     yield Static("Optional — GitHub", classes="section")
-                    yield Label("GitHub token  (public repos used if omitted)", classes="hint")
+                    yield Label(
+                        "GitHub token  (public repos used if omitted)", classes="hint"
+                    )
                     yield Input(id="github_token", placeholder="ghp_…", password=True)
 
                     yield Static("Optional — Adzuna connector", classes="section")
                     yield Label("App ID", classes="hint")
                     yield Input(id="adzuna_app_id", placeholder="xxxxxxxx")
                     yield Label("App key", classes="hint")
-                    yield Input(id="adzuna_app_key", placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", password=True)
+                    yield Input(
+                        id="adzuna_app_key",
+                        placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                        password=True,
+                    )
 
                     yield Static("Optional — LinkedIn scraper", classes="section")
                     yield Label("Email", classes="hint")
                     yield Input(id="linkedin_email", placeholder="you@example.com")
                     yield Label("Password", classes="hint")
-                    yield Input(id="linkedin_password", placeholder="••••••••", password=True)
+                    yield Input(
+                        id="linkedin_password", placeholder="••••••••", password=True
+                    )
 
                     yield Static("", id="status")
 
             with Horizontal(classes="nav"):
                 yield Button("← Back", id="back")
                 yield Button("Validate key", id="validate")
-                yield Button("Continue →", id="continue", variant="primary", disabled=True)
+                yield Button(
+                    "Continue →", id="continue", variant="primary", disabled=True
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -261,12 +278,17 @@ class ProfileSourcesScreen(Screen[None]):
                     yield Input(id="resume_path", placeholder="data/profile/resume.pdf")
                     yield Static("", id="resume_status")
 
-                    yield Label("GitHub username  (optional — mines public repos)", classes="hint")
+                    yield Label(
+                        "GitHub username  (optional — mines public repos)",
+                        classes="hint",
+                    )
                     yield Input(id="github_username", placeholder="octocat")
 
             with Horizontal(classes="nav"):
                 yield Button("← Back", id="back")
-                yield Button("Continue →", id="continue", variant="primary", disabled=True)
+                yield Button(
+                    "Continue →", id="continue", variant="primary", disabled=True
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -291,13 +313,17 @@ class ProfileSourcesScreen(Screen[None]):
         elif Path(path).expanduser().exists():
             status.update("[green]✓ file found[/green]")
         else:
-            status.update("[yellow]⚠ no file at that path yet (you can fix it later)[/yellow]")
+            status.update(
+                "[yellow]⚠ no file at that path yet (you can fix it later)[/yellow]"
+            )
         self.query_one("#continue", Button).disabled = not path
 
     def _save_to_state(self) -> None:
         app: SetupApp = self.app  # type: ignore[assignment]
         app.state.resume_path = self._resume_path()
-        app.state.github_username = self.query_one("#github_username", Input).value.strip()
+        app.state.github_username = self.query_one(
+            "#github_username", Input
+        ).value.strip()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back":
@@ -342,24 +368,35 @@ class SearchScreen(Screen[None]):
                 with Vertical(id="panel"):
                     yield Static("Search criteria & hard filters", id="heading")
 
-                    yield Label("Keywords  (comma- or newline-separated)", classes="hint")
-                    yield Input(id="keywords", placeholder="python, distributed systems, kafka")
+                    yield Label(
+                        "Keywords  (comma- or newline-separated)", classes="hint"
+                    )
+                    yield Input(
+                        id="keywords", placeholder="python, distributed systems, kafka"
+                    )
 
                     yield Label("Job titles", classes="hint")
-                    yield Input(id="titles", placeholder="Backend Engineer, Platform Engineer")
+                    yield Input(
+                        id="titles", placeholder="Backend Engineer, Platform Engineer"
+                    )
 
                     yield Label("Locations", classes="hint")
                     yield Input(id="locations", placeholder="Remote, New York, London")
 
                     yield Label("Remote policy", classes="hint")
                     yield Select(
-                        self._REMOTE_OPTIONS, id="remote_policy", value="any", allow_blank=False
+                        self._REMOTE_OPTIONS,
+                        id="remote_policy",
+                        value="any",
+                        allow_blank=False,
                     )
 
                     with Horizontal(classes="row"):
                         with Vertical(classes="col"):
                             yield Label("Min salary (optional)", classes="hint")
-                            yield Input(id="min_salary", type="integer", placeholder="120000")
+                            yield Input(
+                                id="min_salary", type="integer", placeholder="120000"
+                            )
                         with Vertical(classes="col"):
                             yield Label("Min years exp.", classes="hint")
                             yield Input(id="yoe_min", type="integer", placeholder="0")
@@ -367,11 +404,15 @@ class SearchScreen(Screen[None]):
                             yield Label("Max years exp.", classes="hint")
                             yield Input(id="yoe_max", type="integer", placeholder="8")
 
-                    yield Checkbox("Require visa sponsorship", id="sponsorship_required")
+                    yield Checkbox(
+                        "Require visa sponsorship", id="sponsorship_required"
+                    )
 
             with Horizontal(classes="nav"):
                 yield Button("← Back", id="back")
-                yield Button("Continue →", id="continue", variant="primary", disabled=True)
+                yield Button(
+                    "Continue →", id="continue", variant="primary", disabled=True
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -387,9 +428,15 @@ class SearchScreen(Screen[None]):
         self.query_one("#remote_policy", Select).value = (
             s.remote_policy if s.remote_policy in valid_policies else "any"
         )
-        self.query_one("#min_salary", Input).value = "" if s.min_salary is None else str(s.min_salary)
-        self.query_one("#yoe_min", Input).value = "" if s.yoe_min is None else str(s.yoe_min)
-        self.query_one("#yoe_max", Input).value = "" if s.yoe_max is None else str(s.yoe_max)
+        self.query_one("#min_salary", Input).value = (
+            "" if s.min_salary is None else str(s.min_salary)
+        )
+        self.query_one("#yoe_min", Input).value = (
+            "" if s.yoe_min is None else str(s.yoe_min)
+        )
+        self.query_one("#yoe_max", Input).value = (
+            "" if s.yoe_max is None else str(s.yoe_max)
+        )
         self.query_one("#sponsorship_required", Checkbox).value = s.sponsorship_required
         self._refresh()
 
@@ -462,19 +509,27 @@ class ConnectorsScreen(Screen[None]):
                         classes="hint",
                     )
 
-                    yield Checkbox("Greenhouse  (company job boards)", id="greenhouse_enabled")
+                    yield Checkbox(
+                        "Greenhouse  (company job boards)", id="greenhouse_enabled"
+                    )
                     yield Label(
-                        "Boards — one per line: `token` or `token, Company Name`", classes="hint"
+                        "Boards — one per line: `token` or `token, Company Name`",
+                        classes="hint",
                     )
                     yield TextArea(id="gh_boards")
 
-                    yield Checkbox("Adzuna  (job-search aggregator)", id="adzuna_enabled")
+                    yield Checkbox(
+                        "Adzuna  (job-search aggregator)", id="adzuna_enabled"
+                    )
                     yield Label("Adzuna country code (e.g. us, gb, de)", classes="hint")
                     yield Input(id="adzuna_country", placeholder="us")
                     yield Static("", id="adzuna_warn")
 
                     yield Checkbox("RemoteOK  (remote job feed)", id="remoteok_enabled")
-                    yield Checkbox("LinkedIn  (browser scrape — needs chromium)", id="linkedin_enabled")
+                    yield Checkbox(
+                        "LinkedIn  (browser scrape — needs chromium)",
+                        id="linkedin_enabled",
+                    )
 
             with Horizontal(classes="nav"):
                 yield Button("← Back", id="back")
@@ -486,7 +541,9 @@ class ConnectorsScreen(Screen[None]):
         s = app.state
         self.query_one("#greenhouse_enabled", Checkbox).value = s.greenhouse_enabled
         self.query_one("#gh_boards", TextArea).text = "\n".join(
-            b["token"] if b["token"] == b.get("company") else f"{b['token']}, {b.get('company', '')}"
+            b["token"]
+            if b["token"] == b.get("company")
+            else f"{b['token']}, {b.get('company', '')}"
             for b in s.greenhouse_boards
         )
         self.query_one("#adzuna_enabled", Checkbox).value = s.adzuna_enabled
@@ -515,9 +572,13 @@ class ConnectorsScreen(Screen[None]):
         app: SetupApp = self.app  # type: ignore[assignment]
         s = app.state
         s.greenhouse_enabled = self.query_one("#greenhouse_enabled", Checkbox).value
-        s.greenhouse_boards = parse_greenhouse_boards(self.query_one("#gh_boards", TextArea).text)
+        s.greenhouse_boards = parse_greenhouse_boards(
+            self.query_one("#gh_boards", TextArea).text
+        )
         s.adzuna_enabled = self.query_one("#adzuna_enabled", Checkbox).value
-        s.adzuna_country = self.query_one("#adzuna_country", Input).value.strip() or "us"
+        s.adzuna_country = (
+            self.query_one("#adzuna_country", Input).value.strip() or "us"
+        )
         s.remoteok_enabled = self.query_one("#remoteok_enabled", Checkbox).value
         s.linkedin_enabled = self.query_one("#linkedin_enabled", Checkbox).value
 
@@ -650,9 +711,15 @@ class HandoffScreen(Screen[None]):
 
         commands = []
         if app.state.resume_path:
-            commands.append("uv run resume-agent profile build   # extract facts from your resume")
-        commands.append("uv run resume-agent discover            # run the discovery funnel")
-        commands.append("make dev                                # open the web review board")
+            commands.append(
+                "uv run resume-agent profile build   # extract facts from your resume"
+            )
+        commands.append(
+            "uv run resume-agent discover            # run the discovery funnel"
+        )
+        commands.append(
+            "make dev                                # open the web review board"
+        )
         self.query_one("#next", Static).update(
             "[bold]Next steps:[/bold]\n\n  " + "\n  ".join(commands)
         )

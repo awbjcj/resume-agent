@@ -32,7 +32,9 @@ class StageCycleTime:
     sample_size: int
 
 
-def _sort_moment(value: datetime) -> datetime:
+def _sort_moment(value: datetime | None) -> datetime:
+    if value is None:
+        raise ValueError("dated funnel event is missing occurred_at")
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
@@ -42,7 +44,9 @@ def _sequences(session: Session) -> list[tuple[Application, list[ApplicationEven
         .join(Job, col(Application.job_id) == Job.id)
         .where(col(Job.archived_at).is_(None))
     ).all()
-    application_ids = [application.id for application in applications if application.id is not None]
+    application_ids = [
+        application.id for application in applications if application.id is not None
+    ]
     grouped: dict[int, list[ApplicationEvent]] = defaultdict(list)
     if application_ids:
         events = session.exec(
@@ -62,7 +66,10 @@ def _sequences(session: Session) -> list[tuple[Application, list[ApplicationEven
                 event.id or 0,
             )
         )
-    return [(application, grouped.get(application.id or -1, [])) for application in applications]
+    return [
+        (application, grouped.get(application.id or -1, []))
+        for application in applications
+    ]
 
 
 def _milestones(events: list[ApplicationEvent]) -> list[ApplicationEvent]:
@@ -114,7 +121,10 @@ def stage_cycle_times(session: Session) -> list[StageCycleTime]:
         for previous, current in zip(milestones, milestones[1:], strict=False):
             if previous.occurred_at is None or current.occurred_at is None:
                 continue
-            days = max(0.0, (current.occurred_at - previous.occurred_at).total_seconds() / 86_400)
+            days = max(
+                0.0,
+                (current.occurred_at - previous.occurred_at).total_seconds() / 86_400,
+            )
             gaps[(previous.kind, current.kind)].append(days)
     return [
         StageCycleTime(

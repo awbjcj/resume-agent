@@ -95,7 +95,8 @@ class YamlConfigStore:
                 preserved = {
                     key: value
                     for key, value in existing.items()
-                    if key not in payload and key not in _SUPERSEDED_KEYS.get(domain, ())
+                    if key not in payload
+                    and key not in _SUPERSEDED_KEYS.get(domain, ())
                 }
                 payload = {**preserved, **payload}
         text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)

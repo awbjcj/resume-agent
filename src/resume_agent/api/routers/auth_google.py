@@ -276,11 +276,15 @@ def google_callback(
     # verified email currently belongs to an account; returning users must never
     # be locked out because the signup budget is exhausted.
     with Session(engine) as lookup:
-        known_user = lookup.execute(
-            select(User.id).where(
-                or_(User.google_sub == subject, User.email == email)
+        known_user = (
+            lookup.execute(
+                select(User.id).where(
+                    or_(User.google_sub == subject, User.email == email)
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
     may_create = parsed.mode == "register" or settings.registration_mode == "open"
     if known_user is None and may_create and not verified:
         return _failure(request, "/register?error=unverified_google")

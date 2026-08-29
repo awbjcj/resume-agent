@@ -53,7 +53,9 @@ def atomic_write_text(path: Path, text: str, *, root: Path | str) -> None:
     """
     path = confined_path(root, Path(path).resolve())
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    fd, tmp = tempfile.mkstemp(
+        dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp"
+    )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
@@ -287,7 +289,9 @@ def progress_stats(record: dict, *, now: datetime | None = None) -> ProgressStat
 
     phase_index = record.get("phase_index")
     phase_count = record.get("phase_count")
-    phase = f"Phase {phase_index} of {phase_count}" if phase_index and phase_count else None
+    phase = (
+        f"Phase {phase_index} of {phase_count}" if phase_index and phase_count else None
+    )
 
     started = _parse(record.get("started_at"))
     updated = _parse(record.get("updated_at")) or now

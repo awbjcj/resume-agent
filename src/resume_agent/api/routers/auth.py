@@ -63,12 +63,16 @@ def _record_failure(request: Request, identifier: str) -> None:
 
 
 def resolve_login_user(session: Session, identifier: str) -> User | None:
-    return session.execute(
-        select(User).where(
-            (User.email == identifier)
-            | (User.email.is_(None) & (User.username == identifier))
+    return (
+        session.execute(
+            select(User).where(
+                (User.email == identifier)
+                | (User.email.is_(None) & (User.username == identifier))
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
 
 
 @router.post("/login")
@@ -121,9 +125,7 @@ def login(
     auth.set_session_cookie(
         request,
         response,
-        auth.issue_user_session(
-            settings, user_id=user_id, epoch=epoch
-        ),
+        auth.issue_user_session(settings, user_id=user_id, epoch=epoch),
     )
     # The users.role CHECK constraint guarantees 'admin' | 'user' at the DB layer.
     return MeResponse(

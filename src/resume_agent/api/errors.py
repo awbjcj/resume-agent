@@ -90,7 +90,9 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=422,
             content=_envelope(
-                "VALIDATION_ERROR", "Request validation failed", _validation_details(exc)
+                "VALIDATION_ERROR",
+                "Request validation failed",
+                _validation_details(exc),
             ),
         )
 

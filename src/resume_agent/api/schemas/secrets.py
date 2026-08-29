@@ -34,6 +34,7 @@ SECRET_FIELDS: dict[str, str] = {
     "google_oauth_client_secret": "GOOGLE_OAUTH_CLIENT_SECRET",
 }
 
+
 class SecretStatus(CamelModel):
     key: str  # camelCase field name, e.g. "anthropicApiKey"
     is_set: bool

@@ -45,7 +45,9 @@ async def transcribe_audio(file: UploadFile):
         )
     mime = (file.content_type or "").split(";")[0].strip().lower()
     if mime not in _ALLOWED_MIME:
-        raise ApiException(422, "VALIDATION_ERROR", f"unsupported audio type: {mime or 'unknown'}")
+        raise ApiException(
+            422, "VALIDATION_ERROR", f"unsupported audio type: {mime or 'unknown'}"
+        )
     audio = await file.read()
     if not audio:
         raise ApiException(422, "VALIDATION_ERROR", "empty audio")

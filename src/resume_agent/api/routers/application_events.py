@@ -50,9 +50,7 @@ def post_event(
         raise ApiException(422, "VALIDATION_ERROR", error.message) from error
 
 
-@router.patch(
-    "/jobs/{job_id}/events/{event_id}", response_model=ApplicationEventOut
-)
+@router.patch("/jobs/{job_id}/events/{event_id}", response_model=ApplicationEventOut)
 def patch_event(
     job_id: int,
     event_id: int,

@@ -615,7 +615,7 @@ def _application_investment_clause() -> Any:
     """
     notes = cast(Any, Application.notes)
     return or_(
-        Application.status != ApplicationStatus.ready.value,
+        cast(Any, Application.status) != ApplicationStatus.ready.value,
         and_(notes.is_not(None), func.trim(notes) != ""),
         cast(Any, Application.resume_version_id).is_not(None),
         cast(Any, Application.cover_letter_id).is_not(None),

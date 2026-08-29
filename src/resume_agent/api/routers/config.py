@@ -37,9 +37,13 @@ def put_search(body: SearchConfigDoc, request: Request):
     return _store(request).put("search", body)
 
 
-@router.post("/config/search/normalize-locations", response_model=NormalizeLocationsResponse)
+@router.post(
+    "/config/search/normalize-locations", response_model=NormalizeLocationsResponse
+)
 def normalize_locations(body: NormalizeLocationsRequest):
-    return NormalizeLocationsResponse(normalized=[format_free_location(r) for r in body.raw])
+    return NormalizeLocationsResponse(
+        normalized=[format_free_location(r) for r in body.raw]
+    )
 
 
 @router.get("/config/review", response_model=ReviewConfigDoc)

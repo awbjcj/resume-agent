@@ -85,7 +85,9 @@ def _entry_lines(entry: CalendarEntry, stamp: datetime) -> list[str]:
     ]
     if entry.all_day:
         start_date = _aware(entry.start).date()
-        end_date = _aware(entry.end).date() if entry.end else start_date + timedelta(days=1)
+        end_date = (
+            _aware(entry.end).date() if entry.end else start_date + timedelta(days=1)
+        )
         lines.extend(
             [
                 f"DTSTART;VALUE=DATE:{start_date:%Y%m%d}",

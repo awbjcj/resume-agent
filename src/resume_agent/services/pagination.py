@@ -26,8 +26,10 @@ def paginate(items: list[T], *, page: int = 1, page_size: int = 50) -> Page[T]:
     start = (page - 1) * page_size
     return Page(
         data=items[start : start + page_size],
-        page=page, page_size=page_size,
-        total_items=total, total_pages=total_pages,
+        page=page,
+        page_size=page_size,
+        total_items=total,
+        total_pages=total_pages,
     )
 
 

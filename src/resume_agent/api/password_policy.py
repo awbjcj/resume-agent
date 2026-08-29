@@ -47,7 +47,9 @@ class HibpBreachChecker:
 
 @lru_cache(maxsize=1)
 def _common_passwords() -> frozenset[str]:
-    content = files("resume_agent.api.data").joinpath("common_passwords.txt").read_text()
+    content = (
+        files("resume_agent.api.data").joinpath("common_passwords.txt").read_text()
+    )
     seeds = {line.strip().casefold() for line in content.splitlines() if line.strip()}
     # Cover the predictable numeric variants people most often append to a
     # common base without shipping a large third-party word-list artifact.
@@ -68,14 +70,25 @@ def validate_password(
     checker: BreachChecker | None = None,
 ) -> None:
     if len(password) < MIN_LENGTH:
-        raise ApiException(400, "PASSWORD_WEAK", "Password must be at least 12 characters")
+        raise ApiException(
+            400, "PASSWORD_WEAK", "Password must be at least 12 characters"
+        )
     if len(password) > MAX_LENGTH:
-        raise ApiException(400, "PASSWORD_WEAK", "Password must be at most 1024 characters")
+        raise ApiException(
+            400, "PASSWORD_WEAK", "Password must be at most 1024 characters"
+        )
     lowered = password.casefold()
     identity = (email.partition("@")[0], display_name or "")
-    if any(len(part.strip()) >= 4 and part.strip().casefold() in lowered for part in identity):
-        raise ApiException(400, "PASSWORD_WEAK", "Password must not contain your email or name")
+    if any(
+        len(part.strip()) >= 4 and part.strip().casefold() in lowered
+        for part in identity
+    ):
+        raise ApiException(
+            400, "PASSWORD_WEAK", "Password must not contain your email or name"
+        )
     if lowered in _common_passwords():
         raise ApiException(400, "PASSWORD_WEAK", "That password is too common")
     if (checker or NullBreachChecker()).is_breached(password):
-        raise ApiException(400, "PASSWORD_WEAK", "That password appeared in a known breach")
+        raise ApiException(
+            400, "PASSWORD_WEAK", "That password appeared in a known breach"
+        )
