@@ -127,6 +127,55 @@ class Application(SQLModel, table=True):
     )
 
 
+class ApplicationEvent(SQLModel, table=True):
+    """One dated entry on an application's timeline.
+
+    An event log rather than wide columns on Application: the round count is
+    unbounded (loops run to five, companies insert team-match calls), so
+    columns would cap the model and make every new stage a migration. The
+    spreadsheet the user reads is a pivot over these rows.
+    """
+
+    __tablename__ = cast(Any, "application_events")
+
+    id: int | None = Field(default=None, primary_key=True)
+    application_id: int = Field(foreign_key="applications.id", index=True)
+
+    kind: str = Field(index=True)
+    custom_label: str | None = None
+    sequence: int = 1
+
+    # UTC. `all_day` distinguishes "applied on the 3rd" from "Zoom at 14:00";
+    # `timezone` is an IANA name, not an offset, because DST can shift between
+    # logging an event and its occurrence.
+    occurred_at: datetime | None = Field(default=None, index=True)
+    all_day: bool = False
+    timezone: str | None = None
+    duration_minutes: int | None = None
+
+    modality: str | None = None
+    platform: str | None = None
+    platform_other: str | None = None
+    location_or_link: str | None = None
+    interviewers: str | None = None
+
+    result: str = Field(default="pending", index=True)
+    notes: str | None = None
+    reflection: str | None = None
+
+    # offer_received only; total compensation is derived, never stored.
+    comp_base: int | None = None
+    comp_bonus: int | None = None
+    comp_equity_annual: int | None = None
+    comp_signing: int | None = None
+    comp_currency: str | None = None
+
+    source: str = Field(default="manual")  # manual | migration | gmail
+    schema_version: int = 1
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
 class CoverLetter(SQLModel, table=True):
     __tablename__ = cast(Any, "cover_letters")
 
