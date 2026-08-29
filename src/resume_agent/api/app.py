@@ -29,6 +29,8 @@ from resume_agent.api.routers import admin_system as admin_system_router
 from resume_agent.api.routers import admin_routing as admin_routing_router
 from resume_agent.api.routers import admin_users as admin_users_router
 from resume_agent.api.routers import analytics as analytics_router
+from resume_agent.api.routers import applications as applications_router
+from resume_agent.api.routers import application_events as application_events_router
 from resume_agent.api.routers import auth as auth_router
 from resume_agent.api.routers import auth_google as auth_google_router
 from resume_agent.api.routers import auth_password as auth_password_router
@@ -36,6 +38,7 @@ from resume_agent.api.routers import auth_register as auth_register_router
 from resume_agent.api.routers import boards, health, resumes
 from resume_agent.api.routers import coach as coach_router
 from resume_agent.api.routers import career_lab as career_lab_router
+from resume_agent.api.routers import calendar as calendar_router
 from resume_agent.api.routers import config as config_router
 from resume_agent.api.routers import cover_letters as cover_letters_router
 from resume_agent.api.routers import dashboard as dashboard_router
@@ -165,6 +168,7 @@ def create_app(
         app.state.run_manager.recover_interrupted()
         app.state.run_manager.sweep()  # drop stale run records (unbounded otherwise)
         app.state.gmail_scheduler_task = None
+        app.state.reminder_task = None
         if (
             not _is_memory_db(resolved_db)
             and resolved_settings.gmail_sync_interval_hours > 0
@@ -174,7 +178,15 @@ def create_app(
             app.state.gmail_scheduler_task = asyncio.create_task(
                 scheduler_loop(app.state)
             )
+        if not _is_memory_db(resolved_db):
+            from resume_agent.services.reminder_scheduler import reminder_loop
+
+            app.state.reminder_task = asyncio.create_task(reminder_loop(app.state))
         yield
+        if app.state.reminder_task is not None:
+            app.state.reminder_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await app.state.reminder_task
         if app.state.gmail_scheduler_task is not None:
             app.state.gmail_scheduler_task.cancel()
             with suppress(asyncio.CancelledError):
@@ -338,11 +350,22 @@ def create_app(
         dependencies=download_guarded,
     )
     app.include_router(
+        calendar_router.router, prefix="/api", dependencies=download_guarded
+    )
+    app.include_router(
+        applications_router.link_router,
+        prefix="/api",
+        dependencies=download_guarded,
+    )
+    app.include_router(
         settings_router.link_router, prefix="/api", dependencies=download_guarded
     )
     app.include_router(account_router.router, prefix="/api", dependencies=guarded)
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(
+        application_events_router.router, prefix="/api", dependencies=guarded
+    )
     app.include_router(resumes.router, prefix="/api", dependencies=guarded)
     app.include_router(cover_letters_router.router, prefix="/api", dependencies=guarded)
     app.include_router(prune_router.router, prefix="/api", dependencies=guarded)
@@ -355,6 +378,7 @@ def create_app(
     app.include_router(sources_router.router, prefix="/api", dependencies=guarded)
     app.include_router(scout_router.router, prefix="/api", dependencies=guarded)
     app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(applications_router.router, prefix="/api", dependencies=guarded)
     app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
     app.include_router(taxonomy_router.router, prefix="/api", dependencies=guarded)
     app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)

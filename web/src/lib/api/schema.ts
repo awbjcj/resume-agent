@@ -575,6 +575,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analytics/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Timeline Analytics */
+        get: operations["get_timeline_analytics_api_analytics_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Applications */
+        get: operations["get_applications_api_applications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Applications Csv */
+        get: operations["get_applications_csv_api_applications_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/upcoming.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Upcoming Ics */
+        get: operations["upcoming_ics_api_applications_upcoming_ics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/google/start": {
         parameters: {
             query?: never;
@@ -1692,6 +1760,59 @@ export interface paths {
         };
         /** List Email Drafts */
         get: operations["list_email_drafts_api_jobs__job_id__email_drafts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Events */
+        get: operations["get_events_api_jobs__job_id__events_get"];
+        put?: never;
+        /** Post Event */
+        post: operations["post_event_api_jobs__job_id__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Event */
+        delete: operations["remove_event_api_jobs__job_id__events__event_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Event */
+        patch: operations["patch_event_api_jobs__job_id__events__event_id__patch"];
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/events/{event_id}.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Event Ics */
+        get: operations["event_ics_api_jobs__job_id__events__event_id__ics_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3429,6 +3550,161 @@ export interface components {
             /** Bysource */
             bySource: components["schemas"]["CohortOut"][];
         };
+        /** ApplicationEventCreate */
+        ApplicationEventCreate: {
+            /**
+             * Allday
+             * @default false
+             */
+            allDay: boolean;
+            /** Compbase */
+            compBase?: number | null;
+            /** Compbonus */
+            compBonus?: number | null;
+            /** Compcurrency */
+            compCurrency?: string | null;
+            /** Compequityannual */
+            compEquityAnnual?: number | null;
+            /** Compsigning */
+            compSigning?: number | null;
+            /** Customlabel */
+            customLabel?: string | null;
+            /** Durationminutes */
+            durationMinutes?: number | null;
+            /** Interviewers */
+            interviewers?: string | null;
+            /** Kind */
+            kind: string;
+            /** Locationorlink */
+            locationOrLink?: string | null;
+            /** Modality */
+            modality?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Occurredat */
+            occurredAt?: string | null;
+            /** Platform */
+            platform?: string | null;
+            /** Platformother */
+            platformOther?: string | null;
+            /** Reflection */
+            reflection?: string | null;
+            /**
+             * Result
+             * @default pending
+             */
+            result: string;
+            /** Sequence */
+            sequence?: number | null;
+            /** Timezone */
+            timezone?: string | null;
+        };
+        /** ApplicationEventOut */
+        ApplicationEventOut: {
+            /** Allday */
+            allDay: boolean;
+            /** Applicationid */
+            applicationId: number;
+            /** Compbase */
+            compBase?: number | null;
+            /** Compbonus */
+            compBonus?: number | null;
+            /** Compcurrency */
+            compCurrency?: string | null;
+            /** Compequityannual */
+            compEquityAnnual?: number | null;
+            /** Compsigning */
+            compSigning?: number | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Customlabel */
+            customLabel?: string | null;
+            /** Durationminutes */
+            durationMinutes?: number | null;
+            /** Id */
+            id: number;
+            /** Interviewers */
+            interviewers?: string | null;
+            /** Kind */
+            kind: string;
+            /** Locationorlink */
+            locationOrLink?: string | null;
+            /** Modality */
+            modality?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Occurredat */
+            occurredAt?: string | null;
+            /** Platform */
+            platform?: string | null;
+            /** Platformother */
+            platformOther?: string | null;
+            /** Reflection */
+            reflection?: string | null;
+            /** Result */
+            result: string;
+            /** Sequence */
+            sequence: number;
+            /** Sequenceoverride */
+            sequenceOverride?: number | null;
+            /** Source */
+            source: string;
+            /** Timezone */
+            timezone?: string | null;
+            /** Totalcomp */
+            readonly totalComp: number | null;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** ApplicationEventUpdate */
+        ApplicationEventUpdate: {
+            /** Allday */
+            allDay?: boolean | null;
+            /** Compbase */
+            compBase?: number | null;
+            /** Compbonus */
+            compBonus?: number | null;
+            /** Compcurrency */
+            compCurrency?: string | null;
+            /** Compequityannual */
+            compEquityAnnual?: number | null;
+            /** Compsigning */
+            compSigning?: number | null;
+            /** Customlabel */
+            customLabel?: string | null;
+            /** Durationminutes */
+            durationMinutes?: number | null;
+            /** Interviewers */
+            interviewers?: string | null;
+            /** Kind */
+            kind?: string | null;
+            /** Locationorlink */
+            locationOrLink?: string | null;
+            /** Modality */
+            modality?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Occurredat */
+            occurredAt?: string | null;
+            /** Platform */
+            platform?: string | null;
+            /** Platformother */
+            platformOther?: string | null;
+            /** Reflection */
+            reflection?: string | null;
+            /** Result */
+            result?: string | null;
+            /** Sequence */
+            sequence?: number | null;
+            /** Timezone */
+            timezone?: string | null;
+        };
         /** ApplicationOut */
         ApplicationOut: {
             /** Coverletterid */
@@ -4210,6 +4486,17 @@ export interface components {
          * @enum {string}
          */
         CoverLetterSkillName: "cover-letter-generator" | "cover-letter-writer";
+        /** CycleTimeOut */
+        CycleTimeOut: {
+            /** Fromkind */
+            fromKind: string;
+            /** Mediandays */
+            medianDays: number;
+            /** Samplesize */
+            sampleSize: number;
+            /** Tokind */
+            toKind: string;
+        };
         /** DashboardSummaryOut */
         DashboardSummaryOut: {
             activeCoachSession?: components["schemas"]["CoachSessionSummaryOut"] | null;
@@ -4230,6 +4517,8 @@ export interface components {
             statusCounts: {
                 [key: string]: number;
             };
+            /** Upcomingevents */
+            upcomingEvents?: components["schemas"]["UpcomingEventOut"][];
         };
         /** DemandEdgeOut */
         DemandEdgeOut: {
@@ -4421,6 +4710,15 @@ export interface components {
             status: "planned" | "deterministic_fallback" | "inherited";
             /** Warning */
             warning?: string | null;
+        };
+        /** FlowEdgeOut */
+        FlowEdgeOut: {
+            /** Count */
+            count: number;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
         };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
@@ -5002,6 +5300,22 @@ export interface components {
             /** Upgraded */
             upgraded: number;
         };
+        /** LaneEventOut */
+        LaneEventOut: {
+            /** Allday */
+            allDay: boolean;
+            /** Kind */
+            kind: string;
+            /**
+             * Occurredat
+             * Format: date-time
+             */
+            occurredAt: string;
+            /** Result */
+            result: string;
+            /** Sequence */
+            sequence: number;
+        };
         /** LengthBudget */
         LengthBudget: {
             /**
@@ -5418,6 +5732,34 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** OfferOut */
+        OfferOut: {
+            /** Compbase */
+            compBase: number | null;
+            /** Compbonus */
+            compBonus: number | null;
+            /** Compcurrency */
+            compCurrency: string | null;
+            /** Compequityannual */
+            compEquityAnnual: number | null;
+            /** Compsigning */
+            compSigning: number | null;
+            /** Company */
+            company: string | null;
+            /** Eventid */
+            eventId: number;
+            /** Jobid */
+            jobId: number;
+            /**
+             * Occurredat
+             * Format: date-time
+             */
+            occurredAt: string;
+            /** Sequence */
+            sequence: number;
+            /** Totalcomp */
+            totalComp: number;
+        };
         /** OverrideConflictOut */
         OverrideConflictOut: {
             /** Correctionhead */
@@ -5530,6 +5872,77 @@ export interface components {
             title: string | null;
             /** Url */
             url?: string | null;
+        };
+        /** PipelineLaneOut */
+        PipelineLaneOut: {
+            /** Company */
+            company: string | null;
+            /** Events */
+            events: components["schemas"]["LaneEventOut"][];
+            /** Jobid */
+            jobId: number;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string | null;
+        };
+        /** PivotCellOut */
+        PivotCellOut: {
+            /** Allday */
+            allDay: boolean;
+            /** Interviewers */
+            interviewers: string | null;
+            /** Modality */
+            modality: string | null;
+            /** Notes */
+            notes: string | null;
+            /** Occurredat */
+            occurredAt: string | null;
+            /** Platform */
+            platform: string | null;
+            /** Platformother */
+            platformOther: string | null;
+            /** Result */
+            result: string;
+        };
+        /** PivotRowOut */
+        PivotRowOut: {
+            /** Cells */
+            cells: {
+                [key: string]: components["schemas"]["PivotCellOut"];
+            };
+            /** Compcurrency */
+            compCurrency: string | null;
+            /** Company */
+            company: string | null;
+            /** Customcount */
+            customCount: number;
+            /** Fitscore */
+            fitScore: number | null;
+            /** Jobid */
+            jobId: number;
+            /** Offerdeadline */
+            offerDeadline: string | null;
+            /**
+             * Overflowrounds
+             * @default 0
+             */
+            overflowRounds: number;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string | null;
+            /** Totalcomp */
+            totalComp: number | null;
+        };
+        /** PivotTableOut */
+        PivotTableOut: {
+            /** Rows */
+            rows: components["schemas"]["PivotRowOut"][];
+            /** Technicalroundcolumns */
+            technicalRoundColumns: number;
         };
         /** PlanItemOut */
         PlanItemOut: {
@@ -7248,6 +7661,17 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** TimelineAnalyticsOut */
+        TimelineAnalyticsOut: {
+            /** Activepipeline */
+            activePipeline: components["schemas"]["PipelineLaneOut"][];
+            /** Cycletimes */
+            cycleTimes: components["schemas"]["CycleTimeOut"][];
+            /** Flows */
+            flows: components["schemas"]["FlowEdgeOut"][];
+            /** Offers */
+            offers: components["schemas"]["OfferOut"][];
+        };
         /** TokenCreateRequest */
         TokenCreateRequest: {
             /** Name */
@@ -7361,6 +7785,38 @@ export interface components {
             title: string | null;
             /** Url */
             url?: string | null;
+        };
+        /** UpcomingEventOut */
+        UpcomingEventOut: {
+            /** Allday */
+            allDay: boolean;
+            /** Company */
+            company?: string | null;
+            /** Customlabel */
+            customLabel?: string | null;
+            /** Eventid */
+            eventId: number;
+            /** Jobid */
+            jobId: number;
+            /** Kind */
+            kind: string;
+            /** Locationorlink */
+            locationOrLink?: string | null;
+            /** Modality */
+            modality?: string | null;
+            /**
+             * Occurredat
+             * Format: date-time
+             */
+            occurredAt: string;
+            /** Platform */
+            platform?: string | null;
+            /** Sequence */
+            sequence: number;
+            /** Timezone */
+            timezone?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /** UrlIn */
         UrlIn: {
@@ -8970,6 +9426,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalyticsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_timeline_analytics_api_analytics_timeline_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineAnalyticsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_applications_api_applications_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PivotTableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_applications_csv_api_applications_csv_get: {
+        parameters: {
+            query?: {
+                shape?: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upcoming_ics_api_applications_upcoming_ics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -11674,6 +12256,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailDraftOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_events_api_jobs__job_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_event_api_jobs__job_id__events_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationEventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationEventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_event_api_jobs__job_id__events__event_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_event_api_jobs__job_id__events__event_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationEventUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationEventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    event_ics_api_jobs__job_id__events__event_id__ics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
