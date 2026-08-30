@@ -489,6 +489,8 @@ const en = {
   job: {
     stages: {
       raw: "Raw",
+      extracted: "Extracted",
+      filtered: "Filtered",
       shortlisted: "Shortlisted",
       approved: "Approved",
       tailored: "Tailored",
@@ -611,6 +613,8 @@ const en = {
   runHistory: {
     markRead: "Mark {{kind}} read",
     outcomes: {
+      queued: "queued",
+      cancelling: "cancelling",
       succeeded: "succeeded",
       failed: "failed",
       cancelled: "cancelled",
@@ -637,6 +641,9 @@ const en = {
       tailoring: "Tailoring",
       taxonomyMaintenanceUndo: "Taxonomy maintenance undo",
     },
+  },
+  runPanel: {
+    progress: "{{kind}} progress {{status}}",
   },
   journey: {
     label: "Job-search journey",
@@ -1139,6 +1146,8 @@ const zhCN = {
   job: {
     stages: {
       raw: "原始",
+      extracted: "已提取",
+      filtered: "已筛除",
       shortlisted: "已加入候选",
       approved: "已批准",
       tailored: "已定制",
@@ -1261,6 +1270,8 @@ const zhCN = {
   runHistory: {
     markRead: "将{{kind}}标记为已读",
     outcomes: {
+      queued: "已排队",
+      cancelling: "正在取消",
       succeeded: "成功",
       failed: "失败",
       cancelled: "已取消",
@@ -1287,6 +1298,9 @@ const zhCN = {
       tailoring: "简历定制",
       taxonomyMaintenanceUndo: "撤销技能分类维护",
     },
+  },
+  runPanel: {
+    progress: "{{kind}}进度 {{status}}",
   },
   journey: {
     label: "求职旅程",

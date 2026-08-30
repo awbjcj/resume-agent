@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { useRunStore } from "@/lib/runs/store";
 import { RecentRuns } from "./RecentRuns";
 
@@ -8,6 +9,9 @@ const base = { percent: 0, phase: "", current: 0, total: 0, etaText: null };
 
 describe("RecentRuns", () => {
   beforeEach(() => useRunStore.setState({ runs: {} }));
+  afterEach(async () => {
+    await changeLanguage("en");
+  });
 
   it("shows an empty hint when there are no runs", () => {
     render(<RecentRuns />);
@@ -31,8 +35,8 @@ describe("RecentRuns", () => {
     });
     render(<RecentRuns />);
     const items = screen.getAllByRole("listitem");
-    expect(items[0]).toHaveTextContent("discover");
-    expect(items[1]).toHaveTextContent("pull");
+    expect(items[0]).toHaveTextContent("Discovery");
+    expect(items[1]).toHaveTextContent("Job pull");
     expect(items[1]).toHaveTextContent(/done/i);
     expect(items[1]).toHaveTextContent(/just now/i);
   });
@@ -49,5 +53,20 @@ describe("RecentRuns", () => {
     }
     render(<RecentRuns />);
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
+  });
+
+  it("localizes dynamic run names and phases in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    useRunStore.getState().upsert({
+      ...base,
+      runId: "profile",
+      kind: "profile-build",
+      status: "running",
+      percent: 10,
+      phase: "Extracting and merging source documents",
+    });
+    render(<RecentRuns />);
+
+    expect(screen.getByText(/个人资料构建 · 正在提取并合并源文档/)).toBeInTheDocument();
   });
 });

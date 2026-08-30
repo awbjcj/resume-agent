@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { FileUp, RefreshCw, Star, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   useUploadSources,
 } from "./use-sources";
 import { MaterialIntakeDialogs } from "./MaterialIntakeDialogs";
+import { localizeSourceFragmentStatus, localizeSourceMode } from "@/i18n/dynamic-labels";
 
 const MODES = ["literal", "synthesis"] as const;
 
@@ -36,11 +38,8 @@ const STATUS_VARIANT: Record<string, "secondary" | "outline"> = {
   cached: "secondary",
 };
 
-function statusLabel(status: string): string {
-  return status.replace(/-/g, " ");
-}
-
 export function SourceManager() {
+  const { i18n } = useTranslation();
   const { data: sources, isLoading } = useSources();
   const { data: skeleton } = useSkeleton();
   const upload = useUploadSources();
@@ -137,7 +136,7 @@ export function SourceManager() {
             }}
           >
             {MODES.map((mode) => (
-              <option className={nativeOptionClass} key={mode} value={mode}>{mode}</option>
+              <option className={nativeOptionClass} key={mode} value={mode}>{localizeSourceMode(mode, i18n.resolvedLanguage)}</option>
             ))}
           </select>
           {uploadMode === "synthesis" ? (
@@ -200,7 +199,7 @@ export function SourceManager() {
                       }
                     >
                       {MODES.map((mode) => (
-                        <option className={nativeOptionClass} key={mode} value={mode}>{mode}</option>
+                        <option className={nativeOptionClass} key={mode} value={mode}>{localizeSourceMode(mode, i18n.resolvedLanguage)}</option>
                       ))}
                     </select>
                   )}
@@ -226,7 +225,7 @@ export function SourceManager() {
                 </TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[source.fragmentStatus] ?? "outline"}>
-                    {statusLabel(source.fragmentStatus)}
+                    {localizeSourceFragmentStatus(source.fragmentStatus, i18n.resolvedLanguage)}
                   </Badge>
                 </TableCell>
                 <TableCell>

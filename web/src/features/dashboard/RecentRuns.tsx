@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
 import { Progress } from "@/components/ui/progress";
+import { localizeRunKind, localizeRunPhase } from "@/i18n/dynamic-labels";
 import { useRunStore, type RunRecord } from "@/lib/runs/store";
 
 import { timeAgo } from "./time-ago";
@@ -41,12 +42,15 @@ export function RecentRuns() {
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {runs.map((run) => (
+            {runs.map((run) => {
+              const kind = localizeRunKind(run.kind, i18n.resolvedLanguage, t);
+              const phase = localizeRunPhase(run.phase, i18n.resolvedLanguage);
+              return (
               <li key={run.runId} className="min-w-0">
                 <div className="flex items-baseline justify-between gap-3 text-xs font-semibold uppercase tracking-[0.14em]">
                   <span className="truncate">
-                    {run.kind}
-                    {run.phase ? ` · ${run.phase}` : ""}
+                    {kind}
+                    {phase ? ` · ${phase}` : ""}
                   </span>
                   <span
                     className={`shrink-0 tabular-nums ${
@@ -71,12 +75,13 @@ export function RecentRuns() {
                 {ACTIVE.includes(run.status) && (
                   <Progress
                     value={Math.round(run.percent)}
-                    aria-label={t("dashboard.runProgress", { kind: run.kind })}
+                    aria-label={t("dashboard.runProgress", { kind })}
                     className="mt-1.5 h-1.5"
                   />
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </CardContent>

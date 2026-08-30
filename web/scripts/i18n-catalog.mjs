@@ -11,6 +11,8 @@ const traverse = traverseModule.default ?? traverseModule;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(root, "src");
 const catalogPath = path.join(sourceRoot, "i18n", "auto-catalog.json");
+const dynamicZhCNPath = path.join(sourceRoot, "i18n", "dynamic-zh-CN.json");
+const backendSourceRoot = path.resolve(root, "..", "src", "resume_agent");
 const runtimeCatalogPaths = {
   en: path.join(sourceRoot, "i18n", "auto-en.json"),
   "zh-CN": path.join(sourceRoot, "i18n", "auto-zh-CN.json"),
@@ -27,6 +29,7 @@ const {
 // translation. They are deliberately authored and checked against the catalog;
 // the catalog is never generated from a translation service.
 const FIXED_ZH_CN_TRANSLATIONS = {
+  "100% · {{v0}}": "{{v0}}（100%）",
   "100% · done": "100% · 已完成",
   "A gated reviewer blocks the round outright, so it is never scored — its weight and score bands are disabled rather than silently ignored.": "启用硬性门槛的评审会直接阻断本轮，因此不参与评分；其权重和评分区间会被禁用，而非悄然忽略。",
   "Application timeline grid": "申请时间线表格",
@@ -104,6 +107,7 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "Must": "必须项",
   "Nice": "加分项",
   "No date": "无日期",
+  "No saved research": "暂无已保存的调研结果",
   "Not reported": "未报告",
   "Not shown": "未体现",
   "Open gaps": "未补足差距",
@@ -163,12 +167,15 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "Warnings": "警示信息",
   "Warm": "亲和",
   "{{v0}} / {{v1}}": "{{v0}} / {{v1}}",
+  "{{v0}} · stale": "{{v0}} · 已过期",
+  "{{v0}} {{v1}}: {{v2}}": "{{v0}} {{v1}}：{{v2}}",
   "{{v0}} job{{v1}}": "{{v0}} 个职位",
   "{{v0}} percent": "百分之 {{v0}}",
   "{{v0}} turns": "{{v0}} 轮对话",
   "{{v0}}h": "{{v0}} 小时",
   "{{v0}}h {{v1}}m": "{{v0}} 小时 {{v1}} 分钟",
   "{{v0}}m": "{{v0}} 分钟",
+  "{{v0}}% · {{v1}}": "{{v1}}（{{v0}}%）",
   "· ~{{v0}} left": " · 约剩 {{v0}}",
   "· {{v0}} skipped": " · 跳过 {{v0}} 个",
   "({{v0}} pending)": "（{{v0}} 个待处理）",
@@ -326,6 +333,14 @@ function filesUnder(directory) {
   });
 }
 
+function pythonFilesUnder(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const resolved = path.join(directory, entry.name);
+    if (entry.isDirectory()) return pythonFilesUnder(resolved);
+    return entry.name.endsWith(".py") ? [resolved] : [];
+  });
+}
+
 function collect() {
   const found = new Map();
   for (const filename of filesUnder(sourceRoot)) {
@@ -388,8 +403,68 @@ function collectUnclassified() {
 
 const candidates = collect();
 const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+const dynamicZhCN = JSON.parse(fs.readFileSync(dynamicZhCNPath, "utf8"));
 const missing = [...candidates.entries()].filter(([source]) => !catalog[source]);
 const stale = Object.keys(catalog).filter((source) => !candidates.has(source));
+
+function normalizeBackendProgressLabel(label) {
+  return label.replace(/\{[^{}]+\}/g, "{{value}}");
+}
+
+function reporterCallArguments(source, start) {
+  const open = source.indexOf("(", start);
+  let depth = 0;
+  let quote = null;
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth -= 1;
+      if (depth === 0) return source.slice(open + 1, index);
+    }
+  }
+  return "";
+}
+
+function collectBackendProgressLabels() {
+  const labels = new Map();
+  for (const filename of pythonFilesUnder(backendSourceRoot)) {
+    const source = fs.readFileSync(filename, "utf8");
+    for (const call of source.matchAll(/\b\w*reporter\.(?:begin|step)\(/g)) {
+      const start = call.index ?? 0;
+      const match = /,\s*(?:label\s*=\s*)?(?:f)?(["'])([\s\S]*?)\1/.exec(reporterCallArguments(source, start));
+      if (!match) continue;
+      const label = normalizeBackendProgressLabel(match[2]);
+      const locations = labels.get(label) ?? [];
+      const line = source.slice(0, start).split("\n").length;
+      locations.push(`${path.relative(root, filename).replaceAll("\\", "/")}:${line}`);
+      labels.set(label, locations);
+    }
+  }
+  return labels;
+}
+
+const backendProgressLabels = collectBackendProgressLabels();
+const missingBackendProgressTranslations = [...backendProgressLabels.entries()]
+  .filter(([label]) => typeof dynamicZhCN.runPhases?.[label] !== "string" || !dynamicZhCN.runPhases[label].trim());
+const invalidDynamicValues = [
+  ["sourceModes", ["literal", "synthesis", "project"]],
+  ["sourceFragmentStatuses", ["cached", "extracted", "source-changed", "missing", "stale"]],
+  ["runStatuses", ["queued", "cancelling", "succeeded", "failed", "cancelled"]],
+  ["fallbacks", ["unknownRun", "working", "operationFailed", "unknownMode", "unknownStatus", "etaUnknown"]],
+].flatMap(([section, keys]) => keys.filter((key) => typeof dynamicZhCN[section]?.[key] !== "string" || !dynamicZhCN[section][key].trim())
+  .map((key) => `${section}.${key}`));
 
 function stableKey(source) {
   return `ui_${createHash("sha256").update(source).digest("hex").slice(0, 12)}`;
@@ -523,8 +598,19 @@ if (process.argv.includes("--apply-fixed")) {
     );
     console.error("Run `npm run i18n:generate` and commit the generated files.");
   }
-  if (!missing.length && !stale.length && !invalid.length && !invalidRuntime.length) {
-    console.log(`i18n catalog covers ${candidates.size} user-facing literals.`);
+  if (missingBackendProgressTranslations.length) {
+    console.error(`Missing ${missingBackendProgressTranslations.length} Chinese backend progress labels:`);
+    for (const [label, locations] of missingBackendProgressTranslations) {
+      console.error(`- ${JSON.stringify(label)} (${locations.slice(0, 3).join(", ")})`);
+    }
   }
-  process.exitCode = missing.length || stale.length || invalid.length || invalidRuntime.length ? 1 : 0;
+  if (invalidDynamicValues.length) {
+    console.error(`Dynamic Chinese labels are missing or invalid: ${invalidDynamicValues.join(", ")}`);
+  }
+  if (!missing.length && !stale.length && !invalid.length && !invalidRuntime.length
+      && !missingBackendProgressTranslations.length && !invalidDynamicValues.length) {
+    console.log(`i18n catalog covers ${candidates.size} user-facing literals and ${backendProgressLabels.size} backend progress labels.`);
+  }
+  process.exitCode = missing.length || stale.length || invalid.length || invalidRuntime.length
+    || missingBackendProgressTranslations.length || invalidDynamicValues.length ? 1 : 0;
 }

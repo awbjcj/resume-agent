@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
 
 const TONES: Record<string, string> = {
   raw: "border-neutral-300 bg-neutral-100 text-neutral-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200",
@@ -15,6 +16,19 @@ const TONES: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
+  const fallback = status.replace(/_/g, " ");
+  const label = {
+    raw: t("job.stages.raw"),
+    extracted: t("job.stages.extracted"),
+    filtered: t("job.stages.filtered"),
+    rejected: t("job.stages.rejected"),
+    shortlisted: t("job.stages.shortlisted"),
+    approved: t("job.stages.approved"),
+    tailored: t("job.stages.tailored"),
+    rendered: t("job.stages.rendered"),
+  }[status] ?? fallback;
+
   return (
     <Badge
       variant="outline"
@@ -22,7 +36,7 @@ export function StatusBadge({ status }: { status: string }) {
         TONES[status] ?? "bg-secondary text-secondary-foreground"
       }`}
     >
-      {status.replace(/_/g, " ")}
+      {label}
     </Badge>
   );
 }

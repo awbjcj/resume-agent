@@ -1,6 +1,12 @@
 import { toast } from "sonner";
 
+import i18n from "@/i18n";
+import { localizeRunError, localizeRunKind } from "@/i18n/dynamic-labels";
+
 import type { RunRecord } from "./store";
+import { runLabel } from "./labels";
+
+export { runLabel, runLabelKey, type RunLabelKey } from "./labels";
 
 /**
  * Completions arrive one at a time on the live path and in batches when a
@@ -10,62 +16,8 @@ import type { RunRecord } from "./store";
  */
 export const ANNOUNCE_TOAST_CAP = 3;
 
-const RUN_LABELS: Record<string, string> = {
-  addJobUrl: "Job import",
-  coverLetter: "Cover-letter generation",
-  coverLetterRevise: "Cover-letter revision",
-  companyIntelligence: "Company research",
-  discover: "Discovery",
-  emailDraft: "Email-draft generation",
-  gmailSync: "Gmail sync",
-  "github-sync": "GitHub sync",
-  h1bSponsorship: "H-1B sponsorship check",
-  importUrls: "Job import",
-  linkedinScrape: "LinkedIn import",
-  maintainTaxonomy: "Taxonomy maintenance",
-  "profile-build": "Profile build",
-  pull: "Job pull",
-  redo: "Pipeline redo",
-  refreshClusters: "Skill regrouping",
-  refresh: "Job refresh",
-  reprocess: "Job reprocessing",
-  revise: "Resume revision",
-  tailor: "Tailoring",
-  undoTaxonomyMaintenance: "Taxonomy maintenance undo",
-};
-
-const RUN_LABEL_KEYS = {
-  addJobUrl: "runHistory.kinds.jobImport",
-  coverLetter: "runHistory.kinds.coverLetterGeneration",
-  coverLetterRevise: "runHistory.kinds.coverLetterRevision",
-  companyIntelligence: "runHistory.kinds.companyResearch",
-  discover: "runHistory.kinds.discovery",
-  emailDraft: "runHistory.kinds.emailDraftGeneration",
-  gmailSync: "runHistory.kinds.gmailSync",
-  "github-sync": "runHistory.kinds.githubSync",
-  h1bSponsorship: "runHistory.kinds.h1bSponsorshipCheck",
-  importUrls: "runHistory.kinds.jobImport",
-  linkedinScrape: "runHistory.kinds.linkedinImport",
-  maintainTaxonomy: "runHistory.kinds.taxonomyMaintenance",
-  "profile-build": "runHistory.kinds.profileBuild",
-  pull: "runHistory.kinds.jobPull",
-  redo: "runHistory.kinds.pipelineRedo",
-  refreshClusters: "runHistory.kinds.skillRegrouping",
-  refresh: "runHistory.kinds.jobRefresh",
-  reprocess: "runHistory.kinds.jobReprocessing",
-  revise: "runHistory.kinds.resumeRevision",
-  tailor: "runHistory.kinds.tailoring",
-  undoTaxonomyMaintenance: "runHistory.kinds.taxonomyMaintenanceUndo",
-} as const;
-
-export type RunLabelKey = (typeof RUN_LABEL_KEYS)[keyof typeof RUN_LABEL_KEYS];
-
-export function runLabel(kind: string): string {
-  return RUN_LABELS[kind] ?? kind;
-}
-
-export function runLabelKey(kind: string): RunLabelKey | null {
-  return RUN_LABEL_KEYS[kind as keyof typeof RUN_LABEL_KEYS] ?? null;
+function localizedRunLabel(kind: string): string {
+  return localizeRunKind(kind, i18n.resolvedLanguage, (key) => i18n.t(key));
 }
 
 function resultRecord(run: RunRecord): Record<string, unknown> | null {
@@ -89,11 +41,11 @@ function pluralLabel(count: number, singular: string, pluralForm = `${singular}s
 
 function announceOne(run: RunRecord): void {
   if (run.status === "failed") {
-    toast.error(`${runLabel(run.kind)} failed: ${run.error ?? "unknown error"}`);
+    toast.error(`${localizedRunLabel(run.kind)} ${i18n.t("runHistory.outcomes.failed")}: ${localizeRunError(run.error, i18n.resolvedLanguage) ?? i18n.t("dashboard.errorsUnavailable")}`);
     return;
   }
   if (run.status === "cancelled") {
-    toast.info(`${runLabel(run.kind)} cancelled`);
+    toast.info(`${localizedRunLabel(run.kind)} ${i18n.t("runHistory.outcomes.cancelled")}`);
     return;
   }
   if (run.kind === "tailor") {
@@ -182,7 +134,12 @@ function announceOne(run: RunRecord): void {
     toast.success("Restored the previous taxonomy maintenance generation.");
     return;
   }
-  toast.success(`${runLabel(run.kind)} completed`);
+  const language = i18n.resolvedLanguage ?? i18n.language;
+  toast.success(
+    language.toLowerCase().startsWith("zh")
+      ? `${localizedRunLabel(run.kind)} ${i18n.t("runHistory.outcomes.succeeded")}`
+      : `${runLabel(run.kind)} completed`,
+  );
 }
 
 /**

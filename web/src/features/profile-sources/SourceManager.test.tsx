@@ -1,6 +1,8 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { changeLanguage } from "@/i18n";
 
 const mocks = vi.hoisted(() => ({
   sources: [
@@ -40,6 +42,9 @@ vi.mock("./use-sources", () => ({
 import { SourceManager } from "./SourceManager";
 
 describe("SourceManager", () => {
+  afterEach(async () => {
+    await changeLanguage("en");
+  });
   it("lists sources with mode and primary markers", () => {
     render(<SourceManager />);
     expect(screen.getByText("resume.pdf")).toBeInTheDocument();
@@ -54,6 +59,17 @@ describe("SourceManager", () => {
     options.forEach((option) => {
       expect(option).toHaveClass("bg-popover", "text-popover-foreground");
     });
+  });
+
+  it("localizes protocol mode and fragment-status display values in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    render(<SourceManager />);
+
+    const mode = screen.getAllByRole("combobox")
+      .find((element) => (element as HTMLSelectElement).value === "synthesis") as HTMLSelectElement;
+    expect(mode.selectedOptions[0]?.textContent).toBe("综合提炼");
+    expect(screen.getAllByText("已使用缓存")).not.toHaveLength(0);
+    expect(screen.queryByText("synthesis")).not.toBeInTheDocument();
   });
 
   it("changes a source's anchor through the skeleton dropdown", async () => {

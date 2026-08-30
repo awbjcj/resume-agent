@@ -17,7 +17,7 @@ import {
   useMarkRunCompletionRead,
   useRunCompletions,
 } from "./use-run-completions";
-import { runLabel, runLabelKey } from "@/lib/runs/announce";
+import { localizeRunError, localizeRunKind } from "@/i18n/dynamic-labels";
 
 function isEventNudge(kind: string): boolean {
   return kind === "interview_soon" || kind === "offer_deadline_soon";
@@ -115,8 +115,7 @@ export function NotificationsBell() {
                 </div>
                 <ul className="space-y-2">
                   {runItems.map((item) => {
-                    const key = runLabelKey(item.kind);
-                    const kind = key ? t(key) : runLabel(item.kind);
+                    const kind = localizeRunKind(item.kind, i18n.resolvedLanguage, t);
                     const status = item.status === "succeeded"
                       ? t("runHistory.outcomes.succeeded")
                       : item.status === "failed"
@@ -137,7 +136,8 @@ export function NotificationsBell() {
                             {kind} {status}
                           </div>
                           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            {item.error ?? new Date(item.completedAt).toLocaleString(i18n.resolvedLanguage)}
+                            {localizeRunError(item.error, i18n.resolvedLanguage)
+                              ?? new Date(item.completedAt).toLocaleString(i18n.resolvedLanguage)}
                           </p>
                         </div>
                         {item.readAt == null && (

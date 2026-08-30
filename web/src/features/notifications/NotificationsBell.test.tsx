@@ -58,7 +58,7 @@ describe("NotificationsBell", () => {
     expect(screen.getByRole("button", { name: "Mark all read" })).toBeInTheDocument();
   });
 
-  it("localizes dynamic run kinds and protocol statuses", async () => {
+  it("localizes dynamic run kinds, protocol statuses, and known backend errors", async () => {
     await changeLanguage("zh-CN");
     server.use(
       http.get("*/api/notifications", () => HttpResponse.json([])),
@@ -67,10 +67,10 @@ describe("NotificationsBell", () => {
           {
             id: 12,
             runId: "run-12",
-            kind: "discover",
+            kind: "gmailSync",
             label: "Done",
-            status: "succeeded",
-            error: null,
+            status: "failed",
+            error: "GmailNotConnected: Gmail is not connected for this workspace",
             completedAt: "2026-08-29T12:00:00Z",
             readAt: null,
           },
@@ -81,8 +81,9 @@ describe("NotificationsBell", () => {
     render(<NotificationsBell />, { wrapper: withQueryClient });
 
     await user.click(await screen.findByRole("button", { name: /通知/i }));
-    expect(await screen.findByText("职位发现 成功")).toBeInTheDocument();
-    expect(screen.queryByText(/Discovery|succeeded/)).not.toBeInTheDocument();
+    expect(await screen.findByText("Gmail 同步 失败")).toBeInTheDocument();
+    expect(screen.getByText("Gmail 尚未连接到此工作区。")).toBeInTheDocument();
+    expect(screen.queryByText(/GmailNotConnected|is not connected for this workspace/)).not.toBeInTheDocument();
   });
 
   it("renders follow-up reminders with a draft action", async () => {

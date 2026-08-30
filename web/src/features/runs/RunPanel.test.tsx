@@ -1,11 +1,15 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { RunPanel } from "./RunPanel";
+import { changeLanguage } from "@/i18n";
 import { useRunStore } from "@/lib/runs/store";
 
 describe("RunPanel", () => {
   beforeEach(() => useRunStore.setState({ runs: {} }));
+  afterEach(async () => {
+    await changeLanguage("en");
+  });
 
   it("renders an accessible progressbar for an active run", () => {
     useRunStore.getState().upsert({
@@ -69,6 +73,42 @@ describe("RunPanel", () => {
     render(<RunPanel />);
     expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
     expect(screen.getByText(/cancelled/)).toBeInTheDocument();
+  });
+
+  it("localizes dynamic run kinds and backend phases in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    useRunStore.getState().upsert({
+      runId: "profile-build",
+      kind: "profile-build",
+      status: "running",
+      percent: 0,
+      phase: "Extracting and merging source documents",
+      current: 0,
+      total: 3,
+      etaText: null,
+    });
+    render(<RunPanel />);
+
+    expect(screen.getByText(/个人资料构建 · 正在提取并合并源文档/)).toBeInTheDocument();
+    expect(screen.queryByText(/PROFILE-BUILD|EXTRACTING AND MERGING SOURCE DOCUMENTS/)).not.toBeInTheDocument();
+  });
+
+  it("localizes a running ETA in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    useRunStore.getState().upsert({
+      runId: "profile-build-eta",
+      kind: "profile-build",
+      status: "running",
+      percent: 33,
+      phase: "Extracting and merging source documents",
+      current: 0,
+      total: 3,
+      etaText: "10m 14s",
+    });
+    render(<RunPanel />);
+
+    expect(screen.getByText(/33% · 约剩 10 分 14 秒/)).toBeInTheDocument();
+    expect(screen.queryByText(/left/i)).not.toBeInTheDocument();
   });
 
   it("renders nothing when no runs", () => {

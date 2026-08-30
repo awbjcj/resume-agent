@@ -39,11 +39,6 @@
     "en": "· ••••{{v0}}",
     "zh-CN": "· ••••{{v0}}"
   },
-  "· ~{{v0}} left": {
-    "key": "ui_5fb9af321ca6",
-    "en": "· ~{{v0}} left",
-    "zh-CN": " · 约剩 {{v0}}"
-  },
   "· demand score": {
     "key": "ui_b4299425ed4a",
     "en": "· demand score",
@@ -124,6 +119,11 @@
     "en": "{{v0}} · #{{v1}}",
     "zh-CN": "{{v0}} · #{{v1}}"
   },
+  "{{v0}} · stale": {
+    "key": "ui_a06e2ac8fe64",
+    "en": "{{v0}} · stale",
+    "zh-CN": "{{v0}} · 已过期"
+  },
   "{{v0}} {{v1}}": {
     "key": "ui_42d3759b1c27",
     "en": "{{v0}} {{v1}}",
@@ -143,6 +143,11 @@
     "key": "ui_0532ee228189",
     "en": "{{v0}} {{v1}} tier",
     "zh-CN": "{{v0}} {{v1}} 等级"
+  },
+  "{{v0}} {{v1}}: {{v2}}": {
+    "key": "ui_e3597fd7150e",
+    "en": "{{v0}} {{v1}}: {{v2}}",
+    "zh-CN": "{{v0}} {{v1}}：{{v2}}"
   },
   "{{v0}} / {{v1}}": {
     "key": "ui_64614d6bd5d9",
@@ -169,11 +174,6 @@
     "en": "{{v0}} added, {{v1}} failed: {{v2}}",
     "zh-CN": "已添加 {{v0}} 个，{{v1}} 个失败：{{v2}}"
   },
-  "{{v0}} cancelled": {
-    "key": "ui_7bccc7ca68f7",
-    "en": "{{v0}} cancelled",
-    "zh-CN": "{{v0}} 已取消"
-  },
   "{{v0}} categories · {{v1}} skills": {
     "key": "ui_ca9bf68748d3",
     "en": "{{v0}} categories · {{v1}} skills",
@@ -198,11 +198,6 @@
     "key": "ui_6a33b950dd7e",
     "en": "{{v0}} failed",
     "zh-CN": "{{v0}} 个失败"
-  },
-  "{{v0}} failed: {{v1}}": {
-    "key": "ui_86ca41b9fa37",
-    "en": "{{v0}} failed: {{v1}}",
-    "zh-CN": "{{v0}} 个失败：{{v1}}"
   },
   "{{v0}} file(s) added": {
     "key": "ui_58a8adca71b8",
@@ -268,16 +263,6 @@
     "key": "ui_393fb0ecc147",
     "en": "{{v0}} pending draft note{{v1}} will remain unsaved.",
     "zh-CN": "{{v0}} 条待处理的草稿笔记将不会保存。"
-  },
-  "{{v0}} percent": {
-    "key": "ui_6266c4ea6acf",
-    "en": "{{v0}} percent",
-    "zh-CN": "百分之 {{v0}}"
-  },
-  "{{v0}} progress {{v1}}": {
-    "key": "ui_65f5081a8f2f",
-    "en": "{{v0}} progress {{v1}}",
-    "zh-CN": "{{v0}} 进度 {{v1}}"
   },
   "{{v0}} Refreshing updates every job at this company.": {
     "key": "ui_9b2cf7267887",
@@ -394,15 +379,10 @@
     "en": "{{v0}}%",
     "zh-CN": "{{v0}}%"
   },
-  "{{v0}}% · cancelled": {
-    "key": "ui_331f839f3471",
-    "en": "{{v0}}% · cancelled",
-    "zh-CN": "{{v0}}% · 已取消"
-  },
-  "{{v0}}% · cancelling": {
-    "key": "ui_f953aafce66b",
-    "en": "{{v0}}% · cancelling",
-    "zh-CN": "{{v0}}% · 正在取消"
+  "{{v0}}% · {{v1}}": {
+    "key": "ui_73718a3a31bb",
+    "en": "{{v0}}% · {{v1}}",
+    "zh-CN": "{{v1}}（{{v0}}%）"
   },
   "{{v0}}% remains": {
     "key": "ui_d7d481d86195",
@@ -514,10 +494,10 @@
     "en": "00:00 UTC",
     "zh-CN": "00:00 UTC"
   },
-  "100% · done": {
-    "key": "ui_5f126bc9b052",
-    "en": "100% · done",
-    "zh-CN": "100% · 已完成"
+  "100% · {{v0}}": {
+    "key": "ui_d6c8f4a642cd",
+    "en": "100% · {{v0}}",
+    "zh-CN": "{{v0}}（100%）"
   },
   "14 days": {
     "key": "ui_60acc36e5d51",
@@ -3168,11 +3148,6 @@
     "key": "ui_66b21aa6be95",
     "en": "Domains merged",
     "zh-CN": "领域已合并"
-  },
-  "done": {
-    "key": "ui_a4c3ed04a95a",
-    "en": "done",
-    "zh-CN": "已完成"
   },
   "Done": {
     "key": "ui_11a6767d5674",
@@ -5978,6 +5953,11 @@
     "key": "ui_487d613a452f",
     "en": "No saved Career Lab sessions yet. Start one when you are ready to draft.",
     "zh-CN": "还没有已保存的职业实验室会话。准备好起草时，就开始一次吧。"
+  },
+  "No saved research": {
+    "key": "ui_2a0fbe4496f5",
+    "en": "No saved research",
+    "zh-CN": "暂无已保存的调研结果"
   },
   "No saved views yet.": {
     "key": "ui_0522378ef671",
