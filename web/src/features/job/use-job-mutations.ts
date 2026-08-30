@@ -73,6 +73,24 @@ export function useRefreshRolePreparation(jobId: number) {
   });
 }
 
+export function useRefreshHiringContactIntelligence(jobId: number) {
+  const { launch } = useLaunchRun();
+  return useMutation({
+    mutationFn: () =>
+      launch(
+        "hiringContactIntelligence",
+        () =>
+          unwrap(
+            api.POST("/api/jobs/{job_id}/hiring-contact-intelligence/refreshes", {
+              params: { path: { job_id: jobId } },
+            }),
+          ),
+        ["hiring-contact-intelligence"],
+        { jobId },
+      ),
+  });
+}
+
 export function useSetStage(jobId: number) {
   const qc = useQueryClient();
   return useMutation({

@@ -15,6 +15,7 @@ import { useCompanyIntelligenceVersions } from "@/features/job/use-company-resea
 import { CompanyIntelligenceEvidence } from "./CompanyIntelligenceEvidence";
 import { ResearchNotice, ResearchPanelHeader } from "./ResearchPanel";
 import { RolePreparationPanel } from "./RolePreparationPanel";
+import { HiringContactsPanel } from "./HiringContactsPanel";
 
 type ResearchDepth = "quick" | "standard" | "deep";
 
@@ -145,6 +146,7 @@ export function CompanyIntelligencePanel({
       )}
 
       <RolePreparationPanel jobId={jobId} />
+      <HiringContactsPanel jobId={jobId} />
     </section>
   );
 }

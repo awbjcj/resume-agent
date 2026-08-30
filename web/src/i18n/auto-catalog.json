@@ -184,6 +184,11 @@
     "en": "{{v0}} completed",
     "zh-CN": "{{v0}} 已完成"
   },
+  "{{v0}} copied": {
+    "key": "ui_42116c7be636",
+    "en": "{{v0}} copied",
+    "zh-CN": "已复制{{v0}}"
+  },
   "{{v0}} domains · {{v1}} skills": {
     "key": "ui_2921e26327f1",
     "en": "{{v0}} domains · {{v1}} skills",
@@ -2399,6 +2404,11 @@
     "en": "Connects related skills",
     "zh-CN": "关联相关技能"
   },
+  "Contact research failed. The last saved result is unchanged.": {
+    "key": "ui_3a0c1eb19829",
+    "en": "Contact research failed. The last saved result is unchanged.",
+    "zh-CN": "联系人研究失败。上次保存的结果保持不变。"
+  },
   "Continue": {
     "key": "ui_31fbef162594",
     "en": "Continue",
@@ -2418,6 +2428,16 @@
     "key": "ui_a8bcac3559cd",
     "en": "Conversation active",
     "zh-CN": "对话进行中"
+  },
+  "Copy": {
+    "key": "ui_e21f935f11d7",
+    "en": "Copy",
+    "zh-CN": "复制"
+  },
+  "Copy {{v0}}": {
+    "key": "ui_3f3ebff426db",
+    "en": "Copy {{v0}}",
+    "zh-CN": "复制{{v0}}"
   },
   "Copy body": {
     "key": "ui_601c0c40d595",
@@ -3184,6 +3204,11 @@
     "en": "Draft one from your profile facts and this job description. You can revise it afterwards.",
     "zh-CN": "根据你的个人资料事实和该职位描述生成一份草稿，之后可以修改。"
   },
+  "Draft only. This feature never sends messages. Verify every person's current role before use.": {
+    "key": "ui_28eec1893a07",
+    "en": "Draft only. This feature never sends messages. Verify every person's current role before use.",
+    "zh-CN": "仅提供草稿；此功能绝不会发送消息。使用前请确认每个人当前的职位。"
+  },
   "Drafting now": {
     "key": "ui_b0e0a1833f2f",
     "en": "Drafting now",
@@ -3308,6 +3333,11 @@
     "key": "ui_eaf6d550d9b9",
     "en": "Email delivery is not configured",
     "zh-CN": "尚未配置邮件发送"
+  },
+  "Email draft": {
+    "key": "ui_759811801567",
+    "en": "Email draft",
+    "zh-CN": "电子邮件草稿"
   },
   "Email-draft generation": {
     "key": "ui_6e733943ce7a",
@@ -3804,6 +3834,11 @@
     "en": "Find a job",
     "zh-CN": "查找职位"
   },
+  "Find publicly verified people who may be relevant to this role, then prepare copy-only drafts.": {
+    "key": "ui_a9c8b1be1107",
+    "en": "Find publicly verified people who may be relevant to this role, then prepare copy-only drafts.",
+    "zh-CN": "查找与该职位相关且可通过公开来源验证的人员，并准备仅供复制的草稿。"
+  },
   "Find remote healthcare platform roles…": {
     "key": "ui_48e625443afc",
     "en": "Find remote healthcare platform roles…",
@@ -4049,6 +4084,16 @@
     "en": "Generation is explicit. Existing briefs stay frozen until you regenerate them.",
     "zh-CN": "仅在你明确操作时生成；现有简报在重新生成前保持不变。"
   },
+  "Generic email draft": {
+    "key": "ui_8ed501948b28",
+    "en": "Generic email draft",
+    "zh-CN": "通用电子邮件草稿"
+  },
+  "Generic short message": {
+    "key": "ui_715eb9c10016",
+    "en": "Generic short message",
+    "zh-CN": "通用短消息"
+  },
   "Germany (.de)": {
     "key": "ui_2270c359eb4f",
     "en": "Germany (.de)",
@@ -4293,6 +4338,11 @@
     "key": "ui_7296a62d993c",
     "en": "Hides",
     "zh-CN": "隐藏"
+  },
+  "Hiring contacts": {
+    "key": "ui_a58c18fcc0c1",
+    "en": "Hiring contacts",
+    "zh-CN": "招聘联系人"
   },
   "Hiring manager": {
     "key": "ui_2c778ff88889",
@@ -5003,6 +5053,11 @@
     "key": "ui_37df0b854374",
     "en": "Loading gap-closing advice",
     "zh-CN": "正在加载弥补差距建议"
+  },
+  "Loading hiring-contact intelligence…": {
+    "key": "ui_72b94991dd38",
+    "en": "Loading hiring-contact intelligence…",
+    "zh-CN": "正在加载招聘联系人情报…"
   },
   "Loading history…": {
     "key": "ui_a960c435c77f",
@@ -5759,6 +5814,11 @@
     "en": "No company dossier yet",
     "zh-CN": "尚无公司档案"
   },
+  "No contact research yet": {
+    "key": "ui_0feee4c0113c",
+    "en": "No contact research yet",
+    "zh-CN": "尚无联系人研究"
+  },
   "No cover letter yet": {
     "key": "ui_0f0ba449d458",
     "en": "No cover letter yet",
@@ -5859,10 +5919,20 @@
     "en": "No member selected",
     "zh-CN": "未选择成员"
   },
+  "No named contact was confirmed from public sources.": {
+    "key": "ui_fc075068001f",
+    "en": "No named contact was confirmed from public sources.",
+    "zh-CN": "未能通过公开来源确认具名联系人。"
+  },
   "No PDF": {
     "key": "ui_b0fc9c1c1a36",
     "en": "No PDF",
     "zh-CN": "无 PDF"
+  },
+  "No private enrichment, login-gated scraping, or automatic outreach.": {
+    "key": "ui_bf5017903100",
+    "en": "No private enrichment, login-gated scraping, or automatic outreach.",
+    "zh-CN": "不使用私人数据补全、登录后抓取或自动联系。"
   },
   "No quota ledger entries yet.": {
     "key": "ui_0d7461eacfa8",
@@ -6819,10 +6889,20 @@
     "en": "Public evidence about strategy, recent moves, culture, challenges, and competitive position. Refreshes are always explicit.",
     "zh-CN": "汇总有关战略、近期动态、文化、挑战和竞争地位的公开证据。仅在你明确操作时刷新。"
   },
+  "Public source": {
+    "key": "ui_9f1d7040552b",
+    "en": "Public source",
+    "zh-CN": "公开来源"
+  },
   "Public URL": {
     "key": "ui_f7b60b043d01",
     "en": "Public URL",
     "zh-CN": "公开链接"
+  },
+  "Public-source people research": {
+    "key": "ui_f4b618dcc641",
+    "en": "Public-source people research",
+    "zh-CN": "公开来源人员研究"
   },
   "Published": {
     "key": "ui_2ef42ec21d93",
@@ -7279,6 +7359,11 @@
     "en": "Refresh check",
     "zh-CN": "刷新检查"
   },
+  "Refresh contacts": {
+    "key": "ui_1a9514f6d873",
+    "en": "Refresh contacts",
+    "zh-CN": "刷新联系人"
+  },
   "Refresh repository evidence": {
     "key": "ui_24e3f26681b2",
     "en": "Refresh repository evidence",
@@ -7558,6 +7643,11 @@
     "key": "ui_664c271ca313",
     "en": "Research company",
     "zh-CN": "调研公司"
+  },
+  "Research contacts": {
+    "key": "ui_b11fbcd036b8",
+    "en": "Research contacts",
+    "zh-CN": "研究联系人"
   },
   "Research disabled": {
     "key": "ui_90e6619d28c5",
@@ -8043,6 +8133,11 @@
     "key": "ui_e6089f95fa27",
     "en": "Role preparation failed. The last saved brief is unchanged.",
     "zh-CN": "职位准备生成失败。上次保存的简报保持不变。"
+  },
+  "Role-addressed drafts": {
+    "key": "ui_88a92c81b92b",
+    "en": "Role-addressed drafts",
+    "zh-CN": "面向职位的草稿"
   },
   "Roles (": {
     "key": "ui_7c259307c7ac",
@@ -8729,6 +8824,11 @@
     "en": "Short ID",
     "zh-CN": "短 ID"
   },
+  "Short message draft": {
+    "key": "ui_365a8e402c46",
+    "en": "Short message draft",
+    "zh-CN": "短消息草稿"
+  },
   "Shortlist": {
     "key": "ui_65ced81f8708",
     "en": "Shortlist",
@@ -8833,6 +8933,11 @@
     "key": "ui_22aa085ee4b1",
     "en": "Simultaneous background runs",
     "zh-CN": "同时进行的后台任务数"
+  },
+  "Single public source": {
+    "key": "ui_ab6d91f2c47f",
+    "en": "Single public source",
+    "zh-CN": "单一公开来源"
   },
   "Single source": {
     "key": "ui_c7f159593f2b",
@@ -10408,6 +10513,11 @@
     "key": "ui_dbb8cb2f2afb",
     "en": "Use the private invite code from your administrator.",
     "zh-CN": "使用管理员提供的专属邀请码。"
+  },
+  "Use these when no named person is verified or when a general recruiting channel is more appropriate.": {
+    "key": "ui_df3eecdc5f71",
+    "en": "Use these when no named person is verified or when a general recruiting channel is more appropriate.",
+    "zh-CN": "在没有已验证的具名联系人，或通用招聘渠道更合适时使用这些草稿。"
   },
   "Use this for one member or every member. Member plan and override settings stay in the member drawer below.": {
     "key": "ui_763379b6a734",

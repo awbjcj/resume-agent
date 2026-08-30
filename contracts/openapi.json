@@ -4937,6 +4937,236 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "HiringContactEmptyOut": {
+        "properties": {
+          "canRefresh": {
+            "const": true,
+            "default": true,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "intelligence": {
+            "title": "Intelligence",
+            "type": "null"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "const": "not_generated",
+            "default": "not_generated",
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "const": "empty",
+            "default": "empty",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "HiringContactEmptyOut",
+        "type": "object"
+      },
+      "HiringContactIntelligenceOut": {
+        "properties": {
+          "caveat": {
+            "title": "Caveat",
+            "type": "string"
+          },
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/HiringContactOut"
+            },
+            "title": "Contacts",
+            "type": "array"
+          },
+          "genericEmailDraft": {
+            "title": "Genericemaildraft",
+            "type": "string"
+          },
+          "genericShortMessageDraft": {
+            "title": "Genericshortmessagedraft",
+            "type": "string"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "retrievedAt": {
+            "format": "date-time",
+            "title": "Retrievedat",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "company",
+          "title",
+          "retrievedAt",
+          "genericEmailDraft",
+          "genericShortMessageDraft",
+          "caveat"
+        ],
+        "title": "HiringContactIntelligenceOut",
+        "type": "object"
+      },
+      "HiringContactOut": {
+        "properties": {
+          "contactType": {
+            "enum": [
+              "recruiter",
+              "hiring_manager",
+              "team_leader",
+              "team_member",
+              "executive",
+              "other"
+            ],
+            "title": "Contacttype",
+            "type": "string"
+          },
+          "emailDraft": {
+            "title": "Emaildraft",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "publicRole": {
+            "title": "Publicrole",
+            "type": "string"
+          },
+          "shortMessageDraft": {
+            "title": "Shortmessagedraft",
+            "type": "string"
+          },
+          "sourceUrls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sourceurls",
+            "type": "array"
+          },
+          "verificationState": {
+            "enum": [
+              "corroborated",
+              "single_source"
+            ],
+            "title": "Verificationstate",
+            "type": "string"
+          },
+          "whyRelevant": {
+            "title": "Whyrelevant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "publicRole",
+          "contactType",
+          "verificationState",
+          "whyRelevant",
+          "emailDraft",
+          "shortMessageDraft"
+        ],
+        "title": "HiringContactOut",
+        "type": "object"
+      },
+      "HiringContactReadyOut": {
+        "properties": {
+          "canRefresh": {
+            "const": true,
+            "default": true,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "intelligence": {
+            "$ref": "#/components/schemas/HiringContactIntelligenceOut"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "null"
+          },
+          "state": {
+            "const": "ready",
+            "default": "ready",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "intelligence"
+        ],
+        "title": "HiringContactReadyOut",
+        "type": "object"
+      },
+      "HiringContactUnavailableOut": {
+        "properties": {
+          "canRefresh": {
+            "const": false,
+            "default": false,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "intelligence": {
+            "title": "Intelligence",
+            "type": "null"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "const": "missing_company",
+            "default": "missing_company",
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "HiringContactUnavailableOut",
+        "type": "object"
+      },
       "InterviewAudioAvailabilityOut": {
         "properties": {
           "available": {
@@ -22212,6 +22442,135 @@
           }
         },
         "summary": "Check H1B Sponsorship"
+      }
+    },
+    "/api/jobs/{job_id}/hiring-contact-intelligence": {
+      "get": {
+        "operationId": "get_hiring_contact_intelligence_api_jobs__job_id__hiring_contact_intelligence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "empty": "#/components/schemas/HiringContactEmptyOut",
+                      "ready": "#/components/schemas/HiringContactReadyOut",
+                      "unavailable": "#/components/schemas/HiringContactUnavailableOut"
+                    },
+                    "propertyName": "state"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/HiringContactUnavailableOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HiringContactEmptyOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HiringContactReadyOut"
+                    }
+                  ],
+                  "title": "Response Get Hiring Contact Intelligence Api Jobs  Job Id  Hiring Contact Intelligence Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Hiring Contact Intelligence"
+      }
+    },
+    "/api/jobs/{job_id}/hiring-contact-intelligence/refreshes": {
+      "post": {
+        "operationId": "create_hiring_contact_refresh_api_jobs__job_id__hiring_contact_intelligence_refreshes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Hiring Contact Refresh"
       }
     },
     "/api/jobs/{job_id}/role-preparation-brief": {

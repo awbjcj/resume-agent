@@ -1925,6 +1925,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/hiring-contact-intelligence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Hiring Contact Intelligence */
+        get: operations["get_hiring_contact_intelligence_api_jobs__job_id__hiring_contact_intelligence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/hiring-contact-intelligence/refreshes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Hiring Contact Refresh */
+        post: operations["create_hiring_contact_refresh_api_jobs__job_id__hiring_contact_intelligence_refreshes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/role-preparation-brief": {
         parameters: {
             query?: never;
@@ -5295,6 +5329,120 @@ export interface components {
              * @default ok
              */
             status: string;
+        };
+        /** HiringContactEmptyOut */
+        HiringContactEmptyOut: {
+            /**
+             * Canrefresh
+             * @default true
+             * @constant
+             */
+            canRefresh: true;
+            /** Intelligence */
+            intelligence?: null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Reason
+             * @default not_generated
+             * @constant
+             */
+            reason: "not_generated";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "empty";
+        };
+        /** HiringContactIntelligenceOut */
+        HiringContactIntelligenceOut: {
+            /** Caveat */
+            caveat: string;
+            /** Company */
+            company: string;
+            /** Contacts */
+            contacts?: components["schemas"]["HiringContactOut"][];
+            /** Genericemaildraft */
+            genericEmailDraft: string;
+            /** Genericshortmessagedraft */
+            genericShortMessageDraft: string;
+            /** Jobid */
+            jobId: number;
+            /**
+             * Retrievedat
+             * Format: date-time
+             */
+            retrievedAt: string;
+            /** Title */
+            title: string;
+        };
+        /** HiringContactOut */
+        HiringContactOut: {
+            /**
+             * Contacttype
+             * @enum {string}
+             */
+            contactType: "recruiter" | "hiring_manager" | "team_leader" | "team_member" | "executive" | "other";
+            /** Emaildraft */
+            emailDraft: string;
+            /** Name */
+            name: string;
+            /** Publicrole */
+            publicRole: string;
+            /** Shortmessagedraft */
+            shortMessageDraft: string;
+            /** Sourceurls */
+            sourceUrls?: string[];
+            /**
+             * Verificationstate
+             * @enum {string}
+             */
+            verificationState: "corroborated" | "single_source";
+            /** Whyrelevant */
+            whyRelevant: string;
+        };
+        /** HiringContactReadyOut */
+        HiringContactReadyOut: {
+            /**
+             * Canrefresh
+             * @default true
+             * @constant
+             */
+            canRefresh: true;
+            intelligence: components["schemas"]["HiringContactIntelligenceOut"];
+            /** Message */
+            message?: string | null;
+            /** Reason */
+            reason?: null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "ready";
+        };
+        /** HiringContactUnavailableOut */
+        HiringContactUnavailableOut: {
+            /**
+             * Canrefresh
+             * @default false
+             * @constant
+             */
+            canRefresh: false;
+            /** Intelligence */
+            intelligence?: null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Reason
+             * @default missing_company
+             * @constant
+             */
+            reason: "missing_company";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "unavailable";
         };
         /** InterviewAudioAvailabilityOut */
         InterviewAudioAvailabilityOut: {
@@ -13385,6 +13533,72 @@ export interface operations {
         };
     };
     check_h1b_sponsorship_api_jobs__job_id__h1b_sponsorship_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_hiring_contact_intelligence_api_jobs__job_id__hiring_contact_intelligence_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HiringContactUnavailableOut"] | components["schemas"]["HiringContactEmptyOut"] | components["schemas"]["HiringContactReadyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_hiring_contact_refresh_api_jobs__job_id__hiring_contact_intelligence_refreshes_post: {
         parameters: {
             query?: never;
             header?: {

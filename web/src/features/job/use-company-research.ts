@@ -9,6 +9,10 @@ export type RolePreparationResource =
   | components["schemas"]["RolePreparationUnavailableOut"]
   | components["schemas"]["RolePreparationEmptyOut"]
   | components["schemas"]["RolePreparationReadyOut"];
+export type HiringContactResource =
+  | components["schemas"]["HiringContactUnavailableOut"]
+  | components["schemas"]["HiringContactEmptyOut"]
+  | components["schemas"]["HiringContactReadyOut"];
 
 export function useCompanyIntelligenceVersions(jobId: number, enabled: boolean) {
   return useQuery({
@@ -32,5 +36,17 @@ export function useRolePreparation(jobId: number) {
           params: { path: { job_id: jobId } },
         }),
       ) as Promise<RolePreparationResource>,
+  });
+}
+
+export function useHiringContactIntelligence(jobId: number) {
+  return useQuery({
+    queryKey: ["hiring-contact-intelligence", jobId],
+    queryFn: (): Promise<HiringContactResource> =>
+      unwrap(
+        api.GET("/api/jobs/{job_id}/hiring-contact-intelligence", {
+          params: { path: { job_id: jobId } },
+        }),
+      ) as Promise<HiringContactResource>,
   });
 }

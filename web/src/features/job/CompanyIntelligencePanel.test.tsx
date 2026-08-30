@@ -91,6 +91,15 @@ describe("CompanyIntelligencePanel", () => {
           message: "Research the company before generating role preparation.",
         }),
       ),
+      http.get("/api/jobs/42/hiring-contact-intelligence", () =>
+        HttpResponse.json({
+          state: "empty",
+          reason: "not_generated",
+          canRefresh: true,
+          intelligence: null,
+          message: "Search public sources for people relevant to this role.",
+        }),
+      ),
     );
   });
 
