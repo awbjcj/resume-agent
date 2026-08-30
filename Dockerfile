@@ -1,4 +1,9 @@
 FROM node:22-alpine AS web
+WORKDIR /build
+# web/scripts/i18n-catalog.mjs scans ../src/resume_agent for backend progress
+# labels during `npm run build`'s i18n:check step, so the Python source needs
+# to exist a level above the web workdir even though this stage never runs it.
+COPY src ./src
 WORKDIR /build/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
