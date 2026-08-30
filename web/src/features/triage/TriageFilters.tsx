@@ -130,7 +130,11 @@ export function TriageFilters({
             board="triage"
             filter={filter}
             defaultSort="recency"
-            onApply={onChange}
+            extraQuery={{ archived: archived ? "1" : undefined }}
+            onApply={(nextFilter, params) => {
+              onChange(nextFilter);
+              onArchivedChange(params.get("archived") === "1");
+            }}
           />
         </div>
       </div>

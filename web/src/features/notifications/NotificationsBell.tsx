@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Bell, Check, CircleCheck, Inbox, Loader2, RefreshCw, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,7 +17,7 @@ import {
   useMarkRunCompletionRead,
   useRunCompletions,
 } from "./use-run-completions";
-import { runLabel } from "@/lib/runs/announce";
+import { runLabel, runLabelKey } from "@/lib/runs/announce";
 
 function isEventNudge(kind: string): boolean {
   return kind === "interview_soon" || kind === "offer_deadline_soon";
@@ -31,6 +32,7 @@ function notificationTitle(item: { kind: string; company?: string | null; propos
 }
 
 export function NotificationsBell() {
+  const { t, i18n } = useTranslation();
   const { data: items = [], isLoading } = useNotifications();
   const { data: runItems = [], isLoading: runsLoading } = useRunCompletions();
   const accept = useAcceptNotification();
@@ -112,7 +114,17 @@ export function NotificationsBell() {
                   )}
                 </div>
                 <ul className="space-y-2">
-                  {runItems.map((item) => (
+                  {runItems.map((item) => {
+                    const key = runLabelKey(item.kind);
+                    const kind = key ? t(key) : runLabel(item.kind);
+                    const status = item.status === "succeeded"
+                      ? t("runHistory.outcomes.succeeded")
+                      : item.status === "failed"
+                        ? t("runHistory.outcomes.failed")
+                        : item.status === "cancelled"
+                          ? t("runHistory.outcomes.cancelled")
+                          : item.status;
+                    return (
                     <li
                       key={item.id}
                       className={`rounded-lg border p-3 text-sm ${
@@ -122,10 +134,10 @@ export function NotificationsBell() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-medium">
-                            {runLabel(item.kind)} {item.status}
+                            {kind} {status}
                           </div>
                           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            {item.error ?? new Date(item.completedAt).toLocaleString()}
+                            {item.error ?? new Date(item.completedAt).toLocaleString(i18n.resolvedLanguage)}
                           </p>
                         </div>
                         {item.readAt == null && (
@@ -133,7 +145,7 @@ export function NotificationsBell() {
                             type="button"
                             size="icon-xs"
                             variant="ghost"
-                            aria-label={`Mark ${runLabel(item.kind)} read`}
+                            aria-label={t("runHistory.markRead", { kind })}
                             disabled={markRunRead.isPending}
                             onClick={() => markRunRead.mutate(item.id)}
                           >
@@ -142,7 +154,8 @@ export function NotificationsBell() {
                         )}
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </section>
             )}

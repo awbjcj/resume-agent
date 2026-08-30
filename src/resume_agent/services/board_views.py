@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
 from resume_agent.tracking.tables import SavedBoardView, utcnow
@@ -29,6 +30,14 @@ def _validate(board: str, query_string: str) -> None:
         raise ValueError("view query must be at most 4000 characters")
 
 
+def _commit(session: Session, name: str) -> None:
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise SavedBoardViewConflict(f'A view named "{name}" already exists') from error
+
+
 def list_board_views(session: Session, board: str | None = None) -> list[SavedBoardView]:
     query = select(SavedBoardView).order_by(
         col(SavedBoardView.board), col(SavedBoardView.name)
@@ -54,7 +63,7 @@ def create_board_view(
         raise SavedBoardViewConflict(f'A view named "{name}" already exists')
     row = SavedBoardView(board=board, name=name, query_string=query_string)
     session.add(row)
-    session.commit()
+    _commit(session, name)
     session.refresh(row)
     return row
 
@@ -85,7 +94,7 @@ def update_board_view(
     row.query_string = next_query
     row.updated_at = utcnow()
     session.add(row)
-    session.commit()
+    _commit(session, next_name)
     session.refresh(row)
     return row
 

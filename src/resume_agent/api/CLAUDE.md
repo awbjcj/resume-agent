@@ -28,6 +28,17 @@ logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
   the **launch seam** (`api/runs/launch.py`): `launch()` submits + maps the three
   launch-time errors onto the API envelope (singleton→409, reset→409, quota→429),
   and `session_work()` owns the worker-opens-its-own-session rule.
+- **Terminal runs are also durable.** `RunManager.on_terminal` records exactly one
+  `RunCompletion` row when a run reaches `succeeded`, `failed`, or `cancelled`;
+  callback failures are logged and must never replace the worker's real outcome.
+  `GET /api/run-completions` returns newest-first history (50 by default), while
+  the read endpoints mutate only `read_at`. These records are independent from
+  Gmail-derived application notifications.
+- **Saved board views store the existing URL contract.** `/api/board-views`
+  provides workspace-scoped CRUD for triage, shortlist, and pipeline. Its
+  `queryString` is the canonical `stateToParams` representation, including any
+  endpoint-local flags such as triage's `archived`; do not add a second filter
+  schema to the API.
 - **Errors** use one envelope `{ "error": { code, message, details? } }` via
   `ApiException` + handlers in `api/errors.py`.
 - **Runtime/auth boundary:** `create_app(..., app_mode="local")` auto-activates

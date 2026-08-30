@@ -56,9 +56,14 @@ export function InsightsCard({ summary }: { summary: DashboardSummary }) {
           </div>
           {sources?.openFailures ? (
             <div className="mt-3">
-              <p className="text-2xl font-semibold tabular-nums">{sources.openFailures}</p>
+              <p className="text-2xl font-semibold tabular-nums">{affectedSources.length}</p>
               <p className="text-xs text-muted-foreground">
-                {t("dashboard.sourcesNeedAttention", { count: affectedSources.length })}
+                {t(
+                  affectedSources.length === 1
+                    ? "dashboard.sourcesNeedAttention_one"
+                    : "dashboard.sourcesNeedAttention_other",
+                  { count: affectedSources.length },
+                )}
               </p>
               <p className="mt-2 truncate text-xs font-medium" title={affectedSources.join(", ")}>
                 {affectedSources.join(" · ")}

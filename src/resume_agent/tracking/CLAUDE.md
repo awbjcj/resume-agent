@@ -126,6 +126,16 @@ reaches the run result, the log, and the dashboard.
 - **Board bulk actions are transactional.** `bulk_apply` uses one batched load plus the
   `progressed_job_ids` gate, then one commit. `delete_job_row` is the unguarded cascade shared
   with guarded `delete_job` and prune.
+- **Saved board views are workspace preferences, not copied filters.**
+  `SavedBoardView` is unique by `(board, name)` and stores the canonical board URL
+  query string produced by the web filter serializer. Applying a view feeds that
+  string back through the same parser. Rows persist until explicitly deleted or
+  the workspace is reset.
+- **Run completions are the durable terminal ledger.** `RunCompletion` has one
+  immutable outcome row per run id (`succeeded`, `failed`, or `cancelled`); only
+  `read_at` changes after insertion. History is queried newest first and retained
+  for the life of the workspace. It is intentionally separate from transient SSE
+  state and from Gmail `Notification` rows.
 
 ---
 

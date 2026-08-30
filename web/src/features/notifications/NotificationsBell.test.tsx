@@ -1,10 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "@/test/server";
 import { withQueryClient } from "@/test/utils";
+import { changeLanguage } from "@/i18n";
 import { NotificationsBell } from "./NotificationsBell";
 import { MemoryRouter } from "react-router-dom";
 
@@ -13,6 +14,10 @@ vi.mock("@/features/job/EmailDraftDialog", () => ({
 }));
 
 describe("NotificationsBell", () => {
+  afterEach(async () => {
+    await changeLanguage("en");
+  });
+
   it("shows durable run history and counts only unread runs", async () => {
     server.use(
       http.get("*/api/notifications", () => HttpResponse.json([])),
@@ -51,6 +56,33 @@ describe("NotificationsBell", () => {
     expect(screen.getByText("Job pull failed")).toBeInTheDocument();
     expect(screen.getByText("Provider unavailable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Mark all read" })).toBeInTheDocument();
+  });
+
+  it("localizes dynamic run kinds and protocol statuses", async () => {
+    await changeLanguage("zh-CN");
+    server.use(
+      http.get("*/api/notifications", () => HttpResponse.json([])),
+      http.get("*/api/run-completions", () =>
+        HttpResponse.json([
+          {
+            id: 12,
+            runId: "run-12",
+            kind: "discover",
+            label: "Done",
+            status: "succeeded",
+            error: null,
+            completedAt: "2026-08-29T12:00:00Z",
+            readAt: null,
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<NotificationsBell />, { wrapper: withQueryClient });
+
+    await user.click(await screen.findByRole("button", { name: /通知/i }));
+    expect(await screen.findByText("职位发现 成功")).toBeInTheDocument();
+    expect(screen.queryByText(/Discovery|succeeded/)).not.toBeInTheDocument();
   });
 
   it("renders follow-up reminders with a draft action", async () => {

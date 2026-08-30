@@ -5364,11 +5364,6 @@
     "en": "Map zoom controls",
     "zh-CN": "地图缩放控件"
   },
-  "Mark {{v0}} read": {
-    "key": "ui_511dc6144901",
-    "en": "Mark {{v0}} read",
-    "zh-CN": "将 {{v0}} 标为已读"
-  },
   "Mark all read": {
     "key": "ui_3bc62a9e6a39",
     "en": "Mark all read",

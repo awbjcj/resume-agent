@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
-export type BoardName = "triage" | "shortlist" | "pipeline";
+type SavedBoardViewCreate = components["schemas"]["SavedBoardViewCreate"];
+
+export type BoardName = SavedBoardViewCreate["board"];
 export type SavedBoardView = components["schemas"]["SavedBoardViewOut"];
 
 const key = (board: BoardName) => ["board-views", board] as const;

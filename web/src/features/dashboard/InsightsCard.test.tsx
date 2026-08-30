@@ -31,4 +31,22 @@ describe("InsightsCard", () => {
     expect(screen.getByText("2 sources need attention")).toBeInTheDocument();
     expect(screen.getByText("LinkedIn · Indeed")).toBeInTheDocument();
   });
+
+  it("counts affected sources rather than failure records", () => {
+    render(
+      <InsightsCard
+        summary={{
+          ...SUMMARY,
+          sourceHealth: {
+            openFailures: 2,
+            affectedSources: ["LinkedIn"],
+            latestFailureAt: "2026-08-29T12:00:00Z",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("1 source needs attention")).toBeInTheDocument();
+    expect(screen.getByText("1", { selector: "p" })).toBeInTheDocument();
+  });
 });

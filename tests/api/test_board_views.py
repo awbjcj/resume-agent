@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session
 
 from resume_agent.api.app import create_app
 
@@ -68,3 +70,17 @@ def test_saved_board_view_rejects_unknown_board(client):
         json={"board": "unknown", "name": "Nope"},
     )
     assert response.status_code == 422
+
+
+def test_saved_board_view_constraint_race_returns_conflict(client, monkeypatch):
+    def fail_commit(_session):
+        raise IntegrityError("INSERT INTO saved_board_view", {}, Exception("unique"))
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    response = client.post(
+        "/api/board-views",
+        json={"board": "shortlist", "name": "Concurrent view"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "VIEW_NAME_CONFLICT"

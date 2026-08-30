@@ -26,12 +26,14 @@ export function SavedViewsControl({
   board,
   filter,
   defaultSort,
+  extraQuery,
   onApply,
 }: {
   board: BoardName;
   filter: FilterState;
   defaultSort: SortKey;
-  onApply: (filter: FilterState) => void;
+  extraQuery?: Readonly<Record<string, string | null | undefined>>;
+  onApply: (filter: FilterState, params: URLSearchParams) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -42,10 +44,15 @@ export function SavedViewsControl({
 
   const save = () => {
     if (!trimmedName) return;
+    const params = stateToParams(filter, defaultSort);
+    for (const [key, value] of Object.entries(extraQuery ?? {})) {
+      if (value == null) params.delete(key);
+      else params.set(key, value);
+    }
     createView.mutate(
       {
         name: trimmedName,
-        queryString: stateToParams(filter, defaultSort).toString(),
+        queryString: params.toString(),
       },
       {
         onSuccess: () => {
@@ -85,11 +92,10 @@ export function SavedViewsControl({
                   type="button"
                   className="min-w-0 flex-1 truncate px-2 py-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => {
+                    const params = new URLSearchParams(view.queryString);
                     onApply(
-                      paramsToState(
-                        new URLSearchParams(view.queryString),
-                        defaultSort,
-                      ),
+                      paramsToState(params, defaultSort),
+                      params,
                     );
                     setOpen(false);
                   }}
