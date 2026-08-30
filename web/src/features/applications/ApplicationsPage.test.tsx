@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -47,5 +48,68 @@ describe("ApplicationsPage", () => {
     expect(screen.getByRole("option", { name: "申请状态" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "面试中" })).toBeInTheDocument();
     expect(screen.getByText("正在显示 1 / 1 条申请记录")).toBeInTheDocument();
+  });
+
+  it("compares two selected roles using the deterministic evidence endpoint", async () => {
+    await changeLanguage("en");
+    const rows = [
+      table.rows[0],
+      { ...table.rows[0], jobId: 43, company: "Globex", title: "Staff Engineer", fitScore: null },
+    ];
+    server.use(
+      http.get("/api/applications", () => HttpResponse.json({ ...table, rows })),
+      http.post("/api/jobs/company-intelligence-comparisons", async ({ request }) => {
+        expect(await request.json()).toEqual({ jobIds: [42, 43] });
+        return HttpResponse.json({
+          items: [
+            {
+              jobId: 42,
+              company: "Acme",
+              title: "Senior SWE",
+              fitScore: 82,
+              applicationStatus: "interview",
+              companyEvidence: {
+                state: "ready",
+                retrievedAt: "2026-08-30T12:00:00Z",
+                isStale: false,
+                researchDepth: "deep",
+                sourceCount: 4,
+                strongestVerification: "corroborated",
+              },
+              h1BStatus: "matched",
+              offerTotal: null,
+              offerCurrency: null,
+            },
+            {
+              jobId: 43,
+              company: "Globex",
+              title: "Staff Engineer",
+              fitScore: null,
+              applicationStatus: "interview",
+              companyEvidence: { state: "not_researched" },
+              h1BStatus: null,
+              offerTotal: 210000,
+              offerCurrency: "USD",
+            },
+          ],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter><ApplicationsPage /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await user.click(await screen.findByRole("checkbox", { name: /select acme/i }));
+    await user.click(screen.getByRole("checkbox", { name: /select globex/i }));
+    await user.click(screen.getByRole("button", { name: "Compare selected" }));
+
+    expect(await screen.findByRole("heading", { name: "Role comparison" })).toBeInTheDocument();
+    expect(screen.getByText("deep · 4 sources · corroborated · current")).toBeInTheDocument();
+    expect(screen.getByText("Not researched")).toBeInTheDocument();
+    expect(screen.getByText("Historical filing match")).toBeInTheDocument();
+    expect(screen.getByText("210,000 USD")).toBeInTheDocument();
   });
 });

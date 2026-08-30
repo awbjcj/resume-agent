@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Search } from "lucide-react";
+import { Download, GitCompareArrows, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { openDownload } from "@/lib/api/client";
 import { applicationStatusLabel } from "./application-labels";
 import { ApplicationsTable } from "./ApplicationsTable";
+import { RoleComparisonTable } from "./RoleComparisonTable";
 import { useApplications } from "./use-applications";
+import { useRoleComparison } from "./use-role-comparison";
 
 type SortOrder = "newest" | "company-asc" | "company-desc" | "status";
 
@@ -20,6 +22,8 @@ export function ApplicationsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState<SortOrder>("newest");
+  const [selectedJobIds, setSelectedJobIds] = useState<number[]>([]);
+  const comparison = useRoleComparison();
   const data = query.data;
 
   const visible = useMemo(() => {
@@ -46,6 +50,16 @@ export function ApplicationsPage() {
     void openDownload(`/api/applications.csv?shape=${shape}`).catch((error: Error) =>
       toast.error(error.message),
     );
+  };
+  const toggleSelection = (jobId: number) => {
+    setSelectedJobIds((current) => {
+      if (current.includes(jobId)) return current.filter((value) => value !== jobId);
+      if (current.length === 3) {
+        toast.error("Compare up to three roles at a time");
+        return current;
+      }
+      return [...current, jobId];
+    });
   };
 
   return (
@@ -94,7 +108,46 @@ export function ApplicationsPage() {
       <p className="text-sm text-muted-foreground" role="status">
         {t("applications.showing", { shown: visible.rows.length, total: data?.rows.length ?? 0 })}
       </p>
-      <ApplicationsTable table={visible} />
+      <section aria-label="Role comparison controls" className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4 shadow-card">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Compare roles</p>
+          <p className="text-sm text-muted-foreground">
+            {`Select two or three application rows. ${selectedJobIds.length} selected.`}
+          </p>
+        </div>
+        {selectedJobIds.length ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setSelectedJobIds([]);
+              comparison.reset();
+            }}
+          >
+            <X aria-hidden="true" />
+            Clear
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          disabled={selectedJobIds.length < 2 || comparison.isPending}
+          onClick={() => comparison.mutate(selectedJobIds)}
+        >
+          <GitCompareArrows aria-hidden="true" />
+          {comparison.isPending ? "Comparing…" : "Compare selected"}
+        </Button>
+      </section>
+      {comparison.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Role comparison could not be loaded. The selected applications are unchanged.
+        </p>
+      ) : null}
+      {comparison.data ? <RoleComparisonTable comparison={comparison.data} /> : null}
+      <ApplicationsTable
+        table={visible}
+        selectedJobIds={selectedJobIds}
+        onToggleSelection={toggleSelection}
+      />
     </div>
   );
 }

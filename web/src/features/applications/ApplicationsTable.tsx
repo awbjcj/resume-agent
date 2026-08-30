@@ -84,7 +84,15 @@ function StageCell({ cell, label }: { cell?: PivotCell; label: string }) {
   );
 }
 
-export function ApplicationsTable({ table }: { table: ApplicationsTableData }) {
+export function ApplicationsTable({
+  table,
+  selectedJobIds = [],
+  onToggleSelection,
+}: {
+  table: ApplicationsTableData;
+  selectedJobIds?: readonly number[];
+  onToggleSelection?: (jobId: number) => void;
+}) {
   const { t } = useTranslation();
   if (table.rows.length === 0) {
     return (
@@ -109,7 +117,8 @@ export function ApplicationsTable({ table }: { table: ApplicationsTableData }) {
         </caption>
         <TableHeader>
           <TableRow>
-            <TableHead className="sticky left-0 z-10 min-w-44 bg-card">{t("applicationTimeline.headers.company")}</TableHead>
+            {onToggleSelection ? <TableHead className="w-20">Compare</TableHead> : null}
+            <TableHead className={`sticky ${onToggleSelection ? "left-20" : "left-0"} z-10 min-w-44 bg-card`}>{t("applicationTimeline.headers.company")}</TableHead>
             <TableHead className="min-w-44">{t("applicationTimeline.headers.role")}</TableHead>
             <TableHead>{t("applicationTimeline.headers.status")}</TableHead>
             {stages.map((key) => (
@@ -127,7 +136,18 @@ export function ApplicationsTable({ table }: { table: ApplicationsTableData }) {
         <TableBody>
           {table.rows.map((row) => (
             <TableRow key={row.jobId}>
-              <TableCell className="sticky left-0 z-[1] max-w-52 bg-card font-medium">
+              {onToggleSelection ? (
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={selectedJobIds.includes(row.jobId)}
+                    aria-label={`Select ${row.company || "unknown company"} ${row.title || "role"} for comparison`}
+                    onChange={() => onToggleSelection(row.jobId)}
+                    className="size-4 rounded border-input accent-primary"
+                  />
+                </TableCell>
+              ) : null}
+              <TableCell className={`sticky ${onToggleSelection ? "left-20" : "left-0"} z-[1] max-w-52 bg-card font-medium`}>
                 <Link
                   to={`/pipeline?job=${row.jobId}`}
                   className="block truncate text-primary underline-offset-4 hover:underline"

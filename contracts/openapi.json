@@ -3263,6 +3263,85 @@
         "title": "CohortOut",
         "type": "object"
       },
+      "CompanyEvidenceComparisonOut": {
+        "properties": {
+          "isStale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isstale"
+          },
+          "researchDepth": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quick",
+                  "standard",
+                  "deep"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Researchdepth"
+          },
+          "retrievedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrievedat"
+          },
+          "sourceCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecount"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "strongestVerification": {
+            "anyOf": [
+              {
+                "enum": [
+                  "corroborated",
+                  "single_source",
+                  "inferred"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strongestverification"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "CompanyEvidenceComparisonOut",
+        "type": "object"
+      },
       "CompanyIntelligenceChangeSetOut": {
         "properties": {
           "addedAxes": {
@@ -10408,6 +10487,128 @@
           "instruction"
         ],
         "title": "ReviseRequest",
+        "type": "object"
+      },
+      "RoleComparisonIn": {
+        "properties": {
+          "jobIds": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 3,
+            "minItems": 2,
+            "title": "Jobids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobIds"
+        ],
+        "title": "RoleComparisonIn",
+        "type": "object"
+      },
+      "RoleComparisonItemOut": {
+        "properties": {
+          "applicationStatus": {
+            "title": "Applicationstatus",
+            "type": "string"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "companyEvidence": {
+            "$ref": "#/components/schemas/CompanyEvidenceComparisonOut"
+          },
+          "fitScore": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fitscore"
+          },
+          "h1BStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H1Bstatus"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "offerCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offercurrency"
+          },
+          "offerTotal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offertotal"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "jobId",
+          "applicationStatus",
+          "companyEvidence"
+        ],
+        "title": "RoleComparisonItemOut",
+        "type": "object"
+      },
+      "RoleComparisonOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RoleComparisonItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "RoleComparisonOut",
         "type": "object"
       },
       "RolePreparationAskOut": {
@@ -21342,6 +21543,62 @@
           }
         },
         "summary": "Bulk Jobs"
+      }
+    },
+    "/api/jobs/company-intelligence-comparisons": {
+      "post": {
+        "operationId": "create_role_comparison_api_jobs_company_intelligence_comparisons_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleComparisonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleComparisonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Role Comparison"
       }
     },
     "/api/jobs/from-url": {
