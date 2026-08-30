@@ -73,7 +73,7 @@ describe("analytics chart transforms", () => {
       { fromKind: "recruiter_screen", toKind: "technical_round", medianDays: 6, sampleSize: 12 },
     ]);
     const offers = toOfferRows([
-      { eventId: 12, jobId: 1, company: null, sequence: 1, occurredAt: "2026-03-20T12:00:00Z", compBase: null, compBonus: null, compEquityAnnual: null, compSigning: null, compCurrency: null, totalComp: null },
+      { eventId: 12, jobId: 1, company: null, sequence: 1, occurredAt: "2026-03-20T12:00:00Z", compBase: null, compBonus: null, compEquityAnnual: null, compSigning: null, compCurrency: null, totalComp: 0 },
     ]);
 
     expect(flow.nodes.map((node) => node.name)).toEqual(["已投递", "招聘方初筛"]);

@@ -27,19 +27,19 @@ export const RATE_COST_BAND_STYLES: Record<RateCostBand, {
   },
 };
 
-export const RATE_COST_BAND_LABEL_KEYS: Record<RateCostBand, string> = {
+export const RATE_COST_BAND_LABEL_KEYS = {
   economical: "adminQuota.rate.bands.economical.label",
   standard: "adminQuota.rate.bands.standard.label",
   premium: "adminQuota.rate.bands.premium.label",
-};
+} as const satisfies Record<RateCostBand, string>;
 
-export const RATE_COST_BAND_DETAIL_KEYS: Record<RateCostBand, string> = {
+export const RATE_COST_BAND_DETAIL_KEYS = {
   economical: "adminQuota.rate.bands.economical.detail",
   standard: "adminQuota.rate.bands.standard.detail",
   premium: "adminQuota.rate.bands.premium.detail",
-};
+} as const satisfies Record<RateCostBand, string>;
 
-export const RATE_SORT_LABEL_KEYS: Record<RateSortKey, string> = {
+export const RATE_SORT_LABEL_KEYS = {
   model: "adminQuota.rate.sort.model",
   context: "adminQuota.rate.sort.context",
   input: "adminQuota.rate.sort.input",
@@ -48,19 +48,20 @@ export const RATE_SORT_LABEL_KEYS: Record<RateSortKey, string> = {
   tool: "adminQuota.rate.sort.tool",
   hours: "adminQuota.rate.sort.hours",
   effective: "adminQuota.rate.sort.effective",
-};
+} as const satisfies Record<RateSortKey, string>;
 
-export enum RateVersionStatus {
-  Active = "active",
-  Scheduled = "scheduled",
-  Historical = "historical",
-}
+export const RateVersionStatus = {
+  Active: "active",
+  Scheduled: "scheduled",
+  Historical: "historical",
+} as const;
+export type RateVersionStatus = (typeof RateVersionStatus)[keyof typeof RateVersionStatus];
 
-export const RATE_VERSION_STATUS_LABEL_KEYS: Record<RateVersionStatus, string> = {
+export const RATE_VERSION_STATUS_LABEL_KEYS = {
   [RateVersionStatus.Active]: "adminQuota.rate.statuses.active",
   [RateVersionStatus.Scheduled]: "adminQuota.rate.statuses.scheduled",
   [RateVersionStatus.Historical]: "adminQuota.rate.statuses.historical",
-};
+} as const satisfies Record<RateVersionStatus, string>;
 
 export function rateCostBand(rate: LlmRate): RateCostBand {
   const referenceMicros = rate.inputMicrosPerMillion + rate.outputMicrosPerMillion;

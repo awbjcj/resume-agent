@@ -8,7 +8,10 @@ import { axisProps, CHART_COLORS, tooltipProps } from "./chart-theme";
 
 type Offer = components["schemas"]["OfferOut"];
 
-function localized(t: TFunction | undefined, key: string): string {
+function localized(
+  t: TFunction | undefined,
+  key: "analytics.offer.fallback" | "analytics.offer.unspecifiedCurrency",
+): string {
   return t ? t(key) : i18n.t(key);
 }
 

@@ -82,40 +82,40 @@ const CUSTOM_MODEL = "__custom__";
 const ALL_BALANCES = "ALL";
 const CYCLE_COUNTS = Array.from({ length: 52 }, (_, index) => index + 1);
 
-const TARGET_LABEL_KEYS: Record<QuotaTargetType, string> = {
+const TARGET_LABEL_KEYS = {
   USER: "adminQuota.targets.member",
   TIER: "adminQuota.targets.tier",
   ALL_MEMBERS: "adminQuota.targets.allMembers",
-};
+} as const satisfies Record<QuotaTargetType, string>;
 
-const ACTION_LABEL_KEYS: Record<QuotaActionType, string> = {
+const ACTION_LABEL_KEYS = {
   GRANT_CREDIT: "adminQuota.actions.grantCredit",
   DEBIT_CREDIT: "adminQuota.actions.debitCredit",
   RESET_CURRENT_PERIOD: "adminQuota.actions.resetCurrentPeriod",
-};
+} as const satisfies Record<QuotaActionType, string>;
 
-const RATE_PERIOD_LABEL_KEYS: Record<RatePeriodChoice, string> = {
+const RATE_PERIOD_LABEL_KEYS = {
   all: "adminQuota.rate.periods.all",
   peak: "adminQuota.rate.periods.peak",
   off_peak: "adminQuota.rate.periods.offPeak",
-};
+} as const satisfies Record<RatePeriodChoice, string>;
 
-const BALANCE_LABEL_KEYS: Record<string, string> = {
+const BALANCE_LABEL_KEYS = {
   [ALL_BALANCES]: "adminQuota.balances.all",
   POSITIVE: "adminQuota.balances.positive",
   ZERO: "adminQuota.balances.depleted",
   OVERAGE: "adminQuota.balances.overage",
   UNLIMITED: "adminQuota.balances.unlimited",
-};
+} as const;
 
-const ACCOUNT_STATUS_LABEL_KEYS: Record<QuotaAccount["status"], string> = {
+const ACCOUNT_STATUS_LABEL_KEYS = {
   ACTIVE: "adminQuota.accountStatuses.active",
   EXHAUSTED: "adminQuota.accountStatuses.exhausted",
   OVERAGE: "adminQuota.accountStatuses.overage",
   UNLIMITED: "adminQuota.accountStatuses.unlimited",
-};
+} as const satisfies Record<QuotaAccount["status"], string>;
 
-const LEDGER_KIND_LABEL_KEYS: Record<string, string> = {
+const LEDGER_KIND_LABEL_KEYS = {
   USAGE: "adminQuota.ledgerKinds.usage",
   CREDIT_GRANT: "adminQuota.ledgerKinds.creditGrant",
   CREDIT_DEBIT: "adminQuota.ledgerKinds.creditDebit",
@@ -123,7 +123,7 @@ const LEDGER_KIND_LABEL_KEYS: Record<string, string> = {
   TIER_CHANGE: "adminQuota.ledgerKinds.tierChange",
   TIER_ALLOWANCE_CHANGE: "adminQuota.ledgerKinds.tierAllowanceChange",
   OVERRIDE_CHANGE: "adminQuota.ledgerKinds.overrideChange",
-};
+} as const;
 
 function quotaActionLabel(t: TFunction, action: string): string {
   const key = ACTION_LABEL_KEYS[action as QuotaActionType];
@@ -135,7 +135,7 @@ function quotaAccountStatusLabel(t: TFunction, status: QuotaAccount["status"]): 
 }
 
 function quotaLedgerKindLabel(t: TFunction, kind: string): string {
-  const key = LEDGER_KIND_LABEL_KEYS[kind];
+  const key = LEDGER_KIND_LABEL_KEYS[kind as keyof typeof LEDGER_KIND_LABEL_KEYS];
   return key ? t(key) : kind.replaceAll("_", " ");
 }
 
@@ -1595,7 +1595,7 @@ export function AdminQuotasPage() {
                 <Input className="h-9 pl-9" aria-label="Search members" placeholder="Search member…" value={search} onChange={(event) => setSearch(event.target.value)} />
               </div>
               <Select value={balanceFilter} onValueChange={(value) => setBalanceFilter(value ?? "")}>
-                <SelectTrigger size="compact" className={cn(CONTROL_TRIGGER, "sm:w-44")} aria-label="Balance filter"><SelectValue>{(value) => t(BALANCE_LABEL_KEYS[value as string] ?? BALANCE_LABEL_KEYS[ALL_BALANCES])}</SelectValue></SelectTrigger>
+                <SelectTrigger size="compact" className={cn(CONTROL_TRIGGER, "sm:w-44")} aria-label="Balance filter"><SelectValue>{(value) => t(BALANCE_LABEL_KEYS[value as keyof typeof BALANCE_LABEL_KEYS] ?? BALANCE_LABEL_KEYS[ALL_BALANCES])}</SelectValue></SelectTrigger>
                 <SelectContent>
                   {Object.entries(BALANCE_LABEL_KEYS).map(([value, labelKey]) => (
                     <SelectItem key={value} value={value}>{t(labelKey)}</SelectItem>

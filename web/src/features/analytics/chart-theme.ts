@@ -23,7 +23,7 @@ export const CHART_COLORS = {
   withdrawn: "var(--muted-foreground)",
 } as const;
 
-const STAGE_LABEL_KEYS: Record<string, string> = {
+const STAGE_LABEL_KEYS = {
   application_submitted: "applicationTimeline.stages.applicationSubmitted",
   recruiter_screen: "applicationTimeline.stages.recruiterScreen",
   online_assessment: "applicationTimeline.stages.onlineAssessment",
@@ -39,10 +39,10 @@ const STAGE_LABEL_KEYS: Record<string, string> = {
   rejected: "applicationTimeline.stages.rejected",
   no_response: "applicationTimeline.stages.noResponse",
   withdrawn: "applicationTimeline.stages.withdrawn",
-};
+} as const;
 
 export function stageLabel(kind: string, t?: TFunction): string {
-  const key = STAGE_LABEL_KEYS[kind];
+  const key = STAGE_LABEL_KEYS[kind as keyof typeof STAGE_LABEL_KEYS];
   if (!key) return kind;
   return t ? t(key) : i18n.t(key);
 }
