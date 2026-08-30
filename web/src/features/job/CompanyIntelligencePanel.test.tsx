@@ -34,6 +34,8 @@ const evidence = {
       summary: "Acme is investing in platform tooling.",
       whyItMatters: "Ask how the role supports the platform strategy.",
       citations: ["https://acme.example/strategy"],
+      verificationState: "corroborated" as const,
+      conflictingEvidence: "",
     },
   ],
   sources: [
@@ -42,11 +44,23 @@ const evidence = {
       url: "https://acme.example/strategy",
       publisher: "Acme",
       sourceType: "official" as const,
+      sourceTier: "company_official" as const,
     },
   ],
   retrievedAt: "2026-08-29T12:00:00Z",
   expiresAt: "2026-09-28T12:00:00Z",
   caveat: "Verify important claims with the linked sources.",
+  versionId: 2,
+  versionNumber: 2,
+  previousVersionId: 1,
+  researchDepth: "standard" as const,
+  changes: {
+    addedAxes: [],
+    removedAxes: [],
+    changedAxes: ["strategy" as const],
+    addedSourceUrls: [],
+    removedSourceUrls: [],
+  },
 };
 
 const readyResult = {
@@ -63,6 +77,21 @@ describe("CompanyIntelligencePanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useRunStore.setState({ runs: {} });
+    server.use(
+      http.get("/api/jobs/42/company-intelligence/versions", () =>
+        HttpResponse.json({ items: [evidence] }),
+      ),
+      http.get("/api/jobs/42/role-preparation-brief", () =>
+        HttpResponse.json({
+          state: "unavailable",
+          reason: "company_intelligence_required",
+          canRefresh: false,
+          inputsChanged: false,
+          brief: null,
+          message: "Research the company before generating role preparation.",
+        }),
+      ),
+    );
   });
 
   it("renders saved insights, source provenance, and caveat", () => {
@@ -80,6 +109,8 @@ describe("CompanyIntelligencePanel", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Acme builds infrastructure software.")).toBeInTheDocument();
     expect(screen.getByText("Acme is investing in platform tooling.")).toBeInTheDocument();
+    expect(screen.getByText("Corroborated")).toBeInTheDocument();
+    expect(screen.getByText("Updated Strategy")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /acme strategy/i })).toHaveLength(1);
     expect(screen.getByRole("link", { name: /open source/i })).toHaveAttribute(
       "href",
@@ -118,13 +149,15 @@ describe("CompanyIntelligencePanel", () => {
 
   it("launches an explicit company-scoped research run", async () => {
     const user = userEvent.setup();
+    let requestedDepth: unknown;
     server.use(
-      http.post("/api/jobs/42/company-intelligence/refreshes", () =>
-        HttpResponse.json(
+      http.post("/api/jobs/42/company-intelligence/refreshes", async ({ request }) => {
+        requestedDepth = await request.json();
+        return HttpResponse.json(
           { runId: "run-company", kind: "companyIntelligence", meta: { jobId: 42 } },
           { status: 202 },
-        ),
-      ),
+        );
+      }),
     );
     render(
       <CompanyIntelligencePanel
@@ -147,6 +180,9 @@ describe("CompanyIntelligencePanel", () => {
     const button = screen.getByRole("button", {
       name: /research company for acme/i,
     });
+    const depth = screen.getByLabelText("Company research depth");
+    await user.selectOptions(depth, "deep");
+    expect(depth).toHaveFocus();
     await user.tab();
     expect(button).toHaveFocus();
     await user.keyboard("{Enter}");
@@ -158,6 +194,7 @@ describe("CompanyIntelligencePanel", () => {
       runId: "run-company",
       kind: "companyIntelligence",
     });
+    expect(requestedDepth).toEqual({ depth: "deep" });
   });
 
   it("shows a failed run without hiding the last good dossier", () => {

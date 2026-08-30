@@ -17,6 +17,20 @@ const AXIS_LABELS: Record<Insight["axis"], string> = {
   competitive_position: "Competitive position",
 };
 
+const VERIFICATION_LABELS: Record<Insight["verificationState"], string> = {
+  corroborated: "Corroborated",
+  single_source: "Single source",
+  inferred: "Inference",
+};
+
+const SOURCE_TIER_LABELS: Record<Source["sourceTier"], string> = {
+  company_official: "Company official",
+  government_or_regulatory: "Government or regulatory",
+  reputable_independent: "Reputable independent",
+  employee_or_community: "Employee or community",
+  other: "Other public source",
+};
+
 function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -33,14 +47,23 @@ function citationLabel(url: string, sources: readonly Source[]): string {
 function InsightCard({ insight, sources }: { insight: Insight; sources: readonly Source[] }) {
   return (
     <Card className="gap-0 p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-        {AXIS_LABELS[insight.axis]}
-      </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+          {AXIS_LABELS[insight.axis]}
+        </h3>
+        <Badge variant="outline">{VERIFICATION_LABELS[insight.verificationState]}</Badge>
+      </div>
       <p className="mt-2 text-[15px] leading-7">{insight.summary}</p>
       {insight.whyItMatters && (
         <p className="mt-3 border-t pt-3 text-sm leading-6 text-muted-foreground">
           <span className="font-semibold text-foreground">Candidate lens: </span>
           {insight.whyItMatters}
+        </p>
+      )}
+      {insight.conflictingEvidence && (
+        <p className="mt-3 text-sm leading-6 text-amber-800 dark:text-amber-200">
+          <span className="font-semibold">Conflicting evidence: </span>
+          {insight.conflictingEvidence}
         </p>
       )}
       <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
@@ -76,8 +99,13 @@ function SourceList({ sources }: { sources: readonly Source[] }) {
             <div className="min-w-0">
               <p className="font-medium">{source.title}</p>
               <p className="mt-0.5 text-xs text-muted-foreground capitalize">
-                {source.publisher || new URL(source.url).hostname} · {source.sourceType}
+                {source.publisher || new URL(source.url).hostname} · {SOURCE_TIER_LABELS[source.sourceTier]}
               </p>
+              {source.publishedAt && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Published {formatDate(source.publishedAt)}
+                </p>
+              )}
             </div>
             <a
               href={source.url}
@@ -97,9 +125,13 @@ function SourceList({ sources }: { sources: readonly Source[] }) {
 export function CompanyIntelligenceEvidence({
   evidence,
   isStale,
+  history,
+  historyLoading,
 }: {
   evidence: Evidence;
   isStale: boolean;
+  history: readonly Evidence[];
+  historyLoading: boolean;
 }) {
   const sources = evidence.sources ?? [];
   const insights = evidence.insights ?? [];
@@ -109,6 +141,8 @@ export function CompanyIntelligenceEvidence({
       <Card className="gap-0 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{sources.length} sources</Badge>
+          <Badge variant="outline">{evidence.researchDepth} research</Badge>
+          <Badge variant="outline">Version {evidence.versionNumber}</Badge>
           {isStale && <Badge variant="outline">May be outdated</Badge>}
           <span className="text-xs text-muted-foreground">
             Researched {formatDate(evidence.retrievedAt)}
@@ -130,6 +164,29 @@ export function CompanyIntelligenceEvidence({
         </ResearchNotice>
       )}
 
+      {evidence.previousVersionId && (
+        <Card className="gap-0 p-5">
+          <h3 className="font-heading text-lg font-semibold">What changed</h3>
+          {[
+            ...(evidence.changes?.addedAxes ?? []).map((axis) => `Added ${AXIS_LABELS[axis]}`),
+            ...(evidence.changes?.changedAxes ?? []).map((axis) => `Updated ${AXIS_LABELS[axis]}`),
+            ...(evidence.changes?.removedAxes ?? []).map((axis) => `Removed ${AXIS_LABELS[axis]}`),
+          ].length > 0 || (evidence.changes?.addedSourceUrls ?? []).length > 0 || (evidence.changes?.removedSourceUrls ?? []).length > 0 ? (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {[
+                ...(evidence.changes?.addedAxes ?? []).map((axis) => `Added ${AXIS_LABELS[axis]}`),
+                ...(evidence.changes?.changedAxes ?? []).map((axis) => `Updated ${AXIS_LABELS[axis]}`),
+                ...(evidence.changes?.removedAxes ?? []).map((axis) => `Removed ${AXIS_LABELS[axis]}`),
+                ...((evidence.changes?.addedSourceUrls ?? []).length ? [`Added ${(evidence.changes?.addedSourceUrls ?? []).length} source(s)`] : []),
+                ...((evidence.changes?.removedSourceUrls ?? []).length ? [`Removed ${(evidence.changes?.removedSourceUrls ?? []).length} source(s)`] : []),
+              ].map((item) => <li key={item}><Badge variant="secondary">{item}</Badge></li>)}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">No material evidence changes were detected.</p>
+          )}
+        </Card>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {insights.map((insight) => (
           <InsightCard key={insight.axis} insight={insight} sources={sources} />
@@ -137,6 +194,22 @@ export function CompanyIntelligenceEvidence({
       </div>
 
       <SourceList sources={sources} />
+
+      <details className="rounded-lg border bg-card px-5 py-4">
+        <summary className="cursor-pointer font-semibold">Research history</summary>
+        {historyLoading ? (
+          <p className="mt-3 text-sm text-muted-foreground">Loading history…</p>
+        ) : (
+          <ol className="mt-3 divide-y">
+            {history.map((item) => (
+              <li key={item.versionId ?? `${item.versionNumber}-${item.retrievedAt}`} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
+                <span className="font-medium">Version {item.versionNumber} · {item.researchDepth}</span>
+                <span className="text-xs text-muted-foreground">{formatDate(item.retrievedAt)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </details>
 
       <ResearchNotice
         icon={<CircleAlert className="size-4" />}

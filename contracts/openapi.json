@@ -3263,6 +3263,68 @@
         "title": "CohortOut",
         "type": "object"
       },
+      "CompanyIntelligenceChangeSetOut": {
+        "properties": {
+          "addedAxes": {
+            "items": {
+              "enum": [
+                "strategy",
+                "recent_moves",
+                "engineering_culture",
+                "challenges",
+                "competitive_position"
+              ],
+              "type": "string"
+            },
+            "title": "Addedaxes",
+            "type": "array"
+          },
+          "addedSourceUrls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Addedsourceurls",
+            "type": "array"
+          },
+          "changedAxes": {
+            "items": {
+              "enum": [
+                "strategy",
+                "recent_moves",
+                "engineering_culture",
+                "challenges",
+                "competitive_position"
+              ],
+              "type": "string"
+            },
+            "title": "Changedaxes",
+            "type": "array"
+          },
+          "removedAxes": {
+            "items": {
+              "enum": [
+                "strategy",
+                "recent_moves",
+                "engineering_culture",
+                "challenges",
+                "competitive_position"
+              ],
+              "type": "string"
+            },
+            "title": "Removedaxes",
+            "type": "array"
+          },
+          "removedSourceUrls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Removedsourceurls",
+            "type": "array"
+          }
+        },
+        "title": "CompanyIntelligenceChangeSetOut",
+        "type": "object"
+      },
       "CompanyIntelligenceEmptyOut": {
         "properties": {
           "canRefresh": {
@@ -3328,6 +3390,9 @@
             "title": "Caveat",
             "type": "string"
           },
+          "changes": {
+            "$ref": "#/components/schemas/CompanyIntelligenceChangeSetOut"
+          },
           "displayCompany": {
             "title": "Displaycompany",
             "type": "string"
@@ -3352,6 +3417,27 @@
             "title": "Overview",
             "type": "string"
           },
+          "previousVersionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previousversionid"
+          },
+          "researchDepth": {
+            "default": "standard",
+            "enum": [
+              "quick",
+              "standard",
+              "deep"
+            ],
+            "title": "Researchdepth",
+            "type": "string"
+          },
           "retrievedAt": {
             "format": "date-time",
             "title": "Retrievedat",
@@ -3363,6 +3449,22 @@
             },
             "title": "Sources",
             "type": "array"
+          },
+          "versionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Versionid"
+          },
+          "versionNumber": {
+            "default": 1,
+            "title": "Versionnumber",
+            "type": "integer"
           }
         },
         "required": [
@@ -3378,6 +3480,18 @@
       },
       "CompanyIntelligenceInsightOut": {
         "properties": {
+          "asOf": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asof"
+          },
           "axis": {
             "enum": [
               "strategy",
@@ -3396,8 +3510,22 @@
             "title": "Citations",
             "type": "array"
           },
+          "conflictingEvidence": {
+            "default": "",
+            "title": "Conflictingevidence",
+            "type": "string"
+          },
           "summary": {
             "title": "Summary",
+            "type": "string"
+          },
+          "verificationState": {
+            "enum": [
+              "corroborated",
+              "single_source",
+              "inferred"
+            ],
+            "title": "Verificationstate",
             "type": "string"
           },
           "whyItMatters": {
@@ -3408,7 +3536,8 @@
         "required": [
           "axis",
           "summary",
-          "whyItMatters"
+          "whyItMatters",
+          "verificationState"
         ],
         "title": "CompanyIntelligenceInsightOut",
         "type": "object"
@@ -3470,10 +3599,61 @@
         "title": "CompanyIntelligenceReadyOut",
         "type": "object"
       },
+      "CompanyIntelligenceRefreshIn": {
+        "properties": {
+          "depth": {
+            "default": "standard",
+            "enum": [
+              "quick",
+              "standard",
+              "deep"
+            ],
+            "title": "Depth",
+            "type": "string"
+          }
+        },
+        "title": "CompanyIntelligenceRefreshIn",
+        "type": "object"
+      },
       "CompanyIntelligenceSourceOut": {
         "properties": {
+          "lastVerifiedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastverifiedat"
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publishedat"
+          },
           "publisher": {
             "title": "Publisher",
+            "type": "string"
+          },
+          "sourceTier": {
+            "enum": [
+              "company_official",
+              "government_or_regulatory",
+              "reputable_independent",
+              "employee_or_community",
+              "other"
+            ],
+            "title": "Sourcetier",
             "type": "string"
           },
           "sourceType": {
@@ -3497,7 +3677,8 @@
           "title",
           "url",
           "publisher",
-          "sourceType"
+          "sourceType",
+          "sourceTier"
         ],
         "title": "CompanyIntelligenceSourceOut",
         "type": "object"
@@ -3559,6 +3740,19 @@
           }
         },
         "title": "CompanyIntelligenceUnavailableOut",
+        "type": "object"
+      },
+      "CompanyIntelligenceVersionListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyIntelligenceEvidenceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "title": "CompanyIntelligenceVersionListOut",
         "type": "object"
       },
       "CostTotals": {
@@ -9984,6 +10178,405 @@
           "instruction"
         ],
         "title": "ReviseRequest",
+        "type": "object"
+      },
+      "RolePreparationAskOut": {
+        "properties": {
+          "companyCitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Companycitations",
+            "type": "array"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "rationale"
+        ],
+        "title": "RolePreparationAskOut",
+        "type": "object"
+      },
+      "RolePreparationBriefOut": {
+        "properties": {
+          "applicationStatus": {
+            "title": "Applicationstatus",
+            "type": "string"
+          },
+          "caveat": {
+            "title": "Caveat",
+            "type": "string"
+          },
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "companyIntelligenceVersionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Companyintelligenceversionid"
+          },
+          "companyIntelligenceVersionNumber": {
+            "default": 1,
+            "title": "Companyintelligenceversionnumber",
+            "type": "integer"
+          },
+          "competencies": {
+            "items": {
+              "$ref": "#/components/schemas/RolePreparationCompetencyOut"
+            },
+            "title": "Competencies",
+            "type": "array"
+          },
+          "concerns": {
+            "items": {
+              "$ref": "#/components/schemas/RolePreparationConcernOut"
+            },
+            "title": "Concerns",
+            "type": "array"
+          },
+          "coverLetterId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverletterid"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "inputFingerprint": {
+            "title": "Inputfingerprint",
+            "type": "string"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "likelyQuestions": {
+            "items": {
+              "$ref": "#/components/schemas/RolePreparationQuestionOut"
+            },
+            "title": "Likelyquestions",
+            "type": "array"
+          },
+          "positioningSummary": {
+            "title": "Positioningsummary",
+            "type": "string"
+          },
+          "priorRoundFocus": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Priorroundfocus",
+            "type": "array"
+          },
+          "questionsToAsk": {
+            "items": {
+              "$ref": "#/components/schemas/RolePreparationAskOut"
+            },
+            "title": "Questionstoask",
+            "type": "array"
+          },
+          "recruiterVerificationQuestions": {
+            "items": {
+              "$ref": "#/components/schemas/RolePreparationAskOut"
+            },
+            "title": "Recruiterverificationquestions",
+            "type": "array"
+          },
+          "resumeVersionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumeversionid"
+          },
+          "signalEventIds": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Signaleventids",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "company",
+          "title",
+          "generatedAt",
+          "inputFingerprint",
+          "applicationStatus",
+          "positioningSummary",
+          "caveat"
+        ],
+        "title": "RolePreparationBriefOut",
+        "type": "object"
+      },
+      "RolePreparationCompetencyOut": {
+        "properties": {
+          "companyCitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Companycitations",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "rationale"
+        ],
+        "title": "RolePreparationCompetencyOut",
+        "type": "object"
+      },
+      "RolePreparationConcernOut": {
+        "properties": {
+          "companyCitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Companycitations",
+            "type": "array"
+          },
+          "concern": {
+            "title": "Concern",
+            "type": "string"
+          },
+          "preparation": {
+            "title": "Preparation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concern",
+          "preparation"
+        ],
+        "title": "RolePreparationConcernOut",
+        "type": "object"
+      },
+      "RolePreparationEmptyOut": {
+        "properties": {
+          "brief": {
+            "title": "Brief",
+            "type": "null"
+          },
+          "canRefresh": {
+            "const": true,
+            "default": true,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "inputsChanged": {
+            "const": false,
+            "default": false,
+            "title": "Inputschanged",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "const": "not_generated",
+            "default": "not_generated",
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "const": "empty",
+            "default": "empty",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "RolePreparationEmptyOut",
+        "type": "object"
+      },
+      "RolePreparationQuestionOut": {
+        "properties": {
+          "companyCitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Companycitations",
+            "type": "array"
+          },
+          "competency": {
+            "title": "Competency",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "questionType": {
+            "enum": [
+              "screening",
+              "behavioral",
+              "technical",
+              "system_design",
+              "case",
+              "company",
+              "other"
+            ],
+            "title": "Questiontype",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "storyPrompt": {
+            "title": "Storyprompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "questionType",
+          "competency",
+          "rationale",
+          "storyPrompt"
+        ],
+        "title": "RolePreparationQuestionOut",
+        "type": "object"
+      },
+      "RolePreparationReadyOut": {
+        "properties": {
+          "brief": {
+            "$ref": "#/components/schemas/RolePreparationBriefOut"
+          },
+          "canRefresh": {
+            "const": true,
+            "default": true,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "inputsChanged": {
+            "default": false,
+            "title": "Inputschanged",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "null"
+          },
+          "state": {
+            "const": "ready",
+            "default": "ready",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brief"
+        ],
+        "title": "RolePreparationReadyOut",
+        "type": "object"
+      },
+      "RolePreparationUnavailableOut": {
+        "properties": {
+          "brief": {
+            "title": "Brief",
+            "type": "null"
+          },
+          "canRefresh": {
+            "const": false,
+            "default": false,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "inputsChanged": {
+            "const": false,
+            "default": false,
+            "title": "Inputschanged",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "enum": [
+              "missing_job_description",
+              "company_intelligence_required"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "RolePreparationUnavailableOut",
         "type": "object"
       },
       "RoutingConfigDoc": {
@@ -21022,6 +21615,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CompanyIntelligenceRefreshIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "content": {
@@ -21045,6 +21655,71 @@
           }
         },
         "summary": "Create Company Intelligence Refresh"
+      }
+    },
+    "/api/jobs/{job_id}/company-intelligence/versions": {
+      "get": {
+        "operationId": "get_company_intelligence_versions_api_jobs__job_id__company_intelligence_versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyIntelligenceVersionListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Company Intelligence Versions"
       }
     },
     "/api/jobs/{job_id}/email-draft": {
@@ -21537,6 +22212,135 @@
           }
         },
         "summary": "Check H1B Sponsorship"
+      }
+    },
+    "/api/jobs/{job_id}/role-preparation-brief": {
+      "get": {
+        "operationId": "get_role_preparation_brief_api_jobs__job_id__role_preparation_brief_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "empty": "#/components/schemas/RolePreparationEmptyOut",
+                      "ready": "#/components/schemas/RolePreparationReadyOut",
+                      "unavailable": "#/components/schemas/RolePreparationUnavailableOut"
+                    },
+                    "propertyName": "state"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RolePreparationUnavailableOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RolePreparationEmptyOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RolePreparationReadyOut"
+                    }
+                  ],
+                  "title": "Response Get Role Preparation Brief Api Jobs  Job Id  Role Preparation Brief Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Role Preparation Brief"
+      }
+    },
+    "/api/jobs/{job_id}/role-preparation-brief/refreshes": {
+      "post": {
+        "operationId": "create_role_preparation_refresh_api_jobs__job_id__role_preparation_brief_refreshes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Role Preparation Refresh"
       }
     },
     "/api/jobs/{job_id}/select-cover-letter": {

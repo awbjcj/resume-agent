@@ -37,18 +37,37 @@ export function useCheckH1BSponsorship(jobId: number) {
 export function useRefreshCompanyIntelligence(jobId: number) {
   const { launch } = useLaunchRun();
   return useMutation({
-    mutationFn: () =>
+    mutationFn: (depth: "quick" | "standard" | "deep") =>
       launch(
         "companyIntelligence",
         () =>
           unwrap(
             api.POST("/api/jobs/{job_id}/company-intelligence/refreshes", {
               params: { path: { job_id: jobId } },
+              body: { depth },
             }),
           ),
         // The evidence is keyed by company, so refresh every open job detail;
         // sibling roles at the same employer share the new dossier.
-        ["job"],
+        ["job", "company-intelligence-versions", "role-preparation"],
+        { jobId, depth },
+      ),
+  });
+}
+
+export function useRefreshRolePreparation(jobId: number) {
+  const { launch } = useLaunchRun();
+  return useMutation({
+    mutationFn: () =>
+      launch(
+        "rolePreparation",
+        () =>
+          unwrap(
+            api.POST("/api/jobs/{job_id}/role-preparation-brief/refreshes", {
+              params: { path: { job_id: jobId } },
+            }),
+          ),
+        ["role-preparation"],
         { jobId },
       ),
   });

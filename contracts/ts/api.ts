@@ -1804,6 +1804,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/company-intelligence/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Company Intelligence Versions */
+        get: operations["get_company_intelligence_versions_api_jobs__job_id__company_intelligence_versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/email-draft": {
         parameters: {
             query?: never;
@@ -1902,6 +1919,40 @@ export interface paths {
         put?: never;
         /** Check H1B Sponsorship */
         post: operations["check_h1b_sponsorship_api_jobs__job_id__h1b_sponsorship_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/role-preparation-brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Role Preparation Brief */
+        get: operations["get_role_preparation_brief_api_jobs__job_id__role_preparation_brief_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/role-preparation-brief/refreshes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Role Preparation Refresh */
+        post: operations["create_role_preparation_refresh_api_jobs__job_id__role_preparation_brief_refreshes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4541,6 +4592,19 @@ export interface components {
             /** Responses */
             responses: number;
         };
+        /** CompanyIntelligenceChangeSetOut */
+        CompanyIntelligenceChangeSetOut: {
+            /** Addedaxes */
+            addedAxes?: ("strategy" | "recent_moves" | "engineering_culture" | "challenges" | "competitive_position")[];
+            /** Addedsourceurls */
+            addedSourceUrls?: string[];
+            /** Changedaxes */
+            changedAxes?: ("strategy" | "recent_moves" | "engineering_culture" | "challenges" | "competitive_position")[];
+            /** Removedaxes */
+            removedAxes?: ("strategy" | "recent_moves" | "engineering_culture" | "challenges" | "competitive_position")[];
+            /** Removedsourceurls */
+            removedSourceUrls?: string[];
+        };
         /** CompanyIntelligenceEmptyOut */
         CompanyIntelligenceEmptyOut: {
             /**
@@ -4589,6 +4653,7 @@ export interface components {
         CompanyIntelligenceEvidenceOut: {
             /** Caveat */
             caveat: string;
+            changes?: components["schemas"]["CompanyIntelligenceChangeSetOut"];
             /** Displaycompany */
             displayCompany: string;
             /**
@@ -4602,6 +4667,14 @@ export interface components {
             normalizedCompany: string;
             /** Overview */
             overview: string;
+            /** Previousversionid */
+            previousVersionId?: number | null;
+            /**
+             * Researchdepth
+             * @default standard
+             * @enum {string}
+             */
+            researchDepth: "quick" | "standard" | "deep";
             /**
              * Retrievedat
              * Format: date-time
@@ -4609,9 +4682,18 @@ export interface components {
             retrievedAt: string;
             /** Sources */
             sources?: components["schemas"]["CompanyIntelligenceSourceOut"][];
+            /** Versionid */
+            versionId?: number | null;
+            /**
+             * Versionnumber
+             * @default 1
+             */
+            versionNumber: number;
         };
         /** CompanyIntelligenceInsightOut */
         CompanyIntelligenceInsightOut: {
+            /** Asof */
+            asOf?: string | null;
             /**
              * Axis
              * @enum {string}
@@ -4619,8 +4701,18 @@ export interface components {
             axis: "strategy" | "recent_moves" | "engineering_culture" | "challenges" | "competitive_position";
             /** Citations */
             citations?: string[];
+            /**
+             * Conflictingevidence
+             * @default
+             */
+            conflictingEvidence: string;
             /** Summary */
             summary: string;
+            /**
+             * Verificationstate
+             * @enum {string}
+             */
+            verificationState: "corroborated" | "single_source" | "inferred";
             /** Whyitmatters */
             whyItMatters: string;
         };
@@ -4661,10 +4753,28 @@ export interface components {
              */
             state: "ready";
         };
+        /** CompanyIntelligenceRefreshIn */
+        CompanyIntelligenceRefreshIn: {
+            /**
+             * Depth
+             * @default standard
+             * @enum {string}
+             */
+            depth: "quick" | "standard" | "deep";
+        };
         /** CompanyIntelligenceSourceOut */
         CompanyIntelligenceSourceOut: {
+            /** Lastverifiedat */
+            lastVerifiedAt?: string | null;
+            /** Publishedat */
+            publishedAt?: string | null;
             /** Publisher */
             publisher: string;
+            /**
+             * Sourcetier
+             * @enum {string}
+             */
+            sourceTier: "company_official" | "government_or_regulatory" | "reputable_independent" | "employee_or_community" | "other";
             /**
              * Sourcetype
              * @enum {string}
@@ -4718,6 +4828,11 @@ export interface components {
              * @enum {string}
              */
             state: "unavailable";
+        };
+        /** CompanyIntelligenceVersionListOut */
+        CompanyIntelligenceVersionListOut: {
+            /** Items */
+            items?: components["schemas"]["CompanyIntelligenceEvidenceOut"][];
         };
         /** CostTotals */
         CostTotals: {
@@ -7129,6 +7244,181 @@ export interface components {
              * @default false
              */
             reReview: boolean;
+        };
+        /** RolePreparationAskOut */
+        RolePreparationAskOut: {
+            /** Companycitations */
+            companyCitations?: string[];
+            /** Rationale */
+            rationale: string;
+            /** Text */
+            text: string;
+        };
+        /** RolePreparationBriefOut */
+        RolePreparationBriefOut: {
+            /** Applicationstatus */
+            applicationStatus: string;
+            /** Caveat */
+            caveat: string;
+            /** Company */
+            company: string;
+            /** Companyintelligenceversionid */
+            companyIntelligenceVersionId?: number | null;
+            /**
+             * Companyintelligenceversionnumber
+             * @default 1
+             */
+            companyIntelligenceVersionNumber: number;
+            /** Competencies */
+            competencies?: components["schemas"]["RolePreparationCompetencyOut"][];
+            /** Concerns */
+            concerns?: components["schemas"]["RolePreparationConcernOut"][];
+            /** Coverletterid */
+            coverLetterId?: number | null;
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            /** Inputfingerprint */
+            inputFingerprint: string;
+            /** Jobid */
+            jobId: number;
+            /** Likelyquestions */
+            likelyQuestions?: components["schemas"]["RolePreparationQuestionOut"][];
+            /** Positioningsummary */
+            positioningSummary: string;
+            /** Priorroundfocus */
+            priorRoundFocus?: string[];
+            /** Questionstoask */
+            questionsToAsk?: components["schemas"]["RolePreparationAskOut"][];
+            /** Recruiterverificationquestions */
+            recruiterVerificationQuestions?: components["schemas"]["RolePreparationAskOut"][];
+            /** Resumeversionid */
+            resumeVersionId?: number | null;
+            /** Signaleventids */
+            signalEventIds?: number[];
+            /** Title */
+            title: string;
+        };
+        /** RolePreparationCompetencyOut */
+        RolePreparationCompetencyOut: {
+            /** Companycitations */
+            companyCitations?: string[];
+            /** Name */
+            name: string;
+            /** Rationale */
+            rationale: string;
+        };
+        /** RolePreparationConcernOut */
+        RolePreparationConcernOut: {
+            /** Companycitations */
+            companyCitations?: string[];
+            /** Concern */
+            concern: string;
+            /** Preparation */
+            preparation: string;
+        };
+        /** RolePreparationEmptyOut */
+        RolePreparationEmptyOut: {
+            /** Brief */
+            brief?: null;
+            /**
+             * Canrefresh
+             * @default true
+             * @constant
+             */
+            canRefresh: true;
+            /**
+             * Inputschanged
+             * @default false
+             * @constant
+             */
+            inputsChanged: false;
+            /** Message */
+            message?: string | null;
+            /**
+             * Reason
+             * @default not_generated
+             * @constant
+             */
+            reason: "not_generated";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "empty";
+        };
+        /** RolePreparationQuestionOut */
+        RolePreparationQuestionOut: {
+            /** Companycitations */
+            companyCitations?: string[];
+            /** Competency */
+            competency: string;
+            /** Question */
+            question: string;
+            /**
+             * Questiontype
+             * @enum {string}
+             */
+            questionType: "screening" | "behavioral" | "technical" | "system_design" | "case" | "company" | "other";
+            /** Rationale */
+            rationale: string;
+            /** Storyprompt */
+            storyPrompt: string;
+        };
+        /** RolePreparationReadyOut */
+        RolePreparationReadyOut: {
+            brief: components["schemas"]["RolePreparationBriefOut"];
+            /**
+             * Canrefresh
+             * @default true
+             * @constant
+             */
+            canRefresh: true;
+            /**
+             * Inputschanged
+             * @default false
+             */
+            inputsChanged: boolean;
+            /** Message */
+            message?: string | null;
+            /** Reason */
+            reason?: null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "ready";
+        };
+        /** RolePreparationUnavailableOut */
+        RolePreparationUnavailableOut: {
+            /** Brief */
+            brief?: null;
+            /**
+             * Canrefresh
+             * @default false
+             * @constant
+             */
+            canRefresh: false;
+            /**
+             * Inputschanged
+             * @default false
+             * @constant
+             */
+            inputsChanged: false;
+            /** Message */
+            message?: string | null;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "missing_job_description" | "company_intelligence_required";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "unavailable";
         };
         /** RoutingConfigDoc */
         RoutingConfigDoc: {
@@ -12789,7 +13079,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CompanyIntelligenceRefreshIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {
@@ -12798,6 +13092,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_intelligence_versions_api_jobs__job_id__company_intelligence_versions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyIntelligenceVersionListOut"];
                 };
             };
             /** @description Validation Error */
@@ -13056,6 +13385,72 @@ export interface operations {
         };
     };
     check_h1b_sponsorship_api_jobs__job_id__h1b_sponsorship_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_role_preparation_brief_api_jobs__job_id__role_preparation_brief_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolePreparationUnavailableOut"] | components["schemas"]["RolePreparationEmptyOut"] | components["schemas"]["RolePreparationReadyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_role_preparation_refresh_api_jobs__job_id__role_preparation_brief_refreshes_post: {
         parameters: {
             query?: never;
             header?: {
