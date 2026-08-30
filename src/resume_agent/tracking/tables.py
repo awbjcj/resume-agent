@@ -348,6 +348,27 @@ class CompanyIntelligenceVersionRow(SQLModel, table=True):
     schema_version: int = 2
 
 
+class RolePreparationBriefRow(SQLModel, table=True):
+    __tablename__ = cast(Any, "role_preparation_briefs")
+    __table_args__ = (UniqueConstraint("job_id"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="jobs.id", index=True)
+    brief_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    company_intelligence_version_id: int | None = Field(
+        default=None, foreign_key="company_intelligence_versions.id"
+    )
+    resume_version_id: int | None = Field(
+        default=None, foreign_key="resume_versions.id"
+    )
+    input_fingerprint: str = Field(default="", index=True)
+    generated_at: datetime = Field(default_factory=utcnow)
+    schema_version: int = 1
+
+
 class ErrorRecord(SQLModel, table=True):
     """A durable failure record that the user can dismiss or resolve."""
 
