@@ -25,7 +25,13 @@ from resume_agent.services.mock_interview import (
     sessions_view,
 )
 from resume_agent.sessions.stream import Completed, Notice, TextDelta, ToolStarted
-from resume_agent.tracking.tables import CompanyIntelligenceEvidenceRow, Job, ResumeVersion
+from resume_agent.tracking.tables import (
+    Application,
+    ApplicationEvent,
+    CompanyIntelligenceEvidenceRow,
+    Job,
+    ResumeVersion,
+)
 
 _ids: tuple[int, int] = (0, 0)
 _HINTS = ["Use a concrete example.", "Connect the result to the role."]
@@ -572,6 +578,44 @@ def test_load_context_snapshots_current_company_intelligence(engine):
     context = load_context(engine, job_id, version_id)
 
     assert context.company_intelligence["overview"] == "Current public overview"
+
+
+def test_load_context_snapshots_only_nonempty_interview_reflections(engine):
+    job_id, version_id = _ids
+    with get_session(engine) as db:
+        application = Application(job_id=job_id)
+        db.add(application)
+        db.flush()
+        assert application.id is not None
+        db.add_all(
+            [
+                ApplicationEvent(
+                    application_id=application.id,
+                    kind="behavioral",
+                    occurred_at=datetime(2026, 8, 20, tzinfo=timezone.utc),
+                    result="advanced",
+                    reflection="  I should quantify the result next time.  ",
+                ),
+                ApplicationEvent(
+                    application_id=application.id,
+                    kind="technical_round",
+                    reflection="   ",
+                ),
+                ApplicationEvent(
+                    application_id=application.id,
+                    kind="custom",
+                    reflection="This is not an interview event.",
+                ),
+            ]
+        )
+        db.commit()
+
+    context = load_context(engine, job_id, version_id)
+
+    assert [row.kind for row in context.reflections] == ["behavioral"]
+    assert context.reflections[0].label == "Behavioral"
+    assert context.reflections[0].result == "advanced"
+    assert context.reflections[0].reflection == "I should quantify the result next time."
 
 
 def test_open_session_keeps_company_intelligence_snapshot_after_refresh(tmp_path, engine):

@@ -36,6 +36,16 @@ class InterviewStyle(ExtensibleModel):
     response_mode: Literal["text", "audio_preferred"] = "text"
 
 
+class InterviewReflection(ExtensibleModel):
+    """A bounded, frozen self-assessment from a previous interview event."""
+
+    kind: str = ""
+    label: str = ""
+    occurred_at: str = ""
+    result: str = ""
+    reflection: str = ""
+
+
 class InterviewContext(ExtensibleModel):
     """JD + resume snapshot frozen at opening; a later job edit never re-bases a transcript."""
 
@@ -45,6 +55,7 @@ class InterviewContext(ExtensibleModel):
     criteria: dict = Field(default_factory=dict)
     resume_content: dict = Field(default_factory=dict)
     company_intelligence: dict = Field(default_factory=dict)
+    reflections: list[InterviewReflection] = Field(default_factory=list)
 
 
 class PlanItem(ExtensibleModel):

@@ -30,6 +30,7 @@ from resume_agent.interview.agent import (
 from resume_agent.interview.store import (
     InterviewContext,
     InterviewDebrief,
+    InterviewReflection,
     InterviewStyle,
     apply_answer_delta,
     attach_turn_audio,
@@ -52,6 +53,8 @@ _DEGRADED_HINTS = [
     "Use one specific example and make your individual contribution clear.",
     "Structure the response around context, actions, and a measurable result.",
 ]
+_REFLECTION_COUNT_CAP = 8
+_REFLECTION_CHAR_CAP = 1_000
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +105,14 @@ _OPENING_INSTRUCTION = (
 def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContext:
     from resume_agent.db import get_session
     from resume_agent.services.company_intelligence import load_company_intelligence
-    from resume_agent.tracking.tables import Job, ResumeVersion
+    from resume_agent.tracking.event_vocab import INTERVIEW_KINDS
+    from resume_agent.tracking.tables import (
+        Application,
+        ApplicationEvent,
+        Job,
+        ResumeVersion,
+    )
+    from sqlmodel import select
 
     with get_session(engine) as db:
         job = db.get(Job, job_id)
@@ -114,6 +124,33 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
         if version is None or version.job_id != job_id:
             raise ValueError(f"unknown resume version: {resume_version_id}")
         company_intelligence = load_company_intelligence(db, job.company)
+        reflection_events = db.exec(
+            select(ApplicationEvent)
+            .join(Application)
+            .where(
+                Application.job_id == job_id,
+                ApplicationEvent.kind.in_(INTERVIEW_KINDS),
+            )
+            .order_by(
+                ApplicationEvent.occurred_at.desc(),
+                ApplicationEvent.created_at.desc(),
+            )
+        ).all()
+        reflections = [
+            InterviewReflection(
+                kind=event.kind,
+                label=(
+                    event.custom_label.strip()
+                    if event.custom_label and event.custom_label.strip()
+                    else event.kind.replace("_", " ").title()
+                ),
+                occurred_at=(event.occurred_at.isoformat() if event.occurred_at else ""),
+                result=event.result,
+                reflection=(event.reflection or "").strip()[:_REFLECTION_CHAR_CAP],
+            )
+            for event in reflection_events
+            if (event.reflection or "").strip()
+        ][:_REFLECTION_COUNT_CAP]
         return InterviewContext(
             company=job.company or "",
             title=job.title or "",
@@ -125,6 +162,7 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
                 if company_intelligence is not None
                 else {}
             ),
+            reflections=reflections,
         )
 
 
