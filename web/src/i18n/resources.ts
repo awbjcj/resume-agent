@@ -306,6 +306,8 @@ const en = {
       unsaved: "unsaved",
     },
     errors: {
+      separator: "; ",
+      retry: "Please try again.",
       subscriptionBaseUrlUnset: "{{provider}} is pinned to subscription mode but SUB2API_BASE_URL is unset.",
       subscriptionKeyUnset: "{{provider}} is pinned to subscription mode but {{setting}} is unset.",
       keyWithoutBaseUrl: "{{setting}} is set but SUB2API_BASE_URL is unset, so there is nowhere to send the call.",
@@ -917,6 +919,8 @@ const zhCN = {
       unsaved: "未保存",
     },
     errors: {
+      separator: "；",
+      retry: "请重试。",
       subscriptionBaseUrlUnset: "{{provider}} 已固定为订阅网关模式，但尚未设置 SUB2API_BASE_URL。",
       subscriptionKeyUnset: "{{provider}} 已固定为订阅网关模式，但尚未设置 {{setting}}。",
       keyWithoutBaseUrl: "已设置 {{setting}}，但尚未设置 SUB2API_BASE_URL，因此无法发送请求。",

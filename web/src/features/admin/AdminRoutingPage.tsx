@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Cable, Network } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { SaveBar } from "@/features/settings/SaveBar";
 import { useMe } from "@/features/auth/AuthGate";
 import type { components } from "@/lib/api/schema";
 import { AdminSectionNav } from "./AdminSectionNav";
-import { ProviderRouteCard, type RouteMode } from "./ProviderRouteCard";
+import { providerConfigurationErrorLabel, ProviderRouteCard, type RouteMode } from "./ProviderRouteCard";
 import { useAdminRouting, useSaveAdminRouting } from "./use-admin-routing";
 
 type RoutingDoc = components["schemas"]["RoutingConfigDoc"];
@@ -56,6 +57,7 @@ function RoutingSkeleton() {
 }
 
 export function AdminRoutingPage() {
+  const { t } = useTranslation();
   const me = useMe();
   const routing = useAdminRouting(me.data?.role === "admin");
   const save = useSaveAdminRouting();
@@ -78,7 +80,7 @@ export function AdminRoutingPage() {
     return (
       <Alert variant="destructive">
         <AlertTitle>Routing is unavailable</AlertTitle>
-        <AlertDescription>{routing.error?.message ?? "Please try again."}</AlertDescription>
+          <AlertDescription>{routing.error ? providerConfigurationErrorLabel(t, routing.error.message) : "Please try again."}</AlertDescription>
       </Alert>
     );
   }
@@ -178,7 +180,12 @@ export function AdminRoutingPage() {
       {save.isError ? (
         <Alert variant="destructive">
           <AlertTitle>Routing could not be saved</AlertTitle>
-          <AlertDescription>{save.error.message}</AlertDescription>
+          <AlertDescription>
+            {save.error.message
+              .split("; ")
+              .map((error) => providerConfigurationErrorLabel(t, error))
+              .join(t("providerRouting.errors.separator"))}
+          </AlertDescription>
         </Alert>
       ) : null}
       <SaveBar dirty={dirty} saving={save.isPending} onSave={submit} onDiscard={() => setDraft(null)} />

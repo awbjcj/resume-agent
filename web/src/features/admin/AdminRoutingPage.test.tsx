@@ -17,13 +17,13 @@ const providers = [
   { provider: "deepseek", label: "DeepSeek", routeMode: "api", effectiveMode: "api", configurationError: null, key: { isSet: false, hint: null } },
 ] as const;
 
-function renderPage(savedBodies: Array<Record<string, unknown>> = []) {
+function renderPage(savedBodies: Array<Record<string, unknown>> = [], providerData: unknown = providers) {
   server.use(
     http.get("/api/auth/me", () => HttpResponse.json({ username: "owner", role: "admin", authRequired: true, needsEmail: false, emailVerified: true, googleLinked: false })),
-    http.get("/api/admin/routing", () => HttpResponse.json({ baseUrl: "https://gateway.example.com", providers })),
+    http.get("/api/admin/routing", () => HttpResponse.json({ baseUrl: "https://gateway.example.com", providers: providerData })),
     http.put("/api/admin/routing", async ({ request }) => {
       savedBodies.push(await request.json() as Record<string, unknown>);
-      return HttpResponse.json({ baseUrl: "https://gateway.example.com", providers });
+      return HttpResponse.json({ baseUrl: "https://gateway.example.com", providers: providerData });
     }),
   );
   return render(
@@ -92,6 +92,18 @@ describe("AdminRoutingPage", () => {
       "订阅网关",
       "直连 API",
     ]);
+  });
+
+  it("localizes known provider configuration warnings in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    renderPage([], [{
+      ...providers[0],
+      routeMode: "subscription",
+      effectiveMode: null,
+      configurationError: "anthropic is pinned to subscription mode but SUB2API_BASE_URL is unset",
+    }]);
+
+    expect(await screen.findByText("anthropic 已固定为订阅网关模式，但尚未设置 SUB2API_BASE_URL。")).toBeInTheDocument();
   });
 
   it("has no automated accessibility violations", async () => {

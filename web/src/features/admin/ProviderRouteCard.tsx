@@ -20,7 +20,7 @@ import type { components } from "@/lib/api/schema";
 type ProviderStatus = components["schemas"]["ProviderRoutingStatus"];
 export type RouteMode = ProviderStatus["routeMode"];
 
-function configurationErrorLabel(t: TFunction, error: string): string {
+export function providerConfigurationErrorLabel(t: TFunction, error: string): string {
   const subscription = /^(.+) is pinned to subscription mode but ([A-Z0-9_]+) is unset$/.exec(error);
   if (subscription) {
     const [, provider, setting] = subscription;
@@ -118,7 +118,7 @@ export function ProviderRouteCard({
           <Alert variant="destructive">
             <AlertTriangle aria-hidden="true" />
             <AlertTitle>Configuration incomplete</AlertTitle>
-            <AlertDescription>{configurationErrorLabel(t, provider.configurationError)}</AlertDescription>
+            <AlertDescription>{providerConfigurationErrorLabel(t, provider.configurationError)}</AlertDescription>
           </Alert>
         ) : null}
 
