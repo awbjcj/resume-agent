@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { Facets } from "@/features/board/use-board-query";
+import { SavedViewsControl } from "@/features/board/SavedViewsControl";
 import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
 import {
   emptyFilterState,
@@ -121,9 +122,17 @@ export function TriageFilters({
     <section aria-label="Triage filters" className="mb-5 rounded-lg border bg-card p-4">
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">Filter triage</h2>
-        <span className="text-xs font-semibold tabular-nums text-muted-foreground">
-          {total.toLocaleString()} matching
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+            {total.toLocaleString()} matching
+          </span>
+          <SavedViewsControl
+            board="triage"
+            filter={filter}
+            defaultSort="recency"
+            onApply={onChange}
+          />
+        </div>
       </div>
 
       <form onSubmit={(event) => {

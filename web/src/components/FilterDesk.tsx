@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Facets } from "@/features/board/use-board-query";
+import { SavedViewsControl } from "@/features/board/SavedViewsControl";
+import type { BoardName } from "@/features/board/use-saved-views";
 import { fieldLabel } from "@/lib/format";
 import { industryLabel } from "@/lib/filters/industry-label";
 import {
@@ -168,6 +170,8 @@ export function FilterDesk({
   onChange,
   statusOptions,
   statusLabel,
+  savedViewBoard,
+  defaultSort = "fit",
 }: {
   filter: FilterState;
   facets: Facets;
@@ -177,6 +181,8 @@ export function FilterDesk({
   statusOptions?: readonly string[];
   /** Display formatter for status/stage values. Defaults to underscore-stripping. */
   statusLabel?: (value: string) => string;
+  savedViewBoard?: BoardName;
+  defaultSort?: SortKey;
 }) {
   const [primaryDraft, setPrimaryDraft] = useState(() =>
     primaryDraftFromFilter(filter),
@@ -290,9 +296,19 @@ export function FilterDesk({
     >
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm font-semibold">Filter &amp; sort</span>
-        <span className="text-xs font-semibold tabular-nums text-muted-foreground">
-          {total.toLocaleString()} matching
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+            {total.toLocaleString()} matching
+          </span>
+          {savedViewBoard && (
+            <SavedViewsControl
+              board={savedViewBoard}
+              filter={filter}
+              defaultSort={defaultSort}
+              onApply={onChange}
+            />
+          )}
+        </div>
       </div>
 
       <form

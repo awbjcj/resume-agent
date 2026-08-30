@@ -34,7 +34,7 @@ const RUN_LABELS: Record<string, string> = {
   undoTaxonomyMaintenance: "Taxonomy maintenance undo",
 };
 
-function runLabel(kind: string): string {
+export function runLabel(kind: string): string {
   return RUN_LABELS[kind] ?? kind;
 }
 

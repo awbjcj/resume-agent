@@ -93,7 +93,13 @@ export function ShortlistContainer() {
           ["Sponsorship offered in view", String(sponsored)],
         ]}
       />
-      <FilterDesk filter={filters} facets={facets} total={total} onChange={setFilters} />
+      <FilterDesk
+        filter={filters}
+        facets={facets}
+        total={total}
+        onChange={setFilters}
+        savedViewBoard="shortlist"
+      />
       {!rows.length ? (
         <EmptyState
           title={total === 0 ? "Nothing shortlisted yet" : "No jobs loaded"}

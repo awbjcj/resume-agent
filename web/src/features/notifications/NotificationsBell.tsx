@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Check, Inbox, Loader2, RefreshCw, X } from "lucide-react";
+import { Bell, Check, CircleCheck, Inbox, Loader2, RefreshCw, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,12 @@ import {
   useGmailSync,
   useNotifications,
 } from "./use-notifications";
+import {
+  useMarkAllRunCompletionsRead,
+  useMarkRunCompletionRead,
+  useRunCompletions,
+} from "./use-run-completions";
+import { runLabel } from "@/lib/runs/announce";
 
 function isEventNudge(kind: string): boolean {
   return kind === "interview_soon" || kind === "offer_deadline_soon";
@@ -26,11 +32,15 @@ function notificationTitle(item: { kind: string; company?: string | null; propos
 
 export function NotificationsBell() {
   const { data: items = [], isLoading } = useNotifications();
+  const { data: runItems = [], isLoading: runsLoading } = useRunCompletions();
   const accept = useAcceptNotification();
   const dismiss = useDismissNotification();
+  const markRunRead = useMarkRunCompletionRead();
+  const markAllRunsRead = useMarkAllRunCompletionsRead();
   const sync = useGmailSync();
   const [draftJobId, setDraftJobId] = useState<number | null>(null);
-  const count = items.length;
+  const unreadRuns = runItems.filter((item) => item.readAt == null);
+  const count = items.length + unreadRuns.length;
 
   return (
     <>
@@ -57,7 +67,7 @@ export function NotificationsBell() {
           <div>
             <div className="text-sm font-semibold">Notifications</div>
             <div className="text-xs text-muted-foreground">
-              Status proposals & follow-up reminders
+              Application actions and completed runs
             </div>
           </div>
           <Button
@@ -74,15 +84,75 @@ export function NotificationsBell() {
             Sync Gmail
           </Button>
         </div>
-        {isLoading ? (
+        {isLoading || runsLoading ? (
           <p className="text-sm text-muted-foreground">Loading notifications...</p>
-        ) : count === 0 ? (
+        ) : items.length === 0 && runItems.length === 0 ? (
           <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
             <Inbox className="mb-2 size-4" aria-hidden="true" />
             Nothing pending.
           </div>
         ) : (
-          <ul className="max-h-[24rem] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[28rem] space-y-4 overflow-y-auto pr-1">
+            {runItems.length > 0 && (
+              <section aria-labelledby="run-history-title">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 id="run-history-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Run history
+                  </h3>
+                  {unreadRuns.length > 0 && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      disabled={markAllRunsRead.isPending}
+                      onClick={() => markAllRunsRead.mutate()}
+                    >
+                      Mark all read
+                    </Button>
+                  )}
+                </div>
+                <ul className="space-y-2">
+                  {runItems.map((item) => (
+                    <li
+                      key={item.id}
+                      className={`rounded-lg border p-3 text-sm ${
+                        item.readAt == null ? "bg-primary/5" : "bg-background"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium">
+                            {runLabel(item.kind)} {item.status}
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {item.error ?? new Date(item.completedAt).toLocaleString()}
+                          </p>
+                        </div>
+                        {item.readAt == null && (
+                          <Button
+                            type="button"
+                            size="icon-xs"
+                            variant="ghost"
+                            aria-label={`Mark ${runLabel(item.kind)} read`}
+                            disabled={markRunRead.isPending}
+                            onClick={() => markRunRead.mutate(item.id)}
+                          >
+                            <CircleCheck aria-hidden="true" />
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {items.length > 0 && (
+              <section aria-labelledby="application-actions-title">
+                <h3 id="application-actions-title" className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Application actions
+                </h3>
+          <ul className="space-y-2">
             {items.map((item) => (
               <li key={item.id} className="rounded-lg border bg-background p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -126,6 +196,9 @@ export function NotificationsBell() {
               </li>
             ))}
           </ul>
+              </section>
+            )}
+          </div>
         )}
       </PopoverContent>
     </Popover>

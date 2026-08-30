@@ -5,6 +5,7 @@ import { ackRuns } from "@/lib/runs/ack";
 import { announceCompletions } from "@/lib/runs/announce";
 import { invalidationKeys } from "@/lib/runs/invalidation";
 import { addTerminalListener } from "@/lib/runs/tracker";
+import { RUN_COMPLETIONS_KEY } from "@/features/notifications/use-run-completions";
 
 /**
  * The one place a finished run turns into user-visible effects.
@@ -31,6 +32,7 @@ export function useRunCompletionEffects(): void {
         for (const key of keys) {
           void queryClient.invalidateQueries({ queryKey: [key] });
         }
+        void queryClient.invalidateQueries({ queryKey: RUN_COMPLETIONS_KEY });
       }),
     [queryClient],
   );

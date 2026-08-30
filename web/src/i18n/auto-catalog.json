@@ -1264,6 +1264,16 @@
     "en": "Application & timeline",
     "zh-CN": "申请与时间线"
   },
+  "Application actions": {
+    "key": "ui_f78d20689fac",
+    "en": "Application actions",
+    "zh-CN": "申请操作"
+  },
+  "Application actions and completed runs": {
+    "key": "ui_225514dc4b77",
+    "en": "Application actions and completed runs",
+    "zh-CN": "申请操作与已完成任务"
+  },
   "Application controls": {
     "key": "ui_fcc03e8a861a",
     "en": "Application controls",
@@ -5254,6 +5264,11 @@
     "en": "Loading timeline…",
     "zh-CN": "正在加载时间线……"
   },
+  "Loading views…": {
+    "key": "ui_cea2be818a51",
+    "en": "Loading views…",
+    "zh-CN": "正在加载视图…"
+  },
   "Loading why this version was tailored this way…": {
     "key": "ui_6fa00198e0be",
     "en": "Loading why this version was tailored this way…",
@@ -5348,6 +5363,16 @@
     "key": "ui_4d2c1b44580c",
     "en": "Map zoom controls",
     "zh-CN": "地图缩放控件"
+  },
+  "Mark {{v0}} read": {
+    "key": "ui_511dc6144901",
+    "en": "Mark {{v0}} read",
+    "zh-CN": "将 {{v0}} 标为已读"
+  },
+  "Mark all read": {
+    "key": "ui_3bc62a9e6a39",
+    "en": "Mark all read",
+    "zh-CN": "全部标为已读"
   },
   "Mark applications as submitted in the Pipeline board to populate analytics.": {
     "key": "ui_158f69d71181",
@@ -5769,6 +5794,11 @@
     "en": "n=",
     "zh-CN": "n="
   },
+  "Name this view": {
+    "key": "ui_e6fdb6c7da3d",
+    "en": "Name this view",
+    "zh-CN": "为此视图命名"
+  },
   "Name your first token above to connect an automation.": {
     "key": "ui_97075e64f951",
     "en": "Name your first token above to connect an automation.",
@@ -6118,6 +6148,11 @@
     "key": "ui_487d613a452f",
     "en": "No saved Career Lab sessions yet. Start one when you are ready to draft.",
     "zh-CN": "还没有已保存的职业实验室会话。准备好起草时，就开始一次吧。"
+  },
+  "No saved views yet.": {
+    "key": "ui_0522378ef671",
+    "en": "No saved views yet.",
+    "zh-CN": "尚无已保存的视图。"
   },
   "No Scout sessions yet. Start one when you are ready to shape your search.": {
     "key": "ui_f968a0ce95f2",
@@ -7744,6 +7779,11 @@
     "en": "Rendering options",
     "zh-CN": "生成选项"
   },
+  "Reopen a named filter set for this board.": {
+    "key": "ui_ed1bc8612148",
+    "en": "Reopen a named filter set for this board.",
+    "zh-CN": "重新打开此看板的命名筛选条件。"
+  },
   "Reorganize domains": {
     "key": "ui_dfc4d885181a",
     "en": "Reorganize domains",
@@ -8379,6 +8419,11 @@
     "en": "Run a pull to bring in jobs, or toggle archived.",
     "zh-CN": "运行一次获取以导入职位，或切换显示已归档项。"
   },
+  "Run history": {
+    "key": "ui_addf321bfa5b",
+    "en": "Run history",
+    "zh-CN": "任务历史"
+  },
   "Run research to build a cited company brief.": {
     "key": "ui_a162d837970e",
     "en": "Run research to build a cited company brief.",
@@ -8498,6 +8543,16 @@
     "key": "ui_6fa541c66c81",
     "en": "Saved to Gmail drafts",
     "zh-CN": "已保存到 Gmail 草稿"
+  },
+  "Saved view “{{v0}}”": {
+    "key": "ui_b771194c4c3a",
+    "en": "Saved view “{{v0}}”",
+    "zh-CN": "已保存视图“{{v0}}”"
+  },
+  "Saved views": {
+    "key": "ui_81184cb517ed",
+    "en": "Saved views",
+    "zh-CN": "已保存的视图"
   },
   "Saving…": {
     "key": "ui_23e39291d613",
@@ -9458,11 +9513,6 @@
     "key": "ui_920e413c7d41",
     "en": "Status",
     "zh-CN": "状态"
-  },
-  "Status proposals & follow-up reminders": {
-    "key": "ui_6709ddd90788",
-    "en": "Status proposals & follow-up reminders",
-    "zh-CN": "状态建议与后续提醒"
   },
   "Stay focused while the coach follows the strongest thread.": {
     "key": "ui_b6b8044c8587",
@@ -10799,10 +10849,20 @@
     "en": "View my usage",
     "zh-CN": "查看我的用量"
   },
+  "View name": {
+    "key": "ui_572ffd186209",
+    "en": "View name",
+    "zh-CN": "视图名称"
+  },
   "Viewing": {
     "key": "ui_9dc859e86f2e",
     "en": "Viewing",
     "zh-CN": "正在查看"
+  },
+  "Views": {
+    "key": "ui_69c404591e99",
+    "en": "Views",
+    "zh-CN": "视图"
   },
   "Virtual": {
     "key": "ui_d02c86fe26e7",

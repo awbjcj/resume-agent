@@ -13,6 +13,46 @@ vi.mock("@/features/job/EmailDraftDialog", () => ({
 }));
 
 describe("NotificationsBell", () => {
+  it("shows durable run history and counts only unread runs", async () => {
+    server.use(
+      http.get("*/api/notifications", () => HttpResponse.json([])),
+      http.get("*/api/run-completions", () =>
+        HttpResponse.json([
+          {
+            id: 11,
+            runId: "run-11",
+            kind: "discover",
+            label: "Done",
+            status: "succeeded",
+            error: null,
+            completedAt: "2026-08-29T12:00:00Z",
+            readAt: null,
+          },
+          {
+            id: 10,
+            runId: "run-10",
+            kind: "pull",
+            label: "Done",
+            status: "failed",
+            error: "Provider unavailable",
+            completedAt: "2026-08-29T11:00:00Z",
+            readAt: "2026-08-29T11:30:00Z",
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<NotificationsBell />, { wrapper: withQueryClient });
+
+    expect(await screen.findByRole("button", { name: /notifications \(1 pending\)/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /notifications/i }));
+
+    expect(await screen.findByText("Discovery succeeded")).toBeInTheDocument();
+    expect(screen.getByText("Job pull failed")).toBeInTheDocument();
+    expect(screen.getByText("Provider unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark all read" })).toBeInTheDocument();
+  });
+
   it("renders follow-up reminders with a draft action", async () => {
     server.use(
       http.get("*/api/notifications", () =>

@@ -174,6 +174,8 @@ export function PipelineContainer() {
         onChange={setFilter}
         statusOptions={PIPELINE_STAGE_ORDER}
         statusLabel={pipelineStageLabel}
+        savedViewBoard="pipeline"
+        defaultSort="recency"
       />
       {!stages.length ? (
         <EmptyState

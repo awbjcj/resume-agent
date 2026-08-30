@@ -15,4 +15,16 @@ export const SUMMARY = {
   activeInterviews: [],
   activeCoachSession: null,
   upcomingEvents: [],
+  practiceStats: {
+    completedSessions: 3,
+    scoredSessions: 2,
+    averageScore: 3.8,
+    latestScore: 4.2,
+    changeFromFirst: 0.8,
+  },
+  sourceHealth: {
+    openFailures: 0,
+    affectedSources: [],
+    latestFailureAt: null,
+  },
 };

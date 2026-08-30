@@ -8,6 +8,7 @@ import { ActionQueue } from "./ActionQueue";
 import { AttentionCard } from "./AttentionCard";
 import { DeskHealth } from "./DeskHealth";
 import { InProgressCard } from "./InProgressCard";
+import { InsightsCard } from "./InsightsCard";
 import { RecentRuns } from "./RecentRuns";
 import { QuickAccess } from "./QuickAccess";
 import { StageRail } from "./StageRail";
@@ -62,6 +63,7 @@ export function DashboardPage() {
             </>
           )}
           <InProgressCard summary={summary} />
+          <InsightsCard summary={summary} />
           <UpcomingCard events={summary.upcomingEvents ?? []} />
           <AttentionCard />
         </div>
