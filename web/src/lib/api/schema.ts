@@ -1734,6 +1734,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/company-intelligence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Company Intelligence */
+        get: operations["get_company_intelligence_api_jobs__job_id__company_intelligence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/company-intelligence/refreshes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Company Intelligence Refresh */
+        post: operations["create_company_intelligence_refresh_api_jobs__job_id__company_intelligence_refreshes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/email-draft": {
         parameters: {
             query?: never;
@@ -4420,6 +4454,184 @@ export interface components {
             /** Responses */
             responses: number;
         };
+        /** CompanyIntelligenceEmptyOut */
+        CompanyIntelligenceEmptyOut: {
+            /**
+             * Canrefresh
+             * @default true
+             * @constant
+             */
+            canRefresh: true;
+            /**
+             * Capability
+             * @deprecated
+             * @default unavailable
+             * @constant
+             */
+            capability: "unavailable";
+            /** Evidence */
+            evidence?: null;
+            /**
+             * Isstale
+             * @default false
+             * @constant
+             */
+            isStale: false;
+            /** Message */
+            message?: string | null;
+            /**
+             * Reason
+             * @default not_researched
+             * @constant
+             */
+            reason: "not_researched";
+            /**
+             * Stale
+             * @deprecated
+             * @default false
+             * @constant
+             */
+            stale: false;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "empty";
+        };
+        /** CompanyIntelligenceEvidenceOut */
+        CompanyIntelligenceEvidenceOut: {
+            /** Caveat */
+            caveat: string;
+            /** Displaycompany */
+            displayCompany: string;
+            /**
+             * Expiresat
+             * Format: date-time
+             */
+            expiresAt: string;
+            /** Insights */
+            insights?: components["schemas"]["CompanyIntelligenceInsightOut"][];
+            /** Normalizedcompany */
+            normalizedCompany: string;
+            /** Overview */
+            overview: string;
+            /**
+             * Retrievedat
+             * Format: date-time
+             */
+            retrievedAt: string;
+            /** Sources */
+            sources?: components["schemas"]["CompanyIntelligenceSourceOut"][];
+        };
+        /** CompanyIntelligenceInsightOut */
+        CompanyIntelligenceInsightOut: {
+            /**
+             * Axis
+             * @enum {string}
+             */
+            axis: "strategy" | "recent_moves" | "engineering_culture" | "challenges" | "competitive_position";
+            /** Citations */
+            citations?: string[];
+            /** Summary */
+            summary: string;
+            /** Whyitmatters */
+            whyItMatters: string;
+        };
+        /** CompanyIntelligenceReadyOut */
+        CompanyIntelligenceReadyOut: {
+            /**
+             * Canrefresh
+             * @default true
+             * @constant
+             */
+            canRefresh: true;
+            /**
+             * Capability
+             * @deprecated
+             * @default available
+             * @constant
+             */
+            capability: "available";
+            evidence: components["schemas"]["CompanyIntelligenceEvidenceOut"];
+            /**
+             * Isstale
+             * @default false
+             */
+            isStale: boolean;
+            /** Message */
+            message?: string | null;
+            /** Reason */
+            reason?: null;
+            /**
+             * Stale
+             * @deprecated
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "ready";
+        };
+        /** CompanyIntelligenceSourceOut */
+        CompanyIntelligenceSourceOut: {
+            /** Publisher */
+            publisher: string;
+            /**
+             * Sourcetype
+             * @enum {string}
+             */
+            sourceType: "official" | "independent";
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
+        /** CompanyIntelligenceUnavailableOut */
+        CompanyIntelligenceUnavailableOut: {
+            /**
+             * Canrefresh
+             * @default false
+             * @constant
+             */
+            canRefresh: false;
+            /**
+             * Capability
+             * @deprecated
+             * @default unavailable
+             * @constant
+             */
+            capability: "unavailable";
+            /** Evidence */
+            evidence?: null;
+            /**
+             * Isstale
+             * @default false
+             * @constant
+             */
+            isStale: false;
+            /** Message */
+            message?: string | null;
+            /**
+             * Reason
+             * @default missing_company
+             * @constant
+             */
+            reason: "missing_company";
+            /**
+             * Stale
+             * @deprecated
+             * @default false
+             * @constant
+             */
+            stale: false;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "unavailable";
+        };
         /** CostTotals */
         CostTotals: {
             /**
@@ -5148,6 +5360,8 @@ export interface components {
             bestResumeVersionId?: number | null;
             /** Company */
             company: string | null;
+            /** Companyintelligence */
+            companyIntelligence: components["schemas"]["CompanyIntelligenceUnavailableOut"] | components["schemas"]["CompanyIntelligenceEmptyOut"] | components["schemas"]["CompanyIntelligenceReadyOut"];
             /** Companysize */
             companySize?: string | null;
             /**
@@ -12186,6 +12400,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_intelligence_api_jobs__job_id__company_intelligence_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyIntelligenceUnavailableOut"] | components["schemas"]["CompanyIntelligenceEmptyOut"] | components["schemas"]["CompanyIntelligenceReadyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_company_intelligence_refresh_api_jobs__job_id__company_intelligence_refreshes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

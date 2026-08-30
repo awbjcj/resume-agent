@@ -145,6 +145,7 @@ units and rollout behavior.
 | `H1B_MCP_TIMEOUT_SECONDS` | `30` | MCP timeout in seconds; integer from 1 through 300. |
 | `H1B_MCP_MAX_RESULT_CHARS` | `200000` | Maximum accepted tool-result characters; integer from 1000 through 1000000. |
 | `H1B_CACHE_TTL_DAYS` | `30` | Company-cache lifetime; integer from 1 through 365 days. |
+| `COMPANY_INTELLIGENCE_TTL_DAYS` | `30` | Source-backed company-dossier freshness window; integer from 1 through 365 days. Expiry marks saved evidence stale but never refreshes it automatically. |
 | `H1B_ENRICH_MAX_COMPANIES_PER_RUN` | `50` | Maximum uncached companies researched per run; non-negative integer, with `0` meaning unlimited. |
 
 Historical H-1B data is an advisory signal only. It never confirms current

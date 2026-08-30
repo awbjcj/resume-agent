@@ -14,6 +14,7 @@ const RUN_LABELS: Record<string, string> = {
   addJobUrl: "Job import",
   coverLetter: "Cover-letter generation",
   coverLetterRevise: "Cover-letter revision",
+  companyIntelligence: "Company research",
   discover: "Discovery",
   emailDraft: "Email-draft generation",
   gmailSync: "Gmail sync",

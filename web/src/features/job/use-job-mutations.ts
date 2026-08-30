@@ -34,6 +34,26 @@ export function useCheckH1BSponsorship(jobId: number) {
   });
 }
 
+export function useRefreshCompanyIntelligence(jobId: number) {
+  const { launch } = useLaunchRun();
+  return useMutation({
+    mutationFn: () =>
+      launch(
+        "companyIntelligence",
+        () =>
+          unwrap(
+            api.POST("/api/jobs/{job_id}/company-intelligence/refreshes", {
+              params: { path: { job_id: jobId } },
+            }),
+          ),
+        // The evidence is keyed by company, so refresh every open job detail;
+        // sibling roles at the same employer share the new dossier.
+        ["job"],
+        { jobId },
+      ),
+  });
+}
+
 export function useSetStage(jobId: number) {
   const qc = useQueryClient();
   return useMutation({

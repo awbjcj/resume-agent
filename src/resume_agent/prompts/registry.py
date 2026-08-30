@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from resume_agent.cover_letter import agents as cover_letter_agents
+from resume_agent.company_intelligence import agents as company_intelligence_agents
 from resume_agent.discovery import (
     extract,
     fit,
@@ -104,6 +105,20 @@ PROMPT_SPECS = (
         "tailoring",
         "Formats grounded research into suggestions.",
         suggestions_agents._FORMAT_INSTRUCTIONS,
+    ),
+    _spec(
+        "company-intelligence-research",
+        "Company intelligence (research)",
+        "discovery",
+        "Researches current, cited company facts.",
+        company_intelligence_agents._SEARCH_INSTRUCTIONS,
+    ),
+    _spec(
+        "company-intelligence-format",
+        "Company intelligence (formatter)",
+        "discovery",
+        "Formats grounded company research into a durable dossier.",
+        company_intelligence_agents._FORMAT_INSTRUCTIONS,
     ),
     _spec(
         "reviewer-fact-check",

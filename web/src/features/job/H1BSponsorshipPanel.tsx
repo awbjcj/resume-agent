@@ -15,6 +15,7 @@ import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "recha
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
@@ -30,9 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { components } from "@/lib/api/schema";
-import { cn } from "@/lib/utils";
 import { useCheckH1BSponsorship } from "./use-job-mutations";
 import { ACTIVE_RUN_STATUSES, latestArtifactRun, useArtifactRunIndex } from "./artifact-runs";
+import { ResearchNotice, ResearchPanelHeader } from "./ResearchPanel";
 import type { JobDetail } from "./use-job-detail";
 
 type SponsorshipResult = components["schemas"]["H1BSponsorshipOut"];
@@ -320,59 +321,46 @@ export function H1BSponsorshipPanel({
 
   return (
     <section
-      className="rounded-xl border bg-card p-5 shadow-card"
+      className="space-y-5"
       aria-labelledby="h1b-sponsorship-title"
+      aria-busy={checking}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <ShieldCheck className="size-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Research signal
-            </p>
-            <h3 id="h1b-sponsorship-title" className="mt-1 text-base font-semibold">
-              Historical H-1B sponsorship
-            </h3>
-            <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              Check employer filing history without changing the posting’s current sponsorship signal.
-            </p>
-            {company?.trim() && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Refreshing updates every job at this company.
-              </p>
+      <ResearchPanelHeader
+        titleId="h1b-sponsorship-title"
+        icon={<ShieldCheck className="size-5" aria-hidden="true" />}
+        eyebrow="Research signal"
+        title="Historical H-1B sponsorship"
+        description="Check employer filing history without changing the posting’s current sponsorship signal."
+        context={
+          company?.trim()
+            ? "Refreshing updates every job at this company."
+            : undefined
+        }
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            aria-label={`${buttonLabel} for H-1B sponsorship`}
+            title={company ? `Check historical H-1B filings for ${company}` : "A company is required"}
+            disabled={disabled}
+            onClick={() => check.mutate()}
+          >
+            {checking ? (
+              <LoaderCircle className="animate-spin" aria-hidden="true" />
+            ) : (
+              <StatusIcon aria-hidden="true" />
             )}
-          </div>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full shrink-0 sm:w-auto"
-          aria-label={`${buttonLabel} for H-1B sponsorship`}
-          title={company ? `Check historical H-1B filings for ${company}` : "A company is required"}
-          disabled={disabled}
-          onClick={() => check.mutate()}
-        >
-          {checking ? (
-            <LoaderCircle className="animate-spin" aria-hidden="true" />
-          ) : (
-            <StatusIcon aria-hidden="true" />
-          )}
-          {buttonLabel}
-        </Button>
-      </div>
+            {buttonLabel}
+          </Button>
+        }
+      />
 
-      <div
-        className={cn(
-          "mt-5 flex items-start gap-3 rounded-lg border px-3.5 py-3",
-          meta?.tone ?? "border-border bg-muted/20",
-        )}
-        role="status"
-        aria-live="polite"
+      <Card className="gap-0 p-5">
+        <ResearchNotice
+          icon={<StatusIcon className="size-4" />}
+          className={meta?.tone ?? "border-border bg-muted/20"}
       >
-        <StatusIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold">
               {meta?.label ??
@@ -391,13 +379,15 @@ export function H1BSponsorshipPanel({
                   ? "Add a company name before running a manual check."
                   : "Run a manual check to fetch historical employer evidence."))}
           </p>
-        </div>
-      </div>
+        </ResearchNotice>
 
       {evidence && result?.stale && (
-        <p className="mt-4 text-xs text-amber-700 dark:text-amber-400">
-          ⚠ Checked {formatDate(evidence.retrievedAt)} — may be out of date
-        </p>
+        <ResearchNotice
+          icon={<CalendarClock className="size-4" />}
+          className="mt-4 border-amber-300/60 bg-amber-50/70 text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"
+        >
+          Checked {formatDate(evidence.retrievedAt)} — may be out of date
+        </ResearchNotice>
       )}
 
       {evidence && status !== "unavailable" && periods.length > 0 && (
@@ -438,15 +428,22 @@ export function H1BSponsorshipPanel({
       )}
 
       {evidence?.status === "unavailable" && message && (
-        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50/70 px-3.5 py-3 text-sm leading-6 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
+        <ResearchNotice
+          icon={<CircleAlert className="size-4" />}
+          className="mt-4 border-amber-200 bg-amber-50/70 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100"
+        >
           {message}
-        </p>
+        </ResearchNotice>
       )}
 
       {failed && (
-        <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-sm leading-6 text-destructive">
+        <ResearchNotice
+          icon={<CircleAlert className="size-4" />}
+          className="mt-4 border-destructive/30 bg-destructive/5 text-destructive"
+          role="alert"
+        >
           {errorMessage}
-        </p>
+        </ResearchNotice>
       )}
 
       {evidence?.status === "unavailable" && (
@@ -460,6 +457,7 @@ export function H1BSponsorshipPanel({
           Add the employer name to enable this check.
         </p>
       )}
+      </Card>
     </section>
   );
 }

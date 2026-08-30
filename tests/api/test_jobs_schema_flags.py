@@ -84,6 +84,13 @@ def test_job_detail_exposes_best_version_camelcase():
             "best_resume_version_id": 5,
             "needs_attention": False,
             "regressed": True,
+            "company_intelligence": {
+                "state": "unavailable",
+                "reason": "missing_company",
+                "capability": "unavailable",
+                "can_refresh": False,
+                "evidence": None,
+            },
         }
     )
     dumped = detail.model_dump(by_alias=True)

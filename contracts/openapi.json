@@ -3263,6 +3263,304 @@
         "title": "CohortOut",
         "type": "object"
       },
+      "CompanyIntelligenceEmptyOut": {
+        "properties": {
+          "canRefresh": {
+            "const": true,
+            "default": true,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "capability": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "deprecated": true,
+            "title": "Capability",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "null"
+          },
+          "isStale": {
+            "const": false,
+            "default": false,
+            "title": "Isstale",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "const": "not_researched",
+            "default": "not_researched",
+            "title": "Reason",
+            "type": "string"
+          },
+          "stale": {
+            "const": false,
+            "default": false,
+            "deprecated": true,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "state": {
+            "const": "empty",
+            "default": "empty",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "CompanyIntelligenceEmptyOut",
+        "type": "object"
+      },
+      "CompanyIntelligenceEvidenceOut": {
+        "properties": {
+          "caveat": {
+            "title": "Caveat",
+            "type": "string"
+          },
+          "displayCompany": {
+            "title": "Displaycompany",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyIntelligenceInsightOut"
+            },
+            "title": "Insights",
+            "type": "array"
+          },
+          "normalizedCompany": {
+            "title": "Normalizedcompany",
+            "type": "string"
+          },
+          "overview": {
+            "title": "Overview",
+            "type": "string"
+          },
+          "retrievedAt": {
+            "format": "date-time",
+            "title": "Retrievedat",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyIntelligenceSourceOut"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "normalizedCompany",
+          "displayCompany",
+          "overview",
+          "retrievedAt",
+          "expiresAt",
+          "caveat"
+        ],
+        "title": "CompanyIntelligenceEvidenceOut",
+        "type": "object"
+      },
+      "CompanyIntelligenceInsightOut": {
+        "properties": {
+          "axis": {
+            "enum": [
+              "strategy",
+              "recent_moves",
+              "engineering_culture",
+              "challenges",
+              "competitive_position"
+            ],
+            "title": "Axis",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "whyItMatters": {
+            "title": "Whyitmatters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "axis",
+          "summary",
+          "whyItMatters"
+        ],
+        "title": "CompanyIntelligenceInsightOut",
+        "type": "object"
+      },
+      "CompanyIntelligenceReadyOut": {
+        "properties": {
+          "canRefresh": {
+            "const": true,
+            "default": true,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "capability": {
+            "const": "available",
+            "default": "available",
+            "deprecated": true,
+            "title": "Capability",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/CompanyIntelligenceEvidenceOut"
+          },
+          "isStale": {
+            "default": false,
+            "title": "Isstale",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "null"
+          },
+          "stale": {
+            "default": false,
+            "deprecated": true,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "state": {
+            "const": "ready",
+            "default": "ready",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence"
+        ],
+        "title": "CompanyIntelligenceReadyOut",
+        "type": "object"
+      },
+      "CompanyIntelligenceSourceOut": {
+        "properties": {
+          "publisher": {
+            "title": "Publisher",
+            "type": "string"
+          },
+          "sourceType": {
+            "enum": [
+              "official",
+              "independent"
+            ],
+            "title": "Sourcetype",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "publisher",
+          "sourceType"
+        ],
+        "title": "CompanyIntelligenceSourceOut",
+        "type": "object"
+      },
+      "CompanyIntelligenceUnavailableOut": {
+        "properties": {
+          "canRefresh": {
+            "const": false,
+            "default": false,
+            "title": "Canrefresh",
+            "type": "boolean"
+          },
+          "capability": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "deprecated": true,
+            "title": "Capability",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "null"
+          },
+          "isStale": {
+            "const": false,
+            "default": false,
+            "title": "Isstale",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "const": "missing_company",
+            "default": "missing_company",
+            "title": "Reason",
+            "type": "string"
+          },
+          "stale": {
+            "const": false,
+            "default": false,
+            "deprecated": true,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "state": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "CompanyIntelligenceUnavailableOut",
+        "type": "object"
+      },
       "CostTotals": {
         "properties": {
           "byokEstimatedCostMicros": {
@@ -5054,6 +5352,28 @@
             ],
             "title": "Company"
           },
+          "companyIntelligence": {
+            "discriminator": {
+              "mapping": {
+                "empty": "#/components/schemas/CompanyIntelligenceEmptyOut",
+                "ready": "#/components/schemas/CompanyIntelligenceReadyOut",
+                "unavailable": "#/components/schemas/CompanyIntelligenceUnavailableOut"
+              },
+              "propertyName": "state"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CompanyIntelligenceUnavailableOut"
+              },
+              {
+                "$ref": "#/components/schemas/CompanyIntelligenceEmptyOut"
+              },
+              {
+                "$ref": "#/components/schemas/CompanyIntelligenceReadyOut"
+              }
+            ],
+            "title": "Companyintelligence"
+          },
           "companySize": {
             "anyOf": [
               {
@@ -5380,7 +5700,8 @@
           "hasProgress",
           "application",
           "resumeVersions",
-          "skills"
+          "skills",
+          "companyIntelligence"
         ],
         "title": "JobDetail",
         "type": "object"
@@ -20087,6 +20408,135 @@
           }
         },
         "summary": "Upsert Application"
+      }
+    },
+    "/api/jobs/{job_id}/company-intelligence": {
+      "get": {
+        "operationId": "get_company_intelligence_api_jobs__job_id__company_intelligence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "empty": "#/components/schemas/CompanyIntelligenceEmptyOut",
+                      "ready": "#/components/schemas/CompanyIntelligenceReadyOut",
+                      "unavailable": "#/components/schemas/CompanyIntelligenceUnavailableOut"
+                    },
+                    "propertyName": "state"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CompanyIntelligenceUnavailableOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CompanyIntelligenceEmptyOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CompanyIntelligenceReadyOut"
+                    }
+                  ],
+                  "title": "Response Get Company Intelligence Api Jobs  Job Id  Company Intelligence Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Company Intelligence"
+      }
+    },
+    "/api/jobs/{job_id}/company-intelligence/refreshes": {
+      "post": {
+        "operationId": "create_company_intelligence_refresh_api_jobs__job_id__company_intelligence_refreshes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Company Intelligence Refresh"
       }
     },
     "/api/jobs/{job_id}/email-draft": {

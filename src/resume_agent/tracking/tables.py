@@ -265,6 +265,22 @@ class H1BCompanyEvidence(SQLModel, table=True):
     schema_version: int = 1
 
 
+class CompanyIntelligenceEvidenceRow(SQLModel, table=True):
+    __tablename__ = cast(Any, "company_intelligence_evidence")
+    __table_args__ = (UniqueConstraint("normalized_company"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    normalized_company: str = Field(index=True)
+    display_company: str = ""
+    evidence_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    retrieved_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime = Field(index=True)
+    schema_version: int = 1
+
+
 class ErrorRecord(SQLModel, table=True):
     """A durable failure record that the user can dismiss or resolve."""
 

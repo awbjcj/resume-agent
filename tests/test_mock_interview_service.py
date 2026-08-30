@@ -1,9 +1,11 @@
 """Scripted mock interviews through the service layer with fake runners."""
 
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from sqlmodel import select
 
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.interview.agent import (
@@ -13,6 +15,7 @@ from resume_agent.interview.agent import (
     OpeningInterview,
     ReviewItem,
 )
+from resume_agent.interview.store import load_session
 from resume_agent.services.mock_interview import (
     load_context,
     run_answer_turn,
@@ -22,7 +25,7 @@ from resume_agent.services.mock_interview import (
     sessions_view,
 )
 from resume_agent.sessions.stream import Completed, Notice, TextDelta, ToolStarted
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_agent.tracking.tables import CompanyIntelligenceEvidenceRow, Job, ResumeVersion
 
 _ids: tuple[int, int] = (0, 0)
 _HINTS = ["Use a concrete example.", "Connect the result to the role."]
@@ -540,3 +543,85 @@ def test_load_context_guards(engine):
         load_context(engine, 999, version_id)
     with pytest.raises(ValueError, match="unknown resume version"):
         load_context(engine, job_id, 999)
+
+
+def test_load_context_snapshots_current_company_intelligence(engine):
+    job_id, version_id = _ids
+    with get_session(engine) as db:
+        now = datetime.now(timezone.utc)
+        db.add(
+            CompanyIntelligenceEvidenceRow(
+                normalized_company="acme",
+                display_company="Acme",
+                evidence_json={
+                    "normalized_company": "acme",
+                    "display_company": "Acme",
+                    "overview": "Current public overview",
+                    "insights": [],
+                    "sources": [],
+                    "retrieved_at": now.isoformat(),
+                    "expires_at": (now + timedelta(days=30)).isoformat(),
+                    "caveat": "Verify sources.",
+                },
+                retrieved_at=now,
+                expires_at=now + timedelta(days=30),
+            )
+        )
+        db.commit()
+
+    context = load_context(engine, job_id, version_id)
+
+    assert context.company_intelligence["overview"] == "Current public overview"
+
+
+def test_open_session_keeps_company_intelligence_snapshot_after_refresh(tmp_path, engine):
+    job_id, version_id = _ids
+    now = datetime.now(timezone.utc)
+    with get_session(engine) as db:
+        row = CompanyIntelligenceEvidenceRow(
+            normalized_company="acme",
+            display_company="Acme",
+            evidence_json={
+                "normalized_company": "acme",
+                "display_company": "Acme",
+                "overview": "Original overview",
+                "insights": [],
+                "sources": [],
+                "retrieved_at": now.isoformat(),
+                "expires_at": (now + timedelta(days=30)).isoformat(),
+                "caveat": "Verify sources.",
+            },
+            retrieved_at=now,
+            expires_at=now + timedelta(days=30),
+        )
+        db.add(row)
+        db.commit()
+
+    opening = OpeningInterview(
+        message="Welcome.",
+        hints=_HINTS,
+        plan=[NewPlanItem(competency="Python", question_type="role_specific")],
+    )
+    view = run_opening_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        engine=engine,
+        job_id=job_id,
+        resume_version_id=version_id,
+        style=_style(),
+        interviewer_agent=FakeRunner(["notes"]),
+        formatter_agent=FakeRunner([opening]),
+    )
+
+    with get_session(engine) as db:
+        row = db.exec(
+            select(CompanyIntelligenceEvidenceRow).where(
+                CompanyIntelligenceEvidenceRow.normalized_company == "acme"
+            )
+        ).one()
+        row.evidence_json = {**row.evidence_json, "overview": "Refreshed overview"}
+        db.add(row)
+        db.commit()
+
+    saved = load_session(tmp_path, view["sessionId"])
+    assert saved["context"]["company_intelligence"]["overview"] == "Original overview"

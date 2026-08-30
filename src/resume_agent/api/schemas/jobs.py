@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, model_validator
 
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.company_intelligence.models import (
+    CompanyIntelligenceAxis,
+    CompanyIntelligenceEvidence,
+    CompanySourceType,
+)
 from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.verdict import failing_gate_names
@@ -236,6 +241,83 @@ class H1BSponsorshipOut(CamelModel):
     message: str | None = None
 
 
+class CompanyIntelligenceSourceOut(CamelModel):
+    title: str
+    url: str
+    publisher: str
+    source_type: CompanySourceType
+
+
+class CompanyIntelligenceInsightOut(CamelModel):
+    axis: CompanyIntelligenceAxis
+    summary: str
+    why_it_matters: str
+    citations: list[str] = Field(default_factory=list)
+
+
+class CompanyIntelligenceEvidenceOut(CamelModel):
+    normalized_company: str
+    display_company: str
+    overview: str
+    insights: list[CompanyIntelligenceInsightOut] = Field(default_factory=list)
+    sources: list[CompanyIntelligenceSourceOut] = Field(default_factory=list)
+    retrieved_at: datetime
+    expires_at: datetime
+    caveat: str
+
+    @classmethod
+    def from_evidence(
+        cls, evidence: CompanyIntelligenceEvidence
+    ) -> CompanyIntelligenceEvidenceOut:
+        return cls.model_validate(evidence.model_dump())
+
+
+class CompanyIntelligenceBaseOut(CamelModel):
+    """Stable compatibility fields plus the explicit resource-state contract."""
+
+    capability: Literal["available", "unavailable"] = Field(deprecated=True)
+    stale: bool = Field(default=False, deprecated=True)
+    is_stale: bool = False
+    can_refresh: bool
+    message: str | None = None
+
+
+class CompanyIntelligenceUnavailableOut(CompanyIntelligenceBaseOut):
+    state: Literal["unavailable"] = "unavailable"
+    reason: Literal["missing_company"] = "missing_company"
+    capability: Literal["unavailable"] = Field(default="unavailable", deprecated=True)
+    stale: Literal[False] = Field(default=False, deprecated=True)
+    is_stale: Literal[False] = False
+    can_refresh: Literal[False] = False
+    evidence: None = None
+
+
+class CompanyIntelligenceEmptyOut(CompanyIntelligenceBaseOut):
+    state: Literal["empty"] = "empty"
+    reason: Literal["not_researched"] = "not_researched"
+    capability: Literal["unavailable"] = Field(default="unavailable", deprecated=True)
+    stale: Literal[False] = Field(default=False, deprecated=True)
+    is_stale: Literal[False] = False
+    can_refresh: Literal[True] = True
+    evidence: None = None
+
+
+class CompanyIntelligenceReadyOut(CompanyIntelligenceBaseOut):
+    state: Literal["ready"] = "ready"
+    reason: None = None
+    capability: Literal["available"] = Field(default="available", deprecated=True)
+    can_refresh: Literal[True] = True
+    evidence: CompanyIntelligenceEvidenceOut
+
+
+CompanyIntelligenceOut = Annotated[
+    CompanyIntelligenceUnavailableOut
+    | CompanyIntelligenceEmptyOut
+    | CompanyIntelligenceReadyOut,
+    Field(discriminator="state"),
+]
+
+
 class ApplicationOut(CamelModel):
     id: int
     job_id: int
@@ -288,6 +370,7 @@ class JobDetail(CamelModel):
     reject_reason: str | None = None
     reject_category: str | None = None
     h1b_sponsorship: H1BSponsorshipOut | None = None
+    company_intelligence: CompanyIntelligenceOut
 
 
 class JobPatch(CamelModel):

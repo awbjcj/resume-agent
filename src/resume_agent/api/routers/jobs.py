@@ -30,10 +30,20 @@ from resume_agent.api.schemas.jobs import (
     JobPatch,
     H1BSponsorshipOut,
     H1BSponsorshipEvidenceOut,
+    CompanyIntelligenceEvidenceOut,
+    CompanyIntelligenceEmptyOut,
+    CompanyIntelligenceOut,
+    CompanyIntelligenceReadyOut,
+    CompanyIntelligenceUnavailableOut,
     JobsImportError,
     JobsImportReportOut,
 )
 from resume_agent.config import Settings
+from resume_agent.company_intelligence.agents import (
+    build_formatter_agent as build_company_intelligence_formatter,
+    build_research_agent as build_company_intelligence_researcher,
+)
+from resume_agent.company_intelligence.models import CompanyIntelligenceEvidence
 from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.models import (
     H1B_DISABLED_MESSAGE,
@@ -44,6 +54,11 @@ from resume_agent.h1b.service import check_job_sponsorship
 from resume_agent.api.schemas.runs import AddJobTextRequest, RunOut
 from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.services import board
+from resume_agent.services.company_intelligence import (
+    COMPANY_INTELLIGENCE_EMPTY_MESSAGE,
+    generate_company_intelligence,
+    load_company_intelligence,
+)
 from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
 from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tenancy.limits import DEFAULT_MAX_ACTIVE_JOBS, active_limit
@@ -93,7 +108,20 @@ def _job_detail_response(
     row = board.get_job_detail(session, job_id)
     if row is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    detail = JobDetail.model_validate(row)
+    company_intelligence = _company_intelligence_response(
+        row.company,
+        load_company_intelligence(session, row.company),
+    )
+    detail = JobDetail.model_validate(
+        {
+            **{
+                name: getattr(row, name)
+                for name in JobDetail.model_fields
+                if hasattr(row, name)
+            },
+            "company_intelligence": company_intelligence,
+        }
+    )
     if not settings.h1b_mcp_enabled:
         detail.h1b_sponsorship = H1BSponsorshipOut(
             capability="disabled",
@@ -112,6 +140,29 @@ def _job_detail_response(
     for version in detail.resume_versions:
         version.apply_gate_names(gate_names)
     return detail
+
+
+def _company_intelligence_response(
+    company: str | None,
+    evidence: CompanyIntelligenceEvidence | None,
+    *,
+    now: datetime | None = None,
+) -> CompanyIntelligenceOut:
+    if not normalize_company(company):
+        return CompanyIntelligenceUnavailableOut(
+            message="Add a company name before researching company intelligence.",
+        )
+    if evidence is None:
+        return CompanyIntelligenceEmptyOut(
+            message=COMPANY_INTELLIGENCE_EMPTY_MESSAGE,
+        )
+    current = now or datetime.now(timezone.utc)
+    is_stale = not evidence.is_fresh(current)
+    return CompanyIntelligenceReadyOut(
+        stale=is_stale,
+        is_stale=is_stale,
+        evidence=CompanyIntelligenceEvidenceOut.from_evidence(evidence),
+    )
 
 
 def _h1b_sponsorship_response(
@@ -149,6 +200,23 @@ def get_job_detail(
     settings: Settings = Depends(get_settings_dep),
 ):
     return _job_detail_response(session, job_id, request, settings)
+
+
+@router.get(
+    "/jobs/{job_id}/company-intelligence",
+    response_model=CompanyIntelligenceOut,
+)
+def get_company_intelligence(
+    job_id: int,
+    session: Session = Depends(get_session),
+) -> CompanyIntelligenceOut:
+    job = get_job(session, job_id)
+    if job is None:
+        raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
+    return _company_intelligence_response(
+        job.company,
+        load_company_intelligence(session, job.company),
+    )
 
 
 @router.post(
@@ -194,6 +262,98 @@ def check_h1b_sponsorship(
         singleton_conflict="raise",
         meta={"jobId": job_id},
         busy_message="An H-1B check is already running for this job",
+    )
+
+
+def _launch_company_intelligence_refresh(
+    job_id: int,
+    request: Request,
+    session: Session,
+    settings: Settings,
+    mgr: RunManager,
+) -> RunOut:
+    job = get_job(session, job_id)
+    if job is None:
+        raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
+    company = (job.company or "").strip()
+    company_key = normalize_company(company)
+    if not company_key:
+        raise ApiException(
+            422,
+            "VALIDATION_ERROR",
+            "A company is required before researching company intelligence",
+        )
+    engine = get_engine(request)
+
+    def do_refresh(worker_session: Session, reporter):
+        reporter.begin(1, f"Researching {company}")
+        current_job = get_job(worker_session, job_id)
+        if current_job is None:
+            raise ValueError(f"Job #{job_id} not found")
+        generate_company_intelligence(
+            worker_session,
+            company=company,
+            settings=settings,
+            research_agent=build_company_intelligence_researcher(),
+            formatter=build_company_intelligence_formatter(),
+            reporter=reporter,
+        )
+        reporter.step(1)
+        return {"jobId": job_id, "company": company_key}
+
+    return launch(
+        mgr,
+        "companyIntelligence",
+        session_work(engine, do_refresh),
+        singleton_key=f"company-intelligence:{company_key}",
+        singleton_conflict="raise",
+        meta={"jobId": job_id, "company": company_key},
+        busy_message="Company research is already running for this employer",
+    )
+
+
+@router.post(
+    "/jobs/{job_id}/company-intelligence/refreshes",
+    response_model=RunOut,
+    status_code=202,
+)
+def create_company_intelligence_refresh(
+    job_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+    mgr: RunManager = Depends(get_run_manager),
+) -> RunOut:
+    return _launch_company_intelligence_refresh(
+        job_id,
+        request,
+        session,
+        settings,
+        mgr,
+    )
+
+
+@router.post(
+    "/jobs/{job_id}/company-intelligence",
+    response_model=RunOut,
+    status_code=202,
+    include_in_schema=False,
+)
+def refresh_company_intelligence_compat(
+    job_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+    mgr: RunManager = Depends(get_run_manager),
+) -> RunOut:
+    """Compatibility alias for clients shipped before refreshes became a resource."""
+
+    return _launch_company_intelligence_refresh(
+        job_id,
+        request,
+        session,
+        settings,
+        mgr,
     )
 
 

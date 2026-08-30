@@ -12,6 +12,7 @@ import type { CoverLetterItem } from "@/features/job/CoverLetterRow";
 import { CoverLettersTab } from "@/features/job/CoverLettersTab";
 import { EmailDraftDialog } from "@/features/job/EmailDraftDialog";
 import { H1BSponsorshipPanel } from "@/features/job/H1BSponsorshipPanel";
+import { CompanyIntelligencePanel } from "@/features/job/CompanyIntelligencePanel";
 import { ResumeVersionsTab } from "@/features/job/ResumeVersionsTab";
 import { TrackingTab } from "@/features/job/TrackingTab";
 import { useJobDetail } from "@/features/job/use-job-detail";
@@ -200,6 +201,9 @@ export function JobModal({
                   <TabsTrigger value="sponsorship" className={tabTriggerClass}>
                     Sponsorship
                   </TabsTrigger>
+                  <TabsTrigger value="research" className={tabTriggerClass}>
+                    Research
+                  </TabsTrigger>
                   <TabsTrigger value="coverLetters" className={tabTriggerClass}>
                     Cover letters
                     {coverLetters.length > 0 && (
@@ -334,6 +338,17 @@ export function JobModal({
                       jobId={jobId}
                       company={job.company}
                       initialResult={job.h1BSponsorship}
+                    />
+                  </TabsContent>
+
+                  <TabsContent
+                    value="research"
+                    className="mx-auto mt-0 max-w-6xl"
+                  >
+                    <CompanyIntelligencePanel
+                      jobId={jobId}
+                      company={job.company}
+                      initialResult={job.companyIntelligence}
                     />
                   </TabsContent>
 

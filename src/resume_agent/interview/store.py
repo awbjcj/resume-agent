@@ -44,6 +44,7 @@ class InterviewContext(ExtensibleModel):
     jd_text: str = ""
     criteria: dict = Field(default_factory=dict)
     resume_content: dict = Field(default_factory=dict)
+    company_intelligence: dict = Field(default_factory=dict)
 
 
 class PlanItem(ExtensibleModel):

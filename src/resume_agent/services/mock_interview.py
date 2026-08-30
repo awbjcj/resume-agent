@@ -101,6 +101,7 @@ _OPENING_INSTRUCTION = (
 
 def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContext:
     from resume_agent.db import get_session
+    from resume_agent.services.company_intelligence import load_company_intelligence
     from resume_agent.tracking.tables import Job, ResumeVersion
 
     with get_session(engine) as db:
@@ -112,12 +113,18 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
         version = db.get(ResumeVersion, resume_version_id)
         if version is None or version.job_id != job_id:
             raise ValueError(f"unknown resume version: {resume_version_id}")
+        company_intelligence = load_company_intelligence(db, job.company)
         return InterviewContext(
             company=job.company or "",
             title=job.title or "",
             jd_text=job.jd_text[:JD_CHAR_CAP],
             criteria=job.criteria_json or {},
             resume_content=version.content_json or {},
+            company_intelligence=(
+                company_intelligence.model_dump(mode="json")
+                if company_intelligence is not None
+                else {}
+            ),
         )
 
 

@@ -79,6 +79,12 @@ describe("H1BSponsorshipPanel", () => {
       { wrapper },
     );
 
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Historical H-1B sponsorship",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Historical filings found")).toBeInTheDocument();
     expect(screen.getByText("2022, 2023")).toBeInTheDocument();
     expect(screen.getByText("$150,000")).toBeInTheDocument();

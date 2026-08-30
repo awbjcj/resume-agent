@@ -268,6 +268,7 @@ describe("JobModal", () => {
     expect(
       screen.getByRole("tab", { name: "Sponsorship" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Research" })).toBeInTheDocument();
     expect(
       screen.getByRole("tab", { name: "Cover letters" }),
     ).toBeInTheDocument();
@@ -280,7 +281,7 @@ describe("JobModal", () => {
     expect(
       screen.queryByRole("tab", { name: "Management" }),
     ).not.toBeInTheDocument();
-    expect(screen.getAllByRole("tab")).toHaveLength(7);
+    expect(screen.getAllByRole("tab")).toHaveLength(8);
   });
 
   it("gives H-1B research the full sponsorship canvas", async () => {
@@ -293,5 +294,20 @@ describe("JobModal", () => {
     expect(
       screen.getByRole("heading", { name: "Historical H-1B sponsorship" }),
     ).toBeInTheDocument();
+  });
+
+  it("gives company intelligence the full research canvas", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    const user = userEvent.setup();
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+
+    await user.click(await screen.findByRole("tab", { name: "Research" }));
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Company intelligence" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /research company for acme/i }),
+    ).toBeEnabled();
   });
 });

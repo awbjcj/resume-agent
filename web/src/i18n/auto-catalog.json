@@ -544,11 +544,6 @@
     "en": "● Hard",
     "zh-CN": "● 硬性"
   },
-  "⚠ Checked": {
-    "key": "ui_62fda2c26db7",
-    "en": "⚠ Checked",
-    "zh-CN": "⚠ 已核实"
-  },
   "${{v0}}+ / year": {
     "key": "ui_d22ff1c350b3",
     "en": "${{v0}}+ / year",
@@ -778,6 +773,11 @@
     "key": "ui_668f75a5d451",
     "en": "Add a company name before running a manual check.",
     "zh-CN": "运行手动检查前，请先填写公司名称。"
+  },
+  "Add a company name before running research.": {
+    "key": "ui_6c59a61a6542",
+    "en": "Add a company name before running research.",
+    "zh-CN": "请先添加公司名称，再运行调研。"
   },
   "Add a note": {
     "key": "ui_322c0e13ef4f",
@@ -1829,6 +1829,11 @@
     "en": "cancelling",
     "zh-CN": "取消中"
   },
+  "Candidate lens:": {
+    "key": "ui_2e4605e50fc0",
+    "en": "Candidate lens:",
+    "zh-CN": "求职者视角："
+  },
   "Canonical skill": {
     "key": "ui_3458bfccaef3",
     "en": "Canonical skill",
@@ -1954,6 +1959,11 @@
     "en": "Certified filings",
     "zh-CN": "已认证申请"
   },
+  "Challenges": {
+    "key": "ui_40b9c8f44487",
+    "en": "Challenges",
+    "zh-CN": "挑战"
+  },
   "Change category": {
     "key": "ui_2b31046ef3e9",
     "en": "Change category",
@@ -2008,6 +2018,11 @@
     "key": "ui_7732287944e2",
     "en": "Check your email",
     "zh-CN": "请查收邮件"
+  },
+  "Checked": {
+    "key": "ui_0efd92a33590",
+    "en": "Checked",
+    "zh-CN": "核实于"
   },
   "Checked:": {
     "key": "ui_37c3aebdd557",
@@ -2158,6 +2173,11 @@
     "key": "ui_7306cfea7e9a",
     "en": "Choose which providers use your subscription gateway and which stay on their direct metered APIs.",
     "zh-CN": "选择哪些提供商使用你的订阅网关，哪些保留直接计量 API。"
+  },
+  "Cited employer dossier": {
+    "key": "ui_9096cdbcf5d7",
+    "en": "Cited employer dossier",
+    "zh-CN": "带引证的雇主档案"
   },
   "City": {
     "key": "ui_fc33f73246f4",
@@ -2314,10 +2334,25 @@
     "en": "Company identifier",
     "zh-CN": "公司标识符"
   },
+  "Company intelligence": {
+    "key": "ui_89f7d675f068",
+    "en": "Company intelligence",
+    "zh-CN": "公司情报"
+  },
   "Company or role": {
     "key": "ui_4ba9abe59a29",
     "en": "Company or role",
     "zh-CN": "公司或职位"
+  },
+  "Company research": {
+    "key": "ui_c5eb5a61156d",
+    "en": "Company research",
+    "zh-CN": "公司调研"
+  },
+  "Company research failed. The last saved dossier is unchanged.": {
+    "key": "ui_3f86c108c4e5",
+    "en": "Company research failed. The last saved dossier is unchanged.",
+    "zh-CN": "公司调研失败。上次保存的档案未被更改。"
   },
   "Company size": {
     "key": "ui_50deca5d2484",
@@ -2363,6 +2398,11 @@
     "key": "ui_e1f27044cd25",
     "en": "Compensation",
     "zh-CN": "薪酬"
+  },
+  "Competitive position": {
+    "key": "ui_16566e0c6a50",
+    "en": "Competitive position",
+    "zh-CN": "竞争地位"
   },
   "Complete the required rate fields": {
     "key": "ui_358dd99666e3",
@@ -3534,6 +3574,11 @@
     "en": "Endpoint and credential move together",
     "zh-CN": "端点与凭证一并迁移"
   },
+  "Engineering culture": {
+    "key": "ui_29740326eaef",
+    "en": "Engineering culture",
+    "zh-CN": "工程文化"
+  },
   "Enter a complete HTTP(S) URL.": {
     "key": "ui_7f3b503a7fdd",
     "en": "Enter a complete HTTP(S) URL.",
@@ -4068,6 +4113,11 @@
     "key": "ui_09b2d9cd1123",
     "en": "Follow-up",
     "zh-CN": "跟进"
+  },
+  "for {{v0}}": {
+    "key": "ui_a83984e7fc09",
+    "en": "for {{v0}}",
+    "zh-CN": "适用于 {{v0}}"
   },
   "For example: draft an answer to their “why this team” question.": {
     "key": "ui_6494a4ee86f2",
@@ -5384,6 +5434,11 @@
     "en": "Maximum ranked repositories to import, from 1 to 100.",
     "zh-CN": "要导入的最大排名仓库数，范围为 1 到 100。"
   },
+  "May be outdated": {
+    "key": "ui_f9b76b6b1a4f",
+    "en": "May be outdated",
+    "zh-CN": "可能已过时"
+  },
   "Median": {
     "key": "ui_daab7c435134",
     "en": "Median",
@@ -5923,6 +5978,11 @@
     "key": "ui_4bf520c1a9df",
     "en": "No committed quota operations yet.",
     "zh-CN": "尚无已提交的配额操作。"
+  },
+  "No company dossier yet": {
+    "key": "ui_761cdb84897d",
+    "en": "No company dossier yet",
+    "zh-CN": "尚无公司档案"
   },
   "No cover letter yet": {
     "key": "ui_0f0ba449d458",
@@ -6483,6 +6543,11 @@
     "key": "ui_e36d1a30b2a3",
     "en": "Open selection tray",
     "zh-CN": "打开选择托盘"
+  },
+  "Open source": {
+    "key": "ui_67a0d2e0dab4",
+    "en": "Open source",
+    "zh-CN": "打开来源"
   },
   "Open source record": {
     "key": "ui_867900527254",
@@ -7064,6 +7129,11 @@
     "en": "Pruning",
     "zh-CN": "清理中"
   },
+  "Public evidence about strategy, recent moves, culture, challenges, and competitive position. Refreshes are always explicit.": {
+    "key": "ui_d9695a42edca",
+    "en": "Public evidence about strategy, recent moves, culture, challenges, and competitive position. Refreshes are always explicit.",
+    "zh-CN": "汇总有关战略、近期动态、文化、挑战和竞争地位的公开证据。仅在你明确操作时刷新。"
+  },
   "Public URL": {
     "key": "ui_f7b60b043d01",
     "en": "Public URL",
@@ -7414,6 +7484,11 @@
     "en": "Recent ledger",
     "zh-CN": "近期台账"
   },
+  "Recent moves": {
+    "key": "ui_8fce06e2709c",
+    "en": "Recent moves",
+    "zh-CN": "近期动态"
+  },
   "Reconnect": {
     "key": "ui_bf8a9eab9e7e",
     "en": "Reconnect",
@@ -7503,6 +7578,11 @@
     "key": "ui_24e3f26681b2",
     "en": "Refresh repository evidence",
     "zh-CN": "刷新代码仓库证据"
+  },
+  "Refresh research": {
+    "key": "ui_2065f335fe65",
+    "en": "Refresh research",
+    "zh-CN": "刷新调研"
   },
   "Refreshing updates every job at this company.": {
     "key": "ui_3be9cc33d1df",
@@ -7744,6 +7824,16 @@
     "en": "Requires rate coverage",
     "zh-CN": "需要费率覆盖"
   },
+  "Research": {
+    "key": "ui_979d6300fd98",
+    "en": "Research",
+    "zh-CN": "调研"
+  },
+  "Research company": {
+    "key": "ui_664c271ca313",
+    "en": "Research company",
+    "zh-CN": "调研公司"
+  },
   "Research disabled": {
     "key": "ui_90e6619d28c5",
     "en": "Research disabled",
@@ -7768,6 +7858,11 @@
     "key": "ui_2d5824760f85",
     "en": "Research verified repositories, learning resources, and a portfolio project on demand.",
     "zh-CN": "按需研究已验证的代码仓库、学习资源和作品集项目。"
+  },
+  "Researched": {
+    "key": "ui_ca87622b4b64",
+    "en": "Researched",
+    "zh-CN": "调研于"
   },
   "Researching": {
     "key": "ui_dc01b0720315",
@@ -8303,6 +8398,11 @@
     "key": "ui_7cb50af68ca3",
     "en": "Run a pull to bring in jobs, or toggle archived.",
     "zh-CN": "运行一次获取以导入职位，或切换显示已归档项。"
+  },
+  "Run research to build a cited company brief.": {
+    "key": "ui_a162d837970e",
+    "en": "Run research to build a cited company brief.",
+    "zh-CN": "运行调研以生成带引证的公司简报。"
   },
   "Run your first pull to fill the funnel with fresh postings.": {
     "key": "ui_c9e0041898fc",
@@ -9184,6 +9284,11 @@
     "en": "Source mix",
     "zh-CN": "来源构成"
   },
+  "sources": {
+    "key": "ui_878a52fc5ff6",
+    "en": "sources",
+    "zh-CN": "条来源"
+  },
   "Sources": {
     "key": "ui_caf85b0888d7",
     "en": "Sources",
@@ -9433,6 +9538,11 @@
     "key": "ui_3d591e826d54",
     "en": "Stop recording",
     "zh-CN": "停止录音"
+  },
+  "Strategy": {
+    "key": "ui_6b27710dfaaf",
+    "en": "Strategy",
+    "zh-CN": "战略"
   },
   "Strengths": {
     "key": "ui_b11d27f88ceb",
@@ -10138,6 +10248,11 @@
     "key": "ui_929c3b8512a2",
     "en": "This revision also includes {{v0}} fact{{v1}} you added after the original evidence plan.",
     "zh-CN": "此版本还包含你在原始证据方案之后新增的 {{v0}} 条事实。"
+  },
+  "This saved research is past its freshness window. It remains visible until you choose to refresh it.": {
+    "key": "ui_b4aaebe2738b",
+    "en": "This saved research is past its freshness window. It remains visible until you choose to refresh it.",
+    "zh-CN": "此调研已超过新鲜度期限。在你选择刷新之前，它仍会继续显示。"
   },
   "This skill is unavailable.": {
     "key": "ui_bf75c9ed017d",
