@@ -98,6 +98,27 @@ const en = {
     retry: "Try again",
     elapsedSeconds: "{{count}}s",
   },
+  filters: {
+    sortBy: "Sort by",
+    sortOptions: {
+      fit: "Fit",
+      salary: "Salary",
+      recency: "Most recent",
+      composite: "Composite score",
+      company: "Company",
+    },
+    preset: "Preset",
+    presets: {
+      balanced: "Balanced",
+      payFirst: "Pay-first",
+      freshest: "Freshest",
+    },
+    posted: {
+      label: "Posted",
+      anyTime: "Any time",
+      withinDays: "≤ {{count}} days",
+    },
+  },
   nav: {
     dashboard: "Dashboard",
     prepare: "Prepare",
@@ -459,6 +480,27 @@ const zhCN = {
     close: "关闭",
     retry: "重试",
     elapsedSeconds: "{{count}} 秒",
+  },
+  filters: {
+    sortBy: "排序方式",
+    sortOptions: {
+      fit: "匹配度",
+      salary: "薪资",
+      recency: "最新发布",
+      composite: "综合评分",
+      company: "公司",
+    },
+    preset: "预设",
+    presets: {
+      balanced: "均衡",
+      payFirst: "薪资优先",
+      freshest: "最新优先",
+    },
+    posted: {
+      label: "发布日期",
+      anyTime: "不限时间",
+      withinDays: "最近 {{count}} 天内",
+    },
   },
   nav: {
     dashboard: "仪表盘",
