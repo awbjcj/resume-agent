@@ -11,6 +11,18 @@ const stageRank = new Map<string, number>(
   PIPELINE_STAGE_ORDER.map((stage, index) => [stage, index]),
 );
 
+const PIPELINE_STAGE_LABEL_KEYS = {
+  raw: "job.stages.raw",
+  shortlisted: "job.stages.shortlisted",
+  approved: "job.stages.approved",
+  tailored: "job.stages.tailored",
+  rendered: "job.stages.rendered",
+  rejected: "job.stages.rejected",
+} as const;
+
+type PipelineStageLabelKey =
+  (typeof PIPELINE_STAGE_LABEL_KEYS)[keyof typeof PIPELINE_STAGE_LABEL_KEYS];
+
 export function orderPipelineStages(stages: Iterable<string>) {
   return [...stages].sort((left, right) => {
     const leftRank = stageRank.get(left) ?? Number.MAX_SAFE_INTEGER;
@@ -23,7 +35,13 @@ export function initialOpenPipelineStages() {
   return new Set<string>(["tailored", "rendered"]);
 }
 
-export function pipelineStageLabel(stage: string) {
+export function pipelineStageLabel(
+  stage: string,
+  translate?: (key: PipelineStageLabelKey) => string,
+) {
+  const labelKey = PIPELINE_STAGE_LABEL_KEYS[stage as keyof typeof PIPELINE_STAGE_LABEL_KEYS];
+  if (labelKey && translate) return translate(labelKey);
+
   return stage.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

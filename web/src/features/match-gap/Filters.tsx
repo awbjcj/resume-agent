@@ -13,6 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FacetPopover } from "@/components/filters/FacetPopover";
 import { pipelineStageLabel } from "@/features/pipeline/pipeline-stages";
 import { fieldLabel } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import { TARGET_STATUSES, type Filters as FilterValue } from "./aggregate";
 
 const ALL = "__all__";
@@ -35,6 +36,7 @@ export function Filters({
   seniorities: string[];
   statusCounts: Record<string, number>;
 }) {
+  const { t } = useTranslation();
   const companyItems = [
     { label: "All companies", value: ALL },
     ...companies.map((company) => ({ label: company, value: company })),
@@ -130,7 +132,7 @@ export function Filters({
         }}
         selected={value.statuses}
         onChange={(statuses) => onChange({ ...value, statuses })}
-        getLabel={pipelineStageLabel}
+        getLabel={(stage) => pipelineStageLabel(stage, (key) => t(key))}
       />
 
       <div className="flex h-9 items-center justify-between gap-2 rounded-lg border bg-background px-3 whitespace-nowrap lg:justify-start lg:border-0 lg:bg-transparent lg:px-0">
