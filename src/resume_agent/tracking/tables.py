@@ -315,6 +315,39 @@ class CompanyIntelligenceEvidenceRow(SQLModel, table=True):
     schema_version: int = 1
 
 
+class CompanyIntelligenceVersionRow(SQLModel, table=True):
+    """One immutable observation created by an explicit company refresh."""
+
+    __tablename__ = cast(Any, "company_intelligence_versions")
+    __table_args__ = (
+        UniqueConstraint(
+            "normalized_company",
+            "version_number",
+            name="uq_company_intelligence_version",
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    normalized_company: str = Field(index=True)
+    display_company: str = ""
+    version_number: int = Field(index=True)
+    previous_version_id: int | None = Field(
+        default=None, foreign_key="company_intelligence_versions.id"
+    )
+    research_depth: str = "standard"
+    evidence_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    change_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    retrieved_at: datetime = Field(default_factory=utcnow, index=True)
+    expires_at: datetime = Field(index=True)
+    schema_version: int = 2
+
+
 class ErrorRecord(SQLModel, table=True):
     """A durable failure record that the user can dismiss or resolve."""
 

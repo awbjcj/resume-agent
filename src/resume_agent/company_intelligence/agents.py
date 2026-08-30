@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from agno.agent import Agent
 
-from resume_agent.company_intelligence.models import CompanyIntelligenceDraft
+from resume_agent.company_intelligence.models import (
+    CompanyIntelligenceDraft,
+    CompanyResearchDepth,
+)
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
     AgentRunner,
@@ -33,6 +36,9 @@ _FORMAT_INSTRUCTIONS = [
     "Copy source URLs exactly from the research. Every insight must cite at least one listed source URL that supports it.",
     "Keep summaries factual and concise. why_it_matters explains relevance to a job candidate without claiming the candidate has experience or that the company will hire them.",
     "Classify a source as official only when it is published by the company or a government body; otherwise use independent.",
+    "Set source_tier precisely. Include published_at when the source states a publication date; never guess it.",
+    "Mark an insight inferred only when it is a clearly labelled synthesis rather than a direct source claim. The server decides whether direct claims are corroborated or single-source.",
+    "Use as_of only when the research provides a concrete date, and note material source disagreement in conflicting_evidence without resolving it by guesswork.",
     "Do not include H-1B filing conclusions; sponsorship evidence is owned by a separate feature.",
 ]
 
@@ -42,14 +48,22 @@ def _research_model_id() -> str:
     return settings.advisor_model or settings.premium_model
 
 
-def build_research_agent() -> Runner:
+def build_research_agent(depth: CompanyResearchDepth = "standard") -> Runner:
     model, tools = build_search_equipped(_research_model_id())
+    depth_instruction = {
+        "quick": "Quick scan: prioritize official sources and the most material current independent source; stop once the strongest supported axes are covered.",
+        "standard": "Standard research: balance official and reputable independent sources across all credibly supported axes.",
+        "deep": "Deep dive: seek multiple independent authorities for material claims, dated evidence, and credible conflicting evidence across every supported axis.",
+    }[depth]
     return AgentRunner(
         Agent(
             model=model,
             tools=tools,
             description="Research current, verifiable company intelligence for a job candidate.",
-            instructions=with_guidance("company-intelligence-research", _SEARCH_INSTRUCTIONS),
+            instructions=with_guidance(
+                "company-intelligence-research",
+                [*_SEARCH_INSTRUCTIONS, depth_instruction],
+            ),
             **retry_kwargs(),
         )
     )
