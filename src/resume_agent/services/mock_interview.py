@@ -105,6 +105,7 @@ _OPENING_INSTRUCTION = (
 def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContext:
     from resume_agent.db import get_session
     from resume_agent.services.company_intelligence import load_company_intelligence
+    from resume_agent.services.role_preparation import load_role_preparation_brief
     from resume_agent.tracking.event_vocab import INTERVIEW_KINDS
     from resume_agent.tracking.tables import (
         Application,
@@ -124,6 +125,7 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
         if version is None or version.job_id != job_id:
             raise ValueError(f"unknown resume version: {resume_version_id}")
         company_intelligence = load_company_intelligence(db, job.company)
+        role_preparation_brief = load_role_preparation_brief(db, job_id)
         reflection_events = db.exec(
             select(ApplicationEvent)
             .join(Application)
@@ -160,6 +162,11 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
             company_intelligence=(
                 company_intelligence.model_dump(mode="json")
                 if company_intelligence is not None
+                else {}
+            ),
+            role_preparation_brief=(
+                role_preparation_brief.model_dump(mode="json")
+                if role_preparation_brief is not None
                 else {}
             ),
             reflections=reflections,

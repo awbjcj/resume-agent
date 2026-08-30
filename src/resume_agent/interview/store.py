@@ -55,6 +55,7 @@ class InterviewContext(ExtensibleModel):
     criteria: dict = Field(default_factory=dict)
     resume_content: dict = Field(default_factory=dict)
     company_intelligence: dict = Field(default_factory=dict)
+    role_preparation_brief: dict = Field(default_factory=dict)
     reflections: list[InterviewReflection] = Field(default_factory=list)
 
 

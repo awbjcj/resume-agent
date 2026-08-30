@@ -31,6 +31,7 @@ from resume_agent.tracking.tables import (
     CompanyIntelligenceEvidenceRow,
     Job,
     ResumeVersion,
+    RolePreparationBriefRow,
 )
 
 _ids: tuple[int, int] = (0, 0)
@@ -578,6 +579,40 @@ def test_load_context_snapshots_current_company_intelligence(engine):
     context = load_context(engine, job_id, version_id)
 
     assert context.company_intelligence["overview"] == "Current public overview"
+
+
+def test_load_context_snapshots_current_role_preparation_brief(engine):
+    job_id, version_id = _ids
+    now = datetime.now(timezone.utc)
+    with get_session(engine) as db:
+        db.add(
+            RolePreparationBriefRow(
+                job_id=job_id,
+                brief_json={
+                    "job_id": job_id,
+                    "company": "Acme",
+                    "title": "Engineer",
+                    "generated_at": now.isoformat(),
+                    "input_fingerprint": "abc",
+                    "positioning_summary": "Lead with platform ownership.",
+                    "likely_questions": [],
+                    "questions_to_ask": [
+                        {"text": "How is ownership measured?", "rationale": "Scope"}
+                    ],
+                    "caveat": "Planning aid",
+                },
+                generated_at=now,
+                input_fingerprint="abc",
+            )
+        )
+        db.commit()
+
+    context = load_context(engine, job_id, version_id)
+
+    assert (
+        context.role_preparation_brief["positioning_summary"]
+        == "Lead with platform ownership."
+    )
 
 
 def test_load_context_snapshots_only_nonempty_interview_reflections(engine):
