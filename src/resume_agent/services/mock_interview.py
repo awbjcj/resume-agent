@@ -112,7 +112,7 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
         Job,
         ResumeVersion,
     )
-    from sqlmodel import select
+    from sqlmodel import col, select
 
     with get_session(engine) as db:
         job = db.get(Job, job_id)
@@ -129,11 +129,11 @@ def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContex
             .join(Application)
             .where(
                 Application.job_id == job_id,
-                ApplicationEvent.kind.in_(INTERVIEW_KINDS),
+                col(ApplicationEvent.kind).in_(INTERVIEW_KINDS),
             )
             .order_by(
-                ApplicationEvent.occurred_at.desc(),
-                ApplicationEvent.created_at.desc(),
+                col(ApplicationEvent.occurred_at).desc(),
+                col(ApplicationEvent.created_at).desc(),
             )
         ).all()
         reflections = [

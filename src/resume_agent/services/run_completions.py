@@ -47,7 +47,7 @@ def list_run_completions(
 ) -> list[RunCompletion]:
     query = select(RunCompletion).order_by(col(RunCompletion.completed_at).desc())
     if unread_only:
-        query = query.where(RunCompletion.read_at.is_(None))
+        query = query.where(col(RunCompletion.read_at).is_(None))
     return list(session.exec(query.limit(limit)).all())
 
 
@@ -65,7 +65,7 @@ def mark_run_completion_read(session: Session, completion_id: int) -> RunComplet
 
 def mark_all_run_completions_read(session: Session) -> int:
     rows = session.exec(
-        select(RunCompletion).where(RunCompletion.read_at.is_(None))
+        select(RunCompletion).where(col(RunCompletion.read_at).is_(None))
     ).all()
     if not rows:
         return 0

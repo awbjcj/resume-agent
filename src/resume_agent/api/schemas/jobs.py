@@ -273,12 +273,8 @@ class CompanyIntelligenceEvidenceOut(CamelModel):
 
 
 class CompanyIntelligenceBaseOut(CamelModel):
-    """Stable compatibility fields plus the explicit resource-state contract."""
+    """Fields shared by every company-intelligence resource state."""
 
-    capability: Literal["available", "unavailable"] = Field(deprecated=True)
-    stale: bool = Field(default=False, deprecated=True)
-    is_stale: bool = False
-    can_refresh: bool
     message: str | None = None
 
 
@@ -306,6 +302,8 @@ class CompanyIntelligenceReadyOut(CompanyIntelligenceBaseOut):
     state: Literal["ready"] = "ready"
     reason: None = None
     capability: Literal["available"] = Field(default="available", deprecated=True)
+    stale: bool = Field(default=False, deprecated=True)
+    is_stale: bool = False
     can_refresh: Literal[True] = True
     evidence: CompanyIntelligenceEvidenceOut
 
