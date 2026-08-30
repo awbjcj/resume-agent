@@ -34,7 +34,9 @@ from resume_agent.api.schemas.jobs import (
     CompanyIntelligenceEmptyOut,
     CompanyIntelligenceOut,
     CompanyIntelligenceReadyOut,
+    CompanyIntelligenceRefreshIn,
     CompanyIntelligenceUnavailableOut,
+    CompanyIntelligenceVersionListOut,
     JobsImportError,
     JobsImportReportOut,
 )
@@ -58,6 +60,7 @@ from resume_agent.services.company_intelligence import (
     COMPANY_INTELLIGENCE_EMPTY_MESSAGE,
     generate_company_intelligence,
     load_company_intelligence,
+    load_company_intelligence_history,
 )
 from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
 from resume_agent.taxonomy.industries import normalize_company
@@ -219,6 +222,29 @@ def get_company_intelligence(
     )
 
 
+@router.get(
+    "/jobs/{job_id}/company-intelligence/versions",
+    response_model=CompanyIntelligenceVersionListOut,
+)
+def get_company_intelligence_versions(
+    job_id: int,
+    limit: int = 10,
+    session: Session = Depends(get_session),
+) -> CompanyIntelligenceVersionListOut:
+    job = get_job(session, job_id)
+    if job is None:
+        raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
+    if not normalize_company(job.company):
+        return CompanyIntelligenceVersionListOut()
+    history = load_company_intelligence_history(session, job.company, limit=limit)
+    return CompanyIntelligenceVersionListOut(
+        items=[
+            CompanyIntelligenceEvidenceOut.from_evidence(evidence)
+            for evidence in history
+        ]
+    )
+
+
 @router.post(
     "/jobs/{job_id}/h1b-sponsorship",
     response_model=RunOut,
@@ -271,12 +297,14 @@ def _launch_company_intelligence_refresh(
     session: Session,
     settings: Settings,
     mgr: RunManager,
+    body: CompanyIntelligenceRefreshIn | None = None,
 ) -> RunOut:
     job = get_job(session, job_id)
     if job is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     company = (job.company or "").strip()
     company_key = normalize_company(company)
+    depth = body.depth if body is not None else "standard"
     if not company_key:
         raise ApiException(
             422,
@@ -294,12 +322,13 @@ def _launch_company_intelligence_refresh(
             worker_session,
             company=company,
             settings=settings,
-            research_agent=build_company_intelligence_researcher(),
+            research_agent=build_company_intelligence_researcher(depth),
             formatter=build_company_intelligence_formatter(),
             reporter=reporter,
+            research_depth=depth,
         )
         reporter.step(1)
-        return {"jobId": job_id, "company": company_key}
+        return {"jobId": job_id, "company": company_key, "depth": depth}
 
     return launch(
         mgr,
@@ -307,7 +336,7 @@ def _launch_company_intelligence_refresh(
         session_work(engine, do_refresh),
         singleton_key=f"company-intelligence:{company_key}",
         singleton_conflict="raise",
-        meta={"jobId": job_id, "company": company_key},
+        meta={"jobId": job_id, "company": company_key, "depth": depth},
         busy_message="Company research is already running for this employer",
     )
 
@@ -320,6 +349,7 @@ def _launch_company_intelligence_refresh(
 def create_company_intelligence_refresh(
     job_id: int,
     request: Request,
+    body: CompanyIntelligenceRefreshIn | None = None,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
     mgr: RunManager = Depends(get_run_manager),
@@ -330,6 +360,7 @@ def create_company_intelligence_refresh(
         session,
         settings,
         mgr,
+        body,
     )
 
 
@@ -342,6 +373,7 @@ def create_company_intelligence_refresh(
 def refresh_company_intelligence_compat(
     job_id: int,
     request: Request,
+    body: CompanyIntelligenceRefreshIn | None = None,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
     mgr: RunManager = Depends(get_run_manager),
@@ -354,6 +386,7 @@ def refresh_company_intelligence_compat(
         session,
         settings,
         mgr,
+        body,
     )
 
 

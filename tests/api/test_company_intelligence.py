@@ -131,7 +131,7 @@ def _stub_company_research(monkeypatch):
     monkeypatch.setattr(
         jobs_router,
         "build_company_intelligence_researcher",
-        lambda: _Agent("Source https://acme.example/strategy"),
+        lambda _depth="standard": _Agent("Source https://acme.example/strategy"),
     )
     monkeypatch.setattr(
         jobs_router,
@@ -208,6 +208,46 @@ def test_explicit_refresh_launches_and_persists_grounded_dossier(monkeypatch, tm
     assert run["state"] == "done"
     assert response.json()["kind"] == "companyIntelligence"
     assert detail["companyIntelligence"]["capability"] == "available"
+    assert detail["companyIntelligence"]["evidence"]["versionNumber"] == 1
+
+
+def test_refresh_depth_is_explicit_and_history_is_newest_first(monkeypatch, tmp_path):
+    seen_depths = []
+    _stub_company_research(monkeypatch)
+    original_builder = jobs_router.build_company_intelligence_researcher
+
+    def build_researcher(depth="standard"):
+        seen_depths.append(depth)
+        return original_builder(depth)
+
+    monkeypatch.setattr(
+        jobs_router,
+        "build_company_intelligence_researcher",
+        build_researcher,
+    )
+    client = _client(tmp_path)
+    with client:
+        job_id = _seed(_app(client))
+        first = client.post(
+            f"/api/jobs/{job_id}/company-intelligence/refreshes",
+            json={"depth": "quick"},
+        )
+        second = client.post(
+            f"/api/jobs/{job_id}/company-intelligence/refreshes",
+            json={"depth": "deep"},
+        )
+        history = client.get(
+            f"/api/jobs/{job_id}/company-intelligence/versions"
+        ).json()
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert seen_depths == ["quick", "deep"]
+    assert [item["versionNumber"] for item in history["items"]] == [2, 1]
+    assert [item["researchDepth"] for item in history["items"]] == [
+        "deep",
+        "quick",
+    ]
 
 
 def test_legacy_refresh_route_remains_accepted(monkeypatch, tmp_path):
@@ -267,6 +307,8 @@ def test_openapi_exposes_resource_routes_and_hides_legacy_refresh_alias(tmp_path
 
     resource_path = "/api/jobs/{job_id}/company-intelligence"
     refresh_path = f"{resource_path}/refreshes"
+    versions_path = f"{resource_path}/versions"
     assert "get" in paths[resource_path]
     assert "post" not in paths[resource_path]
     assert "post" in paths[refresh_path]
+    assert "get" in paths[versions_path]

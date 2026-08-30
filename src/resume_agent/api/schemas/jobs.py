@@ -12,7 +12,10 @@ from resume_agent.api.schemas.base import CamelModel
 from resume_agent.company_intelligence.models import (
     CompanyIntelligenceAxis,
     CompanyIntelligenceEvidence,
+    CompanyResearchDepth,
+    CompanySourceTier,
     CompanySourceType,
+    CompanyVerificationState,
 )
 from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.models.review import ReviewCritique
@@ -246,6 +249,9 @@ class CompanyIntelligenceSourceOut(CamelModel):
     url: str
     publisher: str
     source_type: CompanySourceType
+    source_tier: CompanySourceTier
+    published_at: datetime | None = None
+    last_verified_at: datetime | None = None
 
 
 class CompanyIntelligenceInsightOut(CamelModel):
@@ -253,6 +259,17 @@ class CompanyIntelligenceInsightOut(CamelModel):
     summary: str
     why_it_matters: str
     citations: list[str] = Field(default_factory=list)
+    verification_state: CompanyVerificationState
+    as_of: datetime | None = None
+    conflicting_evidence: str = ""
+
+
+class CompanyIntelligenceChangeSetOut(CamelModel):
+    added_axes: list[CompanyIntelligenceAxis] = Field(default_factory=list)
+    removed_axes: list[CompanyIntelligenceAxis] = Field(default_factory=list)
+    changed_axes: list[CompanyIntelligenceAxis] = Field(default_factory=list)
+    added_source_urls: list[str] = Field(default_factory=list)
+    removed_source_urls: list[str] = Field(default_factory=list)
 
 
 class CompanyIntelligenceEvidenceOut(CamelModel):
@@ -264,12 +281,27 @@ class CompanyIntelligenceEvidenceOut(CamelModel):
     retrieved_at: datetime
     expires_at: datetime
     caveat: str
+    version_id: int | None = None
+    version_number: int = 1
+    previous_version_id: int | None = None
+    research_depth: CompanyResearchDepth = "standard"
+    changes: CompanyIntelligenceChangeSetOut = Field(
+        default_factory=CompanyIntelligenceChangeSetOut
+    )
 
     @classmethod
     def from_evidence(
         cls, evidence: CompanyIntelligenceEvidence
     ) -> CompanyIntelligenceEvidenceOut:
         return cls.model_validate(evidence.model_dump())
+
+
+class CompanyIntelligenceVersionListOut(CamelModel):
+    items: list[CompanyIntelligenceEvidenceOut] = Field(default_factory=list)
+
+
+class CompanyIntelligenceRefreshIn(CamelModel):
+    depth: CompanyResearchDepth = "standard"
 
 
 class CompanyIntelligenceBaseOut(CamelModel):
