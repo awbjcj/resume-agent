@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Bot, FileText, ListChecks, MessageCircleMore, Sparkles, SquareCheckBig } from "lucide-react";
+import { FileText, ListChecks, MessageCircleMore, Sparkles, SquareCheckBig } from "lucide-react";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatSessionHistory, type ChatSessionHistoryItem } from "@/components/chat/ChatSessionHistory";
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -251,9 +251,9 @@ export function CareerLabPage() {
       <GuidedWorkspaceHeader
         tone="career-lab"
         icon={<Sparkles />}
-        eyebrow="Drafting studio"
-        title="Career Lab"
-        description="Work through a career question with one verified skill at a time. Every output stays a draft until you decide what to do next."
+        eyebrow={active ? "Career Lab" : "Drafting studio"}
+        title={active?.title || "Career Lab"}
+        description={active?.goal || "Work through a career question with one verified skill at a time. Every output stays a draft until you decide what to do next."}
         meta={
           <>
             <Badge variant={active?.status === "active" ? "secondary" : "outline"}>{active ? (active.status === "active" ? "Session live" : "Session ended") : "Ready to explore"}</Badge>
@@ -296,11 +296,7 @@ export function CareerLabPage() {
       <div className={cn("grid items-start gap-6", active && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
         <main className="flex min-w-0 flex-col gap-4">
           <Card className="min-w-0 overflow-hidden rounded-2xl">
-            <CardHeader className="border-b bg-muted/25 py-4">
-              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active?.title || (showThread ? "Career Lab workspace" : "Start a Career Lab session")}</CardTitle>
-              <CardDescription>{active ? active.goal || "A focused Career Lab session" : "Create a session when you are ready to work through a career question."}</CardDescription>
-            </CardHeader>
-            <CardContent className={cn("flex flex-col gap-4 p-4 sm:p-6", CHAT_SURFACE_HEIGHT)}>
+            <CardContent className={cn("flex flex-col gap-4", showThread ? "p-4 sm:p-6" : "p-0", CHAT_SURFACE_HEIGHT)}>
               {sessionLoading ? <Skeleton className="h-full w-full" /> : null}
               {!sessionLoading && !showThread ? <WorkspaceEmptyState icon={MessageCircleMore} title="Turn a career question into a useful draft" description="Start with one focused request. After the session begins, you can add only the career context that should shape the next draft." actionLabel="Create Career Lab session" onAction={() => setNewOpen(true)} steps={[{ icon: MessageCircleMore, title: "Ask one focused question", description: "Start with the decision, draft, comparison, or next step you need." }, { icon: ListChecks, title: "Set context when needed", description: "Once the session starts, include a profile, job, resume version, or offer references." }, { icon: FileText, title: "Review the draft", description: "Keep every output as a draft until you decide how to use it." }]} /> : null}
               {showThread ? (

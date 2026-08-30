@@ -3,11 +3,11 @@ import { useState } from "react";
 import { ArrowRight, FileText, Sparkles, Wrench } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { PageHeader } from "@/components/PageHeader";
+import { GuidedWorkspaceHeader } from "@/components/chat/GuidedWorkspaceHeader";
+import { Badge } from "@/components/ui/badge";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -87,31 +87,26 @@ export function ProfileWorkspace() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        kicker="Step 1 · Your profile"
+      <GuidedWorkspaceHeader
+        tone="coach"
+        icon={<Sparkles />}
+        eyebrow="Step 1 · Your profile"
         title="Profile"
-        sub="The resume, documents, and skills every tailored application is grounded in."
-      />
-
-      <Card className="border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.05]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" aria-hidden="true" />
-            Profile coach
-          </CardTitle>
-          <CardDescription>
+        description="The resume, documents, and skills every tailored application is grounded in."
+        meta={
+          <Badge variant="outline">
             {lastCoach
               ? `${lastCoach.topicCount} topics · last session ${new Date(lastCoach.startedAt).toLocaleDateString()}`
               : "Start your first coaching session to uncover grounded profile evidence."}
-          </CardDescription>
-          <CardAction>
-            <a className={buttonVariants()} data-slot="button" href="/coach">
-              Open coach
-              <ArrowRight data-icon="inline-end" aria-hidden="true" />
-            </a>
-          </CardAction>
-        </CardHeader>
-      </Card>
+          </Badge>
+        }
+        actions={
+          <a className={buttonVariants()} data-slot="button" href="/coach">
+            Open coach
+            <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          </a>
+        }
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

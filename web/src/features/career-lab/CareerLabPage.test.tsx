@@ -248,6 +248,7 @@ describe("CareerLabPage", () => {
     renderPage();
 
     expect(screen.getByRole("button", { name: "Create Career Lab session" })).toBeInTheDocument();
+    expect(screen.queryByText("Start a Career Lab session")).not.toBeInTheDocument();
   });
 
   it("opens the same conversation when routing asks a clarifying question", async () => {

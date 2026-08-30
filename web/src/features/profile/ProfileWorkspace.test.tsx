@@ -67,6 +67,7 @@ describe("ProfileWorkspace", () => {
     renderWorkspace();
 
     // coach is a persistent hero action, not tucked in a tab
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("link", { name: /open coach/i })).toHaveAttribute("href", "/coach");
 
     await user.click(screen.getByRole("button", { name: /rebuild profile/i }));

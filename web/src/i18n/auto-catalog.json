@@ -529,11 +529,6 @@
     "en": "A company is required",
     "zh-CN": "请填写公司名称"
   },
-  "A focused Career Lab session": {
-    "key": "ui_b32c3163e52e",
-    "en": "A focused Career Lab session",
-    "zh-CN": "一次聚焦的职业实验室课程"
-  },
   "A gated reviewer blocks the round outright, so it is never scored — its weight and score bands are disabled rather than silently ignored.": {
     "key": "ui_862adc2b722d",
     "en": "A gated reviewer blocks the round outright, so it is never scored — its weight and score bands are disabled rather than silently ignored.",
@@ -1759,11 +1754,6 @@
     "en": "Career Lab sessions",
     "zh-CN": "职业实验室会话"
   },
-  "Career Lab workspace": {
-    "key": "ui_4a5df2f8abd0",
-    "en": "Career Lab workspace",
-    "zh-CN": "职业实验室工作区"
-  },
   "Career site": {
     "key": "ui_6edda9fd8188",
     "en": "Career site",
@@ -2608,11 +2598,6 @@
     "key": "ui_3e64171ba2fe",
     "en": "Create a session when you are ready to turn overlooked experience into grounded profile evidence.",
     "zh-CN": "准备好将被忽视的经历转化为扎实的个人资料证据时，创建一个会话。"
-  },
-  "Create a session when you are ready to work through a career question.": {
-    "key": "ui_07bab4b71c50",
-    "en": "Create a session when you are ready to work through a career question.",
-    "zh-CN": "准备好探讨职业问题时，创建一个会话。"
   },
   "Create a tier to start granting members a recurring allowance.": {
     "key": "ui_0d6b1c46c1dc",
@@ -8898,11 +8883,6 @@
     "key": "ui_6ed95dbbea5f",
     "en": "STAR notes",
     "zh-CN": "STAR 笔记"
-  },
-  "Start a Career Lab session": {
-    "key": "ui_84ebe17a7efc",
-    "en": "Start a Career Lab session",
-    "zh-CN": "开始职业实验室会话"
   },
   "Start a Career Lab thread": {
     "key": "ui_4e61bfe8908a",
