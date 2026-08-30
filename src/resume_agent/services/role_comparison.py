@@ -3,27 +3,38 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Literal
 
 from sqlmodel import Session
 
+from resume_agent.company_intelligence.models import CompanyVerificationState
 from resume_agent.h1b.cache import load_company_evidence
+from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.role_comparison.models import (
     CompanyEvidenceComparison,
     RoleComparisonItem,
 )
 from resume_agent.services.company_intelligence import load_company_intelligence
 from resume_agent.taxonomy.industries import normalize_company
+from resume_agent.tracking.status_rules import TERMINAL
 from resume_agent.tracking.timeline_pivot import build_pivot
 
 _VERIFICATION_RANK = {"inferred": 0, "single_source": 1, "corroborated": 2}
+
+
+class InactiveRoleComparisonError(ValueError):
+    """Selected applications include a terminal funnel state."""
 
 
 def _company_projection(session: Session, company: str | None, now: datetime):
     evidence = load_company_intelligence(session, company or "")
     if evidence is None:
         return CompanyEvidenceComparison(state="not_researched")
+    verification_states: list[CompanyVerificationState] = [
+        insight.verification_state for insight in evidence.insights
+    ]
     strongest = max(
-        (insight.verification_state for insight in evidence.insights),
+        verification_states,
         key=lambda value: _VERIFICATION_RANK[value],
         default=None,
     )
@@ -35,6 +46,13 @@ def _company_projection(session: Session, company: str | None, now: datetime):
         source_count=len(evidence.sources),
         strongest_verification=strongest,
     )
+
+
+def _h1b_status(
+    company: str | None, evidence: dict[str, H1BSponsorshipEvidence]
+) -> Literal["matched", "no_match", "unavailable"] | None:
+    key = normalize_company(company)
+    return evidence[key].status if key is not None and key in evidence else None
 
 
 def compare_roles(
@@ -50,6 +68,12 @@ def compare_roles(
             "application jobs not found: " + ", ".join(str(value) for value in missing)
         )
     rows = [rows_by_id[job_id] for job_id in requested]
+    inactive = [row.job_id for row in rows if row.status in TERMINAL]
+    if inactive:
+        raise InactiveRoleComparisonError(
+            "comparison requires active applications; terminal jobs: "
+            + ", ".join(str(value) for value in inactive)
+        )
     h1b = load_company_evidence(session, [row.company for row in rows])
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
@@ -62,11 +86,7 @@ def compare_roles(
             fit_score=row.fit_score,
             application_status=row.status,
             company_evidence=_company_projection(session, row.company, moment),
-            h1b_status=(
-                h1b.get(normalize_company(row.company)).status
-                if normalize_company(row.company) in h1b
-                else None
-            ),
+            h1b_status=_h1b_status(row.company, h1b),
             offer_total=row.total_comp,
             offer_currency=row.comp_currency,
         )

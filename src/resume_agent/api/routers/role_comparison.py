@@ -10,7 +10,10 @@ from resume_agent.api.schemas.role_comparison import (
     RoleComparisonItemOut,
     RoleComparisonOut,
 )
-from resume_agent.services.role_comparison import compare_roles
+from resume_agent.services.role_comparison import (
+    InactiveRoleComparisonError,
+    compare_roles,
+)
 
 router = APIRouter()
 
@@ -25,4 +28,6 @@ def create_role_comparison(
         items = compare_roles(session, body.job_ids)
     except LookupError as exc:
         raise ApiException(404, "COMPARISON_JOB_NOT_FOUND", str(exc)) from exc
+    except InactiveRoleComparisonError as exc:
+        raise ApiException(409, "COMPARISON_REQUIRES_ACTIVE_ROLES", str(exc)) from exc
     return RoleComparisonOut(items=[RoleComparisonItemOut.from_item(item) for item in items])

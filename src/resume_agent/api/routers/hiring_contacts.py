@@ -21,7 +21,8 @@ from resume_agent.hiring_contacts.agents import (
 )
 from resume_agent.services.hiring_contacts import (
     generate_hiring_contact_intelligence,
-    load_hiring_contact_intelligence,
+    hiring_contact_refresh_available,
+    resolve_hiring_contact_resource,
 )
 from resume_agent.tracking.tables import Job
 
@@ -29,17 +30,18 @@ router = APIRouter()
 
 
 def _resource(session: Session, job: Job) -> HiringContactResourceOut:
-    if not job.company.strip():
+    resource = resolve_hiring_contact_resource(session, job)
+    if resource.state == "unavailable":
         return HiringContactUnavailableOut(
             message="Add a company before researching public hiring contacts."
         )
-    artifact = load_hiring_contact_intelligence(session, job.id or 0)
-    if artifact is None:
+    if resource.state == "empty":
         return HiringContactEmptyOut(
             message="Search public sources for people relevant to this role."
         )
+    assert resource.intelligence is not None
     return HiringContactReadyOut(
-        intelligence=HiringContactIntelligenceOut.from_artifact(artifact)
+        intelligence=HiringContactIntelligenceOut.from_artifact(resource.intelligence)
     )
 
 
@@ -70,7 +72,7 @@ def create_hiring_contact_refresh(
     job = session.get(Job, job_id)
     if job is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    if not job.company.strip():
+    if not hiring_contact_refresh_available(job):
         raise ApiException(
             409,
             "HIRING_CONTACT_INTELLIGENCE_UNAVAILABLE",

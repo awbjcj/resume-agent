@@ -12,6 +12,7 @@ from resume_agent.company_intelligence.models import (
     CompanyIntelligenceDraft,
     CompanyIntelligenceInsight,
     CompanyIntelligenceSource,
+    CompanyResearchDepth,
 )
 from resume_agent.db import get_session
 from resume_agent.tracking.tables import CompanyIntelligenceEvidenceRow, Job
@@ -216,7 +217,7 @@ def test_refresh_depth_is_explicit_and_history_is_newest_first(monkeypatch, tmp_
     _stub_company_research(monkeypatch)
     original_builder = jobs_router.build_company_intelligence_researcher
 
-    def build_researcher(depth="standard"):
+    def build_researcher(depth: CompanyResearchDepth = "standard"):
         seen_depths.append(depth)
         return original_builder(depth)
 

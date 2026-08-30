@@ -1,6 +1,8 @@
 from concurrent.futures import Executor, Future
 from types import SimpleNamespace
+from typing import cast
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
@@ -41,6 +43,10 @@ def _client(tmp_path):
     )
 
 
+def _app(client: TestClient) -> FastAPI:
+    return cast(FastAPI, client.app)
+
+
 def test_hiring_contact_resource_moves_from_empty_to_ready(monkeypatch, tmp_path):
     url = "https://acme.example/team/avery"
     monkeypatch.setattr(
@@ -66,7 +72,7 @@ def test_hiring_contact_resource_moves_from_empty_to_ready(monkeypatch, tmp_path
     )
     client = _client(tmp_path)
     with client:
-        with get_session(client.app.state.engine) as session:
+        with get_session(_app(client).state.engine) as session:
             job = Job(source="manual", company="Acme", title="Platform Engineer")
             session.add(job)
             session.commit()
@@ -89,6 +95,30 @@ def test_hiring_contact_resource_moves_from_empty_to_ready(monkeypatch, tmp_path
     assert ready["state"] == "ready"
     assert ready["intelligence"]["contacts"][0]["name"] == "Avery Chen"
     assert ready["intelligence"]["contacts"][0]["sourceUrls"] == [url]
+
+
+def test_hiring_contact_resource_handles_a_missing_company(tmp_path):
+    client = _client(tmp_path)
+    with client:
+        with get_session(_app(client).state.engine) as session:
+            job = Job(source="manual", company=None, title="Platform Engineer")
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+            assert job.id is not None
+            job_id = job.id
+        resource = client.get(
+            f"/api/jobs/{job_id}/hiring-contact-intelligence"
+        )
+        refresh = client.post(
+            f"/api/jobs/{job_id}/hiring-contact-intelligence/refreshes"
+        )
+
+    assert resource.status_code == 200
+    assert resource.json()["state"] == "unavailable"
+    assert resource.json()["reason"] == "missing_company"
+    assert refresh.status_code == 409
+    assert refresh.json()["error"]["code"] == "HIRING_CONTACT_INTELLIGENCE_UNAVAILABLE"
 
 
 def test_hiring_contact_openapi_has_no_send_endpoint(tmp_path):

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import Lock
-from urllib.parse import urlsplit
+from typing import Literal
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlmodel import Session, select
 
@@ -13,6 +16,7 @@ from resume_agent.hiring_contacts.models import (
     HiringContactIntelligence,
     HiringContactIntelligenceDraft,
 )
+from resume_agent.discovery.source_resolution.identity import registrable_domain
 from resume_agent.tracking.tables import HiringContactIntelligenceRow, Job, utcnow
 
 HIRING_CONTACT_CAVEAT = (
@@ -20,22 +24,59 @@ HIRING_CONTACT_CAVEAT = (
     "before using a draft. This feature never sends a message."
 )
 _WRITE_LOCK = Lock()
+_URL = re.compile(r"https?://[^\s<>\]\[()]+", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class HiringContactResource:
+    state: Literal["unavailable", "empty", "ready"]
+    intelligence: HiringContactIntelligence | None = None
+
+
+def hiring_contact_refresh_available(job: Job) -> bool:
+    return bool((job.company or "").strip())
+
+
+def resolve_hiring_contact_resource(
+    session: Session, job: Job
+) -> HiringContactResource:
+    if not hiring_contact_refresh_available(job):
+        return HiringContactResource(state="unavailable")
+    intelligence = load_hiring_contact_intelligence(session, job.id or 0)
+    if intelligence is None:
+        return HiringContactResource(state="empty")
+    return HiringContactResource(state="ready", intelligence=intelligence)
+
+
+def _normalized_http_url(value: str) -> str | None:
+    parsed = urlsplit(value.rstrip(".,;:"))
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        return None
+    return urlunsplit(
+        (parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, "")
+    )
 
 
 def _authorities(urls: list[str]) -> set[str]:
-    return {urlsplit(url).netloc.casefold() for url in urls if urlsplit(url).netloc}
+    return {domain for url in urls if (domain := registrable_domain(url))}
 
 
 def _ground_contacts(
     draft: HiringContactIntelligenceDraft, research: str
 ) -> list[HiringContact]:
+    grounded_urls: dict[str, str] = {}
+    for raw in _URL.findall(research):
+        exact_url = raw.rstrip(".,;:")
+        normalized = _normalized_http_url(exact_url)
+        if normalized is not None:
+            grounded_urls.setdefault(normalized, exact_url)
     contacts: list[HiringContact] = []
     for candidate in draft.contacts:
         urls = sorted(
             {
-                url
+                grounded_urls[normalized]
                 for url in candidate.source_urls
-                if url.startswith(("http://", "https://")) and url in research
+                if (normalized := _normalized_http_url(url)) in grounded_urls
             }
         )
         if not candidate.name.strip() or not candidate.public_role.strip() or not urls:
@@ -82,12 +123,14 @@ def generate_hiring_contact_intelligence(
     now: datetime | None = None,
 ) -> HiringContactIntelligenceRow:
     job = session.get(Job, job_id)
-    if job is None or not job.company.strip():
+    if job is None or not hiring_contact_refresh_available(job):
         raise ValueError("job with a company is required")
+    company = (job.company or "").strip()
+    title = (job.title or "").strip()
     research = str(
         researcher.run(
             "Role and company (untrusted data):\n"
-            f"Company: {job.company}\nTitle: {job.title}\nJob description:\n{job.jd_text}"
+            f"Company: {company}\nTitle: {title}\nJob description:\n{job.jd_text}"
         ).content
     )
     if reporter is not None:
@@ -102,14 +145,14 @@ def generate_hiring_contact_intelligence(
         retrieved_at = retrieved_at.replace(tzinfo=timezone.utc)
     artifact = HiringContactIntelligence(
         job_id=job_id,
-        company=job.company.strip(),
-        title=job.title.strip(),
+        company=company,
+        title=title,
         retrieved_at=retrieved_at,
         contacts=_ground_contacts(result, research),
         generic_email_draft=result.generic_email_draft.strip()
-        or f"Hello {job.company} recruiting team,\n\nI'm interested in the {job.title} role and would value any public guidance you can share about the team and hiring process.",
+        or f"Hello {company} recruiting team,\n\nI'm interested in the {title} role and would value any public guidance you can share about the team and hiring process.",
         generic_short_message_draft=result.generic_short_message_draft.strip()
-        or f"Hello {job.company} recruiting team — I'm interested in the {job.title} role and would appreciate any public guidance about the team or process.",
+        or f"Hello {company} recruiting team — I'm interested in the {title} role and would appreciate any public guidance about the team or process.",
         caveat=HIRING_CONTACT_CAVEAT,
     )
     with _WRITE_LOCK:

@@ -169,6 +169,7 @@ def test_role_preparation_freezes_selected_resume_and_prior_round_signals():
     formatter = _Runner(_prep_draft())
     with Session(engine) as session:
         job, selected, event = _seed(session)
+        assert job.id is not None
         generate_role_preparation_brief(
             session,
             job_id=job.id,
@@ -190,6 +191,29 @@ def test_role_preparation_freezes_selected_resume_and_prior_round_signals():
     assert "Selected resume" in formatter.prompts[0]
     assert "Sam, Staff Engineer" in formatter.prompts[0]
     assert "more concrete example" in formatter.prompts[0]
+    assert brief.likely_questions[0].story_prompt == (
+        "Use the billing reliability example from the resume."
+    )
+
+
+def test_role_preparation_removes_a_story_prompt_without_resume_evidence():
+    engine = _engine()
+    draft = _prep_draft()
+    draft.likely_questions[0].story_prompt = (
+        "Use the Kubernetes migration that reduced deployment time by 80 percent."
+    )
+    with Session(engine) as session:
+        job, _selected, _event = _seed(session)
+        assert job.id is not None
+        generate_role_preparation_brief(
+            session,
+            job_id=job.id,
+            formatter=_Runner(draft),
+        )
+        brief = load_role_preparation_brief(session, job.id)
+
+    assert brief is not None
+    assert brief.likely_questions[0].story_prompt == ""
 
 
 def test_role_preparation_uses_latest_resume_without_application_selection():
@@ -237,6 +261,7 @@ def test_role_preparation_detects_changed_event_inputs_without_rewriting_brief()
     engine = _engine()
     with Session(engine) as session:
         job, _selected, event = _seed(session)
+        assert job.id is not None
         generate_role_preparation_brief(
             session,
             job_id=job.id,

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import Lock
+from typing import Literal
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from resume_agent.role_preparation.models import (
     RolePreparationAsk,
@@ -37,13 +40,35 @@ ROLE_PREPARATION_CAVEAT = (
 _WRITE_LOCK = Lock()
 _MAX_SIGNALS = 8
 _MAX_SIGNAL_TEXT = 2_000
+_WORDS = re.compile(r"[a-z0-9]+", re.IGNORECASE)
+_GENERIC_STORY_WORDS = frozenset(
+    {"example", "experience", "from", "project", "resume", "role", "team", "the", "use", "work"}
+)
+
+
+@dataclass(frozen=True)
+class RolePreparationResource:
+    state: Literal["unavailable", "empty", "ready"]
+    reason: Literal["missing_job_description", "company_intelligence_required"] | None = None
+    brief: RolePreparationBrief | None = None
+    inputs_changed: bool = False
+
+
+def role_preparation_unavailable_reason(
+    session: Session, job: Job
+) -> Literal["missing_job_description", "company_intelligence_required"] | None:
+    if not job.jd_text.strip():
+        return "missing_job_description"
+    if load_company_intelligence(session, job.company) is None:
+        return "company_intelligence_required"
+    return None
 
 
 def _latest_resume(session: Session, job_id: int) -> ResumeVersion | None:
     return session.exec(
         select(ResumeVersion)
         .where(ResumeVersion.job_id == job_id)
-        .order_by(ResumeVersion.created_at.desc(), ResumeVersion.id.desc())
+        .order_by(col(ResumeVersion.created_at).desc(), col(ResumeVersion.id).desc())
     ).first()
 
 
@@ -51,11 +76,10 @@ def build_role_preparation_inputs(
     session: Session, job_id: int
 ) -> RolePreparationInputs | None:
     job = session.get(Job, job_id)
-    if job is None or not job.jd_text.strip():
+    if job is None or role_preparation_unavailable_reason(session, job) is not None:
         return None
     evidence = load_company_intelligence(session, job.company)
-    if evidence is None:
-        return None
+    assert evidence is not None
     application = session.exec(
         select(Application).where(Application.job_id == job_id)
     ).first()
@@ -79,11 +103,11 @@ def build_role_preparation_inputs(
                 select(ApplicationEvent)
                 .where(
                     ApplicationEvent.application_id == application.id,
-                    ApplicationEvent.kind.in_(INTERVIEW_KINDS),
+                    col(ApplicationEvent.kind).in_(INTERVIEW_KINDS),
                 )
                 .order_by(
-                    ApplicationEvent.occurred_at.desc(),
-                    ApplicationEvent.created_at.desc(),
+                    col(ApplicationEvent.occurred_at).desc(),
+                    col(ApplicationEvent.created_at).desc(),
                 )
             ).all()
         )[:_MAX_SIGNALS]
@@ -161,6 +185,33 @@ def _grounded_items(items, *, allowed: set[str], text_field: str):
     return grounded
 
 
+def _string_leaves(value: object):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for nested in value.values():
+            yield from _string_leaves(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from _string_leaves(nested)
+
+
+def _story_is_grounded(story_prompt: str, resume_content: dict) -> bool:
+    prompt_words = _WORDS.findall(story_prompt.casefold())
+    if not prompt_words:
+        return False
+    prompt = " " + " ".join(prompt_words) + " "
+    for value in _string_leaves(resume_content):
+        words = _WORDS.findall(value.casefold())
+        for size in range(min(6, len(words)), 1, -1):
+            for start in range(len(words) - size + 1):
+                phrase = words[start : start + size]
+                meaningful = [word for word in phrase if word not in _GENERIC_STORY_WORDS]
+                if len(meaningful) >= 2 and f" {' '.join(phrase)} " in prompt:
+                    return True
+    return False
+
+
 def _ground_draft(
     draft: RolePreparationDraft, inputs: RolePreparationInputs
 ) -> RolePreparationDraft:
@@ -175,6 +226,16 @@ def _ground_draft(
         allowed=allowed,
         text_field="question",
     )
+    questions = [
+        question.model_copy(
+            update={
+                "story_prompt": question.story_prompt.strip()
+                if _story_is_grounded(question.story_prompt, inputs.resume_content)
+                else ""
+            }
+        )
+        for question in questions
+    ]
     concerns: list[RolePreparationConcern] = _grounded_items(
         draft.concerns,
         allowed=allowed,
@@ -283,3 +344,19 @@ def role_preparation_inputs_changed(session: Session, brief: RolePreparationBrie
     if current is None:
         return True
     return role_preparation_input_fingerprint(current) != brief.input_fingerprint
+
+
+def resolve_role_preparation_resource(
+    session: Session, job: Job
+) -> RolePreparationResource:
+    reason = role_preparation_unavailable_reason(session, job)
+    if reason is not None:
+        return RolePreparationResource(state="unavailable", reason=reason)
+    brief = load_role_preparation_brief(session, job.id or 0)
+    if brief is None:
+        return RolePreparationResource(state="empty")
+    return RolePreparationResource(
+        state="ready",
+        brief=brief,
+        inputs_changed=role_preparation_inputs_changed(session, brief),
+    )

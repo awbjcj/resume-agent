@@ -7,9 +7,10 @@ from datetime import datetime, timedelta, timezone
 from threading import Lock
 from urllib.parse import urlsplit, urlunsplit
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from resume_agent.company_intelligence.models import (
+    CompanyIntelligenceAxis,
     CompanyIntelligenceChangeSet,
     CompanyIntelligenceDraft,
     CompanyIntelligenceEvidence,
@@ -18,6 +19,7 @@ from resume_agent.company_intelligence.models import (
     CompanyResearchDepth,
 )
 from resume_agent.config import Settings
+from resume_agent.discovery.source_resolution.identity import registrable_domain
 from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tracking.tables import (
     CompanyIntelligenceEvidenceRow,
@@ -99,9 +101,9 @@ def _grounded_evidence(
         if not summary or not citations or insight.axis in seen_axes:
             continue
         authorities = {
-            urlsplit(value).netloc.lower()
+            registrable_domain(value)
             for value in citations
-            if urlsplit(value).netloc
+            if registrable_domain(value)
         }
         verification_state = (
             "inferred"
@@ -181,7 +183,7 @@ def load_company_intelligence_history(
     rows = session.exec(
         select(CompanyIntelligenceVersionRow)
         .where(CompanyIntelligenceVersionRow.normalized_company == key)
-        .order_by(CompanyIntelligenceVersionRow.version_number.desc())
+        .order_by(col(CompanyIntelligenceVersionRow.version_number).desc())
         .limit(max(1, min(limit, 50)))
     ).all()
     evidence: list[CompanyIntelligenceEvidence] = []
@@ -200,12 +202,14 @@ def _changes_between(
     previous: CompanyIntelligenceEvidence | None,
     current: CompanyIntelligenceEvidence,
 ) -> CompanyIntelligenceChangeSet:
-    current_by_axis = {item.axis: item for item in current.insights}
-    previous_by_axis = (
+    current_by_axis: dict[CompanyIntelligenceAxis, CompanyIntelligenceInsight] = {
+        item.axis: item for item in current.insights
+    }
+    previous_by_axis: dict[CompanyIntelligenceAxis, CompanyIntelligenceInsight] = (
         {item.axis: item for item in previous.insights} if previous is not None else {}
     )
-    current_axes = set(current_by_axis)
-    previous_axes = set(previous_by_axis)
+    current_axes: set[CompanyIntelligenceAxis] = set(current_by_axis)
+    previous_axes: set[CompanyIntelligenceAxis] = set(previous_by_axis)
 
     def comparable(insight: CompanyIntelligenceInsight) -> dict:
         return insight.model_dump(
@@ -213,7 +217,7 @@ def _changes_between(
             exclude={"schema_version"},
         )
 
-    changed = sorted(
+    changed: list[CompanyIntelligenceAxis] = sorted(
         axis
         for axis in current_axes & previous_axes
         if comparable(current_by_axis[axis]) != comparable(previous_by_axis[axis])
@@ -318,7 +322,7 @@ def generate_company_intelligence(
         latest_version = session.exec(
             select(CompanyIntelligenceVersionRow)
             .where(CompanyIntelligenceVersionRow.normalized_company == key)
-            .order_by(CompanyIntelligenceVersionRow.version_number.desc())
+            .order_by(col(CompanyIntelligenceVersionRow.version_number).desc())
         ).first()
         if latest_version is None and previous is not None:
             latest_version, previous = _append_version(

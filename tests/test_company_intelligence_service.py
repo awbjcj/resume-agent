@@ -142,12 +142,12 @@ def test_server_requires_distinct_authorities_for_corroborated_claims():
     draft.sources.append(
         CompanyIntelligenceSource(
             title="Independent strategy analysis",
-            url="https://analysis.example/acme",
+            url="https://analysis.org/acme",
             publisher="Analysis",
             source_tier="reputable_independent",
         )
     )
-    draft.insights[0].citations.append("https://analysis.example/acme")
+    draft.insights[0].citations.append("https://analysis.org/acme")
     draft.insights[0].verification_state = "corroborated"
     with Session(engine) as session:
         generate_company_intelligence(
@@ -155,7 +155,7 @@ def test_server_requires_distinct_authorities_for_corroborated_claims():
             company="Acme",
             settings=Settings(),
             research_agent=_Agent(
-                "https://acme.example/strategy https://analysis.example/acme"
+                "https://acme.example/strategy https://analysis.org/acme"
             ),
             formatter=_Agent(draft),
         )
@@ -163,6 +163,36 @@ def test_server_requires_distinct_authorities_for_corroborated_claims():
 
     assert evidence is not None
     assert evidence.insights[0].verification_state == "corroborated"
+
+
+def test_server_treats_subdomains_as_one_source_authority():
+    engine = _engine()
+    draft = _draft()
+    second_url = "https://investors.acme.example/strategy"
+    draft.sources.append(
+        CompanyIntelligenceSource(
+            title="Investor strategy page",
+            url=second_url,
+            publisher="Acme Investor Relations",
+            source_type="official",
+        )
+    )
+    draft.insights[0].citations.append(second_url)
+    draft.insights[0].verification_state = "corroborated"
+    with Session(engine) as session:
+        generate_company_intelligence(
+            session,
+            company="Acme",
+            settings=Settings(),
+            research_agent=_Agent(
+                "https://acme.example/strategy " + second_url
+            ),
+            formatter=_Agent(draft),
+        )
+        evidence = load_company_intelligence(session, "Acme")
+
+    assert evidence is not None
+    assert evidence.insights[0].verification_state == "single_source"
 
 
 def test_generation_persists_the_exact_grounded_research_url():

@@ -39,8 +39,8 @@ def test_contact_generation_keeps_only_exact_publicly_grounded_people():
                 public_role="VP of Platform",
                 contact_type="team_leader",
                 source_urls=[
-                    "https://acme.example/team/avery",
-                    "https://conference.example/speakers/avery",
+                    "https://acme.com/team/avery",
+                    "https://conference.org/speakers/avery",
                 ],
                 why_relevant="Publicly leads the platform organization.",
                 email_draft="Hello Avery — I am exploring the platform role.",
@@ -65,8 +65,8 @@ def test_contact_generation_keeps_only_exact_publicly_grounded_people():
             session,
             job_id=job.id,
             researcher=_Runner(
-                "https://acme.example/team/avery "
-                "https://conference.example/speakers/avery"
+                "https://acme.com/team/avery "
+                "https://conference.org/speakers/avery"
             ),
             formatter=_Runner(draft),
             now=now,
@@ -100,3 +100,32 @@ def test_contact_generation_preserves_generic_drafts_when_no_person_is_verified(
     assert artifact.contacts == []
     assert "recruiting team" in artifact.generic_email_draft
     assert "recruiting team" in artifact.generic_short_message_draft
+
+
+def test_contact_generation_rejects_a_source_url_prefix():
+    engine = _engine()
+    draft = HiringContactIntelligenceDraft(
+        contacts=[
+            HiringContactDraft(
+                name="Avery Chen",
+                public_role="VP of Platform",
+                source_urls=["https://acme.example/team/avery"],
+            )
+        ]
+    )
+    with Session(engine) as session:
+        job = Job(source="manual", company="Acme", title="Platform Engineer")
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        assert job.id is not None
+        generate_hiring_contact_intelligence(
+            session,
+            job_id=job.id,
+            researcher=_Runner("https://acme.example/team/avery-profile"),
+            formatter=_Runner(draft),
+        )
+        artifact = load_hiring_contact_intelligence(session, job.id)
+
+    assert artifact is not None
+    assert artifact.contacts == []

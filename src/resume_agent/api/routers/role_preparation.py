@@ -16,12 +16,10 @@ from resume_agent.api.schemas.role_preparation import (
 )
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.role_preparation.agents import build_role_preparation_formatter
-from resume_agent.services.company_intelligence import load_company_intelligence
 from resume_agent.services.role_preparation import (
     build_role_preparation_inputs,
     generate_role_preparation_brief,
-    load_role_preparation_brief,
-    role_preparation_inputs_changed,
+    resolve_role_preparation_resource,
 )
 from resume_agent.tracking.tables import Job
 
@@ -29,24 +27,25 @@ router = APIRouter()
 
 
 def _resource(session: Session, job: Job) -> RolePreparationOut:
-    if not job.jd_text.strip():
+    resource = resolve_role_preparation_resource(session, job)
+    if resource.reason == "missing_job_description":
         return RolePreparationUnavailableOut(
             reason="missing_job_description",
             message="Add a job description before generating role preparation.",
         )
-    if load_company_intelligence(session, job.company) is None:
+    if resource.reason == "company_intelligence_required":
         return RolePreparationUnavailableOut(
             reason="company_intelligence_required",
             message="Research the company before generating role preparation.",
         )
-    brief = load_role_preparation_brief(session, job.id or 0)
-    if brief is None:
+    if resource.state == "empty":
         return RolePreparationEmptyOut(
             message="Generate a role-specific brief from this job and company dossier."
         )
+    assert resource.brief is not None
     return RolePreparationReadyOut(
-        inputs_changed=role_preparation_inputs_changed(session, brief),
-        brief=RolePreparationBriefOut.from_brief(brief),
+        inputs_changed=resource.inputs_changed,
+        brief=RolePreparationBriefOut.from_brief(resource.brief),
     )
 
 
