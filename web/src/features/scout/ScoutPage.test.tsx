@@ -21,6 +21,13 @@ import { ScoutPage } from "./ScoutPage";
 
 beforeEach(() => { vi.clearAllMocks(); mocks.session = null; mocks.sessions = []; mocks.includeArchived = false; mocks.start.mockResolvedValue({ runId: "r1" }); });
 
+it("uses the shared empty-workspace chrome without a second generic header", () => {
+  render(<ScoutPage />, { wrapper: withQueryClient });
+
+  expect(screen.getByRole("heading", { level: 1, name: "Discovery Scout" })).toBeInTheDocument();
+  expect(screen.queryByText("Discovery workspace")).not.toBeInTheDocument();
+});
+
 it("starts discovery from the guided empty state", async () => {
   render(<ScoutPage />, { wrapper: withQueryClient });
   await userEvent.click(screen.getByRole("button", { name: "Create Scout session" }));

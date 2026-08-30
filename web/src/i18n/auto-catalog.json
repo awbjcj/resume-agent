@@ -1392,7 +1392,7 @@
   "Ask the Scout": {
     "key": "ui_7d4596b05e49",
     "en": "Ask the Scout",
-    "zh-CN": "问问 Scout"
+    "zh-CN": "咨询职位探索助手"
   },
   "Assign a plan or set a persistent allowance override. Every saved change is audited.": {
     "key": "ui_b45377f7c651",
@@ -2669,11 +2669,6 @@
     "en": "Covered by your profile",
     "zh-CN": "已在你的个人资料中覆盖"
   },
-  "Create a session when you are ready to shape the next search.": {
-    "key": "ui_0c84e4820107",
-    "en": "Create a session when you are ready to shape the next search.",
-    "zh-CN": "准备好规划下一步求职方向时，创建一个会话。"
-  },
   "Create a tier to start granting members a recurring allowance.": {
     "key": "ui_0d6b1c46c1dc",
     "en": "Create a tier to start granting members a recurring allowance.",
@@ -2717,7 +2712,7 @@
   "Create Scout session": {
     "key": "ui_3f22eebf7468",
     "en": "Create Scout session",
-    "zh-CN": "创建 Scout 会话"
+    "zh-CN": "创建职位探索助手会话"
   },
   "Create tier": {
     "key": "ui_34f92c52a6f6",
@@ -2987,7 +2982,7 @@
   "Describe the search": {
     "key": "ui_315a61a380a0",
     "en": "Describe the search",
-    "zh-CN": "描述搜索内容"
+    "zh-CN": "说明搜索条件"
   },
   "Describe the search you want to explore. You can refine it throughout the conversation.": {
     "key": "ui_d03648e6dd1e",
@@ -3057,32 +3052,27 @@
   "Discovery goal": {
     "key": "ui_6920b3df3868",
     "en": "Discovery goal",
-    "zh-CN": "发现目标"
+    "zh-CN": "职位探索目标"
   },
   "Discovery request": {
     "key": "ui_63da0015d66b",
     "en": "Discovery request",
-    "zh-CN": "发现请求"
+    "zh-CN": "职位探索请求"
   },
   "Discovery Scout": {
     "key": "ui_78c1c39ea0b4",
     "en": "Discovery Scout",
-    "zh-CN": "发现侦察"
+    "zh-CN": "职位探索助手"
   },
   "Discovery Scout is unavailable": {
     "key": "ui_6fbe64b1c07a",
     "en": "Discovery Scout is unavailable",
-    "zh-CN": "发现侦察当前不可用"
+    "zh-CN": "职位探索助手暂不可用"
   },
   "Discovery Scout sessions": {
     "key": "ui_c940882dc310",
     "en": "Discovery Scout sessions",
-    "zh-CN": "发现侦察会话"
-  },
-  "Discovery workspace": {
-    "key": "ui_eafd02041e4f",
-    "en": "Discovery workspace",
-    "zh-CN": "发现工作区"
+    "zh-CN": "职位探索助手会话"
   },
   "Dismiss": {
     "key": "ui_48845bff334a",
@@ -4292,7 +4282,7 @@
   "Guided discovery": {
     "key": "ui_63f6bc1f300b",
     "en": "Guided discovery",
-    "zh-CN": "引导式探索"
+    "zh-CN": "引导式职位探索"
   },
   "Guided evidence discovery": {
     "key": "ui_f76d8c8a687d",
@@ -5722,7 +5712,7 @@
   "New Scout session": {
     "key": "ui_eb7e483ee520",
     "en": "New Scout session",
-    "zh-CN": "新建 Scout 会话"
+    "zh-CN": "新建职位探索助手会话"
   },
   "New session": {
     "key": "ui_cffdba22adf2",
@@ -5997,7 +5987,7 @@
   "No Scout sessions yet. Start one when you are ready to shape your search.": {
     "key": "ui_f968a0ce95f2",
     "en": "No Scout sessions yet. Start one when you are ready to shape your search.",
-    "zh-CN": "还没有 Scout 会话。准备好细化搜索方向时，就开始一次吧。"
+    "zh-CN": "还没有职位探索助手会话。准备好明确求职方向时，即可开始一次探索。"
   },
   "No sessions yet": {
     "key": "ui_f502267deff4",
@@ -7697,7 +7687,7 @@
   "Researching": {
     "key": "ui_dc01b0720315",
     "en": "Researching",
-    "zh-CN": "研究中"
+    "zh-CN": "调研中"
   },
   "Researching…": {
     "key": "ui_784564108b0f",
@@ -8057,7 +8047,7 @@
   "Review the research": {
     "key": "ui_eb79e53e6495",
     "en": "Review the research",
-    "zh-CN": "查看研究结果"
+    "zh-CN": "查看调研结果"
   },
   "Review this grounded note before adding it to your profile.": {
     "key": "ui_d17e84a4a81c",
@@ -8417,27 +8407,27 @@
   "Scout could not reply": {
     "key": "ui_709f1cd51e02",
     "en": "Scout could not reply",
-    "zh-CN": "Scout 未能回复"
+    "zh-CN": "职位探索助手未能回复"
   },
   "Scout could not start": {
     "key": "ui_706647d7b554",
     "en": "Scout could not start",
-    "zh-CN": "Scout 无法启动"
+    "zh-CN": "职位探索助手无法启动"
   },
   "Scout proposals": {
     "key": "ui_3cff33f31063",
     "en": "Scout proposals",
-    "zh-CN": "Scout 建议"
+    "zh-CN": "职位探索助手建议"
   },
   "Scout request failed": {
     "key": "ui_2ee636fb4070",
     "en": "Scout request failed",
-    "zh-CN": "Scout 请求失败"
+    "zh-CN": "职位探索助手请求失败"
   },
   "Scout researching": {
     "key": "ui_dba9232433ad",
     "en": "Scout researching",
-    "zh-CN": "Scout 研究中"
+    "zh-CN": "职位探索助手正在调研"
   },
   "Search": {
     "key": "ui_49c266baaaa7",
@@ -8787,7 +8777,7 @@
   "Shape a smarter search": {
     "key": "ui_d8094d91f828",
     "en": "Shape a smarter search",
-    "zh-CN": "打造更智能的搜索"
+    "zh-CN": "让搜索更精准"
   },
   "Shape how the workspace discovers, reviews, and renders work.": {
     "key": "ui_b2ee49fa15cd",
@@ -9662,7 +9652,7 @@
   "Tell the Scout what you want to find. It will research companies and search terms, then wait for your approval before changing anything.": {
     "key": "ui_dea00aeccf5e",
     "en": "Tell the Scout what you want to find. It will research companies and search terms, then wait for your approval before changing anything.",
-    "zh-CN": "告诉 Scout 你想找什么。它会研究公司和搜索词，在更改任何设置之前等待你批准。"
+    "zh-CN": "告诉职位探索助手你想寻找什么。它会调研公司和搜索词，并在更改任何设置前等待你的批准。"
   },
   "Template deleted": {
     "key": "ui_8fa9d4a8b827",
@@ -9872,12 +9862,12 @@
   "The Scout could not finish that step": {
     "key": "ui_a29f2dd19b16",
     "en": "The Scout could not finish that step",
-    "zh-CN": "Scout 未能完成该步骤"
+    "zh-CN": "职位探索助手未能完成这一步"
   },
   "The Scout returns separate, cited proposals instead of changing settings silently.": {
     "key": "ui_cfd4933c7641",
     "en": "The Scout returns separate, cited proposals instead of changing settings silently.",
-    "zh-CN": "Scout 会返回带引用来源的独立提案，而不是静默地更改设置。"
+    "zh-CN": "职位探索助手会给出彼此独立且附带引用的建议，不会在未告知的情况下更改设置。"
   },
   "The short ID is permanent. Use A–Z, 0–9 and underscores, starting with a letter.": {
     "key": "ui_93ef2bc64e54",
@@ -10427,7 +10417,7 @@
   "Untitled Scout session": {
     "key": "ui_0feff5b5f961",
     "en": "Untitled Scout session",
-    "zh-CN": "未命名 Scout 会话"
+    "zh-CN": "未命名职位探索助手会话"
   },
   "Untitled thread": {
     "key": "ui_f0236e79a51a",

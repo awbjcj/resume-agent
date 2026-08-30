@@ -62,6 +62,18 @@ const session = {
   proposals, recap: null, scrapeAvailable: true, scrapeUnavailableReason: null,
 };
 
+test("the empty Scout state keeps a single page header on a narrow viewport", async ({ page }) => {
+  await mockEmptyRuns(page);
+  await page.route("**/api/scout/sessions**", (route) => route.fulfill({ json: { sessions: [] } }));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/scout");
+
+  await expect(page.getByRole("heading", { name: "Discovery Scout" })).toBeVisible();
+  await expect(page.getByText("Discovery workspace", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
 test("the ledger stays bounded and grouped at twenty-plus proposals", async ({ page }) => {
   await mockEmptyRuns(page);
   // Registered list-first: Playwright matches routes in reverse registration
