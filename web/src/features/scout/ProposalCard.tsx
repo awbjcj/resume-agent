@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  blockedReason, canAddProposal, proposalBadge, proposalDetail, proposalLabel,
+  blockedReason, canAddProposal, companyIntelligenceLabel, proposalBadge, proposalDetail, proposalLabel,
 } from "./proposals";
 import { SourceVerificationActions } from "./SourceVerificationActions";
 import {
@@ -38,6 +38,7 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
 
   const label = proposalLabel(proposal);
   const detail = proposalDetail(proposal);
+  const intelligence = companyIntelligenceLabel(proposal);
   const pending = proposal.status === "pending" && !locallyAdded;
   const normalAddable = canAddProposal(proposal);
   const addDisabled = !pending || !normalAddable || approve.isPending;
@@ -81,6 +82,7 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
           detail region, one click away. */}
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-3 pb-2.5 pl-8">
         <Badge variant="outline" className="px-1.5 py-0 text-[10px] leading-4 font-medium">{locallyAdded ? "Added" : proposalBadge(proposal)}</Badge>
+        {intelligence ? <Badge variant="secondary" className="px-1.5 py-0 text-[10px] leading-4 font-medium">{intelligence}</Badge> : null}
         {detail ? <span className="truncate text-[11px] capitalize text-muted-foreground">{detail}</span> : null}
         {proposal.fitScore != null ? <span className="text-[11px] tabular-nums text-muted-foreground">{proposal.fitScore}% fit</span> : null}
       </div>

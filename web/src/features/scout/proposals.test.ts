@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ScoutProposal } from "./use-scout";
-import { canAddProposal, canManuallyConfirm, verificationLabel } from "./proposals";
+import { canAddProposal, canManuallyConfirm, companyIntelligenceLabel, verificationLabel } from "./proposals";
 
 const source = (
   check: ScoutProposal["check"],
@@ -74,5 +74,21 @@ describe("Scout proposal verification policy", () => {
     expect(verificationLabel(source("unverified"))).toBe("Unverified");
     expect(verificationLabel(source("conflict"))).toBe("Ownership conflict");
     expect(verificationLabel(term())).toBeNull();
+  });
+
+  it("labels server-owned saved research state and version", () => {
+    expect(companyIntelligenceLabel(source("validated", {
+      companyIntelligenceStatus: "ready",
+      companyIntelligenceVersion: 3,
+    }))).toBe("Research v3");
+    expect(companyIntelligenceLabel(source("validated", {
+      companyIntelligenceStatus: "stale",
+      companyIntelligenceVersion: 2,
+    }))).toBe("Research v2 · stale");
+    expect(companyIntelligenceLabel(source("validated", {
+      companyIntelligenceStatus: "missing",
+      companyIntelligenceVersion: null,
+    }))).toBe("No saved research");
+    expect(companyIntelligenceLabel(term())).toBeNull();
   });
 });

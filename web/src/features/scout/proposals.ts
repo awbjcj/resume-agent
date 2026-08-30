@@ -26,6 +26,15 @@ export function verificationLabel(
   return null;
 }
 
+export function companyIntelligenceLabel(row: ScoutProposal): string | null {
+  if (row.kind !== "source" || row.source?.companyIntelligenceStatus == null) return null;
+  const version = row.source.companyIntelligenceVersion;
+  const saved = version == null ? "Research saved" : `Research v${version}`;
+  if (row.source.companyIntelligenceStatus === "ready") return saved;
+  if (row.source.companyIntelligenceStatus === "stale") return `${saved} · stale`;
+  return "No saved research";
+}
+
 /** Why an otherwise-pending proposal cannot be added, for the row to explain. */
 export function blockedReason(row: ScoutProposal, scrapeAvailable: boolean): string {
   if (row.status !== "pending" || canAddProposal(row)) return "";

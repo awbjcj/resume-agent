@@ -61,6 +61,20 @@ describe("ProposalCard", () => {
     expect(screen.queryByRole("button", { name: /add acme/i })).not.toBeInTheDocument();
   });
 
+  it("shows saved company research availability without claiming a refresh", () => {
+    render(inList(<ProposalCard
+      sessionId="s1"
+      proposal={proposal({ source: {
+        ...proposal().source!,
+        companyIntelligenceStatus: "stale",
+        companyIntelligenceVersion: 4,
+      } })}
+      scrapeAvailable
+    />));
+
+    expect(screen.getByText("Research v4 · stale")).toBeInTheDocument();
+  });
+
   it("explains why a blocked proposal cannot be added", async () => {
     const user = userEvent.setup();
     render(inList(<ProposalCard sessionId="s1" proposal={proposal({ check: "unverified" })} scrapeAvailable={false} />));
