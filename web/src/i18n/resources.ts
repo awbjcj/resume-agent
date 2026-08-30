@@ -1,8 +1,14 @@
-import autoCatalog from "./auto-catalog.json";
+import autoEn from "./auto-en.json";
 
-const autoEntries = Object.values(autoCatalog);
-const autoEn = Object.fromEntries(autoEntries.map((entry) => [entry.key, entry.en]));
-const autoZhCN = Object.fromEntries(autoEntries.map((entry) => [entry.key, entry["zh-CN"]]));
+const autoZhCN = {} as typeof autoEn;
+
+export async function loadAutoTranslations(
+  language: "en" | "zh-CN",
+): Promise<typeof autoEn> {
+  if (language === "en") return autoEn;
+  const { default: translations } = await import("./auto-zh-CN.json");
+  return translations as typeof autoEn;
+}
 
 const en = {
   auto: autoEn,

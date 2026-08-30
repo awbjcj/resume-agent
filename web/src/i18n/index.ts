@@ -1,7 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
-import { resources } from "./resources";
+import { loadAutoTranslations, resources } from "./resources";
 
 export const supportedLanguages = ["en", "zh-CN"] as const;
 export type SupportedLanguage = (typeof supportedLanguages)[number];
@@ -49,17 +49,7 @@ function syncDocumentLanguage(language: string): void {
   document.title = i18n.t("app.documentTitle", { lng: normalized });
 }
 
-void i18n.use(initReactI18next).init({
-  resources,
-  lng: getInitialLanguage(),
-  fallbackLng: DEFAULT_LANGUAGE,
-  supportedLngs: supportedLanguages,
-  interpolation: { escapeValue: false },
-  react: { useSuspense: false },
-});
-
-syncDocumentLanguage(i18n.resolvedLanguage ?? i18n.language);
-i18n.on("languageChanged", (language) => {
+function languageChanged(language: string): void {
   const normalized = normalizeLanguage(language) ?? DEFAULT_LANGUAGE;
   syncDocumentLanguage(normalized);
   if (typeof window !== "undefined") {
@@ -69,9 +59,37 @@ i18n.on("languageChanged", (language) => {
       // Changing language should still work when persistence is unavailable.
     }
   }
-});
+}
+
+async function ensureLanguageResources(language: SupportedLanguage): Promise<void> {
+  if (language === DEFAULT_LANGUAGE) return;
+  const auto = await loadAutoTranslations(language);
+  Object.assign(resources[language].translation.auto, auto);
+  if (i18n.isInitialized) {
+    i18n.addResourceBundle(language, "translation", { auto }, true, true);
+  }
+}
+
+async function initializeI18n(): Promise<void> {
+  const initialLanguage = getInitialLanguage();
+  await ensureLanguageResources(initialLanguage);
+  await i18n.use(initReactI18next).init({
+    resources,
+    lng: initialLanguage,
+    fallbackLng: DEFAULT_LANGUAGE,
+    supportedLngs: supportedLanguages,
+    interpolation: { escapeValue: false },
+    react: { useSuspense: false },
+  });
+  syncDocumentLanguage(i18n.resolvedLanguage ?? i18n.language);
+  i18n.on("languageChanged", languageChanged);
+}
+
+export const i18nReady = initializeI18n();
 
 export async function changeLanguage(language: SupportedLanguage): Promise<void> {
+  await i18nReady;
+  await ensureLanguageResources(language);
   await i18n.changeLanguage(language);
 }
 

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 import { parse } from "@babel/parser";
 import traverseModule from "@babel/traverse";
@@ -10,6 +11,17 @@ const traverse = traverseModule.default ?? traverseModule;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(root, "src");
 const catalogPath = path.join(sourceRoot, "i18n", "auto-catalog.json");
+const runtimeCatalogPaths = {
+  en: path.join(sourceRoot, "i18n", "auto-en.json"),
+  "zh-CN": path.join(sourceRoot, "i18n", "auto-zh-CN.json"),
+};
+const require = createRequire(import.meta.url);
+const {
+  clean,
+  isHumanText,
+  isLocalizableStringPath,
+  templateSource,
+} = require("../i18n-classifier.cjs");
 
 // These are the terms where product context matters more than a literal
 // translation. They are deliberately authored and checked against the catalog;
@@ -241,44 +253,6 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "No structured offer": "无结构化录用方案",
 };
 
-const UI_PROPS = new Set([
-  "actionLabel",
-  "alt",
-  "aria-label",
-  "assistantName",
-  "body",
-  "cancelLabel",
-  "caption",
-  "confirmLabel",
-  "description",
-  "detail",
-  "emptyMessage",
-  "eyebrow",
-  "errorMessage",
-  "footer",
-  "heading",
-  "header",
-  "help",
-  "helpText",
-  "hint",
-  "kicker",
-  "label",
-  "message",
-  "note",
-  "noun",
-  "placeholder",
-  "sub",
-  "subtitle",
-  "successMessage",
-  "task",
-  "title",
-]);
-
-const UI_VARIABLE = /(action|badge|caption|date|description|detail|empty|error|eyebrow|fallback|heading|help|hint|label|message|notice|note|placeholder|progress|reason|status|subtitle|success|suffix|summary|text|title)$/i;
-const UI_COLLECTION = /(actions|cards|columns|copy|descriptions|details|errors|fields|filters|items|kinds|labels|messages|meta|modalities|names|nav|options|outcomes|parts|results|rows|scopes|sections|stages|statuses|steps|tabs|titles)$/i;
-const STYLE_VARIABLE = /(?:class(?:name)?|classes|style)$/i;
-const TAILWIND_UTILITY_TOKEN = /^(?:[a-z0-9_/-]+:)*(?:!?)(?:flex|inline-flex|grid|inline-grid|block|inline-block|hidden|relative|absolute|fixed|sticky|uppercase|lowercase|capitalize|truncate|sr-only|(?:whitespace|w|h|min-w|max-w|min-h|max-h|size|p[trblxy]?|m[trblxy]?|text|bg|border|rounded|tracking|leading|font|gap|items|justify|space|overflow|shadow|ring|opacity|transition|duration|ease|animate|cursor)-.+)$/;
-const I18N_KEY = /^[a-z][a-z0-9]*(?:\.[a-z0-9_-]+)+$/i;
 const UNCHANGED_ZH_CN_SOURCES = new Set([
   "00:00 UTC",
   "acme",
@@ -313,18 +287,8 @@ const UNCHANGED_ZH_CN_SOURCES = new Set([
   "Workday",
 ]);
 
-function isI18nKey(value) {
-  return I18N_KEY.test(value);
-}
-
 function isFormattingOnly(value) {
   return /^[\s·•—#%→/…{}v\d–]+$/.test(value);
-}
-
-function variableInit(declaration) {
-  let init = declaration.get("init");
-  while (init.isTSAsExpression() || init.isTSSatisfiesExpression() || init.isTypeCastExpression()) init = init.get("expression");
-  return init;
 }
 
 function filesUnder(directory) {
@@ -335,319 +299,6 @@ function filesUnder(directory) {
     if (resolved.includes(`${path.sep}i18n${path.sep}`)) return [];
     return [resolved];
   });
-}
-
-function clean(value) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function isHumanText(value) {
-  const text = clean(value);
-  if (!text || !/[A-Za-z]/.test(text)) return false;
-  if (/^(https?:|\/api\/|[.#@]|[a-z]+:\/\/)/i.test(text)) return false;
-  if (/(^|\s)(sm|md|lg|xl|2xl|dark|hover|focus|data|group|peer):/.test(text)) return false;
-  if (text.split(/\s+/).every((token) => TAILWIND_UTILITY_TOKEN.test(token))) return false;
-  return true;
-}
-
-function jsxAttributeName(node) {
-  if (node.name.type === "JSXIdentifier") return node.name.name;
-  return null;
-}
-
-function propertyName(node) {
-  if (node.computed) return null;
-  if (node.key.type === "Identifier" || node.key.type === "StringLiteral") return node.key.name ?? node.key.value;
-  return null;
-}
-
-function directVariable(pathRef) {
-  const declaration = pathRef.findParent((candidate) => candidate.isVariableDeclarator());
-  if (!declaration || declaration.node.id.type !== "Identifier") return null;
-  const init = variableInit(declaration);
-  if (init.node === pathRef.node) return { name: declaration.node.id.name, array: false };
-  if (pathRef.parentPath?.isArrayExpression() && init.node === pathRef.parentPath.node) {
-    return { name: declaration.node.id.name, array: true };
-  }
-  let current = pathRef;
-  while (current.parentPath?.isConditionalExpression() || current.parentPath?.isLogicalExpression()) current = current.parentPath;
-  if (current?.node === init.node) return { name: declaration.node.id.name, array: false };
-  return null;
-}
-
-function uiCollectionValue(pathRef) {
-  const declaration = pathRef.findParent((candidate) => candidate.isVariableDeclarator());
-  if (!declaration || declaration.node.id.type !== "Identifier" || !UI_COLLECTION.test(declaration.node.id.name)) return false;
-  const init = variableInit(declaration);
-  if (!init.isArrayExpression() && !init.isObjectExpression()) return false;
-  let current = pathRef;
-  while (current.parentPath && current.parentPath.node !== init.node && !current.parentPath.isFunction()) {
-    if (current.parentPath.isArrayExpression() && current.parentPath.parentPath?.node === init.node) {
-      return current.listKey === "elements"
-        && (Number(current.key) > 0
-          || /\s|^[A-Z][a-z]/.test(pathRef.isStringLiteral() ? pathRef.node.value : templateSource(pathRef.node)));
-    }
-    current = current.parentPath;
-  }
-  if (current.parentPath?.node !== init.node) return false;
-  if (init.isObjectExpression() && /(COPY|DESCRIPTIONS|ERRORS|LABELS|MESSAGES|NAMES|NOTES|TITLES)$/i.test(declaration.node.id.name)) {
-    return pathRef.parentPath?.isObjectProperty()
-      && pathRef.parentPath.parentPath?.node === init.node
-      && pathRef.parentPath.get("value").node === pathRef.node;
-  }
-  if (init.isObjectExpression()) return false;
-  return current.node === pathRef.node && current.listKey === "elements";
-}
-
-function jsxAttribute(pathRef) {
-  let current = pathRef;
-  while (current.parentPath) {
-    const parent = current.parentPath;
-    if (parent.isJSXAttribute()) return parent;
-    if (parent.isJSXExpressionContainer() && parent.parentPath?.isJSXAttribute()) return parent.parentPath;
-    if (!isValueWrapper(current, parent)) return null;
-    current = parent;
-  }
-  return null;
-}
-
-function uiObjectProperty(pathRef) {
-  let current = pathRef;
-  while (current.parentPath) {
-    const parent = current.parentPath;
-    if (parent.isObjectProperty()) return parent.get("value").node === current.node && UI_PROPS.has(propertyName(parent.node));
-    if (!isValueWrapper(current, parent)) return false;
-    current = parent;
-  }
-  return false;
-}
-
-function uiDefaultParameter(pathRef) {
-  const assignment = pathRef.findParent((candidate) => candidate.isAssignmentPattern() || candidate.isFunction());
-  return Boolean(assignment?.isAssignmentPattern()
-    && assignment.node.left.type === "Identifier"
-    && UI_VARIABLE.test(assignment.node.left.name));
-}
-
-function uiSetterCall(pathRef) {
-  const call = pathRef.findParent((candidate) => candidate.isCallExpression() || candidate.isFunction());
-  if (!call?.isCallExpression()) return false;
-  const callee = call.node.callee;
-  if (callee.type === "Identifier") return /^set.*(Error|Message|Notice|Summary)$/.test(callee.name);
-  return callee.type === "MemberExpression"
-    && callee.property.type === "Identifier"
-    && /^(fail|set.*(?:Error|Message|Notice|Summary))$/.test(callee.property.name);
-}
-
-function uiErrorMessage(pathRef) {
-  const creation = pathRef.findParent((candidate) => candidate.isNewExpression() || candidate.isFunction());
-  return Boolean(creation?.isNewExpression()
-    && creation.node.callee.type === "Identifier"
-    && (creation.node.callee.name === "Error" || creation.node.callee.name === "RangeError"));
-}
-
-function uiAttributeFunctionValue(pathRef) {
-  const fn = pathRef.findParent((candidate) => candidate.isArrowFunctionExpression() || candidate.isFunctionExpression() || candidate.isFunctionDeclaration());
-  if (!fn || fn.isFunctionDeclaration()) return false;
-  const attribute = fn.findParent((candidate) => candidate.isJSXAttribute() || candidate.isFunction());
-  if (!attribute?.isJSXAttribute()) return false;
-  const name = jsxAttributeName(attribute.node);
-  if (!name || (name !== "formatter" && !UI_VARIABLE.test(name))) return false;
-  let current = pathRef;
-  while (current.parentPath && current.parentPath !== fn) {
-    const parent = current.parentPath;
-    if (parent.isArrayExpression() || parent.isReturnStatement() || isRenderedBranch(current, parent)) {
-      current = parent;
-      continue;
-    }
-    return false;
-  }
-  return current.parentPath === fn;
-}
-
-function uiRenderedCallbackValue(pathRef) {
-  const fn = pathRef.findParent((candidate) => candidate.isArrowFunctionExpression() || candidate.isFunctionExpression());
-  if (!fn || !outputPosition(fn)) return false;
-  let current = pathRef;
-  while (current.parentPath && current.parentPath !== fn) {
-    const parent = current.parentPath;
-    if (parent.isReturnStatement() || isValueWrapper(current, parent)) {
-      current = parent;
-      continue;
-    }
-    return false;
-  }
-  return current.parentPath === fn;
-}
-
-function uiNamedObjectMap(pathRef) {
-  const property = pathRef.parentPath;
-  const object = property?.parentPath;
-  const declaration = object?.parentPath;
-  return Boolean(property?.isObjectProperty()
-    && property.get("value").node === pathRef.node
-    && object?.isObjectExpression()
-    && declaration?.isVariableDeclarator()
-    && declaration.node.id.type === "Identifier"
-    && (/(COPY|DESCRIPTIONS|ERRORS|LABELS|MESSAGES|NAMES|NOTES|TITLES)$/i.test(declaration.node.id.name)
-      || UI_VARIABLE.test(declaration.node.id.name)));
-}
-
-function uiNamedCall(pathRef) {
-  const call = pathRef.findParent((candidate) => candidate.isCallExpression() || candidate.isFunction());
-  return Boolean(call?.isCallExpression()
-    && call.node.callee.type === "Identifier"
-    && (call.node.callee.name === "label"
-      || call.node.callee.name === "pluralLabel"
-      || /Message$/.test(call.node.callee.name)));
-}
-
-function uiChartName(pathRef) {
-  const attribute = jsxAttribute(pathRef);
-  if (!attribute?.isJSXAttribute() || jsxAttributeName(attribute.node) !== "name") return false;
-  const opening = attribute.parentPath;
-  const elementName = opening?.isJSXOpeningElement() && opening.node.name.type === "JSXIdentifier"
-    ? opening.node.name.name
-    : "";
-  return ["Area", "Bar", "Line", "Pie", "Radar", "RadialBar", "Scatter"].includes(elementName);
-}
-
-function uiJsxCollectionValue(pathRef) {
-  const attribute = pathRef.findParent((candidate) => candidate.isJSXAttribute() || candidate.isFunction());
-  if (!attribute?.isJSXAttribute()) return false;
-  const name = jsxAttributeName(attribute.node);
-  if (name !== "items") return false;
-  const tuple = pathRef.parentPath;
-  return Boolean(tuple?.isArrayExpression()
-    && tuple.parentPath?.isArrayExpression()
-    && pathRef.listKey === "elements"
-    && Number(pathRef.key) === 0);
-}
-
-function namedUiFunction(pathRef) {
-  const fn = pathRef.findParent((candidate) => candidate.isFunctionDeclaration() || candidate.isFunctionExpression() || candidate.isArrowFunctionExpression());
-  if (!fn) return false;
-  let name = fn.node.id?.name;
-  if (!name && fn.parentPath?.isVariableDeclarator() && fn.parentPath.node.id.type === "Identifier") {
-    name = fn.parentPath.node.id.name;
-  }
-  if (!name || (!UI_VARIABLE.test(name) && !/(label|title|formatDate|formatCountdown|recency)/i.test(name))) return false;
-  let current = pathRef;
-  while (current.parentPath?.isConditionalExpression() || current.parentPath?.isLogicalExpression()) current = current.parentPath;
-  if (current.parentPath?.isReturnStatement()) {
-    return current.parentPath.findParent((candidate) => candidate.isFunction()) === fn;
-  }
-  return fn.isArrowFunctionExpression() && fn.get("body") === current;
-}
-
-function uiCollectorCall(pathRef) {
-  const call = pathRef.findParent((candidate) => candidate.isCallExpression());
-  if (!call) return false;
-  let argument = pathRef;
-  while (argument.parentPath && argument.parentPath !== call) argument = argument.parentPath;
-  if (argument.parentPath !== call || argument.listKey !== "arguments") return false;
-  if (call.node.callee.type === "Identifier") {
-    return call.node.callee.name === "scalar" && argument.key === 1;
-  }
-  const callee = call.node.callee;
-  if (!(callee.type === "MemberExpression"
-    && callee.object.type === "Identifier"
-    && callee.property.type === "Identifier"
-    && callee.property.name === "push"
-    && UI_COLLECTION.test(callee.object.name))) return false;
-  if (argument === pathRef) return true;
-  return argument.isArrayExpression() && argument.get("elements.0") === pathRef;
-}
-
-function isToastCall(pathRef) {
-  const call = pathRef.findParent((candidate) => candidate.isCallExpression());
-  if (!call) return false;
-  const callee = call.node.callee;
-  return callee.type === "MemberExpression"
-    && callee.object.type === "Identifier"
-    && callee.object.name === "toast";
-}
-
-function outputPosition(pathRef) {
-  let current = pathRef;
-  while (current.parentPath) {
-    const parent = current.parentPath;
-    if (parent.isJSXExpressionContainer()) {
-      return Boolean(parent.parentPath?.isJSXElement() || parent.parentPath?.isJSXFragment());
-    }
-    if (!isValueWrapper(current, parent)) return false;
-    current = parent;
-  }
-  return false;
-}
-
-function isValueWrapper(current, parent) {
-  return isRenderedBranch(current, parent)
-    || (parent.isArrayExpression()
-      && (!(current.isStringLiteral?.() || current.isTemplateLiteral?.())
-        || Number(current.key) > 0
-        || /\s|^[A-Z][a-z]/.test(current.isStringLiteral?.() ? current.node.value : templateSource(current.node))))
-    || parent.isTemplateLiteral()
-    || parent.isSpreadElement()
-    || (parent.isCallExpression() && current.key === "callee")
-    || parent.isMemberExpression()
-    || parent.isOptionalMemberExpression?.()
-    || parent.isAwaitExpression()
-    || parent.isUnaryExpression();
-}
-
-function isRenderedBranch(current, parent) {
-  if (parent.isConditionalExpression()) return current.key === "consequent" || current.key === "alternate";
-  if (parent.isLogicalExpression()) return current.key === "right";
-  if (parent.isBinaryExpression()) return parent.node.operator === "+";
-  return parent.isTSAsExpression() || parent.isTSSatisfiesExpression() || parent.isParenthesizedExpression();
-}
-
-function isTranslationKey(pathRef) {
-  const call = pathRef.findParent((candidate) => candidate.isCallExpression() || candidate.isFunction());
-  if (!call?.isCallExpression()) return false;
-  const callee = call.node.callee;
-  return (callee.type === "Identifier" && callee.name === "t")
-    || (callee.type === "MemberExpression" && callee.property.type === "Identifier" && callee.property.name === "t");
-}
-
-function isTemplateFragment(pathRef) {
-  const template = pathRef.findParent((candidate) => candidate.isTemplateLiteral() || candidate.isFunction());
-  return Boolean(template?.isTemplateLiteral() && isLocalizableStringPath(template));
-}
-
-export function isLocalizableStringPath(pathRef) {
-  if (pathRef.isJSXText()) return isHumanText(pathRef.node.value);
-  if (!pathRef.isStringLiteral() && !pathRef.isTemplateLiteral()) return false;
-  if (pathRef.findParent((candidate) => candidate.isTSLiteralType() || candidate.isTSTypeAnnotation() || candidate.isTSUnionType())) return false;
-  const value = pathRef.isTemplateLiteral() ? templateSource(pathRef.node) : pathRef.node.value;
-  if (isI18nKey(value)) return false;
-  if (!isHumanText(value)) return false;
-  if (pathRef.parentPath?.isMemberExpression() && pathRef.key === "property") return false;
-  if (isTranslationKey(pathRef)) return false;
-  if (!pathRef.isTemplateLiteral() && isTemplateFragment(pathRef)) return false;
-
-  const parent = pathRef.parentPath;
-  const attribute = jsxAttribute(pathRef);
-  if (attribute) {
-    const name = jsxAttributeName(attribute.node);
-    return Boolean(name && (UI_PROPS.has(name) || UI_VARIABLE.test(name) || uiChartName(pathRef) || uiJsxCollectionValue(pathRef)));
-  }
-  if (outputPosition(pathRef) || isToastCall(pathRef) || uiCollectorCall(pathRef) || uiSetterCall(pathRef) || uiErrorMessage(pathRef) || uiAttributeFunctionValue(pathRef) || uiRenderedCallbackValue(pathRef) || uiJsxCollectionValue(pathRef) || uiNamedCall(pathRef) || uiChartName(pathRef)) return true;
-  if ((parent?.isObjectProperty() && UI_PROPS.has(propertyName(parent.node))) || uiObjectProperty(pathRef)) return true;
-  if (uiNamedObjectMap(pathRef)) return true;
-  if (uiDefaultParameter(pathRef)) return true;
-
-  const variable = directVariable(pathRef);
-  if (variable && !variable.array && !STYLE_VARIABLE.test(variable.name) && UI_VARIABLE.test(variable.name)) return true;
-  if (uiCollectionValue(pathRef)) return true;
-  return namedUiFunction(pathRef);
-}
-
-function templateSource(node) {
-  return node.quasis
-    .map((quasi, index) => `${quasi.value.cooked ?? quasi.value.raw}${index < node.expressions.length ? `{{v${index}}}` : ""}`)
-    .join("");
 }
 
 function collect() {
@@ -771,12 +422,42 @@ function validateCatalog() {
   return [...new Set(invalid)];
 }
 
+function runtimeCatalog(language) {
+  return Object.fromEntries(
+    Object.values(catalog)
+      .map((entry) => [entry.key, entry[language]])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function writeRuntimeCatalogs() {
+  for (const [language, filename] of Object.entries(runtimeCatalogPaths)) {
+    fs.writeFileSync(
+      filename,
+      `${JSON.stringify(runtimeCatalog(language), null, 2)}\n`,
+    );
+  }
+  console.log("Generated compact runtime catalogs for en and zh-CN.");
+}
+
+function invalidRuntimeCatalogs() {
+  return Object.entries(runtimeCatalogPaths).flatMap(([language, filename]) => {
+    if (!fs.existsSync(filename)) return [language];
+    const actual = JSON.parse(fs.readFileSync(filename, "utf8"));
+    return JSON.stringify(actual) === JSON.stringify(runtimeCatalog(language))
+      ? []
+      : [language];
+  });
+}
+
 const keyFlagIndex = process.argv.indexOf("--key");
 
 if (process.argv.includes("--apply-fixed")) {
   applyFixedTranslations();
 } else if (process.argv.includes("--prune")) {
   pruneCatalog();
+} else if (process.argv.includes("--write-runtime")) {
+  writeRuntimeCatalogs();
 } else if (process.argv.includes("--unclassified")) {
   const unclassified = collectUnclassified();
   process.stdout.write(`${JSON.stringify(Object.fromEntries(unclassified), null, 2)}\n`);
@@ -792,6 +473,7 @@ if (process.argv.includes("--apply-fixed")) {
   process.stdout.write(`${JSON.stringify(Object.fromEntries(candidates), null, 2)}\n`);
 } else {
   const invalid = validateCatalog();
+  const invalidRuntime = invalidRuntimeCatalogs();
   if (missing.length) {
     console.error(`Missing ${missing.length} UI translations. Every entry is a fixed, hand-written`);
     console.error(`translation — there is no machine-translation fallback. For each string below,`);
@@ -810,8 +492,14 @@ if (process.argv.includes("--apply-fixed")) {
     console.error(`Catalog contains ${invalid.length} invalid entries:`);
     for (const source of invalid) console.error(`- ${JSON.stringify(source)}`);
   }
-  if (!missing.length && !stale.length && !invalid.length) {
+  if (invalidRuntime.length) {
+    console.error(
+      `Runtime catalogs are missing or stale for: ${invalidRuntime.join(", ")}.`,
+    );
+    console.error("Run `npm run i18n:generate` and commit the generated files.");
+  }
+  if (!missing.length && !stale.length && !invalid.length && !invalidRuntime.length) {
     console.log(`i18n catalog covers ${candidates.size} user-facing literals.`);
   }
-  process.exitCode = missing.length || stale.length || invalid.length ? 1 : 0;
+  process.exitCode = missing.length || stale.length || invalid.length || invalidRuntime.length ? 1 : 0;
 }
