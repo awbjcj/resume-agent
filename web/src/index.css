@@ -116,10 +116,52 @@
 
 .auth-brand-panel {
   background: #061d26;
+  background-image:
+    radial-gradient(circle at 52% 32%, rgba(91, 216, 231, 0.13), transparent 42%),
+    linear-gradient(180deg, #061d26 0%, #041820 100%);
+}
+
+.auth-brand-visual {
+  isolation: isolate;
+}
+
+.auth-brand-visual::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 29, 38, 0.08) 0%,
+    transparent 14%,
+    transparent 82%,
+    rgba(6, 29, 38, 0.28) 100%
+  );
+  content: "";
+  pointer-events: none;
 }
 
 .auth-brand-art {
   filter: saturate(0.88) contrast(1.03);
+}
+
+@media (min-width: 64rem) and (max-height: 51.25rem) {
+  .auth-brand-panel {
+    padding: 1.5rem;
+  }
+
+  .auth-brand-copy {
+    padding: 1rem 1.125rem;
+  }
+
+  .auth-brand-copy-heading {
+    margin-top: 0.5rem;
+    font-size: 1.6rem;
+  }
+
+  .auth-brand-copy-summary,
+  .auth-brand-copy-flow {
+    margin-top: 0.75rem;
+  }
 }
 
 .auth-surface {

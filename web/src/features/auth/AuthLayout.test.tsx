@@ -19,6 +19,13 @@ describe("AuthLayout", () => {
     expect(
       container.querySelector("[data-slot='auth-brand'] img")?.getAttribute("src"),
     ).toContain("auth-evidence-command-center");
+    const visual = container.querySelector("[data-slot='auth-brand-visual']");
+    const copy = container.querySelector("[data-slot='auth-brand-copy']");
+    expect(visual).toBeInTheDocument();
+    expect(copy).toBeInTheDocument();
+    expect(visual?.nextElementSibling).toBe(copy);
+    expect(visual?.querySelector("img")).toHaveClass("object-contain");
+    expect(copy?.querySelector("img")).toBeNull();
     expect(screen.getByText("Secure workspace")).toBeInTheDocument();
   });
 });

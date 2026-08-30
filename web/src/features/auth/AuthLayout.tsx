@@ -27,15 +27,7 @@ export function AuthLayout({
         aria-hidden="true"
         className="auth-brand-panel sticky top-0 hidden h-svh w-[54%] overflow-hidden p-10 text-white lg:flex lg:flex-col xl:p-12 2xl:w-[57%] 2xl:p-14"
       >
-        <img
-          className="auth-brand-art absolute inset-0 size-full object-cover object-center"
-          src={authEvidenceVisual}
-          alt=""
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,20,27,0.72)_0%,rgba(2,20,27,0.08)_32%,rgba(2,20,27,0.2)_58%,rgba(2,20,27,0.92)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(91,216,231,0.2),transparent_34%)]" />
-
-        <div className="relative flex items-center gap-3">
+        <div className="relative z-10 flex shrink-0 items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 shadow-[0_12px_34px_-18px_rgba(91,216,231,0.85)] backdrop-blur-md">
             <Sparkles className="size-4.5" aria-hidden="true" />
           </div>
@@ -47,17 +39,31 @@ export function AuthLayout({
           </div>
         </div>
 
-        <div className="relative mt-auto max-w-xl rounded-2xl border border-white/12 bg-[#061d26]/58 p-6 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.72)] backdrop-blur-xl xl:p-7">
+        <div
+          data-slot="auth-brand-visual"
+          className="auth-brand-visual relative mt-3 flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+        >
+          <img
+            className="auth-brand-art h-full w-auto max-w-full object-contain object-center"
+            src={authEvidenceVisual}
+            alt=""
+          />
+        </div>
+
+        <div
+          data-slot="auth-brand-copy"
+          className="auth-brand-copy relative z-10 mt-3 w-full max-w-xl shrink-0 rounded-2xl border border-white/12 bg-[#061d26]/82 p-6 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.72)] xl:p-7"
+        >
           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-cyan-200/75">
             {t("auth.evidenceLedOperations")}
           </p>
-          <p className="mt-3 text-3xl font-semibold leading-[1.08] tracking-[-0.035em] xl:text-[2.35rem]">
+          <p className="auth-brand-copy-heading mt-3 text-3xl font-semibold leading-[1.08] tracking-[-0.035em] xl:text-[2.35rem]">
             {t("auth.brandPromise")}
           </p>
-          <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/68">
+          <p className="auth-brand-copy-summary mt-4 max-w-lg text-sm leading-relaxed text-white/68">
             {t("auth.brandSummary")}
           </p>
-          <div className="mt-6 flex items-center gap-2 text-[0.7rem] font-medium text-white/72">
+          <div className="auth-brand-copy-flow mt-6 flex items-center gap-2 text-[0.7rem] font-medium text-white/72">
             <span className="rounded-full border border-white/12 bg-white/7 px-3 py-1.5">{t("auth.discover")}</span>
             <span className="h-px w-5 bg-white/18" />
             <span className="rounded-full border border-white/12 bg-white/7 px-3 py-1.5">{t("auth.tailor")}</span>
