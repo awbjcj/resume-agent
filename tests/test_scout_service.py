@@ -25,6 +25,9 @@ from resume_agent.discovery.source_resolution.resolver import resolution_cache_k
 from resume_agent.discovery.source_resolution.search import SearchCoverage
 from resume_agent.services import scout as service
 from resume_agent.services.config_store import YamlConfigStore
+from resume_agent.services.scout_intelligence import (
+    ScoutCompanyIntelligenceSnapshot,
+)
 from resume_agent.sessions.stream import (
     Completed,
     TextDelta,
@@ -668,6 +671,8 @@ def test_session_view_projects_source_resolution_fields(tmp_path):
                     ],
                     searched_families=["lever"],
                     unsearched_families=["workday"],
+                    company_intelligence_status="ready",
+                    company_intelligence_version=3,
                 ),
                 check="unverified",
             )
@@ -683,6 +688,8 @@ def test_session_view_projects_source_resolution_fields(tmp_path):
     assert source["evidence"][0]["kind"] == "candidate"
     assert source["searchedFamilies"] == ["lever"]
     assert source["unsearchedFamilies"] == ["workday"]
+    assert source["companyIntelligenceStatus"] == "ready"
+    assert source["companyIntelligenceVersion"] == 3
 
 
 class UnparsableFormatter:
@@ -772,3 +779,58 @@ def test_a_posting_url_reuses_its_company_and_board_resolution(tmp_path):
     assert proposals[0].source is not None
     assert proposals[0].source.url == root
     assert proposals[0].check == "validated"
+
+
+def test_post_process_attaches_server_owned_company_intelligence_metadata(tmp_path):
+    resolution = CompanySourceResolution(
+        company="Acme, Inc.",
+        requested_url="https://jobs.lever.co/acme",
+        canonical_board_url="https://jobs.lever.co/acme",
+        ats="lever",
+        status="verified",
+        reason_code="VERIFIED_PROVIDER_METADATA",
+    )
+
+    class IntelligenceLookup:
+        def lookup_many(self, companies):
+            assert companies == ["Acme, Inc."]
+            return {
+                "acme": ScoutCompanyIntelligenceSnapshot(
+                    status="stale",
+                    normalized_company="acme",
+                    display_company="Acme",
+                    version_number=4,
+                )
+            }
+
+    proposals = service._post_process(
+        Reporter(),
+        [
+            ScoutTurnDraft.model_validate(
+                {
+                    "message": "Found Acme.",
+                    "proposals": [
+                        {
+                            "kind": "source",
+                            "source": {
+                                "company": "Acme, Inc.",
+                                "url": "https://jobs.lever.co/acme",
+                            },
+                        }
+                    ],
+                }
+            ).proposals[0]
+        ],
+        session={"proposals": []},
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        resolution_cache={
+            resolution_cache_key("Acme, Inc.", resolution.requested_url): resolution
+        },
+        resolve_source=lambda *_args: pytest.fail("source was resolved twice"),
+        intelligence_lookup=IntelligenceLookup(),  # type: ignore[arg-type]
+    )
+
+    assert proposals[0].source is not None
+    assert proposals[0].source.company_intelligence_status == "stale"
+    assert proposals[0].source.company_intelligence_version == 4
