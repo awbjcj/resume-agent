@@ -504,31 +504,6 @@
     "en": "+{{v0}} more supporting fact{{v1}}",
     "zh-CN": "另有 {{v0}} 条支持性事实"
   },
-  "≤ 14 days": {
-    "key": "ui_7709757e216c",
-    "en": "≤ 14 days",
-    "zh-CN": "≤ 14 天"
-  },
-  "≤ 30 days": {
-    "key": "ui_9776b8eaa24c",
-    "en": "≤ 30 days",
-    "zh-CN": "≤ 30 天"
-  },
-  "≤ 45 days": {
-    "key": "ui_9ee4258826bc",
-    "en": "≤ 45 days",
-    "zh-CN": "≤ 45 天"
-  },
-  "≤ 7 days": {
-    "key": "ui_63a92c30fe03",
-    "en": "≤ 7 days",
-    "zh-CN": "≤ 7 天"
-  },
-  "≤ 90 days": {
-    "key": "ui_0389cc656735",
-    "en": "≤ 90 days",
-    "zh-CN": "≤ 90 天"
-  },
   "○ Soft": {
     "key": "ui_e9243c7d1185",
     "en": "○ Soft",
@@ -1238,11 +1213,6 @@
     "key": "ui_882c48121d55",
     "en": "Any annual salary",
     "zh-CN": "不限年薪"
-  },
-  "Any time": {
-    "key": "ui_5e7de49a40c3",
-    "en": "Any time",
-    "zh-CN": "不限时间"
   },
   "Anything specific to cover? (optional)": {
     "key": "ui_e14b51a158c8",
@@ -6943,11 +6913,6 @@
     "key": "ui_5d1fa38bcf0d",
     "en": "Preparing…",
     "zh-CN": "准备中…"
-  },
-  "Preset": {
-    "key": "ui_7252e7ce0085",
-    "en": "Preset",
-    "zh-CN": "预设"
   },
   "Preview": {
     "key": "ui_324b134f57c7",
