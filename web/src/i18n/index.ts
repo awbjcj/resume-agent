@@ -43,8 +43,10 @@ function getInitialLanguage(): SupportedLanguage {
 
 function syncDocumentLanguage(language: string): void {
   if (typeof document === "undefined") return;
-  document.documentElement.lang = normalizeLanguage(language) ?? DEFAULT_LANGUAGE;
+  const normalized = normalizeLanguage(language) ?? DEFAULT_LANGUAGE;
+  document.documentElement.lang = normalized;
   document.documentElement.dir = "ltr";
+  document.title = i18n.t("app.documentTitle", { lng: normalized });
 }
 
 void i18n.use(initReactI18next).init({

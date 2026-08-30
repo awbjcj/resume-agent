@@ -6,6 +6,9 @@ const autoZhCN = Object.fromEntries(autoEntries.map((entry) => [entry.key, entry
 
 const en = {
   auto: autoEn,
+  app: {
+    documentTitle: "Resume Agent",
+  },
   common: {
     language: "Language",
     english: "English",
@@ -15,6 +18,7 @@ const en = {
     cancel: "Cancel",
     close: "Close",
     retry: "Try again",
+    elapsedSeconds: "{{count}}s",
   },
   nav: {
     dashboard: "Dashboard",
@@ -82,6 +86,42 @@ const en = {
     forgotPassword: "Forgot password?",
     signingIn: "Signing in…",
     signIn: "Sign in",
+    passwordStrength: {
+      ariaLabel: "Password strength: {{label}}",
+      labels: {
+        veryWeak: "Very weak",
+        weak: "Weak",
+        fair: "Fair",
+        good: "Good",
+        strong: "Strong",
+      },
+      hints: {
+        tooShort: "Use at least 12 characters.",
+        predictable: "Avoid repeated characters and simple sequences.",
+        addVariety: "Mix uppercase, digits, or symbols.",
+        reasonable: "Looks reasonable — the server makes the final call.",
+      },
+    },
+  },
+  application: {
+    statuses: {
+      ready: "Ready",
+      submitted: "Submitted",
+      interview: "Interview",
+      offer: "Offer",
+      rejected: "Rejected",
+      closed: "Closed",
+    },
+  },
+  job: {
+    stages: {
+      raw: "Raw",
+      shortlisted: "Shortlisted",
+      approved: "Approved",
+      tailored: "Tailored",
+      rendered: "Rendered",
+      rejected: "Rejected",
+    },
   },
   dashboard: {
     waiting_zero: "Nothing is waiting on you",
@@ -211,6 +251,9 @@ type TranslationShape<T> = {
 
 const zhCN = {
   auto: autoZhCN,
+  app: {
+    documentTitle: "求职助手",
+  },
   common: {
     language: "语言",
     english: "English",
@@ -220,6 +263,7 @@ const zhCN = {
     cancel: "取消",
     close: "关闭",
     retry: "重试",
+    elapsedSeconds: "{{count}} 秒",
   },
   nav: {
     dashboard: "仪表盘",
@@ -286,6 +330,42 @@ const zhCN = {
     forgotPassword: "忘记密码？",
     signingIn: "正在登录…",
     signIn: "登录",
+    passwordStrength: {
+      ariaLabel: "密码强度：{{label}}",
+      labels: {
+        veryWeak: "非常弱",
+        weak: "弱",
+        fair: "一般",
+        good: "良好",
+        strong: "强",
+      },
+      hints: {
+        tooShort: "请至少使用 12 个字符。",
+        predictable: "请避免重复字符和简单连续字符。",
+        addVariety: "请混用大写字母、数字或符号。",
+        reasonable: "强度看起来合适，最终结果以服务器校验为准。",
+      },
+    },
+  },
+  application: {
+    statuses: {
+      ready: "就绪",
+      submitted: "已提交",
+      interview: "面试中",
+      offer: "录用通知",
+      rejected: "已拒绝",
+      closed: "已结束",
+    },
+  },
+  job: {
+    stages: {
+      raw: "原始",
+      shortlisted: "已加入候选",
+      approved: "已批准",
+      tailored: "已定制",
+      rendered: "已生成",
+      rejected: "已拒绝",
+    },
   },
   dashboard: {
     waiting_zero: "目前没有待处理事项",

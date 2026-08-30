@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PencilLine } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,15 @@ import type { components } from "@/lib/api/schema";
 import { ApplicationTimeline } from "./ApplicationTimeline";
 import { useUpsertApplication } from "./use-job-mutations";
 
-const STATUSES = ["ready", "submitted", "interview", "offer", "rejected", "closed"];
-
-function statusLabel(status: string): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
+const STATUS_VALUES = ["ready", "submitted", "interview", "offer", "rejected", "closed"] as const;
+const STATUS_LABEL_KEYS = {
+  ready: "application.statuses.ready",
+  submitted: "application.statuses.submitted",
+  interview: "application.statuses.interview",
+  offer: "application.statuses.offer",
+  rejected: "application.statuses.rejected",
+  closed: "application.statuses.closed",
+} as const;
 
 export function ApplicationEditor({
   jobId,
@@ -38,6 +43,7 @@ function ApplicationEditorState({
   jobId: number;
   application: components["schemas"]["ApplicationOut"] | null;
 }) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState(application?.status ?? "ready");
   const [notes, setNotes] = useState(application?.notes ?? "");
   const [overriding, setOverriding] = useState(false);
@@ -46,6 +52,11 @@ function ApplicationEditorState({
   const submit = () => {
     save.mutate({ status, notes: notes || null });
     setOverriding(false);
+  };
+
+  const statusLabel = (value: string): string => {
+    const labelKey = STATUS_LABEL_KEYS[value as keyof typeof STATUS_LABEL_KEYS];
+    return labelKey ? t(labelKey) : value;
   };
 
   return (
@@ -81,7 +92,7 @@ function ApplicationEditorState({
                 onChange={(event) => setStatus(event.target.value)}
                 className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {STATUSES.map((value) => (
+                {STATUS_VALUES.map((value) => (
                   <option key={value} value={value}>
                     {statusLabel(value)}
                   </option>

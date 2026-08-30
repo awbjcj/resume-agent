@@ -26,4 +26,24 @@ describe("automatic i18n build transform", () => {
     expect(result?.code?.match(/resolvedLanguage/g)).toHaveLength(4);
     expect(result?.code).not.toContain('"en-US"');
   });
+
+  it("translates display labels without changing protocol values or translation keys", async () => {
+    const result = await transformAsync(
+      `
+        const STATUSES = ["ready", "submitted"];
+        const JOURNEY_COPY = ["journey.stages.profile.label"];
+        const options = [{ value: "ready", label: "Ready" }];
+      `,
+      {
+        babelrc: false,
+        configFile: false,
+        plugins: [autoI18nPlugin],
+      },
+    );
+
+    expect(result?.code).toContain('"ready"');
+    expect(result?.code).toContain('"submitted"');
+    expect(result?.code).toContain('"journey.stages.profile.label"');
+    expect(result?.code?.match(/\.t\("auto\./g)).toHaveLength(1);
+  });
 });

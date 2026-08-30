@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, RotateCcw, Square } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export function TranscribeButton({
   onText: (text: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>("idle");
   const [elapsed, setElapsed] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -89,7 +91,7 @@ export function TranscribeButton({
         aria-label="Stop recording"
       >
         <Square className="h-4 w-4 animate-pulse" />
-        <span className="ml-1 tabular-nums">{elapsed}s</span>
+        <span className="ml-1 tabular-nums">{t("common.elapsedSeconds", { count: elapsed })}</span>
       </Button>
     );
   }

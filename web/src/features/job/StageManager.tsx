@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,11 +13,24 @@ import {
 import { useSetStage } from "./use-job-mutations";
 import type { JobDetail } from "./use-job-detail";
 
-const STAGES = ["raw", "shortlisted", "approved", "tailored", "rendered", "rejected"];
+const STAGE_VALUES = ["raw", "shortlisted", "approved", "tailored", "rendered", "rejected"] as const;
+const STAGE_LABEL_KEYS = {
+  raw: "job.stages.raw",
+  shortlisted: "job.stages.shortlisted",
+  approved: "job.stages.approved",
+  tailored: "job.stages.tailored",
+  rendered: "job.stages.rendered",
+  rejected: "job.stages.rejected",
+} as const;
 
 export function StageManager({ job }: { job: JobDetail }) {
+  const { t } = useTranslation();
   const [stage, setStage] = useState(job.status);
   const setStageMut = useSetStage(job.id);
+  const stageLabel = (value: string): string => {
+    const labelKey = STAGE_LABEL_KEYS[value as keyof typeof STAGE_LABEL_KEYS];
+    return labelKey ? t(labelKey) : value;
+  };
 
   return (
     <div className="space-y-3">
@@ -27,9 +41,9 @@ export function StageManager({ job }: { job: JobDetail }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {STAGES.map((s) => (
+            {STAGE_VALUES.map((s) => (
               <SelectItem key={s} value={s}>
-                {s}
+                {stageLabel(s)}
               </SelectItem>
             ))}
           </SelectContent>

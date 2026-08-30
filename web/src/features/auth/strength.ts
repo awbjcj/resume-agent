@@ -1,4 +1,9 @@
 export type StrengthScore = 0 | 1 | 2 | 3 | 4;
+export type StrengthHintKey =
+  | "auth.passwordStrength.hints.tooShort"
+  | "auth.passwordStrength.hints.predictable"
+  | "auth.passwordStrength.hints.addVariety"
+  | "auth.passwordStrength.hints.reasonable";
 
 const hasRun = (value: string) => /(.)\1{3,}/.test(value);
 
@@ -13,8 +18,8 @@ function hasSequence(value: string): boolean {
   return false;
 }
 
-export function scorePassword(password: string): { score: StrengthScore; hint: string } {
-  if (!password) return { score: 0, hint: "Use at least 12 characters." };
+export function scorePassword(password: string): { score: StrengthScore; hintKey: StrengthHintKey } {
+  if (!password) return { score: 0, hintKey: "auth.passwordStrength.hints.tooShort" };
   const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((pattern) =>
     pattern.test(password),
   ).length;
@@ -25,11 +30,11 @@ export function scorePassword(password: string): { score: StrengthScore; hint: s
   const score = Math.max(0, Math.min(4, points)) as StrengthScore;
   const hint =
     password.length < 12
-      ? "Use at least 12 characters."
+      ? "auth.passwordStrength.hints.tooShort"
       : hasRun(password) || hasSequence(password)
-        ? "Avoid repeated characters and simple sequences."
+        ? "auth.passwordStrength.hints.predictable"
         : classes < 3
-          ? "Mix uppercase, digits, or symbols."
-          : "Looks reasonable — the server makes the final call.";
-  return { score, hint };
+          ? "auth.passwordStrength.hints.addVariety"
+          : "auth.passwordStrength.hints.reasonable";
+  return { score, hintKey: hint };
 }

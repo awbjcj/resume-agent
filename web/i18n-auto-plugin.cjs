@@ -20,6 +20,7 @@ UI_PROPS.add("message");
 UI_PROPS.add("note");
 const UI_VARIABLE = /(action|badge|caption|date|description|detail|empty|error|eyebrow|fallback|heading|help|hint|label|message|notice|note|placeholder|progress|reason|status|subtitle|success|suffix|summary|text|title)$/i;
 const UI_COLLECTION = /(actions|cards|columns|copy|descriptions|details|errors|fields|filters|items|kinds|labels|messages|meta|modalities|names|nav|options|outcomes|parts|results|rows|scopes|sections|stages|statuses|steps|tabs|titles)$/i;
+const I18N_KEY = /^[a-z][a-z0-9]*(?:\.[a-z0-9_-]+)+$/i;
 const variableInit = (declaration) => {
   let init = declaration.get("init");
   while (init.isTSAsExpression() || init.isTSSatisfiesExpression() || init.isTypeCastExpression()) init = init.get("expression");
@@ -267,14 +268,20 @@ const isTranslationKey = (pathRef) => {
   return (callee.type === "Identifier" && callee.name === "t")
     || (callee.type === "MemberExpression" && callee.property.type === "Identifier" && callee.property.name === "t");
 };
+const isTemplateFragment = (pathRef) => {
+  const template = pathRef.findParent((candidate) => candidate.isTemplateLiteral() || candidate.isFunction());
+  return Boolean(template?.isTemplateLiteral() && isLocalizable(template));
+};
 const isLocalizable = (pathRef) => {
   if (pathRef.isJSXText()) return isHumanText(pathRef.node.value);
   if (!pathRef.isStringLiteral() && !pathRef.isTemplateLiteral()) return false;
   if (pathRef.findParent((candidate) => candidate.isTSLiteralType() || candidate.isTSTypeAnnotation() || candidate.isTSUnionType())) return false;
   const value = pathRef.isTemplateLiteral() ? templateSource(pathRef.node) : pathRef.node.value;
+  if (I18N_KEY.test(value)) return false;
   if (!isHumanText(value)) return false;
   if (pathRef.parentPath?.isMemberExpression() && pathRef.key === "property") return false;
   if (isTranslationKey(pathRef)) return false;
+  if (!pathRef.isTemplateLiteral() && isTemplateFragment(pathRef)) return false;
   const parent = pathRef.parentPath;
   const attribute = jsxAttribute(pathRef);
   if (attribute) {
@@ -287,7 +294,6 @@ const isLocalizable = (pathRef) => {
   if (uiDefaultParameter(pathRef)) return true;
   const variable = directVariable(pathRef);
   if (variable && !variable.array && UI_VARIABLE.test(variable.name)) return true;
-  if (variable?.array && UI_COLLECTION.test(variable.name)) return true;
   if (uiCollectionValue(pathRef)) return true;
   return namedUiFunction(pathRef);
 };

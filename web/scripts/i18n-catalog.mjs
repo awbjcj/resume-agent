@@ -11,9 +11,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(root, "src");
 const catalogPath = path.join(sourceRoot, "i18n", "auto-catalog.json");
 
-const EXACT_TRANSLATIONS = {
+// These are the terms where product context matters more than a literal
+// translation. They are deliberately authored and checked against the catalog;
+// the catalog is never generated from a translation service.
+const FIXED_ZH_CN_TRANSLATIONS = {
   "100% · done": "100% · 已完成",
   "Any annual salary": "不限年薪",
+  "Apps": "应用",
   "Annual bonus": "年度奖金",
   "Avg fit in view": "当前视图平均匹配度",
   "Awaiting review": "等待审核",
@@ -68,6 +72,16 @@ const EXACT_TRANSLATIONS = {
   "Not reported": "未报告",
   "Not shown": "未体现",
   "Open gaps": "未补足差距",
+  "Offer": "录用通知",
+  "Offer %": "录用通知占比",
+  "Offer application ids": "录用通知对应的申请 ID",
+  "Offer comparison": "录用通知对比",
+  "Offer comparison references": "录用通知对比参考",
+  "Offer deadline": "录用通知截止日期",
+  "Offer deadline: {{v0}}": "录用通知截止日期：{{v0}}",
+  "Offer received": "已收到录用通知",
+  "Offers": "录用通知",
+  "offer": "录用通知",
   "Nothing is waiting on you": "目前没有需要你处理的事项",
   "Per-pull job limit for {{v0}}": "{{v0}} 每次获取的职位上限",
   "Proposal": "建议",
@@ -95,6 +109,7 @@ const EXACT_TRANSLATIONS = {
   "Select {{v0}} {{v1}}": "选择 {{v0}} {{v1}}",
   "Tech {{v0}}": "技术面试 {{v0}}",
   "Tech": "技术",
+  "Warm": "亲和",
   "{{v0}} / {{v1}}": "{{v0}} / {{v1}}",
   "{{v0}} job{{v1}}": "{{v0}} 个职位",
   "{{v0}} percent": "百分之 {{v0}}",
@@ -120,17 +135,6 @@ const EXACT_TRANSLATIONS = {
   "{{v0}} job{{v1}} waiting on you": "有 {{v0}} 个职位等待你处理",
   "{{v0}}…": "{{v0}}…",
 };
-
-function refineTranslation(source, translation) {
-  if (EXACT_TRANSLATIONS[source]) return EXACT_TRANSLATIONS[source];
-  let refined = translation;
-  if (/\bjobs?\b/i.test(source)) refined = refined.replaceAll("作业", "职位").replaceAll("工作", "职位");
-  if (/\bprofiles?\b/i.test(source)) refined = refined.replaceAll("配置文件", "个人资料");
-  if (/\bapplications?\b/i.test(source)) refined = refined.replaceAll("应用程序", "申请");
-  if (/\bresumes?\b/i.test(source)) refined = refined.replaceAll("恢复", "简历");
-  if (/\btailor(?:ed|ing)?\b/i.test(source)) refined = refined.replaceAll("剪裁", "定制");
-  return refined;
-}
 
 const UI_PROPS = new Set([
   "actionLabel",
@@ -167,6 +171,48 @@ const UI_PROPS = new Set([
 
 const UI_VARIABLE = /(action|badge|caption|date|description|detail|empty|error|eyebrow|fallback|heading|help|hint|label|message|notice|note|placeholder|progress|reason|status|subtitle|success|suffix|summary|text|title)$/i;
 const UI_COLLECTION = /(actions|cards|columns|copy|descriptions|details|errors|fields|filters|items|kinds|labels|messages|meta|modalities|names|nav|options|outcomes|parts|results|rows|scopes|sections|stages|statuses|steps|tabs|titles)$/i;
+const I18N_KEY = /^[a-z][a-z0-9]*(?:\.[a-z0-9_-]+)+$/i;
+const UNCHANGED_ZH_CN_SOURCES = new Set([
+  "00:00 UTC",
+  "acme",
+  "Acme",
+  "America/New_York",
+  "Ashby",
+  "ATS",
+  "BambooHR",
+  "Breezy HR",
+  "CoderPad",
+  "CodeSignal",
+  "GitHub",
+  "Gmail",
+  "Google",
+  "Google Meet",
+  "Greenhouse",
+  "HackerRank",
+  "JazzHR",
+  "Karat",
+  "Lever",
+  "Microsoft Teams",
+  "n=",
+  "OA",
+  "Personio",
+  "portfolio, flagship-project",
+  "Recruitee",
+  "Resume Agent",
+  "SmartRecruiters",
+  "wd5",
+  "Webex",
+  "Workable",
+  "Workday",
+]);
+
+function isI18nKey(value) {
+  return I18N_KEY.test(value);
+}
+
+function isFormattingOnly(value) {
+  return /^[\s·•—#%→/…{}v\d–]+$/.test(value);
+}
 
 function variableInit(declaration) {
   let init = declaration.get("init");
@@ -459,14 +505,21 @@ function isTranslationKey(pathRef) {
     || (callee.type === "MemberExpression" && callee.property.type === "Identifier" && callee.property.name === "t");
 }
 
+function isTemplateFragment(pathRef) {
+  const template = pathRef.findParent((candidate) => candidate.isTemplateLiteral() || candidate.isFunction());
+  return Boolean(template?.isTemplateLiteral() && isLocalizableStringPath(template));
+}
+
 export function isLocalizableStringPath(pathRef) {
   if (pathRef.isJSXText()) return isHumanText(pathRef.node.value);
   if (!pathRef.isStringLiteral() && !pathRef.isTemplateLiteral()) return false;
   if (pathRef.findParent((candidate) => candidate.isTSLiteralType() || candidate.isTSTypeAnnotation() || candidate.isTSUnionType())) return false;
   const value = pathRef.isTemplateLiteral() ? templateSource(pathRef.node) : pathRef.node.value;
+  if (isI18nKey(value)) return false;
   if (!isHumanText(value)) return false;
   if (pathRef.parentPath?.isMemberExpression() && pathRef.key === "property") return false;
   if (isTranslationKey(pathRef)) return false;
+  if (!pathRef.isTemplateLiteral() && isTemplateFragment(pathRef)) return false;
 
   const parent = pathRef.parentPath;
   const attribute = jsxAttribute(pathRef);
@@ -481,7 +534,6 @@ export function isLocalizableStringPath(pathRef) {
 
   const variable = directVariable(pathRef);
   if (variable && !variable.array && UI_VARIABLE.test(variable.name)) return true;
-  if (variable?.array && UI_COLLECTION.test(variable.name)) return true;
   if (uiCollectionValue(pathRef)) return true;
   return namedUiFunction(pathRef);
 }
@@ -561,15 +613,6 @@ function stableKey(source) {
   return `ui_${createHash("sha256").update(source).digest("hex").slice(0, 12)}`;
 }
 
-function refineCatalog() {
-  for (const [source, entry] of Object.entries(catalog)) {
-    entry["zh-CN"] = refineTranslation(source, entry["zh-CN"]);
-  }
-  const sorted = Object.fromEntries(Object.entries(catalog).sort(([left], [right]) => left.localeCompare(right)));
-  fs.writeFileSync(catalogPath, `${JSON.stringify(sorted, null, 2)}\n`);
-  console.log(`Refined ${Object.keys(sorted).length} catalog entries.`);
-}
-
 function pruneCatalog() {
   const pruned = Object.fromEntries(
     Object.entries(catalog)
@@ -578,6 +621,19 @@ function pruneCatalog() {
   );
   fs.writeFileSync(catalogPath, `${JSON.stringify(pruned, null, 2)}\n`);
   console.log(`Pruned catalog to ${Object.keys(pruned).length} current UI entries.`);
+}
+
+function applyFixedTranslations() {
+  let updated = 0;
+  for (const [source, zhCN] of Object.entries(FIXED_ZH_CN_TRANSLATIONS)) {
+    const entry = catalog[source];
+    if (!entry || entry["zh-CN"] === zhCN) continue;
+    entry["zh-CN"] = zhCN;
+    updated += 1;
+  }
+  const sorted = Object.fromEntries(Object.entries(catalog).sort(([left], [right]) => left.localeCompare(right)));
+  fs.writeFileSync(catalogPath, `${JSON.stringify(sorted, null, 2)}\n`);
+  console.log(`Applied ${updated} fixed Simplified Chinese translations.`);
 }
 
 function validateCatalog() {
@@ -590,6 +646,12 @@ function validateCatalog() {
     }
     if (keys.has(entry.key)) invalid.push(source);
     keys.add(entry.key);
+    if (FIXED_ZH_CN_TRANSLATIONS[source] && entry["zh-CN"] !== FIXED_ZH_CN_TRANSLATIONS[source]) {
+      invalid.push(source);
+    }
+    if (entry["zh-CN"] === source && !isFormattingOnly(source) && !UNCHANGED_ZH_CN_SOURCES.has(source)) {
+      invalid.push(source);
+    }
     const sourceVariables = new Set(source.match(/\{\{v\d+\}\}/g) ?? []);
     const translatedVariables = entry["zh-CN"].match(/\{\{v\d+\}\}/g) ?? [];
     if (translatedVariables.some((variable) => !sourceVariables.has(variable))) invalid.push(source);
@@ -599,8 +661,8 @@ function validateCatalog() {
 
 const keyFlagIndex = process.argv.indexOf("--key");
 
-if (process.argv.includes("--refine")) {
-  refineCatalog();
+if (process.argv.includes("--apply-fixed")) {
+  applyFixedTranslations();
 } else if (process.argv.includes("--prune")) {
   pruneCatalog();
 } else if (process.argv.includes("--unclassified")) {
@@ -628,8 +690,14 @@ if (process.argv.includes("--refine")) {
       console.error(`- ${JSON.stringify(source)} (${locations.slice(0, 3).join(", ")})`);
     }
   }
-  if (stale.length) console.error(`Catalog contains ${stale.length} unused entries.`);
-  if (invalid.length) console.error(`Catalog contains ${invalid.length} invalid entries.`);
+  if (stale.length) {
+    console.error(`Catalog contains ${stale.length} unused entries:`);
+    for (const source of stale) console.error(`- ${JSON.stringify(source)}`);
+  }
+  if (invalid.length) {
+    console.error(`Catalog contains ${invalid.length} invalid entries:`);
+    for (const source of invalid) console.error(`- ${JSON.stringify(source)}`);
+  }
   if (!missing.length && !stale.length && !invalid.length) {
     console.log(`i18n catalog covers ${candidates.size} user-facing literals.`);
   }

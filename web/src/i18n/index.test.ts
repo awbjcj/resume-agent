@@ -38,5 +38,6 @@ describe("i18n locale resolution", () => {
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("zh-CN");
     expect(document.documentElement.lang).toBe("zh-CN");
     expect(document.documentElement.dir).toBe("ltr");
+    expect(document.title).toBe("求职助手");
   });
 });
