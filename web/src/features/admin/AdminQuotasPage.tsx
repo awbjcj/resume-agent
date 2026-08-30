@@ -55,6 +55,7 @@ import {
   RATE_COST_BAND_LABEL_KEYS,
   RATE_COST_BAND_STYLES,
   RATE_SORT_LABEL_KEYS,
+  RATE_VERSION_STATUS_LABEL_KEYS,
   rateCostBand,
   rateVersionStatus,
   type LlmRate,
@@ -379,7 +380,7 @@ function RateVersionsTable({ rates }: { rates: LlmRate[] }) {
               <TableCell>
                 <div className="flex items-center gap-2">
                   <span className="font-mono">{new Date(rate.effectiveFrom).toLocaleDateString()}</span>
-                  <Badge variant="outline" className="h-5 px-1.5 text-[0.65rem]">{t(`adminQuota.rate.statuses.${status}`)}</Badge>
+                  <Badge variant="outline" className="h-5 px-1.5 text-[0.65rem]">{t(RATE_VERSION_STATUS_LABEL_KEYS[status])}</Badge>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {rate.effectiveTo

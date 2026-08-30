@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { formatCalendarDate } from "@/lib/calendar-date";
 import {
+  ApplicationTimelineStage,
   applicationModalityLabel,
   applicationPlatformLabel,
   applicationResultLabel,
@@ -25,22 +26,22 @@ import type { ApplicationsTableData } from "./use-applications";
 type PivotCell = ApplicationsTableData["rows"][number]["cells"][string];
 
 const FIXED_STAGES = [
-  "application_submitted",
-  "recruiter_screen",
-  "online_assessment",
-  "questionnaire",
-  "technical_phone_screen",
+  ApplicationTimelineStage.ApplicationSubmitted,
+  ApplicationTimelineStage.RecruiterScreen,
+  ApplicationTimelineStage.OnlineAssessment,
+  ApplicationTimelineStage.Questionnaire,
+  ApplicationTimelineStage.TechnicalPhoneScreen,
 ] as const;
 
 const LATE_STAGES = [
-  "system_design",
-  "behavioral",
-  "hiring_manager",
-  "onsite_loop",
-  "team_match",
-  "offer_received",
-  "rejected",
-  "withdrawn",
+  ApplicationTimelineStage.SystemDesign,
+  ApplicationTimelineStage.Behavioral,
+  ApplicationTimelineStage.HiringManager,
+  ApplicationTimelineStage.OnsiteLoop,
+  ApplicationTimelineStage.TeamMatch,
+  ApplicationTimelineStage.OfferReceived,
+  ApplicationTimelineStage.Rejected,
+  ApplicationTimelineStage.Withdrawn,
 ] as const;
 
 function compactDate(value: string, allDay = false): string {

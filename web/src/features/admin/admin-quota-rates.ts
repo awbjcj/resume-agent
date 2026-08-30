@@ -50,7 +50,17 @@ export const RATE_SORT_LABEL_KEYS: Record<RateSortKey, string> = {
   effective: "adminQuota.rate.sort.effective",
 };
 
-export type RateVersionStatus = "active" | "scheduled" | "historical";
+export enum RateVersionStatus {
+  Active = "active",
+  Scheduled = "scheduled",
+  Historical = "historical",
+}
+
+export const RATE_VERSION_STATUS_LABEL_KEYS: Record<RateVersionStatus, string> = {
+  [RateVersionStatus.Active]: "adminQuota.rate.statuses.active",
+  [RateVersionStatus.Scheduled]: "adminQuota.rate.statuses.scheduled",
+  [RateVersionStatus.Historical]: "adminQuota.rate.statuses.historical",
+};
 
 export function rateCostBand(rate: LlmRate): RateCostBand {
   const referenceMicros = rate.inputMicrosPerMillion + rate.outputMicrosPerMillion;
@@ -60,9 +70,9 @@ export function rateCostBand(rate: LlmRate): RateCostBand {
 }
 
 export function rateVersionStatus(rate: LlmRate, now = Date.now()): RateVersionStatus {
-  if (new Date(rate.effectiveFrom).getTime() > now) return "scheduled";
-  if (rate.effectiveTo && new Date(rate.effectiveTo).getTime() <= now) return "historical";
-  return "active";
+  if (new Date(rate.effectiveFrom).getTime() > now) return RateVersionStatus.Scheduled;
+  if (rate.effectiveTo && new Date(rate.effectiveTo).getTime() <= now) return RateVersionStatus.Historical;
+  return RateVersionStatus.Active;
 }
 
 function compareNullable(a: number | null, b: number | null, direction: SortDirection): number {

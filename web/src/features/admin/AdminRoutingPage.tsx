@@ -80,7 +80,7 @@ export function AdminRoutingPage() {
     return (
       <Alert variant="destructive">
         <AlertTitle>Routing is unavailable</AlertTitle>
-          <AlertDescription>{routing.error ? providerConfigurationErrorLabel(t, routing.error.message) : "Please try again."}</AlertDescription>
+          <AlertDescription>{routing.error ? providerConfigurationErrorLabel(t, routing.error.message) : t("providerRouting.errors.retry")}</AlertDescription>
       </Alert>
     );
   }

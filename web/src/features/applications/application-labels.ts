@@ -1,5 +1,25 @@
 import type { TFunction } from "i18next";
 
+export enum ApplicationTimelineStage {
+  ApplicationSubmitted = "application_submitted",
+  RecruiterScreen = "recruiter_screen",
+  OnlineAssessment = "online_assessment",
+  Questionnaire = "questionnaire",
+  TechnicalPhoneScreen = "technical_phone_screen",
+  TechnicalRound = "technical_round",
+  SystemDesign = "system_design",
+  Behavioral = "behavioral",
+  HiringManager = "hiring_manager",
+  OnsiteLoop = "onsite_loop",
+  TeamMatch = "team_match",
+  OfferReceived = "offer_received",
+  OfferDeadline = "offer_deadline",
+  Rejected = "rejected",
+  NoResponse = "no_response",
+  Withdrawn = "withdrawn",
+  Custom = "custom",
+}
+
 const STATUS_LABEL_KEYS: Record<string, string> = {
   ready: "application.statuses.ready",
   submitted: "application.statuses.submitted",
