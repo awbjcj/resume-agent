@@ -7,14 +7,17 @@ from typing import Literal
 
 from sqlmodel import Session
 
-from resume_agent.company_intelligence.models import CompanyVerificationState
+from resume_agent.company_intelligence.models import (
+    CompanyIntelligenceEvidence,
+    CompanyVerificationState,
+)
 from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.role_comparison.models import (
     CompanyEvidenceComparison,
     RoleComparisonItem,
 )
-from resume_agent.services.company_intelligence import load_company_intelligence
+from resume_agent.services.company_intelligence import load_company_intelligence_many
 from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tracking.status_rules import TERMINAL
 from resume_agent.tracking.timeline_pivot import build_pivot
@@ -26,8 +29,9 @@ class InactiveRoleComparisonError(ValueError):
     """Selected applications include a terminal funnel state."""
 
 
-def _company_projection(session: Session, company: str | None, now: datetime):
-    evidence = load_company_intelligence(session, company or "")
+def _company_projection(
+    evidence: CompanyIntelligenceEvidence | None, now: datetime
+) -> CompanyEvidenceComparison:
     if evidence is None:
         return CompanyEvidenceComparison(state="not_researched")
     verification_states: list[CompanyVerificationState] = [
@@ -61,7 +65,9 @@ def compare_roles(
     requested = list(dict.fromkeys(job_ids))
     if len(requested) not in {2, 3}:
         raise ValueError("choose two or three distinct jobs")
-    rows_by_id = {row.job_id: row for row in build_pivot(session).rows}
+    rows_by_id = {
+        row.job_id: row for row in build_pivot(session, job_ids=requested).rows
+    }
     missing = [job_id for job_id in requested if job_id not in rows_by_id]
     if missing:
         raise LookupError(
@@ -75,6 +81,9 @@ def compare_roles(
             + ", ".join(str(value) for value in inactive)
         )
     h1b = load_company_evidence(session, [row.company for row in rows])
+    company_evidence = load_company_intelligence_many(
+        session, [row.company for row in rows]
+    )
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
@@ -85,7 +94,9 @@ def compare_roles(
             title=row.title,
             fit_score=row.fit_score,
             application_status=row.status,
-            company_evidence=_company_projection(session, row.company, moment),
+            company_evidence=_company_projection(
+                company_evidence.get(normalize_company(row.company) or ""), moment
+            ),
             h1b_status=_h1b_status(row.company, h1b),
             offer_total=row.total_comp,
             offer_currency=row.comp_currency,

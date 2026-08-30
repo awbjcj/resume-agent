@@ -158,3 +158,16 @@ def test_archived_jobs_are_excluded_and_undated_applications_remain():
     table = build_pivot(session)
     assert [row.company for row in table.rows] == ["Undated"]
     assert table.rows[0].cells == {}
+
+
+def test_pivot_can_scope_the_canonical_projection_to_selected_jobs():
+    session = _session()
+    selected_job, selected = _application(session, "Selected")
+    _event(session, selected, "recruiter_screen", 20)
+    _application(session, "Unrelated")
+
+    table = build_pivot(session, job_ids=[_persisted_id(selected_job.id)])
+
+    assert [row.company for row in table.rows] == ["Selected"]
+    assert "recruiter_screen" in table.rows[0].cells
+    assert build_pivot(session, job_ids=[]).rows == []

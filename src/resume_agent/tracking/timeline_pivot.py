@@ -7,6 +7,7 @@ export, and lossless event export cannot silently disagree.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import logging
@@ -96,12 +97,19 @@ def build_pivot(
     session: Session,
     *,
     max_technical_rounds: int | None = 6,
+    job_ids: Collection[int] | None = None,
 ) -> PivotTable:
-    application_rows = session.exec(
+    query = (
         select(Application, Job)
         .join(Job, col(Application.job_id) == Job.id)
         .where(col(Job.archived_at).is_(None))
-    ).all()
+    )
+    if job_ids is not None:
+        scoped_ids = set(job_ids)
+        if not scoped_ids:
+            return PivotTable(rows=[], technical_round_columns=0, overflow_by_job={})
+        query = query.where(col(Job.id).in_(scoped_ids))
+    application_rows = session.exec(query).all()
     application_ids = [
         application.id
         for application, _ in application_rows
