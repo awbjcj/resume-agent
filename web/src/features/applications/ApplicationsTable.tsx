@@ -20,6 +20,7 @@ import {
   applicationResultLabel,
   applicationStageLabel,
   applicationStatusLabel,
+  isActiveApplicationStatus,
 } from "./application-labels";
 import type { ApplicationsTableData } from "./use-applications";
 
@@ -117,7 +118,11 @@ export function ApplicationsTable({
         </caption>
         <TableHeader>
           <TableRow>
-            {onToggleSelection ? <TableHead className="sticky left-0 z-20 w-20 bg-card">Compare</TableHead> : null}
+            {onToggleSelection ? (
+              <TableHead className="sticky left-0 z-20 w-20 bg-card">
+                {t("applications.comparison.column")}
+              </TableHead>
+            ) : null}
             <TableHead className={`sticky ${onToggleSelection ? "left-20" : "left-0"} z-10 min-w-44 bg-card`}>{t("applicationTimeline.headers.company")}</TableHead>
             <TableHead className="min-w-44">{t("applicationTimeline.headers.role")}</TableHead>
             <TableHead>{t("applicationTimeline.headers.status")}</TableHead>
@@ -134,19 +139,32 @@ export function ApplicationsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {table.rows.map((row) => (
-            <TableRow key={row.jobId}>
-              {onToggleSelection ? (
-                <TableCell className="sticky left-0 z-10 bg-card">
-                  <input
-                    type="checkbox"
-                    checked={selectedJobIds.includes(row.jobId)}
-                    aria-label={`Select ${row.company || "unknown company"} ${row.title || "role"} for comparison`}
-                    onChange={() => onToggleSelection(row.jobId)}
-                    className="size-4 rounded border-input accent-primary"
-                  />
-                </TableCell>
-              ) : null}
+          {table.rows.map((row) => {
+            const canCompare = isActiveApplicationStatus(row.status);
+            return (
+              <TableRow key={row.jobId}>
+                {onToggleSelection ? (
+                  <TableCell className="sticky left-0 z-10 bg-card">
+                    <input
+                      type="checkbox"
+                      checked={selectedJobIds.includes(row.jobId)}
+                      disabled={!canCompare}
+                      aria-label={
+                        canCompare
+                          ? t("applications.comparison.selectRole", {
+                              company: row.company || t("applicationTimeline.unknownCompany"),
+                              role: row.title || t("applications.comparison.unknownRole"),
+                            })
+                          : t("applications.comparison.terminalRole", {
+                              company: row.company || t("applicationTimeline.unknownCompany"),
+                              role: row.title || t("applications.comparison.unknownRole"),
+                            })
+                      }
+                      onChange={() => onToggleSelection(row.jobId)}
+                      className="size-4 rounded border-input accent-primary"
+                    />
+                  </TableCell>
+                ) : null}
               <TableCell className={`sticky ${onToggleSelection ? "left-20" : "left-0"} z-[1] max-w-52 bg-card font-medium`}>
                 <Link
                   to={`/pipeline?job=${row.jobId}`}
@@ -188,8 +206,9 @@ export function ApplicationsTable({
                   : "—"}
               </TableCell>
               <TableCell>{row.customCount ? t("applicationTimeline.otherCount", { count: row.customCount }) : "—"}</TableCell>
-            </TableRow>
-          ))}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

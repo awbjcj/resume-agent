@@ -97,6 +97,10 @@ export function applicationStatusLabel(t: TFunction, value: string): string {
   return labelFor(t, STATUS_LABEL_KEYS, value);
 }
 
+export function isActiveApplicationStatus(value: string): boolean {
+  return value !== "rejected" && value !== "closed";
+}
+
 export function applicationStageLabel(t: TFunction, value: string): string {
   return labelFor(t, STAGE_LABEL_KEYS, value);
 }

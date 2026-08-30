@@ -2179,11 +2179,6 @@
     "en": "Company",
     "zh-CN": "公司"
   },
-  "Company evidence": {
-    "key": "ui_dcc0d4945596",
-    "en": "Company evidence",
-    "zh-CN": "公司证据"
-  },
   "Company identifier": {
     "key": "ui_ed3af933aea5",
     "en": "Company identifier",
@@ -2253,11 +2248,6 @@
     "key": "ui_a93dfa0450fd",
     "en": "Company, role, or location",
     "zh-CN": "公司、职位或地点"
-  },
-  "Compare": {
-    "key": "ui_e888155d8c7d",
-    "en": "Compare",
-    "zh-CN": "比较"
   },
   "Compare each version, understand its evidence choices, and pick what you will send.": {
     "key": "ui_468de5e387a7",
@@ -4314,11 +4304,6 @@
     "en": "H-1B disabled",
     "zh-CN": "H-1B 已禁用"
   },
-  "H-1B evidence": {
-    "key": "ui_1b8320e6bfa3",
-    "en": "H-1B evidence",
-    "zh-CN": "H-1B 证据"
-  },
   "H-1B filings": {
     "key": "ui_3f65783b8a94",
     "en": "H-1B filings",
@@ -4939,11 +4924,6 @@
     "en": "Latest activity",
     "zh-CN": "最新动态"
   },
-  "Latest offer": {
-    "key": "ui_029fbe75fbad",
-    "en": "Latest offer",
-    "zh-CN": "最新录用方案"
-  },
   "Latest pull result": {
     "key": "ui_aa8977b17196",
     "en": "Latest pull result",
@@ -5509,11 +5489,6 @@
     "en": "Mint a single-use code for a new member account.",
     "zh-CN": "为新成员账户生成一次性邀请码。"
   },
-  "Missing values stay explicit; this table does not call a model or guess an answer.": {
-    "key": "ui_a956927b44a4",
-    "en": "Missing values stay explicit; this table does not call a model or guess an answer.",
-    "zh-CN": "缺失值会明确显示；此表不会调用模型或猜测答案。"
-  },
   "Mission control": {
     "key": "ui_e38bc0efbbc7",
     "en": "Mission control",
@@ -6059,11 +6034,6 @@
     "en": "no sponsor",
     "zh-CN": "无担保方"
   },
-  "No structured offer": {
-    "key": "ui_0faa90317789",
-    "en": "No structured offer",
-    "zh-CN": "无结构化录用方案"
-  },
   "No tailored resume yet": {
     "key": "ui_37ca536f424b",
     "en": "No tailored resume yet",
@@ -6163,11 +6133,6 @@
     "key": "ui_8c76ce5e65e7",
     "en": "not scored",
     "zh-CN": "不计分"
-  },
-  "Not scored": {
-    "key": "ui_8d57c61c5029",
-    "en": "Not scored",
-    "zh-CN": "未评分"
   },
   "Not set": {
     "key": "ui_4895f73177ab",
@@ -8164,11 +8129,6 @@
     "en": "Role anchors",
     "zh-CN": "角色锚点"
   },
-  "Role comparison": {
-    "key": "ui_0bbda8711642",
-    "en": "Role comparison",
-    "zh-CN": "职位比较"
-  },
   "Role comparison controls": {
     "key": "ui_84afe9661cb5",
     "en": "Role comparison controls",
@@ -8583,11 +8543,6 @@
     "key": "ui_50892b4ef2f5",
     "en": "Select {{v0}} {{v1}}",
     "zh-CN": "选择 {{v0}} {{v1}}"
-  },
-  "Select {{v0}} {{v1}} for comparison": {
-    "key": "ui_13e16743b50c",
-    "en": "Select {{v0}} {{v1}} for comparison",
-    "zh-CN": "选择 {{v0}} 的 {{v1}} 进行比较"
   },
   "Select {{v0}} domain": {
     "key": "ui_b0539a995882",
@@ -9413,11 +9368,6 @@
     "key": "ui_3d591e826d54",
     "en": "Stop recording",
     "zh-CN": "停止录音"
-  },
-  "Stored evidence only": {
-    "key": "ui_69cb960e48b8",
-    "en": "Stored evidence only",
-    "zh-CN": "仅使用已存证据"
   },
   "Story prompt:": {
     "key": "ui_757fc1f36373",
@@ -10433,11 +10383,6 @@
     "key": "ui_3e4443e52275",
     "en": "unknown error",
     "zh-CN": "未知错误"
-  },
-  "Unknown role": {
-    "key": "ui_1db2d66a8edb",
-    "en": "Unknown role",
-    "zh-CN": "未知职位"
   },
   "Unlimited": {
     "key": "ui_11dde17d6c3e",

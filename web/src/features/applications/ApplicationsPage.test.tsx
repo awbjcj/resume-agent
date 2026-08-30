@@ -113,5 +113,31 @@ describe("ApplicationsPage", () => {
     expect(screen.getByText("Historical filing match")).toBeInTheDocument();
     expect(screen.getByText("210,000 USD")).toBeInTheDocument();
     expect((await axe(container)).violations).toEqual([]);
+
+    await changeLanguage("zh-CN");
+    expect(await screen.findByText("深入 · 4 个来源 · 多方印证 · 当前有效")).toBeInTheDocument();
+    expect(screen.getByText("找到历史申报记录")).toBeInTheDocument();
+  });
+
+  it("does not allow terminal applications to be selected for comparison", async () => {
+    await changeLanguage("en");
+    const rows = [
+      table.rows[0],
+      {
+        ...table.rows[0],
+        jobId: 43,
+        company: "Globex",
+        title: "Closed role",
+        status: "rejected",
+      },
+    ];
+    server.use(http.get("/api/applications", () => HttpResponse.json({ ...table, rows })));
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter><ApplicationsPage /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("checkbox", { name: /globex closed role is closed/i })).toBeDisabled();
   });
 });
