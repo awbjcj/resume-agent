@@ -100,11 +100,11 @@ describe("ChatThread", () => {
       <ChatThread
         messages={[{ id: "a", role: "assistant", parts: [{ kind: "text", text: "hello" }] }]}
         streaming={null}
-        assistantName="Profile coach"
+        assistantName="Profile Coach"
         assistantIcon={<span data-testid="coach-icon" />}
       />,
     );
-    expect(screen.getByText("Profile coach")).toBeInTheDocument();
+    expect(screen.getByText("Profile Coach")).toBeInTheDocument();
     expect(screen.getByTestId("coach-icon")).toBeInTheDocument();
   });
 });

@@ -297,7 +297,7 @@ PROMPT_SPECS = (
     ),
     _spec(
         "coach",
-        "Profile coach",
+        "Profile Coach",
         "profile",
         "Runs evidence-locked profile coaching.",
         coach._COACH_INSTRUCTIONS,

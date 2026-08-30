@@ -131,7 +131,7 @@ describe("CoachPage", () => {
   it("renders the active coaching thread and agenda", () => {
     render(<CoachPage />);
 
-    expect(screen.getByRole("heading", { name: "Profile coach" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Profile Coach" })).toBeInTheDocument();
     expect(screen.getAllByText("What changed after you shipped it?")).toHaveLength(2);
     expect(screen.getByText("In progress")).toBeInTheDocument();
     expect(screen.getByText(/Missing outcome/)).toBeInTheDocument();
@@ -143,7 +143,7 @@ describe("CoachPage", () => {
     coachState.useDefaultSession = false;
     render(<CoachPage />);
 
-    expect(screen.getByText("Profile coach workspace")).toBeInTheDocument();
+    expect(screen.getByText("Find the evidence your profile is missing")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start coaching session" })).toBeInTheDocument();
     expect(screen.queryByText("What changed after you shipped it?")).not.toBeInTheDocument();
   });
@@ -152,7 +152,7 @@ describe("CoachPage", () => {
     const user = userEvent.setup();
     render(<CoachPage />);
 
-    const composer = screen.getByLabelText("Message your profile coach");
+    const composer = screen.getByLabelText("Message your Profile Coach");
     await user.type(composer, "It reduced cycle time by 30%.");
     await user.click(screen.getByRole("button", { name: "Send message" }));
 
@@ -169,7 +169,7 @@ describe("CoachPage", () => {
     sendMessage.mockResolvedValue({ runId: "run-stream" });
     const user = userEvent.setup();
     render(<CoachPage />);
-    await user.type(screen.getByLabelText("Message your profile coach"), "Evidence");
+    await user.type(screen.getByLabelText("Message your Profile Coach"), "Evidence");
     await user.click(screen.getByRole("button", { name: "Send message" }));
     await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
     act(() =>
@@ -217,7 +217,7 @@ describe("CoachPage", () => {
     render(<CoachPage />);
     await user.click(screen.getByRole("button", { name: /^Coaching · 7\/15\/2026/i }));
 
-    expect(screen.queryByLabelText("Message your profile coach")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Message your Profile Coach")).not.toBeInTheDocument();
     expect(screen.getByText(coachState.recap)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start another session/i })).toBeInTheDocument();
   });

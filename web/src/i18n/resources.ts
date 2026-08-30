@@ -123,7 +123,7 @@ const en = {
     dashboard: "Dashboard",
     prepare: "Prepare",
     profile: "Profile",
-    profileCoach: "Profile coach",
+    profileCoach: "Profile Coach",
     mockInterviews: "Mock interviews",
     careerLab: "Career Lab",
     findAndTailor: "Find & tailor",

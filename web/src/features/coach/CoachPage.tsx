@@ -232,7 +232,7 @@ export function CoachPage() {
   }
 
   if (sessions.isError || (displayedSessionId && session.isError)) {
-    return <RunError message="Profile coach data could not be loaded." onRetry={() => { void sessions.refetch(); void session.refetch(); }} />;
+    return <RunError message="Profile Coach data could not be loaded." onRetry={() => { void sessions.refetch(); void session.refetch(); }} />;
   }
 
   const active = session.data;
@@ -285,12 +285,12 @@ export function CoachPage() {
     : undefined;
 
   return (
-    <div className={cn("flex flex-col gap-8", CHAT_PAGE_WIDTH)}>
+    <div className={cn("space-y-6", CHAT_PAGE_WIDTH)}>
       <GuidedWorkspaceHeader
         tone="coach"
         icon={<Sparkles />}
         eyebrow="Guided evidence discovery"
-        title="Profile coach"
+        title="Profile Coach"
         description="Turn overlooked outcomes, scope, and project evidence into grounded profile notes."
         meta={<>
           <Badge variant={active?.status === "active" ? "secondary" : "outline"}>{active?.status === "active" ? "Session live" : active?.status === "ended" ? "Session complete" : "Ready when you are"}</Badge>
@@ -324,25 +324,18 @@ export function CoachPage() {
         ) : null}</>}
       />
 
-      {runError && runState !== "error" ? <Alert variant="destructive"><AlertTitle>Profile coach error</AlertTitle><AlertDescription>{runError}</AlertDescription></Alert> : null}
+      {runError && runState !== "error" ? <Alert variant="destructive"><AlertTitle>Profile Coach error</AlertTitle><AlertDescription>{runError}</AlertDescription></Alert> : null}
 
       {!active ? (
-        <Card className="min-w-0 overflow-hidden rounded-2xl">
-          <CardHeader className="border-b bg-muted/20">
-            <div className="flex items-center gap-2">
-              <Bot className="size-5 text-primary" aria-hidden="true" />
-              <CardTitle>Profile coach workspace</CardTitle>
-            </div>
-            <CardDescription>Create a session when you are ready to turn overlooked experience into grounded profile evidence.</CardDescription>
-          </CardHeader>
-          <CardContent className={cn("flex flex-col gap-4 p-4 sm:p-6", CHAT_SURFACE_HEIGHT)}>
+        <Card className="min-w-0 overflow-hidden rounded-2xl bg-card/90">
+          <CardContent className={cn("flex flex-col gap-4", starting && attachedRunId ? "p-4 sm:p-6" : "p-0", CHAT_SURFACE_HEIGHT)}>
             {starting && attachedRunId ? (
               <>
                 <ChatThread
                   messages={[]}
                   streaming={stream.parts}
                   streamingActive={stream.status === "streaming"}
-                  assistantName="Profile coach"
+                  assistantName="Profile Coach"
                   assistantIcon={COACH_ICON}
                 />
                 {!stream.parts.length ? (
@@ -375,8 +368,11 @@ export function CoachPage() {
       ) : (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <Card className="min-w-0 overflow-hidden rounded-2xl">
-            <CardHeader className="border-b bg-muted/20 py-4">
-              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active.sessionTitle || "Coaching thread"}</CardTitle>
+            <CardHeader className="border-b bg-muted/25 py-1">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Bot className="size-5" aria-hidden="true" /></span>
+                {active.sessionTitle || "Coaching thread"}
+              </CardTitle>
               <CardDescription className="flex items-center gap-2 text-sm"><Clock3 className="size-4" aria-hidden="true" />Started {new Date(active.startedAt).toLocaleString()}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -385,7 +381,7 @@ export function CoachPage() {
                   messages={chatMessages}
                   streaming={streamingParts}
                   streamingActive={stream.status === "streaming"}
-                  assistantName="Profile coach"
+                  assistantName="Profile Coach"
                   assistantIcon={COACH_ICON}
                   renderAfter={(message) => {
                     const index = turnIndexById.get(message.id) ?? -1;
@@ -434,7 +430,7 @@ export function CoachPage() {
                 </div>
               </div>
               {active.status === "active" ? (
-                <div className="border-t bg-card p-5 sm:p-6">
+                <div className="border-t bg-card/95 p-4 sm:p-6">
                   <ChatComposer
                     value={composer}
                     onChange={setComposer}
@@ -442,7 +438,7 @@ export function CoachPage() {
                     onStop={stopMessage}
                     busy={busy}
                     settling={stream.status === "settled"}
-                    ariaLabel="Message your profile coach"
+                    ariaLabel="Message your Profile Coach"
                     placeholder="Share the situation, what you did, and what changed…"
                   />
                 </div>
@@ -460,7 +456,7 @@ export function CoachPage() {
       )}
 
       <ChatSessionHistory
-        ariaLabel="Profile coach sessions"
+        ariaLabel="Profile Coach sessions"
         items={historyItems}
         selectedId={displayedSessionId}
         onSelect={setCurrentSessionId}

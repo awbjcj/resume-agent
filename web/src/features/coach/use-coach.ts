@@ -135,7 +135,7 @@ function useCoachRunMutation<T extends Record<string, unknown>>(
         if (completed.status === "succeeded") {
           if (successMessage) toast.success(successMessage);
         } else {
-          toast.error(completed.error ?? "Profile coach run did not complete");
+          toast.error(completed.error ?? "Profile Coach run did not complete");
         }
         input.onDone?.(completed);
       });

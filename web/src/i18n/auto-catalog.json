@@ -2684,11 +2684,6 @@
     "en": "Create a session when you are ready to shape the next search.",
     "zh-CN": "准备好规划下一步求职方向时，创建一个会话。"
   },
-  "Create a session when you are ready to turn overlooked experience into grounded profile evidence.": {
-    "key": "ui_3e64171ba2fe",
-    "en": "Create a session when you are ready to turn overlooked experience into grounded profile evidence.",
-    "zh-CN": "准备好将被忽视的经历转化为扎实的个人资料证据时，创建一个会话。"
-  },
   "Create a tier to start granting members a recurring allowance.": {
     "key": "ui_0d6b1c46c1dc",
     "en": "Create a tier to start granting members a recurring allowance.",
@@ -5444,9 +5439,9 @@
     "en": "Message failed",
     "zh-CN": "消息发送失败"
   },
-  "Message your profile coach": {
-    "key": "ui_9f4a575264a6",
-    "en": "Message your profile coach",
+  "Message your Profile Coach": {
+    "key": "ui_d70dfbf8e1de",
+    "en": "Message your Profile Coach",
     "zh-CN": "给你的个人资料教练发消息"
   },
   "Metering console": {
@@ -6814,35 +6809,30 @@
     "en": "Profile built {{v0}}",
     "zh-CN": "个人资料已构建 {{v0}}"
   },
-  "Profile coach": {
-    "key": "ui_b7e6274bf3c7",
-    "en": "Profile coach",
+  "Profile Coach": {
+    "key": "ui_b471e831c7e6",
+    "en": "Profile Coach",
     "zh-CN": "个人资料教练"
   },
-  "Profile coach data could not be loaded.": {
-    "key": "ui_69ddc7070bbe",
-    "en": "Profile coach data could not be loaded.",
+  "Profile Coach data could not be loaded.": {
+    "key": "ui_04b2a127adc1",
+    "en": "Profile Coach data could not be loaded.",
     "zh-CN": "个人资料教练数据加载失败。"
   },
-  "Profile coach error": {
-    "key": "ui_847c8f10141c",
-    "en": "Profile coach error",
+  "Profile Coach error": {
+    "key": "ui_e24bc3852072",
+    "en": "Profile Coach error",
     "zh-CN": "个人资料教练出错"
   },
-  "Profile coach run did not complete": {
-    "key": "ui_fde202ea6176",
-    "en": "Profile coach run did not complete",
+  "Profile Coach run did not complete": {
+    "key": "ui_3b1d2bbb3a18",
+    "en": "Profile Coach run did not complete",
     "zh-CN": "个人资料教练任务未完成"
   },
-  "Profile coach sessions": {
-    "key": "ui_3a06aecec21e",
-    "en": "Profile coach sessions",
+  "Profile Coach sessions": {
+    "key": "ui_2a9185031239",
+    "en": "Profile Coach sessions",
     "zh-CN": "个人资料教练会话"
-  },
-  "Profile coach workspace": {
-    "key": "ui_1187cc4d63b8",
-    "en": "Profile coach workspace",
-    "zh-CN": "个人资料教练工作区"
   },
   "Profile facts built": {
     "key": "ui_6ec927ed95d1",

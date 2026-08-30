@@ -176,16 +176,16 @@ the checked-in examples.
 Everything else (the SQLite database, the `output/` and `data/` folders) is
 created automatically on first run.
 
-### Career coaching: Profile coach, Mock interviews, and Career Lab
+### Career coaching: Profile Coach, Mock interviews, and Career Lab
 
 Three coaching surfaces sit alongside the tailoring pipeline in the sidebar,
 each scoped to a different moment in the job hunt.
 
-**Profile coach** (`/coach`) reviews your current fact-lock profile, asks one
+**Profile Coach** (`/coach`) reviews your current fact-lock profile, asks one
 focused question at a time about outcomes, scope, or project evidence you may
 have left out, and drafts only claims grounded in what you actually answered:
 
-![Profile coach — guided evidence discovery](docs/screenshots/profile-coach.png)
+![Profile Coach — guided evidence discovery](docs/screenshots/profile-coach.png)
 
 **Mock interviews** (`/interview`) runs a focused rehearsal against a
 specific tailored role, then turns the conversation into a scored debrief you
