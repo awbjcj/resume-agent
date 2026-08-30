@@ -1,6 +1,7 @@
 import time
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from resume_agent.api.app import create_app
 from resume_agent.api.routers import scout as scout_router
@@ -82,10 +83,15 @@ def seed_unverified_source(tmp_path):
 
 def test_start_preallocates_session_metadata_and_launches_stream(monkeypatch, tmp_path):
     client = client_for(tmp_path)
+    lookups = []
     monkeypatch.setattr(
         "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
-    monkeypatch.setattr(scout_router, "run_start_turn", lambda reporter, **kwargs: {})
+    def run_start(_reporter, **kwargs):
+        lookups.append(kwargs["company_intelligence_lookup"])
+        return {}
+
+    monkeypatch.setattr(scout_router, "run_start_turn", run_start)
     with client:
         response = client.post("/api/scout/sessions", json={"message": "AI infra"})
         assert response.status_code == 202
@@ -97,6 +103,8 @@ def test_start_preallocates_session_metadata_and_launches_stream(monkeypatch, tm
             "turnCount": 0,
         }
         assert wait_for_run(client, body["runId"])["state"] == "done"
+        assert len(lookups) == 1
+        assert isinstance(lookups[0]._session, Session)
 
 
 def test_detail_list_message_and_end_metadata(monkeypatch, tmp_path):

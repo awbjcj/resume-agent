@@ -46,6 +46,8 @@ class ScoutSourceOut(CamelModel):
     evidence: list["ScoutEvidenceOut"] = Field(default_factory=list)
     searched_families: list[str] = Field(default_factory=list)
     unsearched_families: list[str] = Field(default_factory=list)
+    company_intelligence_status: Literal["ready", "stale", "missing"] | None = None
+    company_intelligence_version: int | None = None
 
 
 class ScoutEvidenceOut(CamelModel):

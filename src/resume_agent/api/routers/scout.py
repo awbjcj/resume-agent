@@ -6,9 +6,12 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.engine import Engine
+from sqlmodel import Session
 
 from resume_agent.api.deps import (
     get_config_store,
+    get_engine,
     get_profile_dir,
     get_run_manager,
     get_scout_dir,
@@ -16,7 +19,7 @@ from resume_agent.api.deps import (
 )
 from resume_agent.api.errors import ApiException
 from resume_agent.api.runs.conversation import with_conversation_stream
-from resume_agent.api.runs.launch import launch
+from resume_agent.api.runs.launch import launch, session_work
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.api.schemas.scout import (
@@ -48,6 +51,7 @@ from resume_agent.services.scout import (
     session_view,
     sessions_view,
 )
+from resume_agent.services.scout_intelligence import ScoutCompanyIntelligenceLookup
 
 router = APIRouter()
 _SINGLETON = "scout"
@@ -61,6 +65,10 @@ def _workspace_root(request: Request):
 def _config_paths(request: Request) -> tuple[str, str]:
     config_dir = get_config_store(request).config_dir
     return str(config_dir / "connectors.yaml"), str(config_dir / "search.yaml")
+
+
+def _intelligence_lookup(session: Session) -> ScoutCompanyIntelligenceLookup:
+    return ScoutCompanyIntelligenceLookup(session)
 
 
 def _guard_setup(settings: Settings) -> None:
@@ -85,16 +93,23 @@ def _guard_setup(settings: Settings) -> None:
 
 def _submit(
     manager: RunManager,
+    engine: Engine,
     kind: str,
     work,
     *,
     session_id: str,
     turn_count: int,
 ) -> RunOut:
+    def run_with_session(session: Session, reporter):
+        return with_conversation_stream(
+            manager,
+            lambda current_reporter, sink: work(session, current_reporter, sink),
+        )(reporter)
+
     return launch(
         manager,
         kind,
-        with_conversation_stream(manager, work),
+        session_work(engine, run_with_session),
         singleton_key=_SINGLETON,
         singleton_conflict="raise",
         busy_code="SCOUT_BUSY",
@@ -153,10 +168,12 @@ def start_session(
         raise ApiException(409, "SESSION_ACTIVE", "An active Scout session exists")
     session_id = uuid.uuid4().hex
     connectors_path, search_path = _config_paths(request)
+    engine = get_engine(request)
     return _submit(
         manager,
+        engine,
         "scout-start",
-        lambda reporter, sink: run_start_turn(
+        lambda session, reporter, sink: run_start_turn(
             reporter,
             workspace_root=workspace_root,
             session_id=session_id,
@@ -166,6 +183,7 @@ def start_session(
             profile_dir=get_profile_dir(request),
             browser_enabled=settings.browser_enabled,
             sink=sink,
+            company_intelligence_lookup=_intelligence_lookup(session),
         ),
         session_id=session_id,
         turn_count=0,
@@ -195,10 +213,12 @@ def send_message(
         raise ApiException(409, "CONFLICT", "session ended")
     _guard_setup(settings)
     connectors_path, search_path = _config_paths(request)
+    engine = get_engine(request)
     return _submit(
         manager,
+        engine,
         "scout-turn",
-        lambda reporter, sink: run_message_turn(
+        lambda session, reporter, sink: run_message_turn(
             reporter,
             workspace_root=workspace_root,
             session_id=session_id,
@@ -208,6 +228,7 @@ def send_message(
             profile_dir=get_profile_dir(request),
             browser_enabled=settings.browser_enabled,
             sink=sink,
+            company_intelligence_lookup=_intelligence_lookup(session),
         ),
         session_id=session_id,
         turn_count=len(current["turns"]),
@@ -232,10 +253,12 @@ def end_scout_session(
     if current["status"] != "active":
         raise ApiException(409, "CONFLICT", "session ended")
     connectors_path, search_path = _config_paths(request)
+    engine = get_engine(request)
     return _submit(
         manager,
+        engine,
         "scout-end",
-        lambda reporter, sink: run_recap_turn(
+        lambda session, reporter, sink: run_recap_turn(
             reporter,
             workspace_root=workspace_root,
             session_id=session_id,
@@ -244,6 +267,7 @@ def end_scout_session(
             profile_dir=get_profile_dir(request),
             browser_enabled=settings.browser_enabled,
             sink=sink,
+            company_intelligence_lookup=_intelligence_lookup(session),
         ),
         session_id=session_id,
         turn_count=len(current["turns"]),

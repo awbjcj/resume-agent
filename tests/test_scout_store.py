@@ -126,6 +126,8 @@ def test_legacy_source_payload_defaults_resolution_fields():
     assert payload.resolution_status is None
     assert payload.evidence == []
     assert payload.searched_families == []
+    assert payload.company_intelligence_status is None
+    assert payload.company_intelligence_version is None
 
 
 def test_replacement_requires_the_pending_exact_url(tmp_path):

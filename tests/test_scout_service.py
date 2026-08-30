@@ -495,6 +495,8 @@ def _seed_source_for_approval(
                     ats=ats,
                     resolution_status=resolution_status.get(check),
                     resolution_reason="OWNERSHIP_NOT_PROVEN",
+                    company_intelligence_status="ready",
+                    company_intelligence_version=3,
                 ),
                 check=check,
             )
@@ -618,6 +620,8 @@ def test_re_resolve_replaces_only_the_pending_exact_source_url(monkeypatch, tmp_
         == "https://tempus.wd5.myworkdayjobs.com/Tempus_Careers"
     )
     assert proposal["source"]["requestedUrl"] == "https://tempus.example/careers"
+    assert proposal["source"]["companyIntelligenceStatus"] == "ready"
+    assert proposal["source"]["companyIntelligenceVersion"] == 3
 
 
 def test_server_rejects_non_approvable_source_and_allows_resolution_after_end(tmp_path):

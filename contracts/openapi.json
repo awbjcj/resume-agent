@@ -11988,6 +11988,33 @@
             "title": "Company",
             "type": "string"
           },
+          "companyIntelligenceStatus": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ready",
+                  "stale",
+                  "missing"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Companyintelligencestatus"
+          },
+          "companyIntelligenceVersion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Companyintelligenceversion"
+          },
           "errorCode": {
             "anyOf": [
               {

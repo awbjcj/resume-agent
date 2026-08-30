@@ -45,6 +45,7 @@ def test_scout_command_snapshots_indexes_and_uses_shared_services(
     }
     approved = []
     dismissed = []
+    turn_lookups = []
     monkeypatch.setattr(
         cli,
         "get_settings",
@@ -54,6 +55,7 @@ def test_scout_command_snapshots_indexes_and_uses_shared_services(
             search_mode="auto",
             stream_enabled=False,
             browser_enabled=False,
+            db_url="sqlite://",
         ),
     )
     monkeypatch.setattr(cli, "missing_model_keys", lambda settings: [])
@@ -64,7 +66,11 @@ def test_scout_command_snapshots_indexes_and_uses_shared_services(
         cli, "_tenant_cli_path", lambda value: Path(tmp_path) / Path(value).name
     )
     monkeypatch.setattr(scout_store, "active_session", lambda root: None)
-    monkeypatch.setattr(scout_service, "run_start_turn", lambda *args, **kwargs: view)
+    def start_turn(*_args, **kwargs):
+        turn_lookups.append(kwargs["company_intelligence_lookup"])
+        return view
+
+    monkeypatch.setattr(scout_service, "run_start_turn", start_turn)
 
     def approve(_root, _sid, pid, **kwargs):
         approved.append(pid)
@@ -80,11 +86,11 @@ def test_scout_command_snapshots_indexes_and_uses_shared_services(
 
     monkeypatch.setattr(scout_service, "approve_proposal", approve)
     monkeypatch.setattr(scout_service, "dismiss_proposal", dismiss)
-    monkeypatch.setattr(
-        scout_service,
-        "run_recap_turn",
-        lambda *args, **kwargs: view | {"status": "ended", "recap": "Done"},
-    )
+    def recap_turn(*_args, **kwargs):
+        turn_lookups.append(kwargs["company_intelligence_lookup"])
+        return view | {"status": "ended", "recap": "Done"}
+
+    monkeypatch.setattr(scout_service, "run_recap_turn", recap_turn)
 
     result = CliRunner().invoke(
         cli.app,
@@ -95,6 +101,8 @@ def test_scout_command_snapshots_indexes_and_uses_shared_services(
     assert result.exit_code == 0, result.output
     assert approved == ["p1", "p3"]
     assert dismissed == [("p2", "too early stage")]
+    assert len(turn_lookups) == 2
+    assert turn_lookups[0] is not turn_lookups[1]
     assert "Modal" in result.output and "inference serving" in result.output
 
 
@@ -115,6 +123,7 @@ def test_scout_resumes_active_session_and_quit_leaves_it_open(monkeypatch, tmp_p
             search_mode="auto",
             stream_enabled=False,
             browser_enabled=False,
+            db_url="sqlite://",
         ),
     )
     monkeypatch.setattr(cli, "missing_model_keys", lambda settings: [])

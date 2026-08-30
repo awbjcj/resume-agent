@@ -18,6 +18,7 @@ from resume_agent.discovery.connectors.sources import (
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
+from resume_agent.taxonomy.industries import normalize_company
 
 _TOP_SKILLS = 15
 _DISMISSAL_LEDGER_CAP = 20
@@ -143,7 +144,9 @@ def _existing_terms(search_path: str) -> dict[str, set[str]]:
 
 
 def _company_key(company: str) -> str:
-    return "company:" + " ".join(company.casefold().split())
+    return "company:" + (
+        normalize_company(company) or " ".join(company.casefold().split())
+    )
 
 
 def session_source_keys(session: dict) -> set[str]:

@@ -7983,6 +7983,10 @@ export interface components {
             canonicalBoardUrl: string;
             /** Company */
             company: string;
+            /** Companyintelligencestatus */
+            companyIntelligenceStatus?: ("ready" | "stale" | "missing") | null;
+            /** Companyintelligenceversion */
+            companyIntelligenceVersion?: number | null;
             /** Errorcode */
             errorCode?: string | null;
             /** Evidence */

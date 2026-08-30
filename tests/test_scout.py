@@ -252,6 +252,8 @@ def test_scout_instructions_cover_all_supported_hosts_and_resolver_policy():
     instructions = "\n".join(scout.scout_instructions())
 
     assert "resolve_company_source" in instructions
+    assert "get_saved_company_intelligence" in instructions
+    assert "never refresh" in instructions.casefold()
     assert "check_source" not in instructions
     assert "five web searches" in instructions
     for family in BOARD_FAMILIES:
@@ -291,9 +293,18 @@ def test_build_scout_agent_uses_the_resolver_and_budgeted_fallback(monkeypatch):
         """Resolve ownership for a company source."""
         return json.dumps({"company": company, "url": candidate_url})
 
-    scout.build_scout_agent(resolve_company_source, SearchBudget())
+    def get_saved_company_intelligence(companies: list[str]) -> str:
+        """Read saved company intelligence."""
+        return json.dumps({"companies": companies})
+
+    scout.build_scout_agent(
+        resolve_company_source,
+        SearchBudget(),
+        company_intelligence_tool=get_saved_company_intelligence,
+    )
 
     assert [tool.__name__ for tool in captured["tools"]] == [
         "web_search",
         "resolve_company_source",
+        "get_saved_company_intelligence",
     ]

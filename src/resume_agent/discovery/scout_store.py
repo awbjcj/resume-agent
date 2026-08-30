@@ -50,6 +50,8 @@ class SourcePayload(ExtensibleModel):
     evidence: list[SourceEvidence] = Field(default_factory=list)
     searched_families: list[str] = Field(default_factory=list)
     unsearched_families: list[str] = Field(default_factory=list)
+    company_intelligence_status: Literal["ready", "stale", "missing"] | None = None
+    company_intelligence_version: int | None = None
 
 
 class TermPayload(ExtensibleModel):
@@ -318,6 +320,12 @@ def replace_pending_source_resolution(
         proposal["source"] = _source_from_resolution(
             current["company"], resolution
         ).model_dump(mode="json")
+        proposal["source"]["company_intelligence_status"] = current.get(
+            "company_intelligence_status"
+        )
+        proposal["source"]["company_intelligence_version"] = current.get(
+            "company_intelligence_version"
+        )
         proposal["check"] = _RESOLUTION_CHECK[resolution.status]
         proposal["check_error"] = (
             resolution.reason_code

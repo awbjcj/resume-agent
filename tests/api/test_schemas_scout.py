@@ -29,6 +29,8 @@ def test_source_resolution_fields_serialize_as_camel_case():
         ],
         searched_families=["lever"],
         unsearched_families=["workday"],
+        company_intelligence_status="stale",
+        company_intelligence_version=4,
     )
 
     wire = source.model_dump(by_alias=True)
@@ -36,6 +38,8 @@ def test_source_resolution_fields_serialize_as_camel_case():
     assert wire["requestedUrl"] == "https://acme.example/careers"
     assert wire["canonicalBoardUrl"] == "https://jobs.lever.co/acme"
     assert wire["evidence"][0]["sourceUrl"] == "https://acme.example/careers"
+    assert wire["companyIntelligenceStatus"] == "stale"
+    assert wire["companyIntelligenceVersion"] == 4
 
 
 def test_approval_and_exact_url_request_models_are_closed_at_the_boundary():

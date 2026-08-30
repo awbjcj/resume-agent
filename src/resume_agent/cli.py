@@ -699,6 +699,7 @@ def scout_cmd(
     from resume_agent.discovery.scout_store import active_session
     from resume_agent.services import scout as scout_service
     from resume_agent.services.config_store import YamlConfigStore
+    from resume_agent.services.scout_intelligence import ScoutCompanyIntelligenceLookup
     from resume_agent.sessions.stream import ConsoleStreamSink, NullSink
 
     settings = get_settings()
@@ -731,6 +732,7 @@ def scout_cmd(
     profile_dir = _tenant_cli_path(DEFAULT_PROFILE_DIR)
     workspace_root = profile_dir.parent
     config_store = YamlConfigStore(Path(connectors).parent)
+    engine = _engine(None)
     stream_enabled = getattr(settings, "stream_enabled", True)
 
     def run_streamed(call, *, label="SCOUT"):
@@ -742,7 +744,8 @@ def scout_cmd(
         if stream_enabled:
             typer.echo(f"\n{label}: ", nl=False)
         try:
-            return call(sink)
+            with get_session(engine) as session:
+                return call(sink, ScoutCompanyIntelligenceLookup(session))
         finally:
             sink.close()
 
@@ -779,7 +782,7 @@ def scout_cmd(
             return
         session_id = uuid.uuid4().hex
         view = run_streamed(
-            lambda sink: scout_service.run_start_turn(
+            lambda sink, intelligence_lookup: scout_service.run_start_turn(
                 reporter,
                 workspace_root=workspace_root,
                 session_id=session_id,
@@ -789,6 +792,7 @@ def scout_cmd(
                 profile_dir=profile_dir,
                 browser_enabled=settings.browser_enabled,
                 sink=sink,
+                company_intelligence_lookup=intelligence_lookup,
             )
         )
         show_latest(view)
@@ -807,7 +811,7 @@ def scout_cmd(
             return
         if lowered == "end":
             view = run_streamed(
-                lambda sink: scout_service.run_recap_turn(
+                lambda sink, intelligence_lookup: scout_service.run_recap_turn(
                     reporter,
                     workspace_root=workspace_root,
                     session_id=session_id,
@@ -816,6 +820,7 @@ def scout_cmd(
                     profile_dir=profile_dir,
                     browser_enabled=settings.browser_enabled,
                     sink=sink,
+                    company_intelligence_lookup=intelligence_lookup,
                 ),
                 label="RECAP",
             )
@@ -870,7 +875,7 @@ def scout_cmd(
             continue
 
         view = run_streamed(
-            lambda sink: scout_service.run_message_turn(
+            lambda sink, intelligence_lookup: scout_service.run_message_turn(
                 reporter,
                 workspace_root=workspace_root,
                 session_id=session_id,
@@ -880,6 +885,7 @@ def scout_cmd(
                 profile_dir=profile_dir,
                 browser_enabled=settings.browser_enabled,
                 sink=sink,
+                company_intelligence_lookup=intelligence_lookup,
             )
         )
         show_latest(view)

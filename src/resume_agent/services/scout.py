@@ -52,6 +52,7 @@ from resume_agent.discovery.scout_store import (
 from resume_agent.llm_runner import Runner, UnparsedAgentOutput
 from resume_agent.security.outbound import validate_public_url
 from resume_agent.services.config_store import ConfigStore
+from resume_agent.services.scout_intelligence import ScoutCompanyIntelligenceLookup
 from resume_agent.services.scout_context import (
     _EXISTING_FIELD,
     _candidate_keys,
@@ -73,6 +74,7 @@ from resume_agent.services.sources import (
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
 from resume_agent.sessions.store import now_iso
 from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
+from resume_agent.taxonomy.industries import normalize_company
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +202,7 @@ def _post_process(
     resolution_cache: dict[tuple[str, str], CompanySourceResolution] | None = None,
     resolve_source: Callable[[str, str], CompanySourceResolution] | None = None,
     search_coverage: SearchCoverage | None = None,
+    intelligence_lookup: ScoutCompanyIntelligenceLookup | None = None,
 ) -> list[ScoutProposal]:
     existing_sources = _existing_keys(_load_connectors(connectors_path))
     prior_sources = session_source_keys(session)
@@ -322,6 +325,30 @@ def _post_process(
                 "check_error": _resolution_error(resolution),
             }
         )
+    if intelligence_lookup is not None:
+        companies = [
+            proposal.source.company
+            for proposal in proposals
+            if proposal.kind == "source" and proposal.source is not None
+        ]
+        snapshots = intelligence_lookup.lookup_many(companies)
+        for index, proposal in enumerate(proposals):
+            if proposal.kind != "source" or proposal.source is None:
+                continue
+            key = normalize_company(proposal.source.company)
+            snapshot = snapshots.get(key or "")
+            if snapshot is None:
+                continue
+            proposals[index] = proposal.model_copy(
+                update={
+                    "source": proposal.source.model_copy(
+                        update={
+                            "company_intelligence_status": snapshot.status,
+                            "company_intelligence_version": snapshot.version_number,
+                        }
+                    )
+                }
+            )
     return _rank(proposals)
 
 
@@ -339,6 +366,7 @@ def _run_turn(
     scout_agent: Runner | None,
     formatter_agent: Runner | None,
     sink: StreamSink | None,
+    company_intelligence_lookup: ScoutCompanyIntelligenceLookup | None,
 ) -> dict:
     text = _clean_message(message)
     session = (
@@ -352,14 +380,22 @@ def _run_turn(
     resolution_cache: dict[tuple[str, str], CompanySourceResolution] = {}
     source_resolver = CompanySourceResolver(search_path)
     search_budget = SearchBudget()
-    researcher = scout_agent or build_scout_agent(
-        make_resolve_company_source_tool(
-            search_path,
-            cache=resolution_cache,
-            resolver=source_resolver,
-        ),
-        search_budget,
-    )
+    if scout_agent is not None:
+        researcher = scout_agent
+    else:
+        if company_intelligence_lookup is None:
+            raise ValueError("Scout company intelligence lookup is required")
+        researcher = build_scout_agent(
+            make_resolve_company_source_tool(
+                search_path,
+                cache=resolution_cache,
+                resolver=source_resolver,
+            ),
+            search_budget,
+            company_intelligence_tool=(
+                company_intelligence_lookup.get_saved_company_intelligence
+            ),
+        )
     formatter = formatter_agent or build_scout_formatter_agent()
     prompt = "\n\n".join(
         [
@@ -414,6 +450,7 @@ def _run_turn(
         resolution_cache=resolution_cache,
         resolve_source=source_resolver.resolve,
         search_coverage=output_sink.snapshot(),
+        intelligence_lookup=company_intelligence_lookup,
     )
     reporter.checkpoint()
     turn = ScoutTurnRecord(
@@ -458,6 +495,7 @@ def run_start_turn(
     scout_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
     sink: StreamSink | None = None,
+    company_intelligence_lookup: ScoutCompanyIntelligenceLookup | None = None,
 ) -> dict:
     return _run_turn(
         reporter,
@@ -472,6 +510,7 @@ def run_start_turn(
         scout_agent=scout_agent,
         formatter_agent=formatter_agent,
         sink=sink,
+        company_intelligence_lookup=company_intelligence_lookup,
     )
 
 
@@ -488,6 +527,7 @@ def run_message_turn(
     scout_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
     sink: StreamSink | None = None,
+    company_intelligence_lookup: ScoutCompanyIntelligenceLookup | None = None,
 ) -> dict:
     return _run_turn(
         reporter,
@@ -502,6 +542,7 @@ def run_message_turn(
         scout_agent=scout_agent,
         formatter_agent=formatter_agent,
         sink=sink,
+        company_intelligence_lookup=company_intelligence_lookup,
     )
 
 
@@ -517,15 +558,24 @@ def run_recap_turn(
     scout_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
     sink: StreamSink | None = None,
+    company_intelligence_lookup: ScoutCompanyIntelligenceLookup | None = None,
 ) -> dict:
     session = load_session(workspace_root, session_id)
     if session["status"] != "active":
         raise ValueError("session ended")
     reporter.begin(1, "Discovery Scout is writing a recap")
-    researcher = scout_agent or build_scout_agent(
-        make_resolve_company_source_tool(search_path),
-        SearchBudget(),
-    )
+    if scout_agent is not None:
+        researcher = scout_agent
+    else:
+        if company_intelligence_lookup is None:
+            raise ValueError("Scout company intelligence lookup is required")
+        researcher = build_scout_agent(
+            make_resolve_company_source_tool(search_path),
+            SearchBudget(),
+            company_intelligence_tool=(
+                company_intelligence_lookup.get_saved_company_intelligence
+            ),
+        )
     formatter = formatter_agent or build_scout_formatter_agent()
     prompt = "\n\n".join(
         [
@@ -580,6 +630,8 @@ def _camel_source(source: dict | None) -> dict | None:
         "evidence": source["evidence"],
         "searchedFamilies": source["searched_families"],
         "unsearchedFamilies": source["unsearched_families"],
+        "companyIntelligenceStatus": source.get("company_intelligence_status"),
+        "companyIntelligenceVersion": source.get("company_intelligence_version"),
     }
 
 
