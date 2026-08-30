@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
+import { axe } from "vitest-axe";
 
 import { changeLanguage } from "@/i18n";
 import { server } from "@/test/server";
@@ -96,7 +97,7 @@ describe("ApplicationsPage", () => {
       }),
     );
     const user = userEvent.setup();
-    render(
+    const { container } = render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter><ApplicationsPage /></MemoryRouter>
       </QueryClientProvider>,
@@ -111,5 +112,6 @@ describe("ApplicationsPage", () => {
     expect(screen.getByText("Not researched")).toBeInTheDocument();
     expect(screen.getByText("Historical filing match")).toBeInTheDocument();
     expect(screen.getByText("210,000 USD")).toBeInTheDocument();
+    expect((await axe(container)).violations).toEqual([]);
   });
 });

@@ -52,6 +52,7 @@ export function ApplicationsPage() {
     );
   };
   const toggleSelection = (jobId: number) => {
+    comparison.reset();
     setSelectedJobIds((current) => {
       if (current.includes(jobId)) return current.filter((value) => value !== jobId);
       if (current.length === 3) {

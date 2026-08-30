@@ -117,7 +117,7 @@ export function ApplicationsTable({
         </caption>
         <TableHeader>
           <TableRow>
-            {onToggleSelection ? <TableHead className="w-20">Compare</TableHead> : null}
+            {onToggleSelection ? <TableHead className="sticky left-0 z-20 w-20 bg-card">Compare</TableHead> : null}
             <TableHead className={`sticky ${onToggleSelection ? "left-20" : "left-0"} z-10 min-w-44 bg-card`}>{t("applicationTimeline.headers.company")}</TableHead>
             <TableHead className="min-w-44">{t("applicationTimeline.headers.role")}</TableHead>
             <TableHead>{t("applicationTimeline.headers.status")}</TableHead>
@@ -137,7 +137,7 @@ export function ApplicationsTable({
           {table.rows.map((row) => (
             <TableRow key={row.jobId}>
               {onToggleSelection ? (
-                <TableCell>
+                <TableCell className="sticky left-0 z-10 bg-card">
                   <input
                     type="checkbox"
                     checked={selectedJobIds.includes(row.jobId)}
