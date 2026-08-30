@@ -78,6 +78,7 @@ class CompanySourceResolver:
                 search_path=self.search_path,
                 limit=5,
                 browser=False,
+                apply_search_filters=False,
             )
         except Exception:  # noqa: BLE001 - an individual candidate must not abort its siblings.
             return CompanySourceResolution(

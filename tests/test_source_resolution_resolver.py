@@ -43,6 +43,37 @@ def test_first_party_board_verifies_without_provider_identity():
     assert result.reason_code == "VERIFIED_FIRST_PARTY"
 
 
+def test_resolver_requests_a_filter_free_ownership_preview():
+    preview_kwargs = {}
+
+    def previewer(url, **kwargs):
+        preview_kwargs.update(kwargs)
+        return SourcePreview(
+            ok=True,
+            url=url,
+            kind="workday",
+            role_count=1,
+            observed_companies=("100 Salesforce, Inc.",),
+        )
+
+    resolver = CompanySourceResolver(
+        search_path="search.yaml",
+        crawler=lambda company, url: CrawlReport(
+            requested_url=url,
+            candidates=[CrawlCandidate(url=url)],
+        ),
+        previewer=previewer,
+    )
+
+    result = resolver.resolve(
+        "Salesforce",
+        "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site",
+    )
+
+    assert result.status == "verified"
+    assert preview_kwargs["apply_search_filters"] is False
+
+
 def test_populated_board_with_another_provider_company_is_conflict():
     resolver = CompanySourceResolver(
         search_path="search.yaml",

@@ -45,7 +45,7 @@ from resume_agent.discovery.connectors.sources import (
     native_url_id as native_url_id,
     scrape_target_id as scrape_target_id,
 )
-from resume_agent.discovery.search_config import load_search_config
+from resume_agent.discovery.search_config import SearchConfig, load_search_config
 from resume_agent.security.outbound import resolve_host as _resolve_host
 from resume_agent.services.discovery import DEFAULT_CONNECTORS, DEFAULT_SEARCH
 from resume_agent.tenancy.paths import resolve_tenant_path
@@ -308,7 +308,15 @@ def preview_source(
     country: str = "com",
     limit: int = _PREVIEW_LIMIT,
     browser: bool = True,
+    apply_search_filters: bool = True,
 ) -> SourcePreview:
+    """Inspect a source and return a bounded job/company preview.
+
+    Source Manager previews use the configured relevance filters by default.
+    Ownership verification disables them so a valid board cannot lose its
+    provider identity merely because none of its current roles match the user's
+    job search.
+    """
     if provider == "scrape":
         try:
             normalized = _scrape_url(url)
@@ -367,8 +375,11 @@ def preview_source(
         )
 
     try:
+        search = (
+            load_search_config(search_path) if apply_search_filters else SearchConfig()
+        )
         result = _preview_connector(target, resolved_url, browser=browser).fetch(
-            load_search_config(search_path),
+            search,
             limit=limit,
         )
     except Exception as exc:  # noqa: BLE001 - preview returns errors instead of raising.

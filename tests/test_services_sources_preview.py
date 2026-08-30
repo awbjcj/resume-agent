@@ -99,6 +99,61 @@ def test_preview_forwards_limit_and_browser(monkeypatch):
     assert seen == {"browser": False, "limit": 5}
 
 
+def test_preview_can_skip_job_filters_for_an_ownership_probe(monkeypatch):
+    configured_search = object()
+
+    class FakeConnector:
+        def fetch(self, search, limit=None):
+            if search is configured_search:
+                return FetchResult(jobs=[])
+            return FetchResult(
+                jobs=[
+                    RawJob(
+                        source="workday",
+                        url="https://example.test/job/1",
+                        company="100 Salesforce, Inc.",
+                        title="Technical Support Engineer",
+                        location="Remote",
+                        jd_text="Support customers.",
+                        company_provenance="provider",
+                    )
+                ]
+            )
+
+    monkeypatch.setattr(
+        svc,
+        "inspect_ats",
+        lambda url: AtsInspection(
+            AtsTarget(
+                "workday",
+                tenant="salesforce",
+                datacenter="wd12",
+                site="External_Career_Site",
+            ),
+            True,
+        ),
+    )
+    monkeypatch.setattr(
+        svc,
+        "_preview_connector",
+        lambda target, url, *, browser=True: FakeConnector(),
+    )
+    monkeypatch.setattr(svc, "load_search_config", lambda path: configured_search)
+
+    filtered = svc.preview_source(
+        "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site"
+    )
+    identity = svc.preview_source(
+        "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site",
+        apply_search_filters=False,
+    )
+
+    assert filtered.role_count == 0
+    assert filtered.observed_companies == ()
+    assert identity.role_count == 1
+    assert identity.observed_companies == ("100 Salesforce, Inc.",)
+
+
 @pytest.mark.parametrize(
     ("provider", "kwargs", "expected"),
     [
