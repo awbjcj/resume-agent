@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from datetime import datetime, timedelta, timezone
 from threading import Lock
-from urllib.parse import urlsplit, urlunsplit
 
 from sqlmodel import Session, col, select
 
@@ -19,7 +17,8 @@ from resume_agent.company_intelligence.models import (
     CompanyResearchDepth,
 )
 from resume_agent.config import Settings
-from resume_agent.discovery.source_resolution.identity import registrable_domain
+from resume_agent.llm_runner import expect_schema, expect_text
+from resume_agent.public_sources import PublicSourceIndex
 from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tracking.tables import (
     CompanyIntelligenceEvidenceRow,
@@ -34,17 +33,7 @@ COMPANY_INTELLIGENCE_CAVEAT = (
 COMPANY_INTELLIGENCE_EMPTY_MESSAGE = (
     "No company research has been saved yet. Run an explicit refresh to build a cited dossier."
 )
-_URL = re.compile(r"https?://[^\s<>\]\[()]+", re.IGNORECASE)
 _WRITE_LOCK = Lock()
-
-
-def _normalized_http_url(value: str) -> str | None:
-    parsed = urlsplit(value.rstrip(".,;:"))
-    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
-        return None
-    return urlunsplit(
-        (parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, "")
-    )
 
 
 def _grounded_evidence(
@@ -56,55 +45,36 @@ def _grounded_evidence(
     expires_at: datetime,
     research_depth: CompanyResearchDepth = "standard",
 ) -> CompanyIntelligenceEvidence:
-    grounded_urls: dict[str, str] = {}
-    for raw in _URL.findall(research):
-        exact_url = raw.rstrip(".,;:")
-        normalized = _normalized_http_url(exact_url)
-        if normalized is not None:
-            grounded_urls.setdefault(normalized, exact_url)
+    research_sources = PublicSourceIndex.from_text(research)
     sources: list[CompanyIntelligenceSource] = []
     seen: set[str] = set()
     for source in draft.sources:
-        normalized = _normalized_http_url(source.url)
-        if normalized is None or normalized not in grounded_urls or normalized in seen:
+        grounded_url = research_sources.resolve(source.url)
+        if grounded_url is None or grounded_url in seen:
             continue
-        seen.add(normalized)
+        seen.add(grounded_url)
         source_tier = source.source_tier
         if source_tier == "other" and source.source_type == "official":
             source_tier = "company_official"
         sources.append(
             source.model_copy(
                 update={
-                    "url": grounded_urls[normalized],
+                    "url": grounded_url,
                     "source_tier": source_tier,
                     "last_verified_at": retrieved_at,
                 }
             )
         )
 
-    allowed = {
-        normalized: source.url
-        for source in sources
-        if (normalized := _normalized_http_url(source.url)) is not None
-    }
+    allowed_sources = PublicSourceIndex.from_urls(source.url for source in sources)
     insights: list[CompanyIntelligenceInsight] = []
     seen_axes: set[str] = set()
     for insight in draft.insights:
-        citations = sorted(
-            {
-                allowed[normalized]
-                for value in insight.citations
-                if (normalized := _normalized_http_url(value)) in allowed
-            }
-        )
+        citations = allowed_sources.retain(insight.citations)
         summary = insight.summary.strip()
         if not summary or not citations or insight.axis in seen_axes:
             continue
-        authorities = {
-            registrable_domain(value)
-            for value in citations
-            if registrable_domain(value)
-        }
+        authorities = PublicSourceIndex.authorities(citations)
         verification_state = (
             "inferred"
             if insight.verification_state == "inferred"
@@ -172,6 +142,29 @@ def load_company_intelligence(
         return CompanyIntelligenceEvidence.model_validate(row.evidence_json)
     except (TypeError, ValueError):
         return None
+
+
+def load_company_intelligence_many(
+    session: Session, companies: list[str | None]
+) -> dict[str, CompanyIntelligenceEvidence]:
+    """Load valid current dossiers for normalized company keys in one query."""
+    keys = {key for company in companies if (key := normalize_company(company))}
+    if not keys:
+        return {}
+    rows = session.exec(
+        select(CompanyIntelligenceEvidenceRow).where(
+            col(CompanyIntelligenceEvidenceRow.normalized_company).in_(keys)
+        )
+    ).all()
+    evidence_by_company: dict[str, CompanyIntelligenceEvidence] = {}
+    for row in rows:
+        try:
+            evidence_by_company[row.normalized_company] = (
+                CompanyIntelligenceEvidence.model_validate(row.evidence_json)
+            )
+        except (TypeError, ValueError):
+            continue
+    return evidence_by_company
 
 
 def load_company_intelligence_history(
@@ -275,8 +268,8 @@ def generate_company_intelligence(
     *,
     company: str,
     settings: Settings,
-    research_agent,
-    formatter,
+    research_agent=None,
+    formatter=None,
     reporter=None,
     now: datetime | None = None,
     research_depth: CompanyResearchDepth = "standard",
@@ -284,12 +277,25 @@ def generate_company_intelligence(
     key = normalize_company(company)
     if not key:
         raise ValueError("company is required")
-    research = str(research_agent.run(_research_prompt(company, research_depth)).content)
+    if research_agent is None or formatter is None:
+        from resume_agent.company_intelligence.agents import (
+            build_formatter_agent,
+            build_research_agent,
+        )
+
+        research_agent = research_agent or build_research_agent(research_depth)
+        formatter = formatter or build_formatter_agent()
+    research = expect_text(
+        research_agent.run(_research_prompt(company, research_depth)),
+        source="company-intelligence research",
+    )
     if reporter is not None:
         reporter.checkpoint()
-    formatted = formatter.run(_format_prompt(research)).content
-    if not isinstance(formatted, CompanyIntelligenceDraft):
-        raise ValueError("company formatter did not return CompanyIntelligenceDraft")
+    formatted = expect_schema(
+        formatter.run(_format_prompt(research)),
+        CompanyIntelligenceDraft,
+        source="company-intelligence format",
+    )
     if reporter is not None:
         reporter.checkpoint()
 

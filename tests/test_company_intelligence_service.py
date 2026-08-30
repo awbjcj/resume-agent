@@ -11,6 +11,7 @@ from resume_agent.company_intelligence.models import (
 )
 from resume_agent.config import Settings
 from resume_agent.db import init_db, make_engine
+from resume_agent.llm_runner import UnparsedAgentOutput
 from resume_agent.services.company_intelligence import (
     generate_company_intelligence,
     load_company_intelligence,
@@ -98,6 +99,22 @@ def test_generation_keeps_only_sources_and_claims_grounded_in_research():
     assert evidence.insights[0].verification_state == "single_source"
     assert evidence.version_number == 1
     assert evidence.expires_at.isoformat() == "2026-09-28T12:00:00+00:00"
+
+
+def test_generation_reports_unparsed_formatter_output_at_the_model_boundary():
+    engine = _engine()
+    with Session(engine) as session:
+        with pytest.raises(
+            UnparsedAgentOutput,
+            match="Expected CompanyIntelligenceDraft from company-intelligence format agent",
+        ):
+            generate_company_intelligence(
+                session,
+                company="Acme",
+                settings=Settings(),
+                research_agent=_Agent("https://acme.example/strategy"),
+                formatter=_Agent("not structured output"),
+            )
 
 
 def test_legacy_payload_loads_with_v2_compatibility_defaults():

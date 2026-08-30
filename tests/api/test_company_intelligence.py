@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from resume_agent.api.app import create_app
-from resume_agent.api.routers import jobs as jobs_router
+from resume_agent.company_intelligence import agents as company_agents
 from resume_agent.company_intelligence.models import (
     CompanyIntelligenceDraft,
     CompanyIntelligenceInsight,
@@ -130,13 +130,13 @@ def _stub_company_research(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        jobs_router,
-        "build_company_intelligence_researcher",
+        company_agents,
+        "build_research_agent",
         lambda _depth="standard": _Agent("Source https://acme.example/strategy"),
     )
     monkeypatch.setattr(
-        jobs_router,
-        "build_company_intelligence_formatter",
+        company_agents,
+        "build_formatter_agent",
         lambda: _Agent(draft),
     )
 
@@ -215,15 +215,15 @@ def test_explicit_refresh_launches_and_persists_grounded_dossier(monkeypatch, tm
 def test_refresh_depth_is_explicit_and_history_is_newest_first(monkeypatch, tmp_path):
     seen_depths = []
     _stub_company_research(monkeypatch)
-    original_builder = jobs_router.build_company_intelligence_researcher
+    original_builder = company_agents.build_research_agent
 
     def build_researcher(depth: CompanyResearchDepth = "standard"):
         seen_depths.append(depth)
         return original_builder(depth)
 
     monkeypatch.setattr(
-        jobs_router,
-        "build_company_intelligence_researcher",
+        company_agents,
+        "build_research_agent",
         build_researcher,
     )
     client = _client(tmp_path)

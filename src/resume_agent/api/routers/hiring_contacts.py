@@ -15,10 +15,6 @@ from resume_agent.api.schemas.hiring_contacts import (
     HiringContactUnavailableOut,
 )
 from resume_agent.api.schemas.runs import RunOut
-from resume_agent.hiring_contacts.agents import (
-    build_hiring_contact_formatter,
-    build_hiring_contact_researcher,
-)
 from resume_agent.services.hiring_contacts import (
     generate_hiring_contact_intelligence,
     hiring_contact_refresh_available,
@@ -85,8 +81,6 @@ def create_hiring_contact_refresh(
         generate_hiring_contact_intelligence(
             worker_session,
             job_id=job_id,
-            researcher=build_hiring_contact_researcher(),
-            formatter=build_hiring_contact_formatter(),
             reporter=reporter,
         )
         reporter.step(2)

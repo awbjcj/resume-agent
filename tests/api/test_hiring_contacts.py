@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
-from resume_agent.api.routers import hiring_contacts as contact_router
 from resume_agent.db import get_session
+from resume_agent.hiring_contacts import agents as contact_agents
 from resume_agent.hiring_contacts.models import (
     HiringContactDraft,
     HiringContactIntelligenceDraft,
@@ -50,10 +50,10 @@ def _app(client: TestClient) -> FastAPI:
 def test_hiring_contact_resource_moves_from_empty_to_ready(monkeypatch, tmp_path):
     url = "https://acme.example/team/avery"
     monkeypatch.setattr(
-        contact_router, "build_hiring_contact_researcher", lambda: _Runner(url)
+        contact_agents, "build_hiring_contact_researcher", lambda: _Runner(url)
     )
     monkeypatch.setattr(
-        contact_router,
+        contact_agents,
         "build_hiring_contact_formatter",
         lambda: _Runner(
             HiringContactIntelligenceDraft(

@@ -41,10 +41,6 @@ from resume_agent.api.schemas.jobs import (
     JobsImportReportOut,
 )
 from resume_agent.config import Settings
-from resume_agent.company_intelligence.agents import (
-    build_formatter_agent as build_company_intelligence_formatter,
-    build_research_agent as build_company_intelligence_researcher,
-)
 from resume_agent.company_intelligence.models import CompanyIntelligenceEvidence
 from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.models import (
@@ -322,8 +318,6 @@ def _launch_company_intelligence_refresh(
             worker_session,
             company=company,
             settings=settings,
-            research_agent=build_company_intelligence_researcher(depth),
-            formatter=build_company_intelligence_formatter(),
             reporter=reporter,
             research_depth=depth,
         )

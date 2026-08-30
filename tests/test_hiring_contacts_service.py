@@ -8,6 +8,7 @@ from resume_agent.hiring_contacts.models import (
     HiringContactDraft,
     HiringContactIntelligenceDraft,
 )
+from resume_agent.llm_runner import UnparsedAgentOutput
 from resume_agent.services.hiring_contacts import (
     generate_hiring_contact_intelligence,
     load_hiring_contact_intelligence,
@@ -129,3 +130,25 @@ def test_contact_generation_rejects_a_source_url_prefix():
 
     assert artifact is not None
     assert artifact.contacts == []
+
+
+def test_contact_generation_reports_unparsed_formatter_output_at_the_model_boundary():
+    engine = _engine()
+    with Session(engine) as session:
+        job = Job(source="manual", company="Acme", title="Platform Engineer")
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        assert job.id is not None
+        try:
+            generate_hiring_contact_intelligence(
+                session,
+                job_id=job.id,
+                researcher=_Runner("No contacts found."),
+                formatter=_Runner("not structured output"),
+            )
+        except UnparsedAgentOutput as exc:
+            assert "Expected HiringContactIntelligenceDraft" in str(exc)
+            assert "hiring-contact format agent" in str(exc)
+        else:
+            raise AssertionError("expected unparsed formatter output to be rejected")
