@@ -369,6 +369,20 @@ class RolePreparationBriefRow(SQLModel, table=True):
     schema_version: int = 1
 
 
+class HiringContactIntelligenceRow(SQLModel, table=True):
+    __tablename__ = cast(Any, "hiring_contact_intelligence")
+    __table_args__ = (UniqueConstraint("job_id"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="jobs.id", index=True)
+    intelligence_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    retrieved_at: datetime = Field(default_factory=utcnow)
+    schema_version: int = 1
+
+
 class ErrorRecord(SQLModel, table=True):
     """A durable failure record that the user can dismiss or resolve."""
 

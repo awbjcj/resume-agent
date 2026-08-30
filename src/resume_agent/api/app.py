@@ -46,6 +46,7 @@ from resume_agent.api.routers import dashboard as dashboard_router
 from resume_agent.api.routers import email_drafts as email_drafts_router
 from resume_agent.api.routers import errors as errors_router
 from resume_agent.api.routers import gmail as gmail_router
+from resume_agent.api.routers import hiring_contacts as hiring_contacts_router
 from resume_agent.api.routers import interview as interview_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
@@ -399,6 +400,9 @@ def create_app(
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
     app.include_router(board_views_router.router, prefix="/api", dependencies=guarded)
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(
+        hiring_contacts_router.router, prefix="/api", dependencies=guarded
+    )
     app.include_router(
         role_preparation_router.router, prefix="/api", dependencies=guarded
     )
