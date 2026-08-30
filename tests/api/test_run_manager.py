@@ -117,6 +117,44 @@ def test_error_hook_failure_never_masks_the_run_failure(tmp_path):
     assert snapshot.state is RunState.error
 
 
+def test_terminal_hook_records_every_outcome_once(tmp_path):
+    events = []
+    manager = RunManager(
+        root=tmp_path,
+        executor=InlineExecutor(),
+        on_terminal=events.append,
+    )
+
+    success_id = manager.submit("discover", lambda _reporter: {"ok": True})
+    failure_id = manager.submit("pull", lambda _reporter: 1 / 0)
+    cancelled_id = manager.submit(
+        "tailor", lambda _reporter: (_ for _ in ()).throw(RunCancelled)
+    )
+
+    assert [(event["runId"], event["status"]) for event in events] == [
+        (success_id, "succeeded"),
+        (failure_id, "failed"),
+        (cancelled_id, "cancelled"),
+    ]
+    assert all(event["completedAt"].tzinfo is not None for event in events)
+
+
+def test_terminal_hook_failure_never_masks_the_run_outcome(tmp_path):
+    def broken_hook(_payload):
+        raise RuntimeError("hook failed")
+
+    manager = RunManager(
+        root=tmp_path,
+        executor=InlineExecutor(),
+        on_terminal=broken_hook,
+    )
+    run_id = manager.submit("discover", lambda _reporter: {"ok": True})
+
+    snapshot = manager.get(run_id)
+    assert snapshot is not None
+    assert snapshot.state is RunState.done
+
+
 def test_reporter_checkpoint_raises_when_cancel_requested(tmp_path):
     flag = {"cancel": False}
     rep = RunProgressReporter(

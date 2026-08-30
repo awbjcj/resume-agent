@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,8 @@ from resume_agent.tracking.tables import (
     Job,
     Notification,
     ResumeVersion,
+    RunCompletion,
+    SavedBoardView,
     SkillSuggestion,
 )
 
@@ -89,6 +92,18 @@ def _seed_pipeline(session: Session) -> None:
         )
     )
     session.add(SkillSuggestion(kind="cluster", key="python"))
+    session.add(
+        SavedBoardView(board="shortlist", name="Top roles", query_string="fitMin=80")
+    )
+    session.add(
+        RunCompletion(
+            run_id="run-1",
+            kind="discover",
+            label="Discovery",
+            status="succeeded",
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
     session.commit()
 
 
@@ -130,6 +145,8 @@ def test_jobs_scope_truncates_pipeline_and_clears_exact_targets(session, paths):
     report = reset_workspace(session, paths, ResetScope.jobs)
 
     assert report.rows_deleted == {
+        "run_completions": 1,
+        "saved_board_views": 1,
         "notifications": 1,
         "applications": 1,
         "cover_letters": 1,
@@ -189,7 +206,7 @@ def test_all_scope_preserves_config_secrets_and_overrides(session, paths):
 
     report = reset_workspace(session, paths, ResetScope.all)
 
-    assert sum(report.rows_deleted.values()) == 6
+    assert sum(report.rows_deleted.values()) == 8
     assert report.areas_cleared == [
         "output",
         "runs",

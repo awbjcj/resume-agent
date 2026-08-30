@@ -36,6 +36,7 @@ from resume_agent.api.routers import auth_google as auth_google_router
 from resume_agent.api.routers import auth_password as auth_password_router
 from resume_agent.api.routers import auth_register as auth_register_router
 from resume_agent.api.routers import boards, health, resumes
+from resume_agent.api.routers import board_views as board_views_router
 from resume_agent.api.routers import coach as coach_router
 from resume_agent.api.routers import career_lab as career_lab_router
 from resume_agent.api.routers import calendar as calendar_router
@@ -49,6 +50,7 @@ from resume_agent.api.routers import interview as interview_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
 from resume_agent.api.routers import notifications as notifications_router
+from resume_agent.api.routers import run_completions as run_completions_router
 from resume_agent.api.routers import profile as profile_router
 from resume_agent.api.routers import prompts as prompts_router
 from resume_agent.api.routers import prune as prune_router
@@ -249,11 +251,8 @@ def create_app(
         else resolved_settings.suggestion_batch_concurrency
     )
 
-    def _record_run_error(payload: dict) -> None:
+    def _run_payload_engine(payload: dict):
         from sqlalchemy.orm import Session as SystemSession
-        from sqlmodel import Session as DbSession
-
-        from resume_agent.services.errors import record_error
         from resume_agent.tenancy.system_db import User
 
         context = current_context()
@@ -263,14 +262,22 @@ def create_app(
             system_engine = getattr(app.state, "system_engine", None)
             registry = getattr(app.state, "engine_registry", None)
             if system_engine is None or registry is None:
-                return
+                return None
             with SystemSession(system_engine) as system_session:
                 if system_session.get(User, str(user_id)) is None:
-                    return
+                    return None
             paths = workspace_paths(app.state.data_dir, str(user_id))
             engine = registry.get(str(user_id), paths.db_url)
         if engine is None:
             engine = getattr(app.state, "engine", None)
+        return engine
+
+    def _record_run_error(payload: dict) -> None:
+        from sqlmodel import Session as DbSession
+
+        from resume_agent.services.errors import record_error
+
+        engine = _run_payload_engine(payload)
         if engine is None:
             return
         with DbSession(engine) as database:
@@ -282,6 +289,32 @@ def create_app(
                 run_id=str(payload.get("runId") or "") or None,
             )
 
+    def _record_run_completion(payload: dict) -> None:
+        from datetime import datetime
+
+        from sqlmodel import Session as DbSession
+
+        from resume_agent.services.run_completions import record_run_completion
+
+        engine = _run_payload_engine(payload)
+        completed_at = payload.get("completedAt")
+        if engine is None or not isinstance(completed_at, datetime):
+            return
+        with DbSession(engine) as database:
+            record_run_completion(
+                database,
+                run_id=str(payload.get("runId") or ""),
+                kind=str(payload.get("kind") or "run"),
+                label=str(payload.get("label") or payload.get("kind") or "Run"),
+                status=str(payload.get("status") or "failed"),
+                error=(
+                    str(payload["error"])
+                    if payload.get("error") is not None
+                    else None
+                ),
+                completed_at=completed_at,
+            )
+
     app.state.run_manager = RunManager(
         root=manager_root,
         executor=run_executor,
@@ -289,6 +322,7 @@ def create_app(
             {"suggestion": suggestion_workers} if run_executor is None else None
         ),
         on_error=_record_run_error,
+        on_terminal=_record_run_completion,
     )
 
     def _settings_override() -> Settings:
@@ -362,6 +396,7 @@ def create_app(
     )
     app.include_router(account_router.router, prefix="/api", dependencies=guarded)
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
+    app.include_router(board_views_router.router, prefix="/api", dependencies=guarded)
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(
         application_events_router.router, prefix="/api", dependencies=guarded
@@ -383,6 +418,7 @@ def create_app(
     app.include_router(taxonomy_router.router, prefix="/api", dependencies=guarded)
     app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)
     app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(run_completions_router.router, prefix="/api", dependencies=guarded)
     app.include_router(gmail_router.router, prefix="/api", dependencies=guarded)
     app.include_router(gmail_router.callback_router, prefix="/api")
     app.include_router(email_drafts_router.router, prefix="/api", dependencies=guarded)

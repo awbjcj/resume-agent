@@ -197,6 +197,7 @@ class RunManager:
         executor: Executor | None = None,
         kind_workers: dict[str, int] | None = None,
         on_error: Callable[[dict], None] | None = None,
+        on_terminal: Callable[[dict], None] | None = None,
     ) -> None:
         self.root = Path(root)
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
@@ -226,6 +227,7 @@ class RunManager:
         self._run_roots: dict[str, Path] = {}
         self._stream_notifiers: dict[str, StreamNotifier] = {}
         self.on_error = on_error
+        self.on_terminal = on_terminal
 
     def _emit_error(
         self, run_id: str, kind: str, error: str, user_id: str | None
@@ -242,6 +244,32 @@ class RunManager:
                 }
             )
         except Exception:  # noqa: BLE001 - bookkeeping never masks run failure
+            pass
+
+    def _emit_terminal(self, run_id: str) -> None:
+        if self.on_terminal is None:
+            return
+        snapshot = self.get(run_id)
+        if snapshot is None or snapshot.state not in TERMINAL_RUN_STATES:
+            return
+        status = {
+            "done": "succeeded",
+            "error": "failed",
+            "cancelled": "cancelled",
+        }[snapshot.state.value]
+        try:
+            self.on_terminal(
+                {
+                    "runId": snapshot.run_id,
+                    "kind": snapshot.kind,
+                    "label": snapshot.label,
+                    "status": status,
+                    "error": snapshot.error,
+                    "completedAt": snapshot.updated_at,
+                    "userId": snapshot.user_id,
+                }
+            )
+        except Exception:  # noqa: BLE001 - bookkeeping never masks run outcome
             pass
 
     def register_root(self, root: Path | str) -> None:
@@ -272,6 +300,7 @@ class RunManager:
                 state="cancelled", label="Cancelled", error=None, updated_at=_now()
             )
             self._write(run_id, record)
+            self._emit_terminal(run_id)
             self._cancel_requested.discard(run_id)
             return True
         record.update(state="cancelling", label="Cancelling", updated_at=_now())
@@ -440,6 +469,7 @@ class RunManager:
                     self._emit_error(run_id, kind, error, reporter.user_id)
                     raise
                 finally:
+                    self._emit_terminal(run_id)
                     self._cancel_requested.discard(run_id)
                     self._release_terminal_notifier(run_id)
 
@@ -459,6 +489,7 @@ class RunManager:
                         updated_at=_now(),
                     )
                     self._write(run_id, record)
+                    self._emit_terminal(run_id)
                 raise
             self._futures[run_id] = future
 
@@ -704,6 +735,7 @@ class RunManager:
                 "Backend restarted before this run completed",
                 snapshot.user_id,
             )
+            self._emit_terminal(snapshot.run_id)
             recovered += 1
         return recovered
 

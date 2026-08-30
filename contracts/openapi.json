@@ -3765,12 +3765,18 @@
             "title": "Openerrorcount",
             "type": "integer"
           },
+          "practiceStats": {
+            "$ref": "#/components/schemas/PracticeStatsOut"
+          },
           "queues": {
             "additionalProperties": {
               "type": "integer"
             },
             "title": "Queues",
             "type": "object"
+          },
+          "sourceHealth": {
+            "$ref": "#/components/schemas/SourceHealthOut"
           },
           "statusCounts": {
             "additionalProperties": {
@@ -8037,6 +8043,55 @@
         "title": "PortfolioSelectionOut",
         "type": "object"
       },
+      "PracticeStatsOut": {
+        "properties": {
+          "averageScore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Averagescore"
+          },
+          "changeFromFirst": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changefromfirst"
+          },
+          "completedSessions": {
+            "default": 0,
+            "title": "Completedsessions",
+            "type": "integer"
+          },
+          "latestScore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestscore"
+          },
+          "scoredSessions": {
+            "default": 0,
+            "title": "Scoredsessions",
+            "type": "integer"
+          }
+        },
+        "title": "PracticeStatsOut",
+        "type": "object"
+      },
       "ProfileConfigDoc": {
         "properties": {
           "githubRepoAllow": {
@@ -10102,6 +10157,86 @@
         "title": "RoutingUpdate",
         "type": "object"
       },
+      "RunCompletionOut": {
+        "properties": {
+          "completedAt": {
+            "format": "date-time",
+            "title": "Completedat",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "readAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Readat"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "kind",
+          "label",
+          "status",
+          "completedAt"
+        ],
+        "title": "RunCompletionOut",
+        "type": "object"
+      },
+      "RunCompletionsReadOut": {
+        "properties": {
+          "markedRead": {
+            "title": "Markedread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "markedRead"
+        ],
+        "title": "RunCompletionsReadOut",
+        "type": "object"
+      },
       "RunOut": {
         "properties": {
           "announcedAt": {
@@ -10221,6 +10356,113 @@
         ],
         "title": "RunState",
         "type": "string"
+      },
+      "SavedBoardViewCreate": {
+        "properties": {
+          "board": {
+            "enum": [
+              "triage",
+              "shortlist",
+              "pipeline"
+            ],
+            "title": "Board",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "queryString": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Querystring",
+            "type": "string"
+          }
+        },
+        "required": [
+          "board",
+          "name"
+        ],
+        "title": "SavedBoardViewCreate",
+        "type": "object"
+      },
+      "SavedBoardViewOut": {
+        "properties": {
+          "board": {
+            "enum": [
+              "triage",
+              "shortlist",
+              "pipeline"
+            ],
+            "title": "Board",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "queryString": {
+            "title": "Querystring",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "board",
+          "name",
+          "queryString",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "SavedBoardViewOut",
+        "type": "object"
+      },
+      "SavedBoardViewUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "queryString": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Querystring"
+          }
+        },
+        "title": "SavedBoardViewUpdate",
+        "type": "object"
       },
       "ScoutApproveIn": {
         "properties": {
@@ -11793,6 +12035,36 @@
           "required"
         ],
         "title": "SkillTagOut",
+        "type": "object"
+      },
+      "SourceHealthOut": {
+        "properties": {
+          "affectedSources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affectedsources",
+            "type": "array"
+          },
+          "latestFailureAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestfailureat"
+          },
+          "openFailures": {
+            "default": 0,
+            "title": "Openfailures",
+            "type": "integer"
+          }
+        },
+        "title": "SourceHealthOut",
         "type": "object"
       },
       "SourcePatch": {
@@ -16614,6 +16886,242 @@
         "tags": [
           "auth"
         ]
+      }
+    },
+    "/api/board-views": {
+      "get": {
+        "operationId": "list_views_api_board_views_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "board",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "triage",
+                    "shortlist",
+                    "pipeline"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Board"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedBoardViewOut"
+                  },
+                  "title": "Response List Views Api Board Views Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Views"
+      },
+      "post": {
+        "operationId": "create_view_api_board_views_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedBoardViewCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedBoardViewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create View"
+      }
+    },
+    "/api/board-views/{view_id}": {
+      "delete": {
+        "operationId": "delete_view_api_board_views__view_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "view_id",
+            "required": true,
+            "schema": {
+              "title": "View Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete View"
+      },
+      "patch": {
+        "operationId": "update_view_api_board_views__view_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "view_id",
+            "required": true,
+            "schema": {
+              "title": "View Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedBoardViewUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedBoardViewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update View"
       }
     },
     "/api/career-lab/sessions": {
@@ -24536,6 +25044,179 @@
           }
         },
         "summary": "Launch Resume Revise"
+      }
+    },
+    "/api/run-completions": {
+      "get": {
+        "operationId": "list_completions_api_run_completions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunCompletionOut"
+                  },
+                  "title": "Response List Completions Api Run Completions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Completions"
+      }
+    },
+    "/api/run-completions/read-all": {
+      "post": {
+        "operationId": "mark_all_read_api_run_completions_read_all_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCompletionsReadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark All Read"
+      }
+    },
+    "/api/run-completions/{completion_id}/read": {
+      "post": {
+        "operationId": "mark_read_api_run_completions__completion_id__read_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "completion_id",
+            "required": true,
+            "schema": {
+              "title": "Completion Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCompletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Read"
       }
     },
     "/api/runs": {

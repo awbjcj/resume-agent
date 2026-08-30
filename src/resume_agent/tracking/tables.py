@@ -213,6 +213,40 @@ class Notification(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
+class SavedBoardView(SQLModel, table=True):
+    """A named snapshot of one board's canonical URL filter state."""
+
+    __tablename__ = cast(Any, "saved_board_views")
+    __table_args__ = (
+        UniqueConstraint("board", "name", name="uq_saved_board_view_board_name"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    board: str = Field(index=True)
+    name: str
+    query_string: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(
+        default_factory=utcnow, sa_column_kwargs={"onupdate": utcnow}
+    )
+
+
+class RunCompletion(SQLModel, table=True):
+    """Durable terminal run history, independent of short-lived run JSON."""
+
+    __tablename__ = cast(Any, "run_completions")
+    __table_args__ = (UniqueConstraint("run_id", name="uq_run_completion_run_id"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    run_id: str = Field(index=True)
+    kind: str = Field(index=True)
+    label: str = ""
+    status: str = Field(index=True)
+    error: str | None = None
+    completed_at: datetime = Field(index=True)
+    read_at: datetime | None = Field(default=None, index=True)
+
+
 class EmailDraft(SQLModel, table=True):
     __tablename__ = cast(Any, "email_drafts")
 

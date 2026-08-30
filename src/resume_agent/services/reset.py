@@ -18,6 +18,8 @@ from resume_agent.tracking.tables import (
     Job,
     Notification,
     ResumeVersion,
+    RunCompletion,
+    SavedBoardView,
     SkillSuggestion,
 )
 
@@ -29,6 +31,8 @@ class ResetScope(StrEnum):
 
 
 _PIPELINE_TABLES: tuple[type[SQLModel], ...] = (
+    RunCompletion,
+    SavedBoardView,
     Notification,
     Application,
     CoverLetter,

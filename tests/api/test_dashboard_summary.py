@@ -9,10 +9,13 @@ from sqlmodel import Session
 from resume_agent.api.app import create_app
 from resume_agent.interview.store import (
     InterviewContext,
+    InterviewDebrief,
     InterviewStyle,
     InterviewTurnRecord,
     PlanItem,
+    QuestionReview,
     create_session,
+    end_with_debrief,
 )
 from resume_agent.services.errors import record_error
 from resume_agent.tracking.tables import Application, Job
@@ -107,3 +110,49 @@ def test_summary_includes_active_sessions_and_open_error_count(client):
     assert body["openErrorCount"] == 1
     assert body["activeInterviews"][0]["sessionId"] == "active01"
     assert body["activeCoachSession"] is None
+
+
+def test_summary_includes_practice_progress_and_source_health(client):
+    interview_dir = client.app.state.data_dir / "interview"
+    for index, scores in enumerate(([2, 3], [4, 5]), start=1):
+        session_id = f"ended0{index}"
+        create_session(
+            interview_dir,
+            session_id,
+            job_id=index,
+            resume_version_id=index,
+            style=InterviewStyle(question_count=4),
+            context=InterviewContext(company="Acme", title="Engineer"),
+            plan=[PlanItem(id="q1", competency="Python", question_type="technical")],
+            opening_turn=InterviewTurnRecord(
+                role="interviewer", text="Question", question_id="q1"
+            ),
+        )
+        end_with_debrief(
+            interview_dir,
+            session_id,
+            InterviewDebrief(
+                summary="Done",
+                question_reviews=[
+                    QuestionReview(question_id=f"q{score}", score=score)
+                    for score in scores
+                ],
+            ),
+        )
+
+    with Session(client.app.state.engine) as session:
+        record_error(session, kind="source", source_label="LinkedIn", message="blocked")
+        record_error(session, kind="source", source_label="Indeed", message="timeout")
+
+    body = client.get("/api/dashboard/summary").json()
+
+    assert body["practiceStats"] == {
+        "completedSessions": 2,
+        "scoredSessions": 2,
+        "averageScore": 3.5,
+        "latestScore": 4.5,
+        "changeFromFirst": 2.0,
+    }
+    assert body["sourceHealth"]["openFailures"] == 2
+    assert set(body["sourceHealth"]["affectedSources"]) == {"LinkedIn", "Indeed"}
+    assert body["sourceHealth"]["latestFailureAt"] is not None

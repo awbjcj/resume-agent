@@ -813,6 +813,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/board-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Views */
+        get: operations["list_views_api_board_views_get"];
+        put?: never;
+        /** Create View */
+        post: operations["create_view_api_board_views_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/board-views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete View */
+        delete: operations["delete_view_api_board_views__view_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update View */
+        patch: operations["update_view_api_board_views__view_id__patch"];
+        trace?: never;
+    };
     "/api/career-lab/sessions": {
         parameters: {
             query?: never;
@@ -2706,6 +2742,57 @@ export interface paths {
         put?: never;
         /** Launch Resume Revise */
         post: operations["launch_resume_revise_api_resume_versions__version_id__revise_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/run-completions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Completions */
+        get: operations["list_completions_api_run_completions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/run-completions/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark All Read */
+        post: operations["mark_all_read_api_run_completions_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/run-completions/{completion_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Read */
+        post: operations["mark_read_api_run_completions__completion_id__read_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4721,10 +4808,12 @@ export interface components {
              * @default 0
              */
             openErrorCount: number;
+            practiceStats?: components["schemas"]["PracticeStatsOut"];
             /** Queues */
             queues: {
                 [key: string]: number;
             };
+            sourceHealth?: components["schemas"]["SourceHealthOut"];
             /** Statuscounts */
             statusCounts: {
                 [key: string]: number;
@@ -6249,6 +6338,25 @@ export interface components {
             /** Selectedfactids */
             selectedFactIds?: string[];
         };
+        /** PracticeStatsOut */
+        PracticeStatsOut: {
+            /** Averagescore */
+            averageScore?: number | null;
+            /** Changefromfirst */
+            changeFromFirst?: number | null;
+            /**
+             * Completedsessions
+             * @default 0
+             */
+            completedSessions: number;
+            /** Latestscore */
+            latestScore?: number | null;
+            /**
+             * Scoredsessions
+             * @default 0
+             */
+            scoredSessions: number;
+        };
         /** ProfileConfigDoc */
         ProfileConfigDoc: {
             /** Githubrepoallow */
@@ -7060,6 +7168,36 @@ export interface components {
             /** Openairoutemode */
             openaiRouteMode?: ("auto" | "subscription" | "api") | null;
         };
+        /** RunCompletionOut */
+        RunCompletionOut: {
+            /**
+             * Completedat
+             * Format: date-time
+             */
+            completedAt: string;
+            /** Error */
+            error?: string | null;
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Readat */
+            readAt?: string | null;
+            /** Runid */
+            runId: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "succeeded" | "failed" | "cancelled";
+        };
+        /** RunCompletionsReadOut */
+        RunCompletionsReadOut: {
+            /** Markedread */
+            markedRead: number;
+        };
         /** RunOut */
         RunOut: {
             /** Announcedat */
@@ -7095,6 +7233,52 @@ export interface components {
          * @enum {string}
          */
         RunState: "pending" | "running" | "cancelling" | "done" | "error" | "cancelled";
+        /** SavedBoardViewCreate */
+        SavedBoardViewCreate: {
+            /**
+             * Board
+             * @enum {string}
+             */
+            board: "triage" | "shortlist" | "pipeline";
+            /** Name */
+            name: string;
+            /**
+             * Querystring
+             * @default
+             */
+            queryString: string;
+        };
+        /** SavedBoardViewOut */
+        SavedBoardViewOut: {
+            /**
+             * Board
+             * @enum {string}
+             */
+            board: "triage" | "shortlist" | "pipeline";
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Querystring */
+            queryString: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** SavedBoardViewUpdate */
+        SavedBoardViewUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Querystring */
+            queryString?: string | null;
+        };
         /** ScoutApproveIn */
         ScoutApproveIn: {
             /**
@@ -7609,6 +7793,18 @@ export interface components {
             name: string;
             /** Required */
             required: boolean;
+        };
+        /** SourceHealthOut */
+        SourceHealthOut: {
+            /** Affectedsources */
+            affectedSources?: string[];
+            /** Latestfailureat */
+            latestFailureAt?: string | null;
+            /**
+             * Openfailures
+             * @default 0
+             */
+            openFailures: number;
         };
         /** SourcePatch */
         SourcePatch: {
@@ -10073,6 +10269,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_views_api_board_views_get: {
+        parameters: {
+            query?: {
+                board?: ("triage" | "shortlist" | "pipeline") | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBoardViewOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_view_api_board_views_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedBoardViewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBoardViewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_view_api_board_views__view_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                view_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_view_api_board_views__view_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                view_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedBoardViewUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBoardViewOut"];
                 };
             };
             /** @description Validation Error */
@@ -14671,6 +15003,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_completions_api_run_completions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                unread_only?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunCompletionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_all_read_api_run_completions_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunCompletionsReadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_run_completions__completion_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                completion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunCompletionOut"];
                 };
             };
             /** @description Validation Error */

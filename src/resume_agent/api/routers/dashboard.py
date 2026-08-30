@@ -5,9 +5,18 @@ from sqlmodel import Session
 
 from resume_agent.api.deps import get_interview_dir, get_profile_dir, get_session
 from resume_agent.api.schemas.coach import CoachSessionSummaryOut
-from resume_agent.api.schemas.dashboard import DashboardSummaryOut, UpcomingEventOut
+from resume_agent.api.schemas.dashboard import (
+    DashboardSummaryOut,
+    PracticeStatsOut,
+    SourceHealthOut,
+    UpcomingEventOut,
+)
 from resume_agent.api.schemas.interview import InterviewSessionSummaryOut
-from resume_agent.services.dashboard import summarize_dashboard
+from resume_agent.services.dashboard import (
+    summarize_dashboard,
+    summarize_practice,
+    summarize_source_health,
+)
 from resume_agent.services.errors import count_open
 from resume_agent.services.mock_interview import (
     sessions_view as interview_sessions_view,
@@ -25,6 +34,11 @@ def get_dashboard_summary(request: Request, session: Session = Depends(get_sessi
     interview_rows = interview_sessions_view(
         get_interview_dir(request), status="active"
     )["sessions"]
+    ended_interview_rows = interview_sessions_view(
+        get_interview_dir(request), include_archived=True, status="ended"
+    )["sessions"]
+    practice = summarize_practice(ended_interview_rows)
+    source_health = summarize_source_health(session)
     coach_rows = coach_sessions_view(get_profile_dir(request), status="active")[
         "sessions"
     ]
@@ -39,6 +53,8 @@ def get_dashboard_summary(request: Request, session: Session = Depends(get_sessi
         active_coach_session=(
             CoachSessionSummaryOut.model_validate(coach_rows[0]) if coach_rows else None
         ),
+        practice_stats=PracticeStatsOut.model_validate(practice),
+        source_health=SourceHealthOut.model_validate(source_health),
         upcoming_events=[
             UpcomingEventOut(
                 event_id=event.id,
