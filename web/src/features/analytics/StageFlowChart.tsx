@@ -1,12 +1,13 @@
 import { ResponsiveContainer, Sankey, Tooltip, type SankeyLinkProps } from "recharts";
+import { useTranslation } from "react-i18next";
 
 import type { components } from "@/lib/api/schema";
-import { CHART_COLORS, STAGE_LABELS, STAGE_ORDER, tooltipProps } from "./chart-theme";
+import { CHART_COLORS, stageLabel, STAGE_ORDER, tooltipProps } from "./chart-theme";
 import { RateLabel } from "./RateLabel";
 
 type Flow = components["schemas"]["FlowEdgeOut"];
 
-export function toSankeyData(flows: Flow[]) {
+export function toSankeyData(flows: Flow[], t?: Parameters<typeof stageLabel>[1]) {
   const stageIndex = new Map<string, number>(STAGE_ORDER.map((kind, index) => [kind, index]));
   const exits = new Set(["rejected", "no_response", "withdrawn"]);
   const safeFlows = flows.filter((flow) => {
@@ -36,7 +37,7 @@ export function toSankeyData(flows: Flow[]) {
     targetKind: flow.target,
     color: edgeColor(flow.target),
   }));
-  return { nodes: names.map((name) => ({ name: STAGE_LABELS[name] ?? name })), links };
+  return { nodes: names.map((name) => ({ name: stageLabel(name, t) })), links };
 }
 
 function SankeyLink({
@@ -69,10 +70,11 @@ function edgeColor(target: string): string {
 }
 
 export function StageFlowChart({ flows }: { flows: Flow[] }) {
+  const { t } = useTranslation();
   if (flows.length === 0) {
     return <p className="text-sm text-muted-foreground">Not enough history yet — log a few stages to see where applications go.</p>;
   }
-  const data = toSankeyData(flows);
+  const data = toSankeyData(flows, t);
   if (data.links.length === 0) {
     return <p className="text-sm text-muted-foreground">Not enough forward stage history yet — repeated and out-of-order entries stay in the timeline without distorting this chart.</p>;
   }
@@ -93,7 +95,7 @@ export function StageFlowChart({ flows }: { flows: Flow[] }) {
             style={{ borderLeftColor: edgeColor(link.targetKind) }}
           >
             <p className="font-medium">
-              {STAGE_LABELS[link.sourceKind] ?? link.sourceKind} → {STAGE_LABELS[link.targetKind] ?? link.targetKind}
+              {stageLabel(link.sourceKind, t)} → {stageLabel(link.targetKind, t)}
             </p>
             <RateLabel count={link.count} total={link.total} />
           </div>

@@ -1,4 +1,6 @@
 import { AlertTriangle, Globe, KeyRound, Undo2, Waypoints } from "lucide-react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -18,49 +20,27 @@ import type { components } from "@/lib/api/schema";
 type ProviderStatus = components["schemas"]["ProviderRoutingStatus"];
 export type RouteMode = ProviderStatus["routeMode"];
 
+function configurationErrorLabel(t: TFunction, error: string): string {
+  const subscription = /^(.+) is pinned to subscription mode but ([A-Z0-9_]+) is unset$/.exec(error);
+  if (subscription) {
+    const [, provider, setting] = subscription;
+    return setting === "SUB2API_BASE_URL"
+      ? t("providerRouting.errors.subscriptionBaseUrlUnset", { provider })
+      : t("providerRouting.errors.subscriptionKeyUnset", { provider, setting });
+  }
+  const keyWithoutBaseUrl = /^([A-Z0-9_]+) is set but SUB2API_BASE_URL is unset, so there is nowhere to send the call$/.exec(error);
+  if (keyWithoutBaseUrl) return t("providerRouting.errors.keyWithoutBaseUrl", { setting: keyWithoutBaseUrl[1] });
+  const invalidBaseUrl = /^([A-Z0-9_]+) must be an absolute http\(s\) URL with no credentials, query, or fragment \(got (.+)\)$/.exec(error);
+  if (invalidBaseUrl) return t("providerRouting.errors.invalidBaseUrl", { setting: invalidBaseUrl[1], value: invalidBaseUrl[2] });
+  return error;
+}
+
 /**
  * The single source for every place a route mode is named: the closed select
  * trigger, the option list, and the explanation under it. Passing this array to
  * the Select root also pre-populates Base UI's label store, so the trigger shows
- * "Direct API" on first paint instead of the raw value "api".
+ * a localized label on first paint instead of the raw value "api".
  */
-export const ROUTE_MODES: ReadonlyArray<{
-  value: RouteMode;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: "auto",
-    label: "Auto",
-    description:
-      "Use the subscription gateway when its key is configured; otherwise use the direct API.",
-  },
-  {
-    value: "subscription",
-    label: "Subscription",
-    description:
-      "Require the gateway. Incomplete configuration fails before a paid API call can start.",
-  },
-  {
-    value: "api",
-    label: "Direct API",
-    description: "Always use the provider's direct metered API and ignore its gateway key.",
-  },
-];
-
-const modeCopy = (mode: RouteMode) => ROUTE_MODES.find((entry) => entry.value === mode) ?? ROUTE_MODES[0];
-
-/** Status is derived once so the badge's wording, colour, and icon can never disagree. */
-function routeStatus(provider: ProviderStatus) {
-  if (provider.configurationError) {
-    return { label: "Needs attention", variant: "destructive" as const, Icon: AlertTriangle };
-  }
-  if (provider.effectiveMode === "subscription") {
-    return { label: "Subscription", variant: "default" as const, Icon: Waypoints };
-  }
-  return { label: "Direct API", variant: "outline" as const, Icon: Globe };
-}
-
 export function ProviderRouteCard({
   provider,
   mode,
@@ -76,7 +56,30 @@ export function ProviderRouteCard({
   onModeChange: (mode: RouteMode) => void;
   onKeyChange: (value: string | null | undefined) => void;
 }) {
-  const status = routeStatus(provider);
+  const { t } = useTranslation();
+  const routeModes = [
+    {
+      value: "auto" as const,
+      label: t("providerRouting.modes.auto.label"),
+      description: t("providerRouting.modes.auto.description"),
+    },
+    {
+      value: "subscription" as const,
+      label: t("providerRouting.modes.subscription.label"),
+      description: t("providerRouting.modes.subscription.description"),
+    },
+    {
+      value: "api" as const,
+      label: t("providerRouting.modes.api.label"),
+      description: t("providerRouting.modes.api.description"),
+    },
+  ] satisfies ReadonlyArray<{ value: RouteMode; label: string; description: string }>;
+  const modeCopy = routeModes.find((entry) => entry.value === mode) ?? routeModes[0];
+  const status = provider.configurationError
+    ? { label: t("providerRouting.status.needsAttention"), variant: "destructive" as const, Icon: AlertTriangle }
+    : provider.effectiveMode === "subscription"
+      ? { label: t("providerRouting.status.subscription"), variant: "default" as const, Icon: Waypoints }
+      : { label: t("providerRouting.status.api"), variant: "outline" as const, Icon: Globe };
   const clearing = keyDraft === null;
   const edited = mode !== provider.routeMode || keyDraft !== undefined;
   const keyId = `${provider.provider}-gateway-key`;
@@ -94,13 +97,13 @@ export function ProviderRouteCard({
             <CardDescription className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs">
               {provider.effectiveMode === "subscription" ? (
                 <>
-                  <span className="font-mono">{gatewayHost || "gateway"}</span>
-                  <span>· quota-exempt</span>
+                  <span className="font-mono">{gatewayHost || t("providerRouting.gatewayFallback")}</span>
+                  <span>· {t("providerRouting.summary.quotaExempt")}</span>
                 </>
               ) : (
-                <span>Provider API · metered spend</span>
+                <span>{t("providerRouting.summary.apiMetered")}</span>
               )}
-              {edited ? <span className="text-primary">· unsaved</span> : null}
+              {edited ? <span className="text-primary">· {t("providerRouting.summary.unsaved")}</span> : null}
             </CardDescription>
           </div>
           <Badge variant={status.variant}>
@@ -115,26 +118,26 @@ export function ProviderRouteCard({
           <Alert variant="destructive">
             <AlertTriangle aria-hidden="true" />
             <AlertTitle>Configuration incomplete</AlertTitle>
-            <AlertDescription>{provider.configurationError}</AlertDescription>
+            <AlertDescription>{configurationErrorLabel(t, provider.configurationError)}</AlertDescription>
           </Alert>
         ) : null}
 
         <Field>
           <FieldLabel htmlFor={`${provider.provider}-route-mode`}>Route mode</FieldLabel>
           <Select
-            items={ROUTE_MODES}
+            items={routeModes}
             value={mode}
             onValueChange={(value) => onModeChange(value as RouteMode)}
           >
             <SelectTrigger
               id={`${provider.provider}-route-mode`}
-              aria-label={`${provider.label} route mode`}
+              aria-label={t("providerRouting.routeModeFor", { provider: provider.label })}
               className="w-full"
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {ROUTE_MODES.map((entry) => (
+              {routeModes.map((entry) => (
                 <SelectItem key={entry.value} value={entry.value}>
                   {entry.label}
                 </SelectItem>
@@ -143,7 +146,7 @@ export function ProviderRouteCard({
           </Select>
           {/* Reserve the taller of the three explanations so switching modes
               cannot shuffle the cards below it. */}
-          <FieldDescription className="min-h-10">{modeCopy(mode).description}</FieldDescription>
+          <FieldDescription className="min-h-10">{modeCopy.description}</FieldDescription>
         </Field>
 
         <Field>

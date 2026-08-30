@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { ApplicationsTable } from "./ApplicationsTable";
 
 const cell = (over: Record<string, unknown> = {}) => ({
@@ -66,6 +67,22 @@ describe("ApplicationsTable", () => {
     const detail = screen.getByRole("button", { name: /technical round 1 details/i });
     await user.click(detail);
     expect(screen.getByText(/Advanced · Virtual · Zoom · A. Interviewer/i)).toBeVisible();
+  });
+
+  it("localizes timeline stages, status, and event metadata in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <ApplicationsTable table={table as never} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "技术面 2" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "职位" })).toBeInTheDocument();
+    expect(screen.getByText("面试中")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "技术面 1详情" }));
+    expect(screen.getByText(/进入下一轮 · 线上 · Zoom · A. Interviewer/)).toBeVisible();
   });
 
   it("shows an empty state", () => {

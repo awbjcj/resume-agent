@@ -1,4 +1,5 @@
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
+import { useTranslation } from "react-i18next";
 
 import {
   ChartContainer,
@@ -18,13 +19,13 @@ type Cohort = components["schemas"]["CohortOut"];
 // (`--muted-foreground`, `--foreground`), which made the volume series read as
 // disabled and the offers series as body copy — and left the purpose-built
 // `--chart-*` ramp, which is already tuned for both themes, entirely unused.
-const config: ChartConfig = {
-  applications: { label: "Apps", color: "var(--chart-4)" },
-  interviews: { label: "Interviews", color: "var(--chart-1)" },
-  offers: { label: "Offers", color: "var(--chart-2)" },
-};
-
 export function ConversionChart({ rows }: { rows: Cohort[] }) {
+  const { t } = useTranslation();
+  const config: ChartConfig = {
+    applications: { label: t("analytics.conversion.applications"), color: "var(--chart-4)" },
+    interviews: { label: t("analytics.conversion.interviews"), color: "var(--chart-1)" },
+    offers: { label: t("analytics.conversion.offers"), color: "var(--chart-2)" },
+  };
   // Visual enhancement only; the cohort table is the canonical accessible form.
   return (
     <div
@@ -32,8 +33,8 @@ export function ConversionChart({ rows }: { rows: Cohort[] }) {
       className="rounded-lg border bg-card p-5 shadow-card"
     >
       <div className="mb-4">
-        <div className="text-sm font-semibold">Conversion shape</div>
-        <div className="text-xs text-muted-foreground">Applications, interviews, and offers.</div>
+        <div className="text-sm font-semibold">{t("analytics.conversion.title")}</div>
+        <div className="text-xs text-muted-foreground">{t("analytics.conversion.description")}</div>
       </div>
       <ChartContainer config={config} className="h-72 w-full">
         <BarChart data={rows} accessibilityLayer>

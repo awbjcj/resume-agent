@@ -10,41 +10,47 @@ const ECONOMICAL_RATE_LIMIT_MICROS = 5_000_000;
 const PREMIUM_RATE_LIMIT_MICROS = 20_000_000;
 
 export const RATE_COST_BAND_STYLES: Record<RateCostBand, {
-  label: string;
-  detail: string;
   rail: string;
   badge: string;
 }> = {
   economical: {
-    label: "Economical",
-    detail: "Up to $5 / 1M",
     rail: "bg-chart-2",
     badge: "border-chart-2/30 bg-chart-2/10 text-chart-2",
   },
   standard: {
-    label: "Standard",
-    detail: "$5–$20 / 1M",
     rail: "bg-primary",
     badge: "border-primary/30 bg-primary/10 text-primary",
   },
   premium: {
-    label: "Premium",
-    detail: "Over $20 / 1M",
     rail: "bg-ready",
     badge: "border-ready/30 bg-ready/10 text-ready",
   },
 };
 
-export const RATE_SORT_LABELS: Record<RateSortKey, string> = {
-  model: "Provider and model",
-  context: "Context band",
-  input: "Input rate",
-  cache: "Cache rate",
-  output: "Output rate",
-  tool: "Tool fee",
-  hours: "Billing hours",
-  effective: "Effective date",
+export const RATE_COST_BAND_LABEL_KEYS: Record<RateCostBand, string> = {
+  economical: "adminQuota.rate.bands.economical.label",
+  standard: "adminQuota.rate.bands.standard.label",
+  premium: "adminQuota.rate.bands.premium.label",
 };
+
+export const RATE_COST_BAND_DETAIL_KEYS: Record<RateCostBand, string> = {
+  economical: "adminQuota.rate.bands.economical.detail",
+  standard: "adminQuota.rate.bands.standard.detail",
+  premium: "adminQuota.rate.bands.premium.detail",
+};
+
+export const RATE_SORT_LABEL_KEYS: Record<RateSortKey, string> = {
+  model: "adminQuota.rate.sort.model",
+  context: "adminQuota.rate.sort.context",
+  input: "adminQuota.rate.sort.input",
+  cache: "adminQuota.rate.sort.cache",
+  output: "adminQuota.rate.sort.output",
+  tool: "adminQuota.rate.sort.tool",
+  hours: "adminQuota.rate.sort.hours",
+  effective: "adminQuota.rate.sort.effective",
+};
+
+export type RateVersionStatus = "active" | "scheduled" | "historical";
 
 export function rateCostBand(rate: LlmRate): RateCostBand {
   const referenceMicros = rate.inputMicrosPerMillion + rate.outputMicrosPerMillion;
@@ -53,10 +59,10 @@ export function rateCostBand(rate: LlmRate): RateCostBand {
   return "standard";
 }
 
-export function rateVersionStatus(rate: LlmRate, now = Date.now()): "Active" | "Scheduled" | "Historical" {
-  if (new Date(rate.effectiveFrom).getTime() > now) return "Scheduled";
-  if (rate.effectiveTo && new Date(rate.effectiveTo).getTime() <= now) return "Historical";
-  return "Active";
+export function rateVersionStatus(rate: LlmRate, now = Date.now()): RateVersionStatus {
+  if (new Date(rate.effectiveFrom).getTime() > now) return "scheduled";
+  if (rate.effectiveTo && new Date(rate.effectiveTo).getTime() <= now) return "historical";
+  return "active";
 }
 
 function compareNullable(a: number | null, b: number | null, direction: SortDirection): number {

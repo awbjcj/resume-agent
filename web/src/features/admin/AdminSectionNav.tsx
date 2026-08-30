@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 
@@ -8,16 +9,17 @@ import { Button } from "@/components/ui/button";
  * labelled differently than the tab that leads back to it.
  */
 const ADMIN_SECTIONS = [
-  { to: "/admin", label: "Access & data" },
-  { to: "/admin/quotas", label: "Cost quotas" },
-  { to: "/admin/routing", label: "Provider routing" },
+  { to: "/admin", labelKey: "admin.sections.accessData" },
+  { to: "/admin/quotas", labelKey: "admin.sections.costQuotas" },
+  { to: "/admin/routing", labelKey: "admin.sections.providerRouting" },
 ] as const;
 
 export type AdminSection = (typeof ADMIN_SECTIONS)[number]["to"];
 
 export function AdminSectionNav({ current }: { current: AdminSection }) {
+  const { t } = useTranslation();
   return (
-    <nav aria-label="Administration sections" className="shell-action-rail -mt-5 flex flex-nowrap gap-2 pb-1">
+    <nav aria-label={t("admin.sections.navigation")} className="shell-action-rail -mt-5 flex flex-nowrap gap-2 pb-1">
       {ADMIN_SECTIONS.map((section) => {
         const isCurrent = section.to === current;
         return (
@@ -30,7 +32,7 @@ export function AdminSectionNav({ current }: { current: AdminSection }) {
             aria-current={isCurrent ? "page" : undefined}
             render={<Link to={section.to} />}
           >
-            {section.label}
+            {t(section.labelKey)}
           </Button>
         );
       })}

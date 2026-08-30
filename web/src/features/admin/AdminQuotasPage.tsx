@@ -17,6 +17,8 @@ import {
   Users,
 } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -49,8 +51,10 @@ import { useModelCatalog } from "@/features/settings/use-model-catalog";
 import {
   groupAndSortRates,
   latestVersion,
+  RATE_COST_BAND_DETAIL_KEYS,
+  RATE_COST_BAND_LABEL_KEYS,
   RATE_COST_BAND_STYLES,
-  RATE_SORT_LABELS,
+  RATE_SORT_LABEL_KEYS,
   rateCostBand,
   rateVersionStatus,
   type LlmRate,
@@ -77,34 +81,65 @@ const CUSTOM_MODEL = "__custom__";
 const ALL_BALANCES = "ALL";
 const CYCLE_COUNTS = Array.from({ length: 52 }, (_, index) => index + 1);
 
-const TARGET_LABELS: Record<QuotaTargetType, string> = {
-  USER: "One member",
-  TIER: "One tier",
-  ALL_MEMBERS: "All members",
+const TARGET_LABEL_KEYS: Record<QuotaTargetType, string> = {
+  USER: "adminQuota.targets.member",
+  TIER: "adminQuota.targets.tier",
+  ALL_MEMBERS: "adminQuota.targets.allMembers",
 };
 
-const ACTION_LABELS: Record<QuotaActionType, string> = {
-  GRANT_CREDIT: "Grant credit",
-  DEBIT_CREDIT: "Debit credit",
-  RESET_CURRENT_PERIOD: "Reset current period",
+const ACTION_LABEL_KEYS: Record<QuotaActionType, string> = {
+  GRANT_CREDIT: "adminQuota.actions.grantCredit",
+  DEBIT_CREDIT: "adminQuota.actions.debitCredit",
+  RESET_CURRENT_PERIOD: "adminQuota.actions.resetCurrentPeriod",
 };
 
-const RATE_PERIOD_LABELS: Record<RatePeriodChoice, string> = {
-  all: "Every hour",
-  peak: "Peak hours",
-  off_peak: "Off-peak hours",
+const RATE_PERIOD_LABEL_KEYS: Record<RatePeriodChoice, string> = {
+  all: "adminQuota.rate.periods.all",
+  peak: "adminQuota.rate.periods.peak",
+  off_peak: "adminQuota.rate.periods.offPeak",
 };
 
-const BALANCE_LABELS: Record<string, string> = {
-  [ALL_BALANCES]: "All balances",
-  POSITIVE: "Positive",
-  ZERO: "Depleted",
-  OVERAGE: "Overage",
-  UNLIMITED: "Unlimited",
+const BALANCE_LABEL_KEYS: Record<string, string> = {
+  [ALL_BALANCES]: "adminQuota.balances.all",
+  POSITIVE: "adminQuota.balances.positive",
+  ZERO: "adminQuota.balances.depleted",
+  OVERAGE: "adminQuota.balances.overage",
+  UNLIMITED: "adminQuota.balances.unlimited",
 };
 
-function usd(micros: number | null | undefined): string {
-  if (micros == null) return "Unlimited";
+const ACCOUNT_STATUS_LABEL_KEYS: Record<QuotaAccount["status"], string> = {
+  ACTIVE: "adminQuota.accountStatuses.active",
+  EXHAUSTED: "adminQuota.accountStatuses.exhausted",
+  OVERAGE: "adminQuota.accountStatuses.overage",
+  UNLIMITED: "adminQuota.accountStatuses.unlimited",
+};
+
+const LEDGER_KIND_LABEL_KEYS: Record<string, string> = {
+  USAGE: "adminQuota.ledgerKinds.usage",
+  CREDIT_GRANT: "adminQuota.ledgerKinds.creditGrant",
+  CREDIT_DEBIT: "adminQuota.ledgerKinds.creditDebit",
+  RESET: "adminQuota.ledgerKinds.reset",
+  TIER_CHANGE: "adminQuota.ledgerKinds.tierChange",
+  TIER_ALLOWANCE_CHANGE: "adminQuota.ledgerKinds.tierAllowanceChange",
+  OVERRIDE_CHANGE: "adminQuota.ledgerKinds.overrideChange",
+};
+
+function quotaActionLabel(t: TFunction, action: string): string {
+  const key = ACTION_LABEL_KEYS[action as QuotaActionType];
+  return key ? t(key) : action.replaceAll("_", " ");
+}
+
+function quotaAccountStatusLabel(t: TFunction, status: QuotaAccount["status"]): string {
+  return t(ACCOUNT_STATUS_LABEL_KEYS[status]);
+}
+
+function quotaLedgerKindLabel(t: TFunction, kind: string): string {
+  const key = LEDGER_KIND_LABEL_KEYS[kind];
+  return key ? t(key) : kind.replaceAll("_", " ");
+}
+
+function usd(t: TFunction, micros: number | null | undefined): string {
+  if (micros == null) return t("adminQuota.values.unlimited");
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: "USD",
@@ -113,8 +148,8 @@ function usd(micros: number | null | undefined): string {
   }).format(micros / MICROS_PER_USD);
 }
 
-function optionalUsd(micros: number | null | undefined): string {
-  return micros == null ? "—" : usd(micros);
+function optionalUsd(t: TFunction, micros: number | null | undefined): string {
+  return micros == null ? "—" : usd(t, micros);
 }
 
 function tokens(value: number): string {
@@ -151,15 +186,21 @@ function tierIdFromName(name: string): string {
   return identifier.slice(0, 32).replace(/_+$/g, "") || "TIER";
 }
 
-function cycleSuffix(unit: CycleUnit, count: number): string {
-  const label = unit === "WEEK" ? "week" : "month";
-  return count === 1 ? `every ${label}` : `every ${count} ${label}s`;
+function cycleSuffix(t: TFunction, unit: CycleUnit, count: number): string {
+  if (unit === "WEEK") {
+    return count === 1
+      ? t("adminQuota.cycles.everyWeek")
+      : t("adminQuota.cycles.everyWeeks", { count });
+  }
+  return count === 1
+    ? t("adminQuota.cycles.everyMonth")
+    : t("adminQuota.cycles.everyMonths", { count });
 }
 
 /** Agrees with the count beside it, so the pair never reads "Every 1 Months". */
-function unitLabel(unit: CycleUnit, count: string): string {
-  const label = unit === "WEEK" ? "Week" : "Month";
-  return count === "1" ? label : `${label}s`;
+function unitLabel(t: TFunction, unit: CycleUnit, count: string): string {
+  if (unit === "WEEK") return t(count === "1" ? "adminQuota.cycles.week" : "adminQuota.cycles.weeks");
+  return t(count === "1" ? "adminQuota.cycles.month" : "adminQuota.cycles.months");
 }
 
 /**
@@ -254,6 +295,7 @@ function SortableRateHead({
   direction: SortDirection;
   onSort: (key: RateSortKey) => void;
 }) {
+  const { t } = useTranslation();
   const active = activeKey === sortKey;
   const Icon = active ? (direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
 
@@ -264,7 +306,7 @@ function SortableRateHead({
         className="-mx-1 inline-flex h-8 items-center gap-1 rounded-md px-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         onClick={() => onSort(sortKey)}
       >
-        {RATE_SORT_LABELS[sortKey]}
+        {t(RATE_SORT_LABEL_KEYS[sortKey])}
         <Icon className={cn("size-3.5", active ? "text-primary" : "text-muted-foreground/60")} aria-hidden="true" />
       </button>
     </TableHead>
@@ -272,6 +314,7 @@ function SortableRateHead({
 }
 
 function RateVersionsTable({ rates }: { rates: LlmRate[] }) {
+  const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<RateSortKey>("effective");
   const [direction, setDirection] = useState<SortDirection>("desc");
   const groups = useMemo(
@@ -320,7 +363,7 @@ function RateVersionsTable({ rates }: { rates: LlmRate[] }) {
                   <div className="font-mono text-sm font-semibold">{group.model}</div>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="text-xs capitalize text-muted-foreground">{group.provider}</span>
-                    <Badge variant="outline" className={cn("h-5 px-1.5 text-[0.65rem]", tone.badge)}>{tone.label}</Badge>
+                    <Badge variant="outline" className={cn("h-5 px-1.5 text-[0.65rem]", tone.badge)}>{t(RATE_COST_BAND_LABEL_KEYS[band])}</Badge>
                   </div>
                   {group.versions.length > 1 ? (
                     <div className="mt-2 text-[0.68rem] text-muted-foreground">{group.versions.length} versions · newest first</div>
@@ -328,18 +371,20 @@ function RateVersionsTable({ rates }: { rates: LlmRate[] }) {
                 </TableCell>
               ) : null}
               <TableCell className="font-mono">{tokens(rate.contextMinTokens)}–{rate.contextMaxTokens == null ? "∞" : tokens(rate.contextMaxTokens)}</TableCell>
-              <TableCell className="font-mono tabular-nums">{usd(rate.inputMicrosPerMillion)}</TableCell>
-              <TableCell className="font-mono tabular-nums">{optionalUsd(rate.cacheReadMicrosPerMillion)} / {optionalUsd(rate.cacheWriteMicrosPerMillion)}</TableCell>
-              <TableCell className="font-mono tabular-nums">{usd(rate.outputMicrosPerMillion)}</TableCell>
-              <TableCell className="font-mono tabular-nums">{optionalUsd(rate.toolMicrosPerUnit)}</TableCell>
-              <TableCell className="capitalize">{rate.ratePeriod ? rate.ratePeriod.replace("_", "-") : "Every hour"}</TableCell>
+              <TableCell className="font-mono tabular-nums">{usd(t, rate.inputMicrosPerMillion)}</TableCell>
+              <TableCell className="font-mono tabular-nums">{optionalUsd(t, rate.cacheReadMicrosPerMillion)} / {optionalUsd(t, rate.cacheWriteMicrosPerMillion)}</TableCell>
+              <TableCell className="font-mono tabular-nums">{usd(t, rate.outputMicrosPerMillion)}</TableCell>
+              <TableCell className="font-mono tabular-nums">{optionalUsd(t, rate.toolMicrosPerUnit)}</TableCell>
+              <TableCell>{t(RATE_PERIOD_LABEL_KEYS[rate.ratePeriod ?? "all"])}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
                   <span className="font-mono">{new Date(rate.effectiveFrom).toLocaleDateString()}</span>
-                  <Badge variant="outline" className="h-5 px-1.5 text-[0.65rem]">{status}</Badge>
+                  <Badge variant="outline" className="h-5 px-1.5 text-[0.65rem]">{t(`adminQuota.rate.statuses.${status}`)}</Badge>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {rate.effectiveTo ? `until ${new Date(rate.effectiveTo).toLocaleDateString()}` : "No end date"}
+                  {rate.effectiveTo
+                    ? t("adminQuota.rate.effectiveUntil", { date: new Date(rate.effectiveTo).toLocaleDateString() })
+                    : t("adminQuota.rate.noEndDate")}
                 </div>
               </TableCell>
             </TableRow>
@@ -361,6 +406,7 @@ function AccountDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [tierId, setTierId] = useState("");
   const [override, setOverride] = useState("");
@@ -420,17 +466,17 @@ function AccountDrawer({
                 <dt className="text-muted-foreground">Status</dt>
                 <dd className="mt-1">
                   <Badge variant={account.status === "OVERAGE" ? "destructive" : "outline"}>
-                    {account.status}
+                    {quotaAccountStatusLabel(t, account.status)}
                   </Badge>
                 </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Period spend</dt>
-                <dd className="mt-1 font-mono">{usd(account.spentMicros)}</dd>
+                <dd className="mt-1 font-mono">{usd(t, account.spentMicros)}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Credits</dt>
-                <dd className="mt-1 font-mono">{usd(account.creditBalanceMicros)}</dd>
+                <dd className="mt-1 font-mono">{usd(t, account.creditBalanceMicros)}</dd>
               </div>
             </dl>
 
@@ -522,8 +568,8 @@ function AccountDrawer({
                   {ledger.data.data.map((entry) => (
                     <li key={entry.id} className="rounded-lg border p-3 text-xs">
                       <div className="flex justify-between gap-3">
-                        <span className="font-medium">{entry.kind.replaceAll("_", " ")}</span>
-                        <span className="font-mono">{usd(entry.amountMicros)}</span>
+                        <span className="font-medium">{quotaLedgerKindLabel(t, entry.kind)}</span>
+                        <span className="font-mono">{usd(t, entry.amountMicros)}</span>
                       </div>
                       <div className="mt-1 text-muted-foreground">
                         {entry.reason ?? "Automated usage accounting"} · {new Date(entry.createdAt).toLocaleString()}
@@ -556,6 +602,7 @@ function QuotaOperationCard({
   title: string;
   description: string;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [targetType, setTargetType] = useState<QuotaTargetType>(targetTypes[0]);
   const [targetValue, setTargetValue] = useState("");
@@ -626,11 +673,11 @@ function QuotaOperationCard({
             <Field label="Scope" htmlFor={`${title}-scope`} className="w-36">
               <Select value={targetType} onValueChange={(value) => changeTargetType(value as QuotaTargetType)}>
                 <SelectTrigger id={`${title}-scope`} size="compact" className={CONTROL_TRIGGER} aria-label="Target scope">
-                  <SelectValue>{(value) => TARGET_LABELS[value as QuotaTargetType]}</SelectValue>
+                  <SelectValue>{(value) => t(TARGET_LABEL_KEYS[value as QuotaTargetType])}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {targetTypes.map((type) => (
-                    <SelectItem key={type} value={type}>{TARGET_LABELS[type]}</SelectItem>
+                    <SelectItem key={type} value={type}>{t(TARGET_LABEL_KEYS[type])}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -703,11 +750,11 @@ function QuotaOperationCard({
               }}
             >
               <SelectTrigger id={`${title}-action`} size="compact" className={CONTROL_TRIGGER} aria-label="Quota action">
-                <SelectValue>{(value) => ACTION_LABELS[value as QuotaActionType]}</SelectValue>
+                  <SelectValue>{(value) => t(ACTION_LABEL_KEYS[value as QuotaActionType])}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(ACTION_LABELS) as QuotaActionType[]).map((action) => (
-                  <SelectItem key={action} value={action}>{ACTION_LABELS[action]}</SelectItem>
+                {(Object.keys(ACTION_LABEL_KEYS) as QuotaActionType[]).map((action) => (
+                  <SelectItem key={action} value={action}>{t(ACTION_LABEL_KEYS[action])}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -758,7 +805,7 @@ function QuotaOperationCard({
                 {`${preview.affectedCount} account${preview.affectedCount === 1 ? "" : "s"} frozen for review`}
               </div>
               <div className="mt-0.5 text-xs text-muted-foreground">
-                Total effect {usd(preview.totalEffectMicros)} · preview expires {new Date(preview.expiresAt).toLocaleTimeString()}
+                Total effect {usd(t, preview.totalEffectMicros)} · preview expires {new Date(preview.expiresAt).toLocaleTimeString()}
               </div>
             </div>
             <Button
@@ -863,6 +910,7 @@ function TierEditor({
   isArchiving: boolean;
   error: string | null;
 }) {
+  const { t } = useTranslation();
   const prefix = mode === "create" ? "new-tier" : "edit-tier";
   const allowanceMicros = optionalMicros(form.allowance);
   const allowanceIsValid = allowanceMicros !== undefined;
@@ -951,11 +999,11 @@ function TierEditor({
               className={CONTROL_TRIGGER}
               aria-label={mode === "create" ? "New tier cycle period" : "Tier cycle period"}
             >
-              <SelectValue>{(value) => unitLabel(value as CycleUnit, form.cycleCount)}</SelectValue>
+              <SelectValue>{(value) => unitLabel(t, value as CycleUnit, form.cycleCount)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="MONTH">{unitLabel("MONTH", form.cycleCount)}</SelectItem>
-              <SelectItem value="WEEK">{unitLabel("WEEK", form.cycleCount)}</SelectItem>
+              <SelectItem value="MONTH">{unitLabel(t, "MONTH", form.cycleCount)}</SelectItem>
+              <SelectItem value="WEEK">{unitLabel(t, "WEEK", form.cycleCount)}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -979,7 +1027,7 @@ function TierEditor({
         <p id="new-tier-id-rule" className="text-xs text-muted-foreground">
           {mode === "create"
             ? "The short ID is permanent. Use A–Z, 0–9 and underscores, starting with a letter."
-            : `${tier?.memberCount ?? 0} member${tier?.memberCount === 1 ? "" : "s"} on this tier · ${usd(tier?.spendMicros ?? 0)} spent this period`}
+            : `${tier?.memberCount ?? 0} member${tier?.memberCount === 1 ? "" : "s"} on this tier · ${usd(t, tier?.spendMicros ?? 0)} spent this period`}
         </p>
         <div className="flex gap-2">
           {mode === "edit" && tier && !tier.isDefault ? (
@@ -1013,6 +1061,7 @@ function TierEditor({
 }
 
 function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAccount[] }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -1179,13 +1228,13 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
                   </div>
                   <span className="truncate font-mono text-xs text-muted-foreground">{tier.id}</span>
                   <div className="min-w-0">
-                    <div className="truncate font-mono text-sm tabular-nums">{usd(tier.allowanceMicros)}</div>
+                    <div className="truncate font-mono text-sm tabular-nums">{usd(t, tier.allowanceMicros)}</div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {cycleSuffix(tier.cycleUnit, tier.cycleCount)}
+                      {cycleSuffix(t, tier.cycleUnit, tier.cycleCount)}
                     </div>
                   </div>
                   <span className="text-right font-mono text-sm tabular-nums">{tier.memberCount}</span>
-                  <span className="text-right font-mono text-sm tabular-nums">{usd(tier.spendMicros)}</span>
+                  <span className="text-right font-mono text-sm tabular-nums">{usd(t, tier.spendMicros)}</span>
                   <Button
                     size="xs"
                     variant="ghost"
@@ -1237,6 +1286,7 @@ function TierPanel({ tiers, accounts }: { tiers: QuotaTier[]; accounts: QuotaAcc
 }
 
 function RateCreator({ rates }: { rates: LlmRate[] }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const modelCatalog = useModelCatalog();
   const [providerChoice, setProviderChoice] = useState<string | null>(null);
@@ -1375,10 +1425,10 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
           {provider === "deepseek" ? (
             <Field label="Billing hours" htmlFor="rate-period" className="w-full sm:w-40">
               <Select value={ratePeriod} onValueChange={(value) => setRatePeriod(value as RatePeriodChoice)}>
-                <SelectTrigger id="rate-period" size="compact" className={CONTROL_TRIGGER} aria-label="Rate billing hours"><SelectValue>{(value) => RATE_PERIOD_LABELS[value as RatePeriodChoice]}</SelectValue></SelectTrigger>
+                <SelectTrigger id="rate-period" size="compact" className={CONTROL_TRIGGER} aria-label="Rate billing hours"><SelectValue>{(value) => t(RATE_PERIOD_LABEL_KEYS[value as RatePeriodChoice])}</SelectValue></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(RATE_PERIOD_LABELS) as RatePeriodChoice[]).map((period) => (
-                    <SelectItem key={period} value={period}>{RATE_PERIOD_LABELS[period]}</SelectItem>
+                  {(Object.keys(RATE_PERIOD_LABEL_KEYS) as RatePeriodChoice[]).map((period) => (
+                    <SelectItem key={period} value={period}>{t(RATE_PERIOD_LABEL_KEYS[period])}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1436,11 +1486,12 @@ function RateCreator({ rates }: { rates: LlmRate[] }) {
 }
 
 function operationTargetLabel(
+  t: TFunction,
   operation: components["schemas"]["QuotaOperationOut"],
   accounts: QuotaAccount[],
   tiers: QuotaTier[],
 ): string {
-  if (operation.targetType === "ALL_MEMBERS") return "All members";
+  if (operation.targetType === "ALL_MEMBERS") return t("adminQuota.targets.allMembers");
   if (operation.targetType === "USER") {
     return accounts.find((account) => account.userId === operation.targetValue)?.username ?? operation.targetValue ?? "Member";
   }
@@ -1449,6 +1500,7 @@ function operationTargetLabel(
 }
 
 export function AdminQuotasPage() {
+  const { t } = useTranslation();
   const me = useMe();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<QuotaAccount | null>(null);
@@ -1511,9 +1563,9 @@ export function AdminQuotasPage() {
         </div>
         <div className="p-5">
           <dl className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-            <Metric label="Month spend" value={usd(summary.data.monthlySpendMicros)} detail="Shared platform keys" />
-            <Metric label="Platform cap" value={usd(summary.data.monthlyCapMicros)} detail="UTC calendar month" />
-            <Metric label="Runway" value={usd(summary.data.remainingMicros)} detail={`${Math.max(0, 100 - runway).toFixed(1)}% remains`} warning={runway >= 80} />
+            <Metric label="Month spend" value={usd(t, summary.data.monthlySpendMicros)} detail="Shared platform keys" />
+            <Metric label="Platform cap" value={usd(t, summary.data.monthlyCapMicros)} detail="UTC calendar month" />
+            <Metric label="Runway" value={usd(t, summary.data.remainingMicros)} detail={`${Math.max(0, 100 - runway).toFixed(1)}% remains`} warning={runway >= 80} />
             <Metric label="Unpriced calls" value={String(summary.data.unpricedCallCount)} detail="Requires rate coverage" warning={summary.data.unpricedCallCount > 0} />
             <Metric label="Next reset" value={new Date(summary.data.nextResetAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })} detail="00:00 UTC" />
           </dl>
@@ -1542,10 +1594,10 @@ export function AdminQuotasPage() {
                 <Input className="h-9 pl-9" aria-label="Search members" placeholder="Search member…" value={search} onChange={(event) => setSearch(event.target.value)} />
               </div>
               <Select value={balanceFilter} onValueChange={(value) => setBalanceFilter(value ?? "")}>
-                <SelectTrigger size="compact" className={cn(CONTROL_TRIGGER, "sm:w-44")} aria-label="Balance filter"><SelectValue>{(value) => BALANCE_LABELS[value as string] ?? "All balances"}</SelectValue></SelectTrigger>
+                <SelectTrigger size="compact" className={cn(CONTROL_TRIGGER, "sm:w-44")} aria-label="Balance filter"><SelectValue>{(value) => t(BALANCE_LABEL_KEYS[value as string] ?? BALANCE_LABEL_KEYS[ALL_BALANCES])}</SelectValue></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(BALANCE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  {Object.entries(BALANCE_LABEL_KEYS).map(([value, labelKey]) => (
+                    <SelectItem key={value} value={value}>{t(labelKey)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1582,10 +1634,10 @@ export function AdminQuotasPage() {
                     <TableRow key={account.userId}>
                       <TableCell><div className="font-medium">{account.username}</div>{account.disabled ? <span className="text-xs text-muted-foreground">Disabled</span> : null}</TableCell>
                       <TableCell><Badge variant="outline">{account.tierId}</Badge></TableCell>
-                      <TableCell className="font-mono">{usd(account.spentMicros)}</TableCell>
-                      <TableCell className="font-mono">{usd(account.remainingMicros)}</TableCell>
-                      <TableCell className="font-mono">{usd(account.creditBalanceMicros)}</TableCell>
-                      <TableCell className="font-mono">{usd(account.sharedCostMicros)} / {usd(account.byokCostMicros)}</TableCell>
+                      <TableCell className="font-mono">{usd(t, account.spentMicros)}</TableCell>
+                      <TableCell className="font-mono">{usd(t, account.remainingMicros)}</TableCell>
+                      <TableCell className="font-mono">{usd(t, account.creditBalanceMicros)}</TableCell>
+                      <TableCell className="font-mono">{usd(t, account.sharedCostMicros)} / {usd(t, account.byokCostMicros)}</TableCell>
                       <TableCell className="font-mono">{tokens(account.totalTokens)}</TableCell>
                       <TableCell className="font-mono">{new Date(account.periodEnd).toLocaleDateString()}</TableCell>
                       <TableCell><Button size="sm" variant="ghost" onClick={() => setSelected(account)}>Manage</Button></TableCell>
@@ -1621,8 +1673,8 @@ export function AdminQuotasPage() {
                   {(Object.entries(RATE_COST_BAND_STYLES) as [RateCostBand, typeof RATE_COST_BAND_STYLES[RateCostBand]][]).map(([band, tone]) => (
                     <span key={band} className="inline-flex items-center gap-1.5">
                       <i aria-hidden="true" className={cn("size-2 rounded-full", tone.rail)} />
-                      <span className="font-medium text-foreground">{tone.label}</span>
-                      <span>{tone.detail}</span>
+                      <span className="font-medium text-foreground">{t(RATE_COST_BAND_LABEL_KEYS[band])}</span>
+                      <span>{t(RATE_COST_BAND_DETAIL_KEYS[band])}</span>
                     </span>
                   ))}
                 </div>
@@ -1658,9 +1710,9 @@ export function AdminQuotasPage() {
                     <TableBody>
                       {auditRows.map((operation) => (
                         <TableRow key={operation.id}>
-                          <TableCell><Badge variant="outline">{operation.actionType.replaceAll("_", " ")}</Badge></TableCell>
-                          <TableCell>{operationTargetLabel(operation, accounts.data.data, tiers.data.data)}</TableCell>
-                          <TableCell className="font-mono">{optionalUsd(operation.amountMicros)}</TableCell>
+                          <TableCell><Badge variant="outline">{quotaActionLabel(t, operation.actionType)}</Badge></TableCell>
+                          <TableCell>{operationTargetLabel(t, operation, accounts.data.data, tiers.data.data)}</TableCell>
+                          <TableCell className="font-mono">{optionalUsd(t, operation.amountMicros)}</TableCell>
                           <TableCell>{operation.affectedCount}</TableCell>
                           <TableCell className="max-w-xs">{operation.reason}</TableCell>
                           <TableCell className="font-mono text-xs">{operation.actorUserId}</TableCell>

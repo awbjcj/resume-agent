@@ -1,5 +1,8 @@
 import type { components } from "@/lib/api/schema";
-import { STAGE_LABELS } from "./chart-theme";
+import { useTranslation } from "react-i18next";
+
+import { applicationStatusLabel } from "@/features/applications/application-labels";
+import { stageLabel } from "./chart-theme";
 
 type PipelineLane = components["schemas"]["PipelineLaneOut"];
 
@@ -31,6 +34,7 @@ export function toLanes(pipeline: PipelineLane[], now: Date = new Date()) {
 }
 
 export function PipelineTimelineChart({ pipeline, now }: { pipeline: PipelineLane[]; now?: Date }) {
+  const { t } = useTranslation();
   const lanes = toLanes(pipeline, now);
   if (lanes.length === 0) {
     return <p className="text-sm text-muted-foreground">No active applications with dated events yet.</p>;
@@ -43,14 +47,14 @@ export function PipelineTimelineChart({ pipeline, now }: { pipeline: PipelineLan
         </div>
         {lanes.map((lane) => (
           <div key={lane.jobId} className="grid grid-cols-[11rem_minmax(28rem,1fr)] items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/30">
-            <div className="min-w-0"><p className="truncate font-medium">{lane.company || "Application"}</p><p className="truncate text-xs text-muted-foreground">{lane.title || lane.status}</p></div>
+            <div className="min-w-0"><p className="truncate font-medium">{lane.company || t("applicationTimeline.applicationFallback")}</p><p className="truncate text-xs text-muted-foreground">{lane.title || applicationStatusLabel(t, lane.status)}</p></div>
             <div className="relative h-9 rounded bg-muted/40">
               <span className="absolute inset-y-0 w-px bg-foreground/45" style={{ left: `${lane.todayPosition}%` }} aria-hidden="true" />
               {lane.events.map((event, index) => (
                 <span
                   key={`${event.kind}-${event.sequence}-${index}`}
-                  title={`${STAGE_LABELS[event.kind] ?? event.kind} · ${event.date.toLocaleDateString()}`}
-                  aria-label={`${STAGE_LABELS[event.kind] ?? event.kind}, ${event.date.toLocaleDateString()}`}
+                  title={`${stageLabel(event.kind, t)} · ${event.date.toLocaleDateString()}`}
+                  aria-label={`${stageLabel(event.kind, t)}, ${event.date.toLocaleDateString()}`}
                   className={`absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-background ${event.upcoming ? "bg-primary" : "bg-muted-foreground"}`}
                   style={{ left: `${event.position}%` }}
                 />

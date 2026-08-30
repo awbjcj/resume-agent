@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { server } from "@/test/server";
 import { AdminQuotasPage } from "./AdminQuotasPage";
 
@@ -306,6 +307,20 @@ describe("AdminQuotasPage", () => {
     await user.click(screen.getByRole("button", { name: "Input rate" }));
     const rankedModels = [...table.querySelectorAll("td[data-rate-cost-band] .font-mono")].map((node) => node.textContent);
     expect(rankedModels).toEqual(["deepseek-v4-flash", "gpt-5.6-sol"]);
+  });
+
+  it("localizes rate bands, statuses, periods, and sortable columns in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("tablist");
+
+    await user.click(screen.getAllByRole("tab")[2]);
+    expect(await screen.findAllByText("高级型")).not.toHaveLength(0);
+    expect(screen.getAllByText("经济型")).not.toHaveLength(0);
+    expect(screen.getAllByText(/^(已生效|待生效|历史版本)$/).length).toBeGreaterThan(0);
+    expect(screen.getByText("低谷时段")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "输入费率" })).toBeInTheDocument();
   });
 
   it("keeps optional cache and tool fields in the compact rate action row", async () => {

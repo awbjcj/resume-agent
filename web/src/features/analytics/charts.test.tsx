@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { CycleTimeChart, toCycleRows } from "./CycleTimeChart";
 import { OfferComparisonChart, toOfferRows } from "./OfferComparisonChart";
 import { PipelineTimelineChart, toLanes } from "./PipelineTimelineChart";
@@ -60,6 +61,24 @@ describe("analytics chart transforms", () => {
       { eventId: 11, jobId: 1, company: "Acme", sequence: 1, occurredAt: "2026-03-20T12:00:00Z", compBase: 180000, compBonus: null, compEquityAnnual: null, compSigning: null, compCurrency: "USD", totalComp: 180000 },
     ]);
     expect(rows[0]).toMatchObject({ company: "Acme", base: 180000, bonus: 0, currency: "USD" });
+  });
+
+  it("localizes stage names and generated offer fallbacks in Chinese", async () => {
+    await changeLanguage("zh-CN");
+
+    const flow = toSankeyData([
+      { source: "application_submitted", target: "recruiter_screen", count: 5 },
+    ]);
+    const cycles = toCycleRows([
+      { fromKind: "recruiter_screen", toKind: "technical_round", medianDays: 6, sampleSize: 12 },
+    ]);
+    const offers = toOfferRows([
+      { eventId: 12, jobId: 1, company: null, sequence: 1, occurredAt: "2026-03-20T12:00:00Z", compBase: null, compBonus: null, compEquityAnnual: null, compSigning: null, compCurrency: null, totalComp: null },
+    ]);
+
+    expect(flow.nodes.map((node) => node.name)).toEqual(["已投递", "招聘方初筛"]);
+    expect(cycles[0].label).toBe("招聘方初筛 → 技术面");
+    expect(offers[0]).toMatchObject({ company: "录用通知", label: "录用通知 · #1", currency: "未注明币种" });
   });
 });
 

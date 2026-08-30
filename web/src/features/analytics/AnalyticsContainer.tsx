@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTranslation } from "react-i18next";
 import { BoardSkeleton } from "@/components/skeletons";
 import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
@@ -30,6 +31,7 @@ function CohortTable({
   header: string;
   rows: Cohort[];
 }) {
+  const { t } = useTranslation();
   return (
     <div className="overflow-x-auto rounded-lg border bg-card shadow-card">
       {/* `caption-top` overrides the shadcn default: this caption is the table's
@@ -42,12 +44,12 @@ function CohortTable({
         <TableHeader>
           <TableRow>
             <TableHead>{header}</TableHead>
-            <TableHead>Apps</TableHead>
-            <TableHead>Responses</TableHead>
-            <TableHead>Interviews</TableHead>
-            <TableHead>Offers</TableHead>
-            <TableHead>Interview %</TableHead>
-            <TableHead>Offer %</TableHead>
+            <TableHead>{t("analytics.table.applications")}</TableHead>
+            <TableHead>{t("analytics.table.responses")}</TableHead>
+            <TableHead>{t("analytics.table.interviews")}</TableHead>
+            <TableHead>{t("analytics.table.offers")}</TableHead>
+            <TableHead>{t("analytics.table.interviewRate")}</TableHead>
+            <TableHead>{t("analytics.table.offerRate")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -69,6 +71,7 @@ function CohortTable({
 }
 
 export function AnalyticsContainer() {
+  const { t } = useTranslation();
   const { data, isLoading } = useAnalytics();
   const timeline = useTimelineAnalytics();
   if (isLoading || timeline.isLoading) return <BoardSkeleton />;
@@ -79,47 +82,47 @@ export function AnalyticsContainer() {
   return (
     <>
       <PageHeader
-        kicker="Conversion"
-        title="Analytics / Funnel"
-        sub="Which sources and fit-score bands actually convert. Rates are share of submitted applications."
+        kicker={t("analytics.header.kicker")}
+        title={t("analytics.header.title")}
+        sub={t("analytics.header.description")}
       />
       <MetricRow
         items={[
-          ["Submitted", String(totalApps)],
-          ["Offers", String(totalOffers)],
-          ["Sources tracked", String(data?.bySource.length ?? 0)],
+          [t("analytics.metrics.submitted"), String(totalApps)],
+          [t("analytics.metrics.offers"), String(totalOffers)],
+          [t("analytics.metrics.sourcesTracked"), String(data?.bySource.length ?? 0)],
         ]}
       />
       <div className="grid min-w-0 gap-6 xl:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle><h2>Stage flow</h2></CardTitle><CardDescription>Where applications advance or leave the process.</CardDescription></CardHeader>
+          <CardHeader><CardTitle><h2>{t("analytics.panels.stageFlow.title")}</h2></CardTitle><CardDescription>{t("analytics.panels.stageFlow.description")}</CardDescription></CardHeader>
           <CardContent><StageFlowChart flows={timeline.data?.flows ?? []} /></CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle><h2>Cycle time</h2></CardTitle><CardDescription>Median elapsed days between consecutive stages.</CardDescription></CardHeader>
+          <CardHeader><CardTitle><h2>{t("analytics.panels.cycleTime.title")}</h2></CardTitle><CardDescription>{t("analytics.panels.cycleTime.description")}</CardDescription></CardHeader>
           <CardContent><CycleTimeChart cycleTimes={timeline.data?.cycleTimes ?? []} /></CardContent>
         </Card>
         <Card className="xl:col-span-2">
-          <CardHeader><CardTitle><h2>Active pipeline</h2></CardTitle><CardDescription>Past and upcoming events around today.</CardDescription></CardHeader>
+          <CardHeader><CardTitle><h2>{t("analytics.panels.activePipeline.title")}</h2></CardTitle><CardDescription>{t("analytics.panels.activePipeline.description")}</CardDescription></CardHeader>
           <CardContent><PipelineTimelineChart pipeline={timeline.data?.activePipeline ?? []} /></CardContent>
         </Card>
         {(timeline.data?.offers.length ?? 0) > 0 ? (
           <Card className="xl:col-span-2">
-            <CardHeader><CardTitle><h2>Offer comparison</h2></CardTitle><CardDescription>Annualized components, kept separate by currency.</CardDescription></CardHeader>
+            <CardHeader><CardTitle><h2>{t("analytics.panels.offerComparison.title")}</h2></CardTitle><CardDescription>{t("analytics.panels.offerComparison.description")}</CardDescription></CardHeader>
             <CardContent><OfferComparisonChart offers={timeline.data!.offers} /></CardContent>
           </Card>
         ) : null}
       </div>
       {totalApps === 0 ? (
         <EmptyState
-          title="No applications tracked yet"
-          body="Mark applications as submitted in the Pipeline board to populate analytics."
+          title={t("analytics.empty.title")}
+          body={t("analytics.empty.description")}
         />
       ) : (
         <div className="space-y-8">
           <ConversionChart rows={data!.bySource} />
-          <CohortTable caption="By source" header="Source" rows={data!.bySource} />
-          <CohortTable caption="By fit-score band" header="Fit band" rows={data!.byBand} />
+          <CohortTable caption={t("analytics.table.bySource")} header={t("analytics.table.source")} rows={data!.bySource} />
+          <CohortTable caption={t("analytics.table.byFitBand")} header={t("analytics.table.fitBand")} rows={data!.byBand} />
         </div>
       )}
     </>

@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
 import { describe, expect, it } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { server } from "@/test/server";
 import { AdminRoutingPage } from "./AdminRoutingPage";
 
@@ -73,6 +74,24 @@ describe("AdminRoutingPage", () => {
 
     await user.click(within(listbox).getByRole("option", { name: "Subscription" }));
     await waitFor(() => expect(trigger).toHaveTextContent("Subscription"));
+  });
+
+  it("localizes route modes, statuses, and route-mode labels in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    const user = userEvent.setup();
+    renderPage();
+
+    const trigger = await screen.findByLabelText("Gemini 的路由模式");
+    expect(trigger).toHaveTextContent("直连 API");
+    expect(screen.getAllByText("订阅网关").length).toBeGreaterThan(0);
+
+    await user.click(trigger);
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "自动选择",
+      "订阅网关",
+      "直连 API",
+    ]);
   });
 
   it("has no automated accessibility violations", async () => {

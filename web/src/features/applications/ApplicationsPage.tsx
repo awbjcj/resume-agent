@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/PageHeader";
@@ -7,12 +8,14 @@ import { BoardSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { openDownload } from "@/lib/api/client";
+import { applicationStatusLabel } from "./application-labels";
 import { ApplicationsTable } from "./ApplicationsTable";
 import { useApplications } from "./use-applications";
 
 type SortOrder = "newest" | "company-asc" | "company-desc" | "status";
 
 export function ApplicationsPage() {
+  const { t } = useTranslation();
   const query = useApplications();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -68,19 +71,19 @@ export function ApplicationsPage() {
           </span>
         </label>
         <label className="grid gap-1.5 text-sm font-medium" htmlFor="application-status-filter">
-          Status
+          {t("applications.status")}
           <select id="application-status-filter" className="h-10 rounded-lg border bg-background px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="all">All statuses</option>
-            {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
+            <option value="all">{t("applications.allStatuses")}</option>
+            {statuses.map((value) => <option key={value} value={value}>{applicationStatusLabel(t, value)}</option>)}
           </select>
         </label>
         <label className="grid gap-1.5 text-sm font-medium" htmlFor="application-sort">
-          Sort
+          {t("applications.sortBy")}
           <select id="application-sort" className="h-10 rounded-lg border bg-background px-3" value={sort} onChange={(event) => setSort(event.target.value as SortOrder)}>
-            <option value="newest">Newest activity</option>
-            <option value="company-asc">Company A–Z</option>
-            <option value="company-desc">Company Z–A</option>
-            <option value="status">Status</option>
+            <option value="newest">{t("applications.sortOptions.newest")}</option>
+            <option value="company-asc">{t("applications.sortOptions.companyAscending")}</option>
+            <option value="company-desc">{t("applications.sortOptions.companyDescending")}</option>
+            <option value="status">{t("applications.sortOptions.status")}</option>
           </select>
         </label>
         <div className="flex flex-wrap gap-2 md:justify-end">
@@ -89,7 +92,7 @@ export function ApplicationsPage() {
         </div>
       </section>
       <p className="text-sm text-muted-foreground" role="status">
-        Showing {visible.rows.length} of {data?.rows.length ?? 0} applications
+        {t("applications.showing", { shown: visible.rows.length, total: data?.rows.length ?? 0 })}
       </p>
       <ApplicationsTable table={visible} />
     </div>
