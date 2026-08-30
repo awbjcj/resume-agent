@@ -46,4 +46,24 @@ describe("automatic i18n build transform", () => {
     expect(result?.code).toContain('"journey.stages.profile.label"');
     expect(result?.code?.match(/\.t\("auto\./g)).toHaveLength(1);
   });
+
+  it("keeps Tailwind class lists raw while translating prose that uses the word block", async () => {
+    const result = await transformAsync(
+      `
+        const className = "block text-sm";
+        const options = [{
+          value: "blocked",
+          label: "A gated reviewer blocks the round outright, so it is never scored — its weight and score bands are disabled rather than silently ignored.",
+        }];
+      `,
+      {
+        babelrc: false,
+        configFile: false,
+        plugins: [autoI18nPlugin],
+      },
+    );
+
+    expect(result?.code).toContain('"block text-sm"');
+    expect(result?.code?.match(/\.t\("auto\./g)).toHaveLength(1);
+  });
 });

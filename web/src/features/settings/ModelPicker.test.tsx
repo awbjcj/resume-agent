@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { ModelPicker, ModelTuningControls } from "./ModelPicker";
 import type { ProviderModelCatalog } from "./use-model-catalog";
 
@@ -107,7 +108,32 @@ describe("ModelPicker", () => {
     );
 
     const effortGroup = screen.getByRole("group", { name: "Effort" });
-    await user.click(within(effortGroup).getByRole("button", { name: "Xhigh" }));
+    await user.click(within(effortGroup).getByRole("button", { name: "Extra high" }));
+    expect(onEffort).toHaveBeenCalledWith("xhigh");
+  });
+
+  it("localizes model capability and reasoning labels without changing their values", async () => {
+    await changeLanguage("zh-CN");
+    const user = userEvent.setup();
+    const onEffort = vi.fn();
+    render(
+      <>
+        <ModelPicker value={KNOWN_MODEL} onChange={vi.fn()} catalog={CATALOG} />
+        <ModelTuningControls
+          modelId={KNOWN_MODEL}
+          reasoningEffort={null}
+          catalog={CATALOG}
+          onReasoningEffortChange={onEffort}
+        />
+      </>,
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    expect(await screen.findByText("推理")).toBeInTheDocument();
+    expect(screen.getByText("搜索")).toBeInTheDocument();
+
+    const effortGroup = screen.getByRole("group", { name: "推理强度" });
+    await user.click(within(effortGroup).getByRole("button", { name: "极高" }));
     expect(onEffort).toHaveBeenCalledWith("xhigh");
   });
 

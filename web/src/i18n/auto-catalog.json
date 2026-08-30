@@ -237,7 +237,7 @@
   "{{v0}} gate": {
     "key": "ui_a6e4d3850192",
     "en": "{{v0}} gate",
-    "zh-CN": "{{v0}} 关卡"
+    "zh-CN": "{{v0}} 硬性门槛"
   },
   "{{v0}} item{{v1}}": {
     "key": "ui_abf0397fa52d",
@@ -268,11 +268,6 @@
     "key": "ui_a467f7bc063a",
     "en": "{{v0}} mock interviews in progress",
     "zh-CN": "{{v0}} 场模拟面试进行中"
-  },
-  "{{v0}} model tier": {
-    "key": "ui_e6860c1c651e",
-    "en": "{{v0}} model tier",
-    "zh-CN": "{{v0}} 模型等级"
   },
   "{{v0}} new value": {
     "key": "ui_3d2e9a939e1b",
@@ -609,6 +604,11 @@
     "en": "A focused Career Lab session",
     "zh-CN": "一次聚焦的职业实验室课程"
   },
+  "A gated reviewer blocks the round outright, so it is never scored — its weight and score bands are disabled rather than silently ignored.": {
+    "key": "ui_862adc2b722d",
+    "en": "A gated reviewer blocks the round outright, so it is never scored — its weight and score bands are disabled rather than silently ignored.",
+    "zh-CN": "启用硬性门槛的评审会直接阻断本轮，因此不参与评分；其权重和评分区间会被禁用，而非悄然忽略。"
+  },
   "A new code is on its way.": {
     "key": "ui_8f5c29c43fff",
     "en": "A new code is on its way.",
@@ -763,11 +763,6 @@
     "key": "ui_d7f84e3a8014",
     "en": "Add {{v0}} to calendar",
     "zh-CN": "将 {{v0}} 添加到日历"
-  },
-  "Add a {{v0}} API key to use this model": {
-    "key": "ui_ee6c7ff7e541",
-    "en": "Add a {{v0}} API key to use this model",
-    "zh-CN": "添加 {{v0}} API 密钥以使用此模型"
   },
   "Add a company name before running a manual check.": {
     "key": "ui_668f75a5d451",
@@ -1289,6 +1284,11 @@
     "en": "Application submitted",
     "zh-CN": "申请已提交"
   },
+  "Application timeline grid": {
+    "key": "ui_8cdf9d689d9e",
+    "en": "Application timeline grid",
+    "zh-CN": "申请时间线表格"
+  },
   "applications": {
     "key": "ui_fd54e5a82e36",
     "en": "applications",
@@ -1673,11 +1673,6 @@
     "key": "ui_76ebb46d6430",
     "en": "Billing peak rates now — pricier until {{v0}} UTC.",
     "zh-CN": "当前为高峰计费时段——{{v0}} UTC 前价格更高。"
-  },
-  "Blocking — any claim not traceable to a profile fact fails the round.": {
-    "key": "ui_496b97d85b00",
-    "en": "Blocking — any claim not traceable to a profile fact fails the round.",
-    "zh-CN": "阻断项——任何无法追溯到个人资料事实的表述都将导致本轮不通过。"
   },
   "Board": {
     "key": "ui_4816cbfd74aa",
@@ -2128,6 +2123,11 @@
     "key": "ui_15a9299c0b66",
     "en": "Choose a stage",
     "zh-CN": "选择阶段"
+  },
+  "Choose a tailored job. Jobs with an interview in progress are hidden so you can resume them from the sessions list.": {
+    "key": "ui_8542b6ed56ae",
+    "en": "Choose a tailored job. Jobs with an interview in progress are hidden so you can resume them from the sessions list.",
+    "zh-CN": "请选择已定制的职位。正在进行面试的职位会被隐藏，以便你从会话列表中继续。"
   },
   "Choose a tier": {
     "key": "ui_56ebcf892d16",
@@ -2759,11 +2759,6 @@
     "en": "Cover-letter revision in progress",
     "zh-CN": "求职信修改进行中"
   },
-  "Coverage of the job description's stated requirements.": {
-    "key": "ui_5b8400b595a2",
-    "en": "Coverage of the job description's stated requirements.",
-    "zh-CN": "职位描述中明确要求的覆盖程度。"
-  },
   "covered": {
     "key": "ui_2d3c822d9399",
     "en": "covered",
@@ -2903,11 +2898,6 @@
     "key": "ui_c7a05c3bcef7",
     "en": "Custom events are excluded from stage flow and cycle time.",
     "zh-CN": "自定义事件不计入阶段流程和周期时间。"
-  },
-  "Custom model id…": {
-    "key": "ui_e966929e4bf9",
-    "en": "Custom model id…",
-    "zh-CN": "自定义模型 ID…"
   },
   "Custom resume templates": {
     "key": "ui_7d0254ca2a00",
@@ -3119,11 +3109,6 @@
     "en": "Demeanor",
     "zh-CN": "举止"
   },
-  "Density — cuts padding without cutting evidence.": {
-    "key": "ui_5c4d858c0a10",
-    "en": "Density — cuts padding without cutting evidence.",
-    "zh-CN": "信息密度——精简冗余，同时保留证据。"
-  },
   "Depleted": {
     "key": "ui_1b5a6d554177",
     "en": "Depleted",
@@ -3133,11 +3118,6 @@
     "key": "ui_f1dbc33978a9",
     "en": "Depth",
     "zh-CN": "深度"
-  },
-  "Depth and credibility of the evidence for this specific role.": {
-    "key": "ui_6a595b844080",
-    "en": "Depth and credibility of the evidence for this specific role.",
-    "zh-CN": "针对该职位的证据深度与可信度。"
   },
   "Describe the search": {
     "key": "ui_315a61a380a0",
@@ -3499,11 +3479,6 @@
     "en": "Effective rate versions",
     "zh-CN": "生效费率版本"
   },
-  "Effort": {
-    "key": "ui_4387e5d3966f",
-    "en": "Effort",
-    "zh-CN": "强度"
-  },
   "Eligible jobs": {
     "key": "ui_87e7eb3edf91",
     "en": "Eligible jobs",
@@ -3818,6 +3793,11 @@
     "key": "ui_528e8bd71c83",
     "en": "Export events",
     "zh-CN": "导出事件"
+  },
+  "Export grid": {
+    "key": "ui_7509d064c82c",
+    "en": "Export grid",
+    "zh-CN": "导出表格"
   },
   "Export my data": {
     "key": "ui_fddb7f9c69fe",
@@ -4197,7 +4177,7 @@
   "Gate": {
     "key": "ui_fa77a5252d38",
     "en": "Gate",
-    "zh-CN": "关卡"
+    "zh-CN": "硬性门槛"
   },
   "gateway": {
     "key": "ui_4ea5ee68fea0",
@@ -4692,7 +4672,7 @@
   "Integrity gate — read-only": {
     "key": "ui_09d9284c9bdd",
     "en": "Integrity gate — read-only",
-    "zh-CN": "完整性检查点 — 只读"
+    "zh-CN": "完整性校验（只读）"
   },
   "Interview": {
     "key": "ui_4effe447355c",
@@ -5149,6 +5129,11 @@
     "en": "List view",
     "zh-CN": "列表视图"
   },
+  "Listen first, with interviewer text hidden until you reveal it.": {
+    "key": "ui_d85a714be7c1",
+    "en": "Listen first, with interviewer text hidden until you reveal it.",
+    "zh-CN": "先收听；在你主动显示前，面试官文字将保持隐藏。"
+  },
   "Live interview": {
     "key": "ui_0c3f94ba823e",
     "en": "Live interview",
@@ -5203,6 +5188,11 @@
     "key": "ui_b598423803fe",
     "en": "Loading audio…",
     "zh-CN": "正在加载音频……"
+  },
+  "Loading gap-closing advice": {
+    "key": "ui_37df0b854374",
+    "en": "Loading gap-closing advice",
+    "zh-CN": "正在加载弥补差距建议"
   },
   "Loading job": {
     "key": "ui_04a276e4f1c1",
@@ -5567,7 +5557,7 @@
   "Mid tier model": {
     "key": "ui_b3cb68f89c3d",
     "en": "Mid tier model",
-    "zh-CN": "中档模型"
+    "zh-CN": "标准型模型"
   },
   "Min aspects per entry": {
     "key": "ui_13b26e813923",
@@ -5667,17 +5657,22 @@
   "Model tier": {
     "key": "ui_e4c8feda7ee9",
     "en": "Model tier",
-    "zh-CN": "模型等级"
+    "zh-CN": "模型档位"
   },
   "Model tiers": {
     "key": "ui_0abd92cd79ed",
     "en": "Model tiers",
-    "zh-CN": "模型等级"
+    "zh-CN": "模型档位"
   },
   "model-id": {
     "key": "ui_25a4c317149d",
     "en": "model-id",
     "zh-CN": "模型 ID"
+  },
+  "Models are grouped into one block and their immutable versions stay newest-first. Sort any column to rank model groups by the latest version.": {
+    "key": "ui_8576580583aa",
+    "en": "Models are grouped into one block and their immutable versions stay newest-first. Sort any column to rank model groups by the latest version.",
+    "zh-CN": "模型按组归类，各不可变版本按最新优先排序。可按任意列排序，按每组最新版本对模型组排名。"
   },
   "month": {
     "key": "ui_a5c7d1719e28",
@@ -6059,11 +6054,6 @@
     "en": "No jobs match these filters.",
     "zh-CN": "没有职位符合这些筛选条件。"
   },
-  "No key": {
-    "key": "ui_e867868d5a03",
-    "en": "No key",
-    "zh-CN": "无密钥"
-  },
   "no limit": {
     "key": "ui_b53557b24e11",
     "en": "no limit",
@@ -6267,7 +6257,7 @@
   "not scored": {
     "key": "ui_8c76ce5e65e7",
     "en": "not scored",
-    "zh-CN": "未评分"
+    "zh-CN": "不计分"
   },
   "Not set": {
     "key": "ui_4895f73177ab",
@@ -6902,12 +6892,12 @@
   "Premium": {
     "key": "ui_de88c121a82a",
     "en": "Premium",
-    "zh-CN": "高级"
+    "zh-CN": "高价位"
   },
   "Premium tier model": {
     "key": "ui_6126831f894f",
     "en": "Premium tier model",
-    "zh-CN": "高级等级模型"
+    "zh-CN": "高级型模型"
   },
   "Preparing interviewer audio…": {
     "key": "ui_cc5a3fdf88c9",
@@ -7113,11 +7103,6 @@
     "key": "ui_886d1fc9abaf",
     "en": "Provider routing",
     "zh-CN": "提供商路由"
-  },
-  "provider:model-id (e.g. openai:gpt-5.5)": {
-    "key": "ui_3c96ac895178",
-    "en": "provider:model-id (e.g. openai:gpt-5.5)",
-    "zh-CN": "provider:model-id（例如 openai:gpt-5.5）"
   },
   "providers currently route through it.": {
     "key": "ui_2e26da748d8a",
@@ -8274,11 +8259,6 @@
     "en": "Revise this version",
     "zh-CN": "修改此版本"
   },
-  "Reviser model tier": {
-    "key": "ui_3c30034df8d3",
-    "en": "Reviser model tier",
-    "zh-CN": "修订模型层级"
-  },
   "Revision": {
     "key": "ui_2e516d68f42f",
     "en": "Revision",
@@ -8699,11 +8679,6 @@
     "en": "Select a job with a tailored resume so the questions match the real opportunity.",
     "zh-CN": "选择一个已定制简历的职位，以便问题与真实机会相符。"
   },
-  "Select a model": {
-    "key": "ui_fad7a5ffc490",
-    "en": "Select a model",
-    "zh-CN": "选择模型"
-  },
   "Select a target before previewing the operation": {
     "key": "ui_2b41b9956f32",
     "en": "Select a target before previewing the operation",
@@ -8939,11 +8914,6 @@
     "en": "Shape how the workspace discovers, reviews, and renders work.",
     "zh-CN": "调整工作区发现、审核和生成材料的方式。"
   },
-  "Share of evidenced must-have requirements actually rendered.": {
-    "key": "ui_4ff061d362df",
-    "en": "Share of evidenced must-have requirements actually rendered.",
-    "zh-CN": "有证据支持且实际呈现的必备要求占比。"
-  },
   "Share roles, locations, industries, and boundaries in plain language.": {
     "key": "ui_d118bb9c0f5a",
     "en": "Share roles, locations, industries, and boundaries in plain language.",
@@ -9113,11 +9083,6 @@
     "key": "ui_22aa085ee4b1",
     "en": "Simultaneous background runs",
     "zh-CN": "同时进行的后台任务数"
-  },
-  "Six-second skim: does the top of the page land?": {
-    "key": "ui_80a2df8f3725",
-    "en": "Six-second skim: does the top of the page land?",
-    "zh-CN": "六秒快速浏览：页面顶部是否抓住重点？"
   },
   "Skill": {
     "key": "ui_6df1bb18a59a",
@@ -10129,11 +10094,6 @@
     "en": "These were judged to name no skill, so they no longer consume a classification call. Restore any that are real.",
     "zh-CN": "这些被判定为未指明任何技能，因此不再消耗分类调用。如有误判，可将其恢复。"
   },
-  "Thinking": {
-    "key": "ui_a20d12c5e9c4",
-    "en": "Thinking",
-    "zh-CN": "思考中"
-  },
   "This {{v0}} and its rendered PDF will be removed. This cannot be undone.": {
     "key": "ui_568fd8e87aaf",
     "en": "This {{v0}} and its rendered PDF will be removed. This cannot be undone.",
@@ -10867,7 +10827,7 @@
   "Warnings": {
     "key": "ui_0e04cd10f9af",
     "en": "Warnings",
-    "zh-CN": "警告"
+    "zh-CN": "警示信息"
   },
   "wd5": {
     "key": "ui_f91fb61bb57d",
@@ -11099,11 +11059,6 @@
     "en": "Write cover letters",
     "zh-CN": "撰写求职信"
   },
-  "Writer model tier": {
-    "key": "ui_3291de1993a8",
-    "en": "Writer model tier",
-    "zh-CN": "写作模型等级"
-  },
   "Years of experience, max": {
     "key": "ui_69e772a24fc3",
     "en": "Years of experience, max",
@@ -11153,6 +11108,11 @@
     "key": "ui_a5deb0c53abd",
     "en": "Your bridge",
     "zh-CN": "你的衔接说明"
+  },
+  "Your browser blocked autoplay. Press play to listen.": {
+    "key": "ui_815d29e89aa6",
+    "en": "Your browser blocked autoplay. Press play to listen.",
+    "zh-CN": "浏览器阻止了自动播放。请点击播放以收听。"
   },
   "Your edits to the": {
     "key": "ui_73825fa60094",

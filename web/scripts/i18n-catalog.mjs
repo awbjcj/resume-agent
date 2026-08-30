@@ -16,6 +16,8 @@ const catalogPath = path.join(sourceRoot, "i18n", "auto-catalog.json");
 // the catalog is never generated from a translation service.
 const FIXED_ZH_CN_TRANSLATIONS = {
   "100% · done": "100% · 已完成",
+  "A gated reviewer blocks the round outright, so it is never scored — its weight and score bands are disabled rather than silently ignored.": "启用硬性门槛的评审会直接阻断本轮，因此不参与评分；其权重和评分区间会被禁用，而非悄然忽略。",
+  "Application timeline grid": "申请时间线表格",
   "Any annual salary": "不限年薪",
   "Apps": "应用",
   "Annual bonus": "年度奖金",
@@ -26,6 +28,7 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "Blocking — any claim not traceable to a profile fact fails the round.": "阻断项——任何无法追溯到个人资料事实的表述都将导致本轮不通过。",
   "Certified filings": "已认证申请",
   "Choose a member": "选择成员",
+  "Choose a tailored job. Jobs with an interview in progress are hidden so you can resume them from the sessions list.": "请选择已定制的职位。正在进行面试的职位会被隐藏，以便你从会话列表中继续。",
   "Choose a tier": "选择等级",
   "Confidence": "置信度",
   "Complete": "已完成",
@@ -47,6 +50,7 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "Enter a non-negative annual salary.": "请输入不小于零的年薪。",
   "Expires": "到期时间",
   "Expand": "展开",
+  "Export grid": "导出表格",
   "Filing periods": "申请期间",
   "Filings": "申请数",
   "Fit >= {{v0}}": "匹配度 ≥ {{v0}}",
@@ -56,16 +60,24 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "Focused rehearsal": "专注演练",
   "Generate another": "再生成一封",
   "Generate cover letter": "生成求职信",
+  "Gate": "硬性门槛",
   "Gmail connected.": "Gmail 已连接。",
   "Guided discovery": "引导式探索",
   "Guided evidence discovery": "引导式证据发掘",
   "Job": "职位",
   "job": "职位",
   "Jobs": "职位",
+  "Integrity gate — read-only": "完整性校验（只读）",
+  "Listen first, with interviewer text hidden until you reveal it.": "先收听；在你主动显示前，面试官文字将保持隐藏。",
+  "Loading gap-closing advice": "正在加载弥补差距建议",
   "Loaded": "已加载",
   "Message": "消息",
   "Matching": "匹配数",
   "Min salary (USD)": "最低年薪（美元）",
+  "Mid tier model": "标准型模型",
+  "Model tier": "模型档位",
+  "Model tiers": "模型档位",
+  "Models are grouped into one block and their immutable versions stay newest-first. Sort any column to rank model groups by the latest version.": "模型按组归类，各不可变版本按最新优先排序。可按任意列排序，按每组最新版本对模型组排名。",
   "Must": "必须项",
   "Nice": "加分项",
   "No date": "无日期",
@@ -84,6 +96,8 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "offer": "录用通知",
   "Nothing is waiting on you": "目前没有需要你处理的事项",
   "Per-pull job limit for {{v0}}": "{{v0}} 每次获取的职位上限",
+  "Premium": "高价位",
+  "Premium tier model": "高级型模型",
   "Proposal": "建议",
   "Pull jobs": "获取职位",
   "Question {{v0}} of {{v1}}": "第 {{v0}} 题，共 {{v1}} 题",
@@ -109,6 +123,8 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "Select {{v0}} {{v1}}": "选择 {{v0}} {{v1}}",
   "Tech {{v0}}": "技术面试 {{v0}}",
   "Tech": "技术",
+  "not scored": "不计分",
+  "Warnings": "警示信息",
   "Warm": "亲和",
   "{{v0}} / {{v1}}": "{{v0}} / {{v1}}",
   "{{v0}} job{{v1}}": "{{v0}} 个职位",
@@ -133,7 +149,10 @@ const FIXED_ZH_CN_TRANSLATIONS = {
   "${{v0}}k+ / year": "${{v0}}k+ / 年",
   "${{v0}}M+ / year": "${{v0}}M+ / 年",
   "{{v0}} job{{v1}} waiting on you": "有 {{v0}} 个职位等待你处理",
+  "{{v0}} gate": "{{v0}} 硬性门槛",
+  "{{v0}} model tier": "{{v0}} 模型档位",
   "{{v0}}…": "{{v0}}…",
+  "Your browser blocked autoplay. Press play to listen.": "浏览器阻止了自动播放。请点击播放以收听。",
 };
 
 const UI_PROPS = new Set([
@@ -171,6 +190,8 @@ const UI_PROPS = new Set([
 
 const UI_VARIABLE = /(action|badge|caption|date|description|detail|empty|error|eyebrow|fallback|heading|help|hint|label|message|notice|note|placeholder|progress|reason|status|subtitle|success|suffix|summary|text|title)$/i;
 const UI_COLLECTION = /(actions|cards|columns|copy|descriptions|details|errors|fields|filters|items|kinds|labels|messages|meta|modalities|names|nav|options|outcomes|parts|results|rows|scopes|sections|stages|statuses|steps|tabs|titles)$/i;
+const STYLE_VARIABLE = /(?:class(?:name)?|classes|style)$/i;
+const TAILWIND_UTILITY_TOKEN = /^(?:[a-z0-9_/-]+:)*(?:!?)(?:flex|inline-flex|grid|inline-grid|block|inline-block|hidden|relative|absolute|fixed|sticky|uppercase|lowercase|capitalize|truncate|sr-only|(?:whitespace|w|h|min-w|max-w|min-h|max-h|size|p[trblxy]?|m[trblxy]?|text|bg|border|rounded|tracking|leading|font|gap|items|justify|space|overflow|shadow|ring|opacity|transition|duration|ease|animate|cursor)-.+)$/;
 const I18N_KEY = /^[a-z][a-z0-9]*(?:\.[a-z0-9_-]+)+$/i;
 const UNCHANGED_ZH_CN_SOURCES = new Set([
   "00:00 UTC",
@@ -239,8 +260,7 @@ function isHumanText(value) {
   if (!text || !/[A-Za-z]/.test(text)) return false;
   if (/^(https?:|\/api\/|[.#@]|[a-z]+:\/\/)/i.test(text)) return false;
   if (/(^|\s)(sm|md|lg|xl|2xl|dark|hover|focus|data|group|peer):/.test(text)) return false;
-  if (/(^|\s)(flex|grid|block|hidden|relative|absolute|w-|h-|p[trblxy]?-[\d[]|m[trblxy]?-[\d[]|text-|bg-|border-|rounded-|gap-|items-|justify-|space-|min-|max-|overflow-|shadow-|ring-)/.test(text)) return false;
-  if (/\b(?:text|bg|border|rounded|tracking|leading|font|w|h|min|max|p[trblxy]?|m[trblxy]?|gap|items|justify|shadow|ring|opacity)-[^\s]+/.test(text) && !/[.!?]/.test(text)) return false;
+  if (text.split(/\s+/).every((token) => TAILWIND_UTILITY_TOKEN.test(token))) return false;
   return true;
 }
 
@@ -533,7 +553,7 @@ export function isLocalizableStringPath(pathRef) {
   if (uiDefaultParameter(pathRef)) return true;
 
   const variable = directVariable(pathRef);
-  if (variable && !variable.array && UI_VARIABLE.test(variable.name)) return true;
+  if (variable && !variable.array && !STYLE_VARIABLE.test(variable.name) && UI_VARIABLE.test(variable.name)) return true;
   if (uiCollectionValue(pathRef)) return true;
   return namedUiFunction(pathRef);
 }
@@ -626,8 +646,14 @@ function pruneCatalog() {
 function applyFixedTranslations() {
   let updated = 0;
   for (const [source, zhCN] of Object.entries(FIXED_ZH_CN_TRANSLATIONS)) {
+    if (!candidates.has(source)) continue;
     const entry = catalog[source];
-    if (!entry || entry["zh-CN"] === zhCN) continue;
+    if (!entry) {
+      catalog[source] = { key: stableKey(source), en: source, "zh-CN": zhCN };
+      updated += 1;
+      continue;
+    }
+    if (entry["zh-CN"] === zhCN) continue;
     entry["zh-CN"] = zhCN;
     updated += 1;
   }

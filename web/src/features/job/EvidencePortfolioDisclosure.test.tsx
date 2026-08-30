@@ -2,8 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { server } from "@/test/server";
 import { EvidencePortfolioDisclosure } from "./EvidencePortfolioDisclosure";
 
@@ -61,6 +62,10 @@ const payload = {
 };
 
 describe("EvidencePortfolioDisclosure", () => {
+  beforeEach(async () => {
+    await changeLanguage("en");
+  });
+
   it("fetches lazily and exposes the fallback, coverage, evidence, and omissions", async () => {
     const requested = vi.fn();
     server.use(
@@ -93,6 +98,24 @@ describe("EvidencePortfolioDisclosure", () => {
   it("stays absent for legacy portfolio-less versions", () => {
     renderDisclosure(false);
     expect(screen.queryByRole("button", { name: /why this experience was chosen/i })).not.toBeInTheDocument();
+  });
+
+  it("localizes the fixed fallback warning without translating its technical cause", async () => {
+    await changeLanguage("zh-CN");
+    server.use(
+      http.get("/api/resume-versions/9/evidence-portfolio", () =>
+        HttpResponse.json({
+          ...payload,
+          warning: "Evidence planner unavailable (planner unavailable); deterministic fallback used.",
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDisclosure();
+
+    await user.click(screen.getAllByRole("button")[0]);
+
+    expect(await screen.findByText("证据规划器不可用（规划器不可用）；已使用基于规则的兜底选择。")).toBeInTheDocument();
   });
 
   it("shows an accessible error without closing the disclosure", async () => {

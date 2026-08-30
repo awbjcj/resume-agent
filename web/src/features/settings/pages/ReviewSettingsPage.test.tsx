@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { changeLanguage } from "@/i18n";
 import { withQueryClient } from "@/test/utils";
 import { ReviewSettingsPage } from "./ReviewSettingsPage";
 
@@ -58,8 +59,8 @@ describe("ReviewSettingsPage pipeline controls", () => {
   it("saves merged advisory and writer tier changes", async () => {
     render(<ReviewSettingsPage />, { wrapper: withQueryClient });
     await userEvent.click(screen.getByRole("switch", { name: /merge advisory/i }));
-    await userEvent.click(screen.getByRole("button", { name: "mid writer tier" }));
-    await userEvent.click(screen.getByRole("button", { name: "cheap reviser tier" }));
+    await userEvent.click(screen.getByRole("button", { name: "Standard Writer model tier" }));
+    await userEvent.click(screen.getByRole("button", { name: "Economy Reviser model tier" }));
     await saveChanges();
     expect(save).toHaveBeenCalledWith(
       "/api/config/review",
@@ -68,6 +69,22 @@ describe("ReviewSettingsPage pipeline controls", () => {
         tailorTier: "mid",
         reviserTier: "cheap",
       }),
+    );
+  });
+
+  it("localizes model tiers while keeping their saved values canonical", async () => {
+    await changeLanguage("zh-CN");
+    render(<ReviewSettingsPage />, { wrapper: withQueryClient });
+
+    expect(screen.getByText("硬性门槛")).toBeInTheDocument();
+    expect(screen.getByText(/启用硬性门槛的评审会直接阻断本轮/)).toBeInTheDocument();
+    expect(screen.getByText(/阻断项/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "写作模型档位：标准型" }));
+    await userEvent.click(screen.getByRole("button", { name: "保存更改" }));
+
+    expect(save).toHaveBeenCalledWith(
+      "/api/config/review",
+      expect.objectContaining({ tailorTier: "mid" }),
     );
   });
 

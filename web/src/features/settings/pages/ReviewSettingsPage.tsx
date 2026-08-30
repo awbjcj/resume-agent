@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -36,6 +37,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { modelTierLabel } from "@/i18n/model-labels";
 import { cn } from "@/lib/utils";
 import type { paths } from "@/lib/api/schema";
 import { ResetSectionButton } from "../ResetSectionButton";
@@ -69,13 +71,21 @@ type RosterId = (typeof ROSTERS)[number]["id"];
 
 /** What each shipped reviewer actually judges. The table used to be five bare
  *  names, which made weight and tier look arbitrary. */
-const REVIEWER_NOTES: Record<string, string> = {
-  "fact-check": "Blocking — any claim not traceable to a profile fact fails the round.",
-  "ats-keyword": "Coverage of the job description's stated requirements.",
-  recruiter: "Six-second skim: does the top of the page land?",
-  "hiring-manager": "Depth and credibility of the evidence for this specific role.",
-  concision: "Density — cuts padding without cutting evidence.",
-  "must-have-coverage": "Share of evidenced must-have requirements actually rendered.",
+type ReviewerNoteKey =
+  | "review.reviewerNotes.factCheck"
+  | "review.reviewerNotes.atsKeyword"
+  | "review.reviewerNotes.recruiter"
+  | "review.reviewerNotes.hiringManager"
+  | "review.reviewerNotes.concision"
+  | "review.reviewerNotes.mustHaveCoverage";
+
+const REVIEWER_NOTE_KEYS: Record<string, ReviewerNoteKey> = {
+  "fact-check": "review.reviewerNotes.factCheck",
+  "ats-keyword": "review.reviewerNotes.atsKeyword",
+  recruiter: "review.reviewerNotes.recruiter",
+  "hiring-manager": "review.reviewerNotes.hiringManager",
+  concision: "review.reviewerNotes.concision",
+  "must-have-coverage": "review.reviewerNotes.mustHaveCoverage",
 };
 
 export function ReviewSettingsPage() {
@@ -221,13 +231,14 @@ function NumberField({
 }
 
 function TierToggle({
-  label, value, onChange, name,
+  label, value, onChange, nameKey,
 }: {
   label: string;
   value: ModelTier;
   onChange: (tier: ModelTier) => void;
-  name: string;
+  nameKey: "model.tierNames.writer" | "model.tierNames.reviser";
 }) {
+  const { t } = useTranslation();
   return (
     <Field>
       <FieldLabel>{label}</FieldLabel>
@@ -239,8 +250,15 @@ function TierToggle({
         }}
       >
         {MODEL_TIERS.map((tier) => (
-          <ToggleGroupItem key={tier} value={tier} aria-label={`${tier} ${name}`}>
-            {tier}
+          <ToggleGroupItem
+            key={tier}
+            value={tier}
+            aria-label={t("model.tierChoice", {
+              tier: modelTierLabel(t, tier),
+              name: t(nameKey),
+            })}
+          >
+            {modelTierLabel(t, tier)}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -280,6 +298,7 @@ function ReviewRosterForm({
   endpoint: ConfigPath;
   onDirtyChange: (dirty: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const { data } = useConfig(endpoint);
   const save = useSaveConfig(endpoint);
   const { draft, setDraft, dirty, reset } = useDraft(data as ReviewDoc | undefined);
@@ -356,14 +375,14 @@ function ReviewRosterForm({
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TierToggle
-            label="Writer model tier"
-            name="writer tier"
+            label={t("model.tierNames.writer")}
+            nameKey="model.tierNames.writer"
             value={draft.tailorTier}
             onChange={(tier) => setDraft({ ...draft, tailorTier: tier })}
           />
           <TierToggle
-            label="Reviser model tier"
-            name="reviser tier"
+            label={t("model.tierNames.reviser")}
+            nameKey="model.tierNames.reviser"
             value={draft.reviserTier}
             onChange={(tier) => setDraft({ ...draft, reviserTier: tier })}
           />
@@ -391,9 +410,9 @@ function ReviewRosterForm({
               <TableRow key={r.name}>
                 <TableCell className="align-top">
                   <div className="font-medium">{r.name}</div>
-                  {REVIEWER_NOTES[r.name] && (
+                  {REVIEWER_NOTE_KEYS[r.name] && (
                     <div className="max-w-[26ch] text-xs leading-snug text-muted-foreground">
-                      {REVIEWER_NOTES[r.name]}
+                      {t(REVIEWER_NOTE_KEYS[r.name])}
                     </div>
                   )}
                 </TableCell>
@@ -432,12 +451,19 @@ function ReviewRosterForm({
                     value={r.modelTier}
                     onValueChange={(v) => v && setReviewer(i, { modelTier: v })}
                   >
-                    <SelectTrigger aria-label={`${r.name} model tier`} className="w-32">
-                      <SelectValue>{(v) => String(v ?? r.modelTier)}</SelectValue>
+                    <SelectTrigger
+                      aria-label={t("model.reviewerTier", { reviewer: r.name })}
+                      className="w-32"
+                    >
+                      <SelectValue>{(v) => modelTierLabel(t, String(v ?? r.modelTier))}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {MODEL_TIERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        {MODEL_TIERS.map((tier) => (
+                          <SelectItem key={tier} value={tier}>
+                            {modelTierLabel(t, tier)}
+                          </SelectItem>
+                        ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>

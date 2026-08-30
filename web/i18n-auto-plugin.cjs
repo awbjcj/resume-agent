@@ -20,6 +20,8 @@ UI_PROPS.add("message");
 UI_PROPS.add("note");
 const UI_VARIABLE = /(action|badge|caption|date|description|detail|empty|error|eyebrow|fallback|heading|help|hint|label|message|notice|note|placeholder|progress|reason|status|subtitle|success|suffix|summary|text|title)$/i;
 const UI_COLLECTION = /(actions|cards|columns|copy|descriptions|details|errors|fields|filters|items|kinds|labels|messages|meta|modalities|names|nav|options|outcomes|parts|results|rows|scopes|sections|stages|statuses|steps|tabs|titles)$/i;
+const STYLE_VARIABLE = /(?:class(?:name)?|classes|style)$/i;
+const TAILWIND_UTILITY_TOKEN = /^(?:[a-z0-9_/-]+:)*(?:!?)(?:flex|inline-flex|grid|inline-grid|block|inline-block|hidden|relative|absolute|fixed|sticky|uppercase|lowercase|capitalize|truncate|sr-only|(?:whitespace|w|h|min-w|max-w|min-h|max-h|size|p[trblxy]?|m[trblxy]?|text|bg|border|rounded|tracking|leading|font|gap|items|justify|space|overflow|shadow|ring|opacity|transition|duration|ease|animate|cursor)-.+)$/;
 const I18N_KEY = /^[a-z][a-z0-9]*(?:\.[a-z0-9_-]+)+$/i;
 const variableInit = (declaration) => {
   let init = declaration.get("init");
@@ -49,8 +51,7 @@ const isHumanText = (value) => {
       && /[A-Za-z]/.test(text)
       && !/^(https?:|\/api\/|[.#@]|[a-z]+:\/\/)/i.test(text)
       && !/(^|\s)(sm|md|lg|xl|2xl|dark|hover|focus|data|group|peer):/.test(text)
-      && !/(^|\s)(flex|grid|block|hidden|relative|absolute|w-|h-|p[trblxy]?-[\d[]|m[trblxy]?-[\d[]|text-|bg-|border-|rounded-|gap-|items-|justify-|space-|min-|max-|overflow-|shadow-|ring-)/.test(text)
-      && !(/\b(?:text|bg|border|rounded|tracking|leading|font|w|h|min|max|p[trblxy]?|m[trblxy]?|gap|items|justify|shadow|ring|opacity)-[^\s]+/.test(text) && !/[.!?]/.test(text)),
+      && !text.split(/\s+/).every((token) => TAILWIND_UTILITY_TOKEN.test(token)),
   );
 };
 const jsxAttributeName = (node) => node.name.type === "JSXIdentifier" ? node.name.name : null;
@@ -293,7 +294,7 @@ const isLocalizable = (pathRef) => {
   if (uiNamedObjectMap(pathRef)) return true;
   if (uiDefaultParameter(pathRef)) return true;
   const variable = directVariable(pathRef);
-  if (variable && !variable.array && UI_VARIABLE.test(variable.name)) return true;
+  if (variable && !variable.array && !STYLE_VARIABLE.test(variable.name) && UI_VARIABLE.test(variable.name)) return true;
   if (uiCollectionValue(pathRef)) return true;
   return namedUiFunction(pathRef);
 };

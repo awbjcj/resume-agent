@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { reasoningEffortLabel } from "@/i18n/model-labels";
 import {
   Select,
   SelectContent,
@@ -32,14 +34,19 @@ export function findCatalogModel(
 }
 
 function CapabilityBadges({ model }: { model: ModelEntry }) {
+  const { t } = useTranslation();
   if (!model.supportsReasoning && !model.supportsNativeSearch) return null;
   return (
     <span className="ml-auto flex gap-1">
       {model.supportsReasoning && (
-        <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">Thinking</Badge>
+        <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+          {t("model.capabilities.reasoning")}
+        </Badge>
       )}
       {model.supportsNativeSearch && (
-        <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">Search</Badge>
+        <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+          {t("model.capabilities.search")}
+        </Badge>
       )}
     </span>
   );
@@ -53,6 +60,7 @@ export function ModelPicker({
   onChange: (value: string) => void;
   catalog: ProviderModelCatalog[] | undefined;
 }) {
+  const { t } = useTranslation();
   const allModels = useMemo(() => (catalog ?? []).flatMap((p) => p.models), [catalog]);
   const knownIds = useMemo(() => new Set(allModels.map((m) => m.id)), [allModels]);
   // Base UI's <SelectValue> resolves labels through an internal items store
@@ -60,8 +68,8 @@ export function ModelPicker({
   // (nothing opened yet) it falls back to the raw value string. Resolve the
   // trigger label ourselves instead of relying on that store.
   const labelFor = (v: string | undefined) => {
-    if (!v) return "Select a model";
-    if (v === CUSTOM_VALUE) return "Custom model id…";
+    if (!v) return t("model.select");
+    if (v === CUSTOM_VALUE) return t("model.customModelId");
     return allModels.find((m) => m.id === v)?.label ?? v;
   };
   // Explicit escape hatch: once the user picks "Custom model id…", stay in
@@ -100,7 +108,9 @@ export function ModelPicker({
                 <span className="ml-auto flex items-center gap-1.5">
                   {provider.provider === "deepseek" && <DeepSeekPricingBadge />}
                   {!provider.hasKey && (
-                    <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">No key</Badge>
+                    <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+                      {t("model.noKey")}
+                    </Badge>
                   )}
                 </span>
               </SelectLabel>
@@ -109,7 +119,9 @@ export function ModelPicker({
                   key={model.id}
                   value={model.id}
                   disabled={!provider.hasKey}
-                  title={!provider.hasKey ? `Add a ${provider.label} API key to use this model` : undefined}
+                  title={!provider.hasKey
+                    ? t("model.addProviderKey", { provider: provider.label })
+                    : undefined}
                 >
                   <span className="flex w-full items-center gap-1.5">
                     <span>{model.label}</span>
@@ -120,13 +132,13 @@ export function ModelPicker({
             </SelectGroup>
           ))}
           <SelectSeparator />
-          <SelectItem value={CUSTOM_VALUE}>Custom model id…</SelectItem>
+          <SelectItem value={CUSTOM_VALUE}>{t("model.customModelId")}</SelectItem>
         </SelectContent>
       </Select>
       {isCustom && (
         <Input
           value={value}
-          placeholder="provider:model-id (e.g. openai:gpt-5.5)"
+          placeholder={t("model.customModelPlaceholder")}
           onChange={(e) => {
             setCustomValue(e.target.value);
             onChange(e.target.value);
@@ -148,6 +160,7 @@ function TuningToggleGroup({
   levels: string[];
   onChange: (value: string | null) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className={TUNING_LABEL_CLASS}>{label}</span>
@@ -161,11 +174,11 @@ function TuningToggleGroup({
         }}
       >
         <ToggleGroupItem value={PROVIDER_DEFAULT} className="h-7 rounded-full px-2.5 text-xs">
-          Default
+          {t("model.providerDefault")}
         </ToggleGroupItem>
         {levels.map((level) => (
           <ToggleGroupItem key={level} value={level} className="h-7 rounded-full px-2.5 text-xs">
-            {level[0].toUpperCase() + level.slice(1)}
+            {reasoningEffortLabel(t, level)}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -184,12 +197,13 @@ export function ModelTuningControls({
   catalog: ProviderModelCatalog[] | undefined;
   onReasoningEffortChange: (value: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const model = findCatalogModel(catalog, modelId);
   if (!model || model.reasoningEfforts.length === 0) return null;
 
   return (
     <TuningToggleGroup
-      label="Effort"
+      label={t("model.reasoningEffort")}
       value={reasoningEffort}
       levels={model.reasoningEfforts}
       onChange={onReasoningEffortChange}

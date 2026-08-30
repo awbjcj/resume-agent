@@ -1,3 +1,9 @@
+import { useTranslation } from "react-i18next";
+
+import {
+  profileBuildReportLineLabel,
+  profileBuildStatusLabel,
+} from "@/i18n/profile-build-diagnostics";
 import { useRunStore } from "@/lib/runs/store";
 
 type BuildReport = {
@@ -27,6 +33,7 @@ function Section({ title, lines, tone }: {
 }
 
 export function BuildReportPanel() {
+  const { t } = useTranslation();
   const runs = useRunStore((s) => s.runs);
   const latest = Object.values(runs)
     .filter((run) => run.kind === "profile-build" && run.status === "succeeded")
@@ -35,7 +42,7 @@ export function BuildReportPanel() {
   const report = latest.result as BuildReport;
   const docStatus = Object.entries(report.docStatus ?? {})
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([doc, status]) => `${doc}: ${status}`);
+    .map(([doc, status]) => `${doc}: ${profileBuildStatusLabel(t, status)}`);
 
   return (
     <div className="flex flex-col gap-3 rounded-md border p-3">
@@ -43,10 +50,24 @@ export function BuildReportPanel() {
         Last build: {report.experiences ?? 0} experiences, {report.projects ?? 0} projects
       </div>
       <Section title="Document status" lines={docStatus} />
-      <Section title="Anchor decisions" lines={report.anchorDecisions ?? []} />
-      <Section title="Dropped claims" lines={report.verificationDrops ?? []} tone="warn" />
-      <Section title="Conflicts" lines={report.conflicts ?? []} />
-      <Section title="Warnings" lines={report.warnings ?? []} tone="warn" />
+      <Section
+        title="Anchor decisions"
+        lines={(report.anchorDecisions ?? []).map((line) => profileBuildReportLineLabel(t, "anchor", line))}
+      />
+      <Section
+        title="Dropped claims"
+        lines={(report.verificationDrops ?? []).map((line) => profileBuildReportLineLabel(t, "verificationDrop", line))}
+        tone="warn"
+      />
+      <Section
+        title="Conflicts"
+        lines={(report.conflicts ?? []).map((line) => profileBuildReportLineLabel(t, "conflict", line))}
+      />
+      <Section
+        title="Warnings"
+        lines={(report.warnings ?? []).map((line) => profileBuildReportLineLabel(t, "warning", line))}
+        tone="warn"
+      />
     </div>
   );
 }

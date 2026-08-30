@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   BriefcaseBusiness,
@@ -13,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { evidencePortfolioWarningLabel } from "@/i18n/profile-build-diagnostics";
 import type { components } from "@/lib/api/schema";
 import { useEvidencePortfolio } from "./use-evidence-portfolio";
 
@@ -61,6 +63,7 @@ export function EvidencePortfolioDisclosure({
   versionId: number;
   available: boolean;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
   const panelId = useId();
@@ -194,7 +197,7 @@ export function EvidencePortfolioDisclosure({
                   role="status"
                 >
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  {data.warning}
+                  {evidencePortfolioWarningLabel(t, data.warning)}
                 </p>
               ) : null}
 
