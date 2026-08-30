@@ -1,6 +1,8 @@
 from concurrent.futures import Executor, Future
 from datetime import datetime, timedelta, timezone
+from typing import cast
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
@@ -55,7 +57,7 @@ class _Agent:
         return _Result(self.content)
 
 
-def _client(tmp_path, *, executor=None):
+def _client(tmp_path, *, executor: Executor | None = None) -> TestClient:
     return TestClient(
         create_app(
             db_url="sqlite://",
@@ -65,12 +67,17 @@ def _client(tmp_path, *, executor=None):
     )
 
 
-def _seed(app, company="Acme"):
+def _app(client: TestClient) -> FastAPI:
+    return cast(FastAPI, client.app)
+
+
+def _seed(app: FastAPI, company: str | None = "Acme") -> int:
     with get_session(app.state.engine) as session:
         job = Job(source="manual", company=company, title="Engineer", jd_text="Build")
         session.add(job)
         session.commit()
         session.refresh(job)
+        assert job.id is not None
         return job.id
 
 
@@ -137,9 +144,10 @@ def test_job_detail_reads_stale_company_evidence_shared_by_sibling_job(tmp_path)
     client = _client(tmp_path)
     now = datetime.now(timezone.utc)
     with client:
-        first = _seed(client.app, "Acme, Inc.")
-        second = _seed(client.app, "Acme LLC")
-        with get_session(client.app.state.engine) as session:
+        app = _app(client)
+        first = _seed(app, "Acme, Inc.")
+        second = _seed(app, "Acme LLC")
+        with get_session(app.state.engine) as session:
             session.add(
                 CompanyIntelligenceEvidenceRow(
                     normalized_company="acme",
@@ -168,8 +176,8 @@ def test_job_detail_reads_stale_company_evidence_shared_by_sibling_job(tmp_path)
 def test_job_detail_distinguishes_empty_from_missing_company(tmp_path):
     client = _client(tmp_path)
     with client:
-        empty_job = _seed(client.app, "Acme")
-        unavailable_job = _seed(client.app, None)
+        empty_job = _seed(_app(client), "Acme")
+        unavailable_job = _seed(_app(client), None)
 
         empty = client.get(f"/api/jobs/{empty_job}").json()["companyIntelligence"]
         unavailable = client.get(
@@ -189,7 +197,7 @@ def test_explicit_refresh_launches_and_persists_grounded_dossier(monkeypatch, tm
     _stub_company_research(monkeypatch)
     client = _client(tmp_path)
     with client:
-        job_id = _seed(client.app)
+        job_id = _seed(_app(client))
         response = client.post(
             f"/api/jobs/{job_id}/company-intelligence/refreshes"
         )
@@ -206,7 +214,7 @@ def test_legacy_refresh_route_remains_accepted(monkeypatch, tmp_path):
     _stub_company_research(monkeypatch)
     client = _client(tmp_path)
     with client:
-        job_id = _seed(client.app)
+        job_id = _seed(_app(client))
         response = client.post(f"/api/jobs/{job_id}/company-intelligence")
 
     assert response.status_code == 202
@@ -218,11 +226,12 @@ def test_refresh_keeps_company_and_singleton_identity_aligned(monkeypatch, tmp_p
     executor = _DeferredExecutor()
     client = _client(tmp_path, executor=executor)
     with client:
-        job_id = _seed(client.app, "Acme")
+        app = _app(client)
+        job_id = _seed(app, "Acme")
         response = client.post(
             f"/api/jobs/{job_id}/company-intelligence/refreshes"
         )
-        with get_session(client.app.state.engine) as session:
+        with get_session(app.state.engine) as session:
             job = session.get(Job, job_id)
             assert job is not None
             job.company = "Beta"
@@ -231,7 +240,7 @@ def test_refresh_keeps_company_and_singleton_identity_aligned(monkeypatch, tmp_p
 
         executor.run_next()
         acme = client.get(f"/api/jobs/{job_id}/company-intelligence").json()
-        with get_session(client.app.state.engine) as session:
+        with get_session(app.state.engine) as session:
             rows = session.exec(select(CompanyIntelligenceEvidenceRow)).all()
 
     assert response.status_code == 202
@@ -242,7 +251,7 @@ def test_refresh_keeps_company_and_singleton_identity_aligned(monkeypatch, tmp_p
 def test_explicit_refresh_requires_company(tmp_path):
     client = _client(tmp_path)
     with client:
-        job_id = _seed(client.app, company=None)
+        job_id = _seed(_app(client), company=None)
         response = client.post(
             f"/api/jobs/{job_id}/company-intelligence/refreshes"
         )

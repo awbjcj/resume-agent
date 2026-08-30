@@ -178,7 +178,10 @@ def generate_company_intelligence(
             )
         ).first()
         if row is None:
-            row = CompanyIntelligenceEvidenceRow(normalized_company=key)
+            row = CompanyIntelligenceEvidenceRow(
+                normalized_company=key,
+                expires_at=evidence.expires_at,
+            )
             session.add(row)
         row.display_company = company.strip()
         row.evidence_json = evidence.model_dump(mode="json")
