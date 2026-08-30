@@ -7,8 +7,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
-from resume_agent.api.routers import role_preparation as role_router
 from resume_agent.db import get_session
+from resume_agent.role_preparation import agents as role_agents
 from resume_agent.role_preparation.models import (
     RolePreparationAsk,
     RolePreparationDraft,
@@ -120,7 +120,7 @@ def _draft():
 
 def test_role_preparation_resource_moves_from_empty_to_ready(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        role_router,
+        role_agents,
         "build_role_preparation_formatter",
         lambda: _Runner(_draft()),
     )

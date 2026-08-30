@@ -15,11 +15,10 @@ from resume_agent.api.schemas.role_preparation import (
     RolePreparationUnavailableOut,
 )
 from resume_agent.api.schemas.runs import RunOut
-from resume_agent.role_preparation.agents import build_role_preparation_formatter
 from resume_agent.services.role_preparation import (
-    build_role_preparation_inputs,
     generate_role_preparation_brief,
     resolve_role_preparation_resource,
+    role_preparation_unavailable_reason,
 )
 from resume_agent.tracking.tables import Job
 
@@ -77,7 +76,7 @@ def create_role_preparation_refresh(
     job = session.get(Job, job_id)
     if job is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    if build_role_preparation_inputs(session, job_id) is None:
+    if role_preparation_unavailable_reason(session, job) is not None:
         raise ApiException(
             409,
             "ROLE_PREPARATION_UNAVAILABLE",
@@ -90,7 +89,6 @@ def create_role_preparation_refresh(
         generate_role_preparation_brief(
             worker_session,
             job_id=job_id,
-            formatter=build_role_preparation_formatter(),
             reporter=reporter,
         )
         reporter.step(1)

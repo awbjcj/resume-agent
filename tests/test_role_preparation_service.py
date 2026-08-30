@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import pytest
+from sqlalchemy import event as sqlalchemy_event
 from sqlmodel import Session
 
 from resume_agent.company_intelligence.models import (
@@ -10,6 +12,7 @@ from resume_agent.company_intelligence.models import (
 )
 from resume_agent.config import Settings
 from resume_agent.db import init_db, make_engine
+from resume_agent.llm_runner import UnparsedAgentOutput
 from resume_agent.role_preparation.models import (
     RolePreparationAsk,
     RolePreparationCompetency,
@@ -22,6 +25,7 @@ from resume_agent.services.role_preparation import (
     generate_role_preparation_brief,
     load_role_preparation_brief,
     role_preparation_inputs_changed,
+    resolve_role_preparation_resource,
 )
 from resume_agent.tracking.tables import (
     Application,
@@ -278,3 +282,51 @@ def test_role_preparation_detects_changed_event_inputs_without_rewriting_brief()
 
     assert unchanged is not None
     assert unchanged.input_fingerprint == brief.input_fingerprint
+
+
+def test_role_preparation_reports_unparsed_output_at_the_model_boundary():
+    engine = _engine()
+    with Session(engine) as session:
+        job, _selected, _event = _seed(session)
+        assert job.id is not None
+        with pytest.raises(
+            UnparsedAgentOutput,
+            match="Expected RolePreparationDraft from role-preparation format agent",
+        ):
+            generate_role_preparation_brief(
+                session,
+                job_id=job.id,
+                formatter=_Runner("not structured output"),
+            )
+
+
+def test_ready_resource_reuses_the_loaded_job_and_company_snapshot():
+    engine = _engine()
+    with Session(engine) as session:
+        job, _selected, _event = _seed(session)
+        assert job.id is not None
+        job_id = job.id
+        generate_role_preparation_brief(
+            session,
+            job_id=job_id,
+            formatter=_Runner(_prep_draft()),
+        )
+
+    statements = 0
+
+    def count_statement(*_args):
+        nonlocal statements
+        statements += 1
+
+    sqlalchemy_event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        with Session(engine) as session:
+            job = session.get(Job, job_id)
+            assert job is not None
+            resource = resolve_role_preparation_resource(session, job)
+    finally:
+        sqlalchemy_event.remove(engine, "before_cursor_execute", count_statement)
+
+    assert resource.state == "ready"
+    assert resource.inputs_changed is False
+    assert statements == 6
