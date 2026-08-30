@@ -35,14 +35,20 @@ export function initialOpenPipelineStages() {
   return new Set<string>(["tailored", "rendered"]);
 }
 
+export function normalizePipelineStage(stage: string) {
+  return stage.trim().toLowerCase();
+}
+
 export function pipelineStageLabel(
   stage: string,
   translate?: (key: PipelineStageLabelKey) => string,
 ) {
-  const labelKey = PIPELINE_STAGE_LABEL_KEYS[stage as keyof typeof PIPELINE_STAGE_LABEL_KEYS];
+  const normalizedStage = normalizePipelineStage(stage);
+  const labelKey =
+    PIPELINE_STAGE_LABEL_KEYS[normalizedStage as keyof typeof PIPELINE_STAGE_LABEL_KEYS];
   if (labelKey && translate) return translate(labelKey);
 
-  return stage.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return normalizedStage.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function openStagesFromParam(stage: string | null): Set<string> {

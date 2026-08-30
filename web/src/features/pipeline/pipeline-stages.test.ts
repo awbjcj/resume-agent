@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   initialOpenPipelineStages,
+  normalizePipelineStage,
   openStagesFromParam,
 } from "./pipeline-stages";
 
@@ -16,5 +17,11 @@ describe("openStagesFromParam", () => {
 
   it("ignores unknown stage names", () => {
     expect(openStagesFromParam("bogus")).toEqual(initialOpenPipelineStages());
+  });
+});
+
+describe("normalizePipelineStage", () => {
+  it("canonicalizes legacy casing and surrounding whitespace", () => {
+    expect(normalizePipelineStage("  Shortlisted ")).toBe("shortlisted");
   });
 });

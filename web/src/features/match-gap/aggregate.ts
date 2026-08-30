@@ -1,4 +1,5 @@
 import type { components } from "@/lib/api/schema";
+import { normalizePipelineStage } from "@/features/pipeline/pipeline-stages";
 
 type Payload = components["schemas"]["MatchGapOut"];
 type JobLite = Payload["jobs"][number];
@@ -163,9 +164,12 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
   );
   const statusCounts: Record<string, number> = {};
   for (const job of jobsBeforeStatus) {
-    statusCounts[job.status] = (statusCounts[job.status] ?? 0) + 1;
+    const status = normalizePipelineStage(job.status);
+    statusCounts[status] = (statusCounts[status] ?? 0) + 1;
   }
-  const filteredJobs = jobsBeforeStatus.filter((job) => filters.statuses.has(job.status));
+  const filteredJobs = jobsBeforeStatus.filter((job) =>
+    filters.statuses.has(normalizePipelineStage(job.status)),
+  );
   const filteredJobIds = new Set(filteredJobs.map((job) => job.id));
   const edges = payload.edges.filter((edge) => filteredJobIds.has(edge.jobId));
 

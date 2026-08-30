@@ -64,4 +64,34 @@ describe("Filters", () => {
     expect(screen.getByRole("checkbox", { name: /已批准/ })).toBeInTheDocument();
     expect(screen.queryByText("Shortlisted")).not.toBeInTheDocument();
   });
+
+  it("merges differently cased stage counts into one Chinese facet option", async () => {
+    const user = userEvent.setup();
+    await changeLanguage("zh-CN");
+
+    render(
+      <Filters
+        value={{
+          q: "",
+          company: null,
+          seniority: null,
+          statuses: defaultTargetStatuses(),
+          gapsOnly: false,
+          weighting: "essential",
+        }}
+        onChange={() => {}}
+        companies={[]}
+        seniorities={[]}
+        statusCounts={{ Shortlisted: 236, Tailored: 5, Rendered: 4, Approved: 2 }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^阶段/ }));
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
+    expect(screen.getAllByText("已加入候选")).toHaveLength(1);
+    expect(screen.getAllByText("已定制")).toHaveLength(1);
+    expect(screen.getAllByText("已生成")).toHaveLength(1);
+    expect(screen.getAllByText("已批准")).toHaveLength(1);
+  });
 });

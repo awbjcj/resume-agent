@@ -212,6 +212,21 @@ describe("deriveView", () => {
     expect(byCompany.statusCounts).toEqual({ tailored: 1 });
   });
 
+  it("normalizes legacy stage casing before counting and filtering", () => {
+    const legacyPayload: Payload = {
+      ...payload,
+      jobs: payload.jobs.map((job) => ({
+        ...job,
+        status: job.status[0].toUpperCase() + job.status.slice(1),
+      })),
+    };
+
+    const view = deriveView(legacyPayload, base);
+
+    expect(view.statusCounts).toEqual({ shortlisted: 1, tailored: 1 });
+    expect(view.filteredJobCount).toBe(2);
+  });
+
   it("returns filtered demanding jobs by stable skill key", () => {
     const jobs = deriveView(payload, { ...base, company: "Datadog" }).jobsForSkill(
       "kubernetes",

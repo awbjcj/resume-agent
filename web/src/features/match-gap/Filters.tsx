@@ -11,7 +11,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FacetPopover } from "@/components/filters/FacetPopover";
-import { pipelineStageLabel } from "@/features/pipeline/pipeline-stages";
+import {
+  normalizePipelineStage,
+  pipelineStageLabel,
+} from "@/features/pipeline/pipeline-stages";
 import { fieldLabel } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import { TARGET_STATUSES, type Filters as FilterValue } from "./aggregate";
@@ -45,6 +48,14 @@ export function Filters({
     { label: "All levels", value: ALL },
     ...seniorities.map((seniority) => ({ label: fieldLabel(seniority), value: seniority })),
   ];
+  const normalizedStatusCounts: Record<string, number> = Object.fromEntries(
+    TARGET_STATUSES.map((status) => [status, 0]),
+  );
+  for (const [status, count] of Object.entries(statusCounts)) {
+    const normalizedStatus = normalizePipelineStage(status);
+    normalizedStatusCounts[normalizedStatus] =
+      (normalizedStatusCounts[normalizedStatus] ?? 0) + count;
+  }
 
   return (
     <div
@@ -126,10 +137,7 @@ export function Filters({
         label="Stage"
         presentation="field"
         className="w-full lg:w-auto lg:rounded-full"
-        counts={{
-          ...Object.fromEntries(TARGET_STATUSES.map((status) => [status, 0])),
-          ...statusCounts,
-        }}
+        counts={normalizedStatusCounts}
         selected={value.statuses}
         onChange={(statuses) => onChange({ ...value, statuses })}
         getLabel={(stage) => pipelineStageLabel(stage, (key) => t(key))}
