@@ -134,8 +134,11 @@ def test_comparison_reads_only_selected_roles_with_a_bounded_query_count():
             assert job.id is not None
             session.add(Application(job_id=job.id, status="interview"))
         session.commit()
-        requested = [jobs[41].id, jobs[7].id]
-        assert all(job_id is not None for job_id in requested)
+        first_requested_id = jobs[41].id
+        second_requested_id = jobs[7].id
+        assert first_requested_id is not None
+        assert second_requested_id is not None
+        requested = [first_requested_id, second_requested_id]
         statements = 0
 
         def count_statement(*_args):
@@ -144,7 +147,7 @@ def test_comparison_reads_only_selected_roles_with_a_bounded_query_count():
 
         event.listen(engine, "before_cursor_execute", count_statement)
         try:
-            items = compare_roles(session, [int(value) for value in requested])
+            items = compare_roles(session, requested)
         finally:
             event.remove(engine, "before_cursor_execute", count_statement)
 
