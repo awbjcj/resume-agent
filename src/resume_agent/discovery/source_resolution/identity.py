@@ -12,7 +12,7 @@ import tldextract
 from bs4 import BeautifulSoup
 
 
-_TLD = tldextract.TLDExtract(suffix_list_urls=())
+_TLD = tldextract.TLDExtract(cache_dir=None, suffix_list_urls=())
 _LEGAL_SUFFIXES = frozenset(
     {
         "inc",
