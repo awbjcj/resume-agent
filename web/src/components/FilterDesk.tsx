@@ -1,5 +1,6 @@
 import { SearchIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { MinFitInput } from "@/components/MinFitInput";
 import { SalaryThresholdInput } from "@/components/SalaryThresholdInput";
@@ -32,30 +33,21 @@ import {
 import { ActiveFilterSummary } from "./filters/ActiveFilterSummary";
 import { FacetPopover } from "./filters/FacetPopover";
 
-const SORTS: [SortKey, string][] = [
-  ["fit", "Fit"],
-  ["salary", "Salary"],
-  ["recency", "Recency"],
-  ["composite", "Composite"],
-  ["company", "Company"],
-];
-const PRESETS: [Preset, string][] = [
-  ["balanced", "Balanced"],
-  ["pay_first", "Pay-first"],
-  ["freshest", "Freshest"],
-];
-const STALE_OPTIONS: [string, string][] = [
-  ["any", "Any time"],
-  ["7", "≤ 7 days"],
-  ["14", "≤ 14 days"],
-  ["30", "≤ 30 days"],
-  ["45", "≤ 45 days"],
-  ["90", "≤ 90 days"],
-];
-
-const SORT_ITEMS = SORTS.map(([value, label]) => ({ value, label }));
-const PRESET_ITEMS = PRESETS.map(([value, label]) => ({ value, label }));
-const STALE_ITEMS = STALE_OPTIONS.map(([value, label]) => ({ value, label }));
+const SORTS: readonly SortKey[] = ["fit", "salary", "recency", "composite", "company"];
+const SORT_LABEL_KEYS = {
+  fit: "filters.sortOptions.fit",
+  salary: "filters.sortOptions.salary",
+  recency: "filters.sortOptions.recency",
+  composite: "filters.sortOptions.composite",
+  company: "filters.sortOptions.company",
+} as const;
+const PRESETS: readonly Preset[] = ["balanced", "pay_first", "freshest"];
+const PRESET_LABEL_KEYS = {
+  balanced: "filters.presets.balanced",
+  pay_first: "filters.presets.payFirst",
+  freshest: "filters.presets.freshest",
+} as const;
+const STALE_DAYS = [7, 14, 30, 45, 90] as const;
 const CONTROL_LABEL_CLASS =
   "text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground";
 
@@ -178,6 +170,7 @@ export function FilterDesk({
   /** Display formatter for status/stage values. Defaults to underscore-stripping. */
   statusLabel?: (value: string) => string;
 }) {
+  const { t } = useTranslation();
   const [primaryDraft, setPrimaryDraft] = useState(() =>
     primaryDraftFromFilter(filter),
   );
@@ -230,6 +223,21 @@ export function FilterDesk({
     committedQ !== filter.q.trim() ||
     salaryDraft.value !== filter.salaryMin ||
     committedFitMin !== filter.fitMin;
+  const sortItems = SORTS.map((value) => ({
+    value,
+    label: t(SORT_LABEL_KEYS[value]),
+  }));
+  const presetItems = PRESETS.map((value) => ({
+    value,
+    label: t(PRESET_LABEL_KEYS[value]),
+  }));
+  const staleItems = [
+    { value: "any", label: t("filters.posted.anyTime") },
+    ...STALE_DAYS.map((days) => ({
+      value: String(days),
+      label: t("filters.posted.withinDays", { count: days }),
+    })),
+  ];
 
   const applyPrimaryFilters = () => {
     if (!salaryDraft.valid || !hasPrimaryDraftChanges) return;
@@ -359,10 +367,10 @@ export function FilterDesk({
 
           <Field className="w-full gap-1.5 sm:w-30">
             <FieldLabel htmlFor="f-stale" className={CONTROL_LABEL_CLASS}>
-              Posted
+              {t("filters.posted.label")}
             </FieldLabel>
             <Select
-              items={STALE_ITEMS}
+              items={staleItems}
               value={
                 filter.staleDays == null ? "any" : String(filter.staleDays)
               }
@@ -383,7 +391,7 @@ export function FilterDesk({
                 className="w-max min-w-[var(--anchor-width)]"
               >
                 <SelectGroup>
-                  {STALE_ITEMS.map((item) => (
+                  {staleItems.map((item) => (
                     <SelectItem key={item.value} value={item.value}>
                       {item.label}
                     </SelectItem>
@@ -395,10 +403,10 @@ export function FilterDesk({
 
           <Field className="w-full gap-1.5 sm:w-28">
             <FieldLabel htmlFor="f-sort" className={CONTROL_LABEL_CLASS}>
-              Sort
+              {t("filters.sortBy")}
             </FieldLabel>
             <Select
-              items={SORT_ITEMS}
+              items={sortItems}
               value={filter.sort}
               onValueChange={(value) => set({ sort: value as SortKey })}
             >
@@ -415,7 +423,7 @@ export function FilterDesk({
                 className="w-max min-w-[var(--anchor-width)]"
               >
                 <SelectGroup>
-                  {SORT_ITEMS.map((item) => (
+                  {sortItems.map((item) => (
                     <SelectItem key={item.value} value={item.value}>
                       {item.label}
                     </SelectItem>
@@ -428,10 +436,10 @@ export function FilterDesk({
           {filter.sort === "composite" && (
             <Field className="w-full gap-1.5 sm:w-28">
               <FieldLabel htmlFor="f-preset" className={CONTROL_LABEL_CLASS}>
-                Preset
+                {t("filters.preset")}
               </FieldLabel>
               <Select
-                items={PRESET_ITEMS}
+                items={presetItems}
                 value={filter.preset}
                 onValueChange={(value) => set({ preset: value as Preset })}
               >
@@ -448,7 +456,7 @@ export function FilterDesk({
                   className="w-max min-w-[var(--anchor-width)]"
                 >
                   <SelectGroup>
-                    {PRESET_ITEMS.map((item) => (
+                    {presetItems.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
                         {item.label}
                       </SelectItem>

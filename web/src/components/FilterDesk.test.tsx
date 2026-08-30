@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { FilterDesk } from "./FilterDesk";
 import { salarySummary } from "./SalaryThresholdInput";
+import { changeLanguage } from "@/i18n";
 import { emptyFilterState } from "@/lib/filters/types";
 
 const facets = {
@@ -24,7 +25,7 @@ describe("FilterDesk", () => {
   it("renders the desk with a Min fit control", () => {
     render(<FilterDesk filter={emptyFilterState()} facets={facets} total={1} onChange={() => {}} />);
     expect(screen.getByText("Min fit")).toBeInTheDocument();
-    expect(screen.getByText("Sort")).toBeInTheDocument();
+    expect(screen.getByText("Sort by")).toBeInTheDocument();
 
     const searchField = screen.getByRole("searchbox", { name: "Search" })
       .closest('[data-slot="field"]');
@@ -33,6 +34,29 @@ describe("FilterDesk", () => {
     expect(searchField?.parentElement).toBe(fitField?.parentElement);
     expect(searchField).toHaveClass("sm:flex-1");
     expect(fitField).toHaveClass("sm:flex-1");
+  });
+
+  it("translates the sort controls and choices in Chinese", async () => {
+    await changeLanguage("zh-CN");
+    const user = userEvent.setup();
+    render(
+      <FilterDesk
+        filter={{ ...emptyFilterState(), sort: "composite" }}
+        facets={facets}
+        total={1}
+        onChange={() => {}}
+      />,
+    );
+
+    const sort = screen.getByRole("combobox", { name: "排序方式" });
+    expect(sort).toHaveTextContent("综合评分");
+    expect(screen.getByRole("combobox", { name: "预设" })).toHaveTextContent("均衡");
+    expect(screen.getByRole("combobox", { name: "发布日期" })).toHaveTextContent("不限时间");
+
+    await user.click(sort);
+    expect(screen.getByRole("option", { name: "匹配度" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "薪资" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "最新发布" })).toBeVisible();
   });
 
   it("shows the Preset control only for composite sort", () => {
@@ -67,7 +91,7 @@ describe("FilterDesk", () => {
       screen.getByRole("spinbutton", { name: "Min fit" }),
       screen.getByRole("spinbutton", { name: "Min salary (USD)" }),
       screen.getByRole("combobox", { name: "Posted" }),
-      screen.getByRole("combobox", { name: "Sort" }),
+      screen.getByRole("combobox", { name: "Sort by" }),
       screen.getByRole("button", { name: /^apply$/i }),
     ];
 
