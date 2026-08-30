@@ -388,24 +388,25 @@ invocation. The unit the tenancy seam passes around; nothing user-scoped is
 resolved outside one.
 _Avoid_: session (a session is one way a UserContext gets established), tenant
 
-**Budget**:
-A user's rolling 7-day weighted-token allowance against the shared provider
-keys. Recorded always; enforced only for non-admin users on shared keys, and
-resolved **once per phase, not per call** — `SpendGate` (`tenancy/spend.py`)
-holds one decision on the active `UserContext` for
-`Settings.spend_gate_ttl_seconds`, and recording a call decrements that
-decision's remaining headroom so the call that exhausts a budget is the call
-that invalidates it. The TTL is a ceiling on staleness, not the mechanism that
-keeps the decision correct.
-_Avoid_: quota (quotas cap resources, budgets cap spend), token limit
+**Cost allowance**:
+A non-admin user's anchored-period USD micro-cost allowance for shared provider
+keys, consumed before durable credits. In `enforce` mode this is the spend
+authority; in `shadow` mode the legacy rolling weighted-token budget remains
+the active compatibility gate while exact cost is dual-recorded. Administrators
+bypass the per-user allowance but remain inside the platform's UTC-month shared
+cost cap. BYOK calls retain telemetry and carry zero quota charge.
+_Avoid_: token budget (legacy shadow-mode term), resource quota
 
 **Spend gate**:
 The single seam that answers both "which key funds this call?" (`select`, never
 raises) and "may I spend?" (`open`, raises) from one evaluation. Before it, the
 two questions were derived independently — twice per call, from three modules —
-and could disagree. Settlement (the `UsageEvent`, its line items, the quota
-charge) is a separate, uncacheable write and is deliberately not part of it.
-_Avoid_: budget check (that names only half of it), key resolver
+and could disagree. One decision is cached per model on the active
+`UserContext`, with headroom decremented at settlement and immediate
+invalidation on exhaustion; the TTL only bounds external-policy staleness.
+Settlement (the `UsageEvent`, its line items, and any cost charge) is a
+separate write.
+_Avoid_: cost check (that names only half of it), key resolver
 
 **Quota**:
 A per-user resource cap that applies to everyone regardless of key or role —
@@ -487,3 +488,45 @@ The server-side weighted fit/salary/recency SQL sort key (`PRESETS`) for the
 shortlist. Presets choose different weight sets; stable job-id ordering breaks
 ties.
 _Avoid_: composite score (the score is the value; the rank is its use as sort key)
+
+## Application timeline, research, and workspace recall
+
+**Application event**:
+One structured milestone owned by an Application — submission, screening or
+interview round, offer/deadline, rejection/withdrawal, or a labeled custom
+event. It carries its own time, sequence, result, notes/reflection, and optional
+interview or compensation detail. Event creation may advance Application
+status through `tracking/status_rules.py`; editing or deleting an event never
+rewinds status (ADR 0012).
+_Avoid_: status update (status is one projection of some event kinds), activity
+
+**Timeline pivot**:
+`tracking/timeline_pivot.py::build_pivot` — the canonical batched cross-job
+dataset for the Applications grid, wide CSV, lossless event CSV, timeline
+analytics, and offer comparisons. Presentations project this dataset instead
+of independently joining Application events, so round numbering and event
+coverage cannot silently diverge.
+_Avoid_: applications table (one UI projection), retrospective report
+
+**Company intelligence**:
+Explicitly refreshed, source-grounded public-company evidence cached by
+normalized company and shared by sibling jobs. The formatter may retain only
+sources found in the research output and only insights citing those retained
+sources; a failed refresh preserves the last good dossier, while expiry marks
+it stale without triggering background research. This evidence is separate
+from historical H-1B sponsorship evidence.
+_Avoid_: company profile (candidate profile is a different domain), sponsorship signal
+
+**Saved board view**:
+A workspace-scoped name plus serialized query string for exactly one of Triage,
+Shortlist, or Pipeline. Applying it restores the canonical URL-backed filter
+state; it does not persist a materialized result set or create a new filtering
+policy.
+_Avoid_: preset (presets are built-in sort policies), saved search
+
+**Run completion**:
+The durable terminal history row for a background run — succeeded, failed, or
+cancelled — with independent read state for the notification surface. It is
+idempotent by run id and survives after the live Run snapshot/SSE delivery has
+ceased; it does not replace the Run snapshot as execution state.
+_Avoid_: notification (one presentation of the history), run snapshot
