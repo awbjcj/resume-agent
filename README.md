@@ -4,13 +4,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 
-A local-first, command-line and web job-hunt pipeline. Point it at your own
-resume and API keys, and it pulls job posts from multiple sources (job-board
-connectors, LinkedIn, or hand-pasted), scores them against a **fact-locked**
-profile of your real experience, helps you tailor a resume through a panel of
-reviewer agents, drafts a matching cover letter, renders both to PDF, and tracks
-every application — auto-syncing statuses from your Gmail — all on your own
-machine, in one SQLite database.
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+A local-first command-line and web job-hunt pipeline that can also run as a
+hosted multi-user service. Point it at your own resume and API keys, and it
+pulls job posts from multiple sources (job-board connectors, LinkedIn, or
+hand-pasted), scores them against a **fact-locked** profile of your real
+experience, helps you tailor a resume through a panel of reviewer agents,
+drafts a matching cover letter, renders both to PDF, and tracks every
+application in a workspace-scoped SQLite database.
 
 The guiding rule is **fact-lock**: every bullet on a tailored resume must trace
 back to a fact you actually provided. The agents rewrite and reframe; they never
@@ -51,7 +53,7 @@ points where _you_ (not the agent) make the call.
 | **Tailor**       | `tailor`                     | A writer agent drafts a fact-locked resume; a reviewer panel critiques and a reviser loops until it passes.                                               |
 | **Cover letter** | `cover-letter`               | Drafts a fact-locked cover letter per job, gated by a deterministic provenance check, and renders it to PDF.                                              |
 | **Render**       | `render`                     | A chosen resume version becomes a PDF in `output/`.                                                                                                       |
-| **👤 Track**     | web app / `sync-status`      | Log submission status and notes by hand, or let `sync-status` read Gmail and **propose** status moves for you to apply.                                   |
+| **👤 Track**     | web app / `sync-status`      | Record dated application events, outcomes, reflections, and offer details; export calendars/CSV, or let `sync-status` read Gmail and **propose** status moves for you to apply. |
 
 ### What it looks like
 
@@ -92,8 +94,10 @@ under their own stage, alongside every other stage in flight:
 
 ![Pipeline — every job by stage, including rendered PDFs](docs/screenshots/pipeline.png)
 
-**👤 Track.** Open a job → **Tracking** tab to set the application status
-by hand, or let `sync-status` propose moves from Gmail:
+**👤 Track.** Open a job → **Tracking** tab to set application status and log
+the complete timeline: submission, screening and interview rounds, outcomes,
+reflections, offer details, and custom events. Dated events can be downloaded
+as calendar files, while `sync-status` can propose moves from Gmail:
 
 ![Tracking tab — application status and notes](docs/screenshots/tracking-tab.png)
 
@@ -221,6 +225,27 @@ starts the optional sibling `h1b-job-search-mcp` server. That launcher uses
 `http://127.0.0.1:8001/mcp` for the API's Streamable HTTP connection, so no
 manual MCP command or URL is needed. Run `make stack-health` after startup to
 check both HTTP health endpoints and the MCP handshake/tool allowlist.
+
+### Application workspace and company research
+
+The **Applications** page (`/applications`) projects every active application
+through one shared timeline dataset. Search and sort the grid, compare repeated
+technical rounds, and export either the readable wide grid or the lossless
+event-level CSV. **Analytics** (`/analytics`) reuses the same dataset for stage
+flows, cycle times, active-pipeline lanes, and offer comparisons; upcoming
+events can also be downloaded together as an `.ics` calendar.
+
+Each job's **Research** tab keeps employer evidence separate from sponsorship
+evidence. **Company intelligence** builds a cited brief across strategy, recent
+moves, engineering culture, challenges, and competitive position. A refresh is
+always user-triggered, only citations present in the research output survive
+validation, stale evidence remains visibly marked, and sibling jobs at the same
+normalized company share the saved dossier.
+
+Triage, Shortlist, and Pipeline filters can be saved as named workspace views.
+The notifications menu keeps durable success/failure/cancellation history for
+background runs, and the Dashboard summarizes practice-score trends and open
+source failures alongside the action queues.
 
 ### Hosted multi-user server
 
@@ -495,15 +520,17 @@ uv run resume-agent render 12 [--config config/render.yaml]
 ### Web app — visual boards
 
 Runs the FastAPI backend and React frontend with Shortlist, Pipeline, Triage,
-Analytics, and Match-gap views. Use it to approve shortlisted jobs, inspect
-rendered artifacts, edit application status/notes, and prune stale jobs. It
-opens on the **Dashboard** (`/`) — daily counts by stage and quick links into
-whatever needs attention next:
+Applications, Analytics, and Match-gap views. Use it to approve shortlisted
+jobs, inspect rendered artifacts, maintain application timelines, save board
+views, and prune stale jobs. It opens on the **Dashboard** (`/`) — daily counts
+by stage, practice and source-health insights, and quick links into whatever
+needs attention next:
 
 ![Dashboard — daily operations at a glance](docs/screenshots/dashboard.png)
 
-**Analytics** (`/analytics`) shows which sources and fit-score bands actually
-convert to interviews and offers:
+**Analytics** (`/analytics`) shows which sources and fit-score bands convert to
+interviews and offers, plus stage flows, cycle times, the active application
+timeline, and compensation comparisons:
 
 ![Analytics — conversion funnel by source and fit band](docs/screenshots/analytics.png)
 
@@ -550,9 +577,15 @@ hosted-only settings such as `APP_BASE_URL` are present).
 - The committed contract the frontend consumes lives in `contracts/`
   (`openapi.json` + generated `ts/api.ts`); regenerate with
   `bash scripts/gen_ts_client.sh` after any schema change.
-- Long operations (`POST /api/discover|pull|tailor|cover-letters|jobs/from-url`)
-  return a **run** you watch via `GET /api/runs/{id}/events` (Server-Sent Events)
-  or poll at `GET /api/runs/{id}`.
+- Long operations return a **run** you watch via
+  `GET /api/runs/{id}/events` (Server-Sent Events) or poll at
+  `GET /api/runs/{id}`. Terminal outcomes are also recorded in the durable
+  `/api/run-completions` history so a dropped browser connection cannot erase
+  the result.
+- Application events live under `/api/jobs/{job_id}/events`; the cross-job
+  projection is `/api/applications`, with wide/long CSV and purpose-bound ICS
+  downloads. Saved board views use `/api/board-views`, and explicit company
+  research uses `/api/jobs/{job_id}/company-intelligence/refreshes`.
 - In hosted mode, configure account credentials/PATs for API access and set
   `CORS_ORIGINS` (comma-separated) for a separate frontend dev server. Local
   mode intentionally ignores account and API authentication settings.
