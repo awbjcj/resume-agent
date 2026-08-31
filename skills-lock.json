@@ -247,9 +247,9 @@
     "project-dossier": {
       "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
-      "reviewedRef": "e85fdb29570bb23dcd89435a869e91630aa0463a",
+      "reviewedRef": "57a1db26c67dd3835d84510fe615ff42329986a8",
       "skillPath": "skills/project-dossier/SKILL.md",
-      "computedHash": "845e0997f40e798d5c08b2bb3bee402cfffee955f860b573e8f42db6724d9ca2",
+      "computedHash": "73a275b87ecbeef5f1f483bb6ddcabf6bae6b011caebff169803ff44d89e132c",
       "localVersion": "2026-08-02",
       "family": "internal_profile",
       "uses": ["profile_project"],
