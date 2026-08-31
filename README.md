@@ -41,15 +41,15 @@ employment or education history.
 Every tailoring round is then judged by **three deterministic gates** that run
 in-process, with no model involved:
 
-| Gate               | Blocks the round when a draft…                              |
-| ------------------ | ------------------------------------------------------------- |
-| `provenance`       | cites a fact id that does not resolve to a real fact         |
-| `skill-naming`     | claims a skill your profile does not establish               |
-| `numeric-evidence` | states a number your evidence does not support               |
+| Gate               | Blocks the round when a draft…                       |
+| ------------------ | ---------------------------------------------------- |
+| `provenance`       | cites a fact id that does not resolve to a real fact |
+| `skill-naming`     | claims a skill your profile does not establish       |
+| `numeric-evidence` | states a number your evidence does not support       |
 
 Those three names are **reserved** — configuring a reviewer with one of them is a
 startup error, so editing the roster can never shadow a gate. Gates and LLM
-critiques then flow through a *single* verdict constructor
+critiques then flow through a _single_ verdict constructor
 (`tailor/verdict.py::aggregate`), so "what makes a round pass" has exactly one
 definition, and any failed gate blocks the round no matter how well it scored.
 
@@ -76,9 +76,9 @@ output can be traced back to the exact bytes of the procedure that produced it.
 
 Where agents use tools — Source Scout, Profile Coach, sponsorship research,
 Career Lab — every tool inside the loop is **read-only** (search, probe,
-inspect). Writes happen *after* the loop, through deterministic services, behind
+inspect). Writes happen _after_ the loop, through deterministic services, behind
 your approval, and anything a tool "verified" is re-verified outside the loop
-before it is presented as validated. Scout *proposes* sources; Coach *drafts*
+before it is presented as validated. Scout _proposes_ sources; Coach _drafts_
 notes you edit before saving; Career Lab output is draft-only by construction —
 it cannot apply, upload, send, or update your profile.
 
@@ -86,8 +86,8 @@ it cannot apply, upload, send, or update your profile.
 
 Reviewer context is scoped like a permission, not padded for convenience:
 
-- **Gate reviewers** see the draft, the job description, and *only the profile
-  facts that draft actually cites*.
+- **Gate reviewers** see the draft, the job description, and _only the profile
+  facts that draft actually cites_.
 - **Advisory reviewers** (style, impact, formatting) see no raw profile at all.
 - Every third-party job description is wrapped in explicit untrusted-content
   delimiters, so a JD carrying "ignore your instructions" is data, not policy.
@@ -149,14 +149,14 @@ and a saved artifact.
                                          sync-status (Gmail proposes the moves)
 ```
 
-| Stage            | Command                      | What happens                                                                                                                                              |
-| ---------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Ingest**       | `pull` / `scrape` / `addjob` | Raw jobs land in the DB (deduped by URL or JD text). `pull` runs every enabled job-board connector; `scrape` drives LinkedIn; `addjob` takes one by hand. |
-| **Discover**     | `discover`                   | Agents extract structured criteria, apply your hard filters, and score fit → `shortlisted`.                                                               |
-| **👤 Approve**   | web app or `approve`         | The cost gate: you approve only the jobs worth paying to tailor.                                                                                          |
-| **Tailor**       | `tailor`                     | A writer agent drafts a fact-locked resume; a reviewer panel critiques and a reviser loops until it passes.                                               |
-| **Cover letter** | `cover-letter`               | Drafts a fact-locked cover letter per job, gated by a deterministic provenance check, and renders it to PDF.                                              |
-| **Render**       | `render`                     | A chosen resume version becomes a PDF in `output/`.                                                                                                       |
+| Stage            | Command                      | What happens                                                                                                                                                                    |
+| ---------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ingest**       | `pull` / `scrape` / `addjob` | Raw jobs land in the DB (deduped by URL or JD text). `pull` runs every enabled job-board connector; `scrape` drives LinkedIn; `addjob` takes one by hand.                       |
+| **Discover**     | `discover`                   | Agents extract structured criteria, apply your hard filters, and score fit → `shortlisted`.                                                                                     |
+| **👤 Approve**   | web app or `approve`         | The cost gate: you approve only the jobs worth paying to tailor.                                                                                                                |
+| **Tailor**       | `tailor`                     | A writer agent drafts a fact-locked resume; a reviewer panel critiques and a reviser loops until it passes.                                                                     |
+| **Cover letter** | `cover-letter`               | Drafts a fact-locked cover letter per job, gated by a deterministic provenance check, and renders it to PDF.                                                                    |
+| **Render**       | `render`                     | A chosen resume version becomes a PDF in `output/`.                                                                                                                             |
 | **👤 Track**     | web app / `sync-status`      | Record dated application events, outcomes, reflections, and offer details; export calendars/CSV, or let `sync-status` read Gmail and **propose** status moves for you to apply. |
 
 ### What it looks like
@@ -290,17 +290,17 @@ profile, same verified skill registry, same read-only tool loops, same durable
 run substrate — the work that usually makes a job hunt collapse under its own
 weight becomes tractable:
 
-| Surface                  | What it removes from the job hunt                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| Surface                  | What it removes from the job hunt                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
 | **Profile Coach**        | Evidence you never wrote down. Interviews you one question at a time and drafts only what you said. |
-| **Mock interviews**      | Rehearsing blind. Practises against a *specific* tailored role and scores the debrief.            |
-| **Career Lab**           | Negotiation prep, pivots, portfolio write-ups — one verified skill per turn, output stays a draft. |
-| **Match-gap**            | Guessing what to learn next. Ranks the skills your target jobs demand and your profile lacks.     |
-| **Sponsorship evidence** | Applying blind to visa-hostile employers, using historical filings as a signal — never a promise. |
-| **Company intelligence** | Unprepared interviews. A cited employer brief, refreshed only when you ask.                       |
-| **Application timeline** | Losing track. Every round, outcome, and deadline in one dataset, exportable as CSV or calendar.    |
-| **Gmail sync**           | Manual status chasing. Reads your inbox and *proposes* status moves you approve.                  |
-| **Analytics**            | Repeating what does not work. Shows which sources and fit bands actually convert.                 |
+| **Mock interviews**      | Rehearsing blind. Practises against a _specific_ tailored role and scores the debrief.              |
+| **Career Lab**           | Negotiation prep, pivots, portfolio write-ups — one verified skill per turn, output stays a draft.  |
+| **Match-gap**            | Guessing what to learn next. Ranks the skills your target jobs demand and your profile lacks.       |
+| **Sponsorship evidence** | Applying blind to visa-hostile employers, using historical filings as a signal — never a promise.   |
+| **Company intelligence** | Unprepared interviews. A cited employer brief, refreshed only when you ask.                         |
+| **Application timeline** | Losing track. Every round, outcome, and deadline in one dataset, exportable as CSV or calendar.     |
+| **Gmail sync**           | Manual status chasing. Reads your inbox and _proposes_ status moves you approve.                    |
+| **Analytics**            | Repeating what does not work. Shows which sources and fit bands actually convert.                   |
 
 ### Career coaching: Profile Coach, Mock interviews, and Career Lab
 
@@ -616,7 +616,7 @@ Tailors one job (`--job-id`) or every approved job (`--approved`). Each round is
 saved as a `ResumeVersion` and judged by the three deterministic gates plus the
 reviewer panel; the loop revises until a draft passes or `max_rounds` quality
 passes are spent. The **fact-check** reviewer is a hard gate, and so are
-`provenance`, `skill-naming`, and `numeric-evidence` — a round that fails *only*
+`provenance`, `skill-naming`, and `numeric-evidence` — a round that fails _only_
 on provenance earns a free retry that does not spend a quality pass. Optional
 `config/style_guide.md` prose is appended beneath the fixed fact-lock rules for
 the writer, reviser, and reviewers; it governs how resumes are written, never
@@ -808,7 +808,7 @@ silently re-based).
 
 | Path                                                  | Contents                                                                                                                                                        |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data/resume_tailor_harness.db`                                | All jobs, resume versions, cover letters, and applications (SQLite).                                                                                            |
+| `data/resume_tailor_harness.db`                       | All jobs, resume versions, cover letters, and applications (SQLite).                                                                                            |
 | `data/profile/facts.json`                             | Your fact-lock profile.                                                                                                                                         |
 | `data/connector_runs.json`                            | Per-connector run history that `sources` reads.                                                                                                                 |
 | `data/gmail_token.json`                               | Cached Gmail OAuth token for CLI/local-mode `sync-status` (git-ignored). The API/web app stores each user's token inside their own workspace instead.           |
