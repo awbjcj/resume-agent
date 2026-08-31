@@ -2,10 +2,18 @@
 
 ## Branching
 
-`main` is currently the only branch on `origin`; feature work branches from it
-and returns by PR. `main` is protected (PR + passing checks required, no direct
-pushes/force-pushes) and is the only branch Railway deploys from. If an integration
-branch is reintroduced, update this section and the CI branch triggers together.
+`dev` is the integration branch: all feature work branches from `dev` and
+returns to `dev` by PR. `main` only ever receives merges from `dev` — never
+directly from a feature branch — and is the only branch Railway deploys
+from. `main` is protected (PR required, no direct pushes/force-pushes,
+required status checks: `ci / python-quality`, `ci / web-quality`,
+`ci / security-audit`, `require-dev-base`); the last of those
+(`.github/workflows/require-dev-base.yml`) fails any PR into `main` whose
+head branch isn't `dev`, since GitHub branch protection has no native
+"only allow merges from branch X" rule. Dependabot
+(`.github/dependabot.yml`) targets `dev` for the same reason — dependency
+bumps land on `dev` and ride the normal `dev` → `main` promotion PR like
+everything else.
 
 CI is split by branch so `dev` gets fast feedback and `main` gets the full
 gate before a deploy-triggering merge: `.github/workflows/_reusable-ci.yml`
