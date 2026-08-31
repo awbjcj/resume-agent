@@ -1,23 +1,23 @@
 import pytest
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.group_corrections import (
     corrections_path,
     load_group_corrections,
 )
-from resume_agent.profile.matrix import load_matrix, rebuild_saved_matrix
-from resume_agent.profile.store import load_facts, save_facts
-from resume_agent.services.profile_groups import (
+from resume_tailor_harness.profile.matrix import load_matrix, rebuild_saved_matrix
+from resume_tailor_harness.profile.store import load_facts, save_facts
+from resume_tailor_harness.services.profile_groups import (
     GroupCorrectionNotFoundError,
     UnknownGroupError,
     clear_group,
     set_group,
 )
-from resume_agent.services.profile_skills import (
+from resume_tailor_harness.services.profile_skills import (
     ProfileNotBuiltError,
     SkillNotFoundError,
 )
-from resume_agent.taxonomy.groups import group_map_path, save_group_map
+from resume_tailor_harness.taxonomy.groups import group_map_path, save_group_map
 
 
 @pytest.fixture()

@@ -1,10 +1,10 @@
 import pytest
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.github.repos import RepoMeta
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.services.suggestions import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.github.repos import RepoMeta
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.services.suggestions import (
     SuggestionContext,
     SuggestionTargetNotFound,
     generate_suggestion,
@@ -13,20 +13,20 @@ from resume_agent.services.suggestions import (
     suggestion_fingerprint,
     suggestion_statuses,
 )
-from resume_agent.suggestions.agents import (
+from resume_tailor_harness.suggestions.agents import (
     ProjectIdea,
     RepoRef,
     ResourceRef,
     SuggestionDraft,
 )
-from resume_agent.tracking.match_gap import (
+from resume_tailor_harness.tracking.match_gap import (
     DemandEdge,
     DemandGraph,
     JobLite,
     SkillNode,
     DomainNode,
 )
-from resume_agent.tracking.tables import SkillSuggestion
+from resume_tailor_harness.tracking.tables import SkillSuggestion
 
 
 class _Result:

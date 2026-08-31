@@ -4,11 +4,11 @@ from types import SimpleNamespace
 from evals.cl_runner import run_cl_case
 from evals.judge import DimensionScore, JudgeVerdict
 from evals.schema import load_case
-from resume_agent.models.cover_letter import (
+from resume_tailor_harness.models.cover_letter import (
     CoverLetterContent,
     CoverLetterParagraph,
 )
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 class _StubRunner:

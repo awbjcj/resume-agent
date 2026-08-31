@@ -45,9 +45,9 @@ joins gate names generically, so new gate names surface with no web change.
 
 | Path | Responsibility |
 | ---- | -------------- |
-| `src/resume_agent/tailor/skill_naming.py` | Gate: a displayed skill name resolves to its cited fact |
-| `src/resume_agent/tailor/numeric_evidence.py` | Gate: every number in generated prose appears in its cited fact |
-| `src/resume_agent/tailor/coverage.py` | Must-have coverage block + coverage measurement critique |
+| `src/resume_tailor_harness/tailor/skill_naming.py` | Gate: a displayed skill name resolves to its cited fact |
+| `src/resume_tailor_harness/tailor/numeric_evidence.py` | Gate: every number in generated prose appears in its cited fact |
+| `src/resume_tailor_harness/tailor/coverage.py` | Must-have coverage block + coverage measurement critique |
 | `tests/test_tailor_skill_naming.py` | Gate 1 unit tests |
 | `tests/test_tailor_numeric_evidence.py` | Gate 2 unit tests |
 | `tests/test_tailor_coverage.py` | Coverage module unit tests |
@@ -56,12 +56,12 @@ joins gate names generically, so new gate names surface with no web change.
 
 | Path | Change |
 | ---- | ------ |
-| `src/resume_agent/tailor/verdict.py:12` | Register both gates in `DETERMINISTIC_GATES` |
-| `src/resume_agent/tailor/workflow.py` | Run the two gates and the coverage critique each round |
-| `src/resume_agent/tailor/tailoring.py` | Coverage block into tailor + revise inputs |
-| `src/resume_agent/tailor/panel.py` | Coverage block into the lean review input |
-| `src/resume_agent/tailor/agents.py` | Writer/reviser instructions; ats-keyword rubric |
-| `src/resume_agent/tailor/craft.py` | Rebalance the bullet-outcome rule |
+| `src/resume_tailor_harness/tailor/verdict.py:12` | Register both gates in `DETERMINISTIC_GATES` |
+| `src/resume_tailor_harness/tailor/workflow.py` | Run the two gates and the coverage critique each round |
+| `src/resume_tailor_harness/tailor/tailoring.py` | Coverage block into tailor + revise inputs |
+| `src/resume_tailor_harness/tailor/panel.py` | Coverage block into the lean review input |
+| `src/resume_tailor_harness/tailor/agents.py` | Writer/reviser instructions; ats-keyword rubric |
+| `src/resume_tailor_harness/tailor/craft.py` | Rebalance the bullet-outcome rule |
 | `config/review.yaml` | Sync to `config/review.yaml.example` |
 | `scripts/tailor_health.py` | Report the new gates |
 
@@ -73,7 +73,7 @@ Targets mechanism M1. A displayed skill name must resolve to the fact it cites.
 Compound names block; atomic mismatches are advisory.
 
 **Files:**
-- Create: `src/resume_agent/tailor/skill_naming.py`
+- Create: `src/resume_tailor_harness/tailor/skill_naming.py`
 - Test: `tests/test_tailor_skill_naming.py`
 
 **Interfaces:**
@@ -88,10 +88,10 @@ Compound names block; atomic mismatches are advisory.
 Create `tests/test_tailor_skill_naming.py`:
 
 ```python
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.models.resume import ResumeContent, TailoredSkill
-from resume_agent.models.review import Severity
-from resume_agent.tailor.skill_naming import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.models.resume import ResumeContent, TailoredSkill
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.tailor.skill_naming import (
     SKILL_NAMING_REVIEWER,
     skill_naming_critique,
     split_name,
@@ -183,11 +183,11 @@ def test_split_name_drops_empty_segments_and_parentheses():
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_skill_naming.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.skill_naming'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.skill_naming'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/tailor/skill_naming.py`:
+Create `src/resume_tailor_harness/tailor/skill_naming.py`:
 
 ```python
 """Deterministic gate: a displayed skill name must resolve to the fact it cites.
@@ -206,11 +206,11 @@ fact-lock forbids a writer from claiming as the job's own term.
 
 import re
 
-from resume_agent.models.profile import ProfileFacts, Skill
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.tailor.provenance import index_facts
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.models.profile import ProfileFacts, Skill
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.tailor.provenance import index_facts
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 SKILL_NAMING_REVIEWER = "skill-naming"
 
@@ -309,8 +309,8 @@ Expected: PASS (7 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tailor/skill_naming.py tests/test_tailor_skill_naming.py
-git add src/resume_agent/tailor/skill_naming.py tests/test_tailor_skill_naming.py
+ruff check src/resume_tailor_harness/tailor/skill_naming.py tests/test_tailor_skill_naming.py
+git add src/resume_tailor_harness/tailor/skill_naming.py tests/test_tailor_skill_naming.py
 git commit -m "feat(tailor): deterministic skill-naming gate
 
 A displayed skills entry that merges two technologies while citing one fact id
@@ -328,7 +328,7 @@ Targets mechanisms M2 and M4. Every standalone number in generated prose must
 appear in the text of the fact that prose cites.
 
 **Files:**
-- Create: `src/resume_agent/tailor/numeric_evidence.py`
+- Create: `src/resume_tailor_harness/tailor/numeric_evidence.py`
 - Test: `tests/test_tailor_numeric_evidence.py`
 
 **Interfaces:**
@@ -343,21 +343,21 @@ appear in the text of the fact that prose cites.
 Create `tests/test_tailor_numeric_evidence.py`:
 
 ```python
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     ProfileFacts,
     Project,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
 )
-from resume_agent.models.review import Severity
-from resume_agent.tailor.numeric_evidence import (
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.tailor.numeric_evidence import (
     NUMERIC_EVIDENCE_REVIEWER,
     claim_numbers,
     fact_numbers,
@@ -494,11 +494,11 @@ def test_fact_numbers_ignores_child_bullets():
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_numeric_evidence.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.numeric_evidence'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.numeric_evidence'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/tailor/numeric_evidence.py`:
+Create `src/resume_tailor_harness/tailor/numeric_evidence.py`:
 
 ```python
 """Deterministic gate: a number in generated prose must come from a cited fact.
@@ -519,10 +519,10 @@ LLM fact-checker can still catch.
 import re
 from typing import Any
 
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.tailor.provenance import index_facts
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.tailor.provenance import index_facts
 
 NUMERIC_EVIDENCE_REVIEWER = "numeric-evidence"
 
@@ -650,8 +650,8 @@ Expected: PASS (9 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tailor/numeric_evidence.py tests/test_tailor_numeric_evidence.py
-git add src/resume_agent/tailor/numeric_evidence.py tests/test_tailor_numeric_evidence.py
+ruff check src/resume_tailor_harness/tailor/numeric_evidence.py tests/test_tailor_numeric_evidence.py
+git add src/resume_tailor_harness/tailor/numeric_evidence.py tests/test_tailor_numeric_evidence.py
 git commit -m "feat(tailor): deterministic numeric-evidence gate
 
 Every standalone number in generated prose must appear in the fact that prose
@@ -670,7 +670,7 @@ Renders the already-computed `SkillMatchContext` for prompts, and measures how
 much evidenced must-have coverage reached the resume.
 
 **Files:**
-- Create: `src/resume_agent/tailor/coverage.py`
+- Create: `src/resume_tailor_harness/tailor/coverage.py`
 - Test: `tests/test_tailor_coverage.py`
 
 **Interfaces:**
@@ -688,16 +688,16 @@ much evidenced must-have coverage reached the resume.
 Create `tests/test_tailor_coverage.py`:
 
 ```python
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredSkill,
 )
-from resume_agent.models.review import Severity
-from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
-from resume_agent.tailor.coverage import (
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
+from resume_tailor_harness.tailor.coverage import (
     COVERAGE_REVIEWER,
     coverage_critique,
     coverage_report,
@@ -816,11 +816,11 @@ def test_coverage_critique_is_none_without_evidenced_must_haves():
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_coverage.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.coverage'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.coverage'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/tailor/coverage.py`:
+Create `src/resume_tailor_harness/tailor/coverage.py`:
 
 ```python
 """Must-have coverage: the deterministic answer the pipeline already computes.
@@ -841,11 +841,11 @@ could hand the writer an unwinnable round.
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.profile.matrix import SkillMatch, SkillMatchContext
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.profile.matrix import SkillMatch, SkillMatchContext
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 COVERAGE_REVIEWER = "must-have-coverage"
 
@@ -981,8 +981,8 @@ Expected: PASS (6 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tailor/coverage.py tests/test_tailor_coverage.py
-git add src/resume_agent/tailor/coverage.py tests/test_tailor_coverage.py
+ruff check src/resume_tailor_harness/tailor/coverage.py tests/test_tailor_coverage.py
+git add src/resume_tailor_harness/tailor/coverage.py tests/test_tailor_coverage.py
 git commit -m "feat(tailor): must-have coverage block and measurement
 
 build_skill_match_context is computed on every tailor run and was consumed only
@@ -997,8 +997,8 @@ gate, because the length budget legitimately forces cuts."
 ### Task 4: register and run the two gates
 
 **Files:**
-- Modify: `src/resume_agent/tailor/verdict.py:12`
-- Modify: `src/resume_agent/tailor/workflow.py` (both `run_tailor_review` and
+- Modify: `src/resume_tailor_harness/tailor/verdict.py:12`
+- Modify: `src/resume_tailor_harness/tailor/workflow.py` (both `run_tailor_review` and
   `arun_tailor_review`)
 - Test: `tests/test_tailor_verdict.py`, `tests/test_tailor_workflow.py`
 
@@ -1014,16 +1014,16 @@ Append to `tests/test_tailor_verdict.py`:
 
 ```python
 def test_new_deterministic_gates_are_registered():
-    from resume_agent.tailor.verdict import DETERMINISTIC_GATES
+    from resume_tailor_harness.tailor.verdict import DETERMINISTIC_GATES
 
     assert "skill-naming" in DETERMINISTIC_GATES
     assert "numeric-evidence" in DETERMINISTIC_GATES
 
 
 def test_a_new_gate_failure_blocks_the_round_and_is_named():
-    from resume_agent.models.review import ReviewCritique
-    from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-    from resume_agent.tailor.verdict import aggregate, failing_gate_names
+    from resume_tailor_harness.models.review import ReviewCritique
+    from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+    from resume_tailor_harness.tailor.verdict import aggregate, failing_gate_names
 
     config = ReviewConfig(reviewers=[ReviewerSpec(name="recruiter", weight=1)])
     critiques = [
@@ -1054,10 +1054,10 @@ def test_every_round_carries_the_deterministic_critiques():
 
 def test_a_new_gate_failure_is_not_granted_the_provenance_free_retry():
     """A citation slip is provenance ONLY; a numeric failure is a real round."""
-    from resume_agent.models.review import ReviewCritique
-    from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-    from resume_agent.tailor.workflow import _is_citation_slip
-    from resume_agent.tailor.verdict import aggregate
+    from resume_tailor_harness.models.review import ReviewCritique
+    from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+    from resume_tailor_harness.tailor.workflow import _is_citation_slip
+    from resume_tailor_harness.tailor.verdict import aggregate
 
     config = ReviewConfig(reviewers=[ReviewerSpec(name="recruiter", weight=1)])
     verdict = aggregate(
@@ -1079,12 +1079,12 @@ Expected: FAIL — `assert 'skill-naming' in frozenset({'provenance'})`
 
 - [ ] **Step 3: Register the gates**
 
-In `src/resume_agent/tailor/verdict.py`, replace lines 7 and 12:
+In `src/resume_tailor_harness/tailor/verdict.py`, replace lines 7 and 12:
 
 ```python
-from resume_agent.tailor.numeric_evidence import NUMERIC_EVIDENCE_REVIEWER
-from resume_agent.tailor.provenance import PROVENANCE_REVIEWER
-from resume_agent.tailor.skill_naming import SKILL_NAMING_REVIEWER
+from resume_tailor_harness.tailor.numeric_evidence import NUMERIC_EVIDENCE_REVIEWER
+from resume_tailor_harness.tailor.provenance import PROVENANCE_REVIEWER
+from resume_tailor_harness.tailor.skill_naming import SKILL_NAMING_REVIEWER
 ```
 
 ```python
@@ -1097,11 +1097,11 @@ DETERMINISTIC_GATES = frozenset(
 
 - [ ] **Step 4: Run the gates every round**
 
-In `src/resume_agent/tailor/workflow.py`, add the imports:
+In `src/resume_tailor_harness/tailor/workflow.py`, add the imports:
 
 ```python
-from resume_agent.tailor.numeric_evidence import numeric_evidence_critique
-from resume_agent.tailor.skill_naming import skill_naming_critique
+from resume_tailor_harness.tailor.numeric_evidence import numeric_evidence_critique
+from resume_tailor_harness.tailor.skill_naming import skill_naming_critique
 ```
 
 In **both** `run_tailor_review` and `arun_tailor_review`, replace the line
@@ -1139,8 +1139,8 @@ that is the gate working, not a bug.
 - [ ] **Step 7: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tailor/
-git add src/resume_agent/tailor/verdict.py src/resume_agent/tailor/workflow.py tests/test_tailor_verdict.py tests/test_tailor_workflow.py
+ruff check src/resume_tailor_harness/tailor/
+git add src/resume_tailor_harness/tailor/verdict.py src/resume_tailor_harness/tailor/workflow.py tests/test_tailor_verdict.py tests/test_tailor_workflow.py
 git commit -m "feat(tailor): run skill-naming and numeric-evidence every round
 
 Registering both names in DETERMINISTIC_GATES is the whole wiring: aggregate,
@@ -1154,11 +1154,11 @@ free retry to a round that also tripped a new gate."
 ### Task 5: wire the coverage block into the prompts
 
 **Files:**
-- Modify: `src/resume_agent/tailor/tailoring.py` (`compose_tailor_input`,
+- Modify: `src/resume_tailor_harness/tailor/tailoring.py` (`compose_tailor_input`,
   `compose_revise_input`)
-- Modify: `src/resume_agent/tailor/panel.py` (`compose_lean_review_input`,
+- Modify: `src/resume_tailor_harness/tailor/panel.py` (`compose_lean_review_input`,
   `run_panel`, `arun_panel`, `_panel_inputs`)
-- Modify: `src/resume_agent/tailor/workflow.py`
+- Modify: `src/resume_tailor_harness/tailor/workflow.py`
 - Test: `tests/test_tailor_tailoring.py`, `tests/test_tailor_panel.py`
 
 **Interfaces:**
@@ -1176,9 +1176,9 @@ Append to `tests/test_tailor_tailoring.py`:
 def test_tailor_input_places_coverage_between_criteria_and_jd():
     """Stable-first ordering: coverage is fixed for the job, so it belongs in
     the stable job-context order ahead of volatile blocks."""
-    from resume_agent.models.job import JobCriteria
-    from resume_agent.models.profile import Contact, ProfileFacts
-    from resume_agent.tailor.tailoring import compose_tailor_input
+    from resume_tailor_harness.models.job import JobCriteria
+    from resume_tailor_harness.models.profile import Contact, ProfileFacts
+    from resume_tailor_harness.tailor.tailoring import compose_tailor_input
 
     text = compose_tailor_input(
         "JD body",
@@ -1192,9 +1192,9 @@ def test_tailor_input_places_coverage_between_criteria_and_jd():
 
 
 def test_tailor_input_omits_the_block_when_coverage_is_empty():
-    from resume_agent.models.job import JobCriteria
-    from resume_agent.models.profile import Contact, ProfileFacts
-    from resume_agent.tailor.tailoring import compose_tailor_input
+    from resume_tailor_harness.models.job import JobCriteria
+    from resume_tailor_harness.models.profile import Contact, ProfileFacts
+    from resume_tailor_harness.tailor.tailoring import compose_tailor_input
 
     text = compose_tailor_input(
         "JD body", JobCriteria(), ProfileFacts(contact=Contact(name="Ada"))
@@ -1204,9 +1204,9 @@ def test_tailor_input_omits_the_block_when_coverage_is_empty():
 
 
 def test_revise_input_places_coverage_before_the_current_resume():
-    from resume_agent.models.profile import Contact, ProfileFacts
-    from resume_agent.models.resume import ResumeContent
-    from resume_agent.tailor.tailoring import compose_revise_input
+    from resume_tailor_harness.models.profile import Contact, ProfileFacts
+    from resume_tailor_harness.models.resume import ResumeContent
+    from resume_tailor_harness.tailor.tailoring import compose_revise_input
 
     text = compose_revise_input(
         ResumeContent(contact=Contact(name="Ada")),
@@ -1224,9 +1224,9 @@ Append to `tests/test_tailor_panel.py`:
 
 ```python
 def test_lean_review_input_carries_the_coverage_block():
-    from resume_agent.models.profile import Contact
-    from resume_agent.models.resume import ResumeContent
-    from resume_agent.tailor.panel import compose_lean_review_input
+    from resume_tailor_harness.models.profile import Contact
+    from resume_tailor_harness.models.resume import ResumeContent
+    from resume_tailor_harness.tailor.panel import compose_lean_review_input
 
     text = compose_lean_review_input(
         ResumeContent(contact=Contact(name="Ada")),
@@ -1240,9 +1240,9 @@ def test_lean_review_input_carries_the_coverage_block():
 
 
 def test_lean_review_input_omits_the_block_when_empty():
-    from resume_agent.models.profile import Contact
-    from resume_agent.models.resume import ResumeContent
-    from resume_agent.tailor.panel import compose_lean_review_input
+    from resume_tailor_harness.models.profile import Contact
+    from resume_tailor_harness.models.resume import ResumeContent
+    from resume_tailor_harness.tailor.panel import compose_lean_review_input
 
     text = compose_lean_review_input(
         ResumeContent(contact=Contact(name="Ada")), "JD body", "stats"
@@ -1258,7 +1258,7 @@ Expected: FAIL — `TypeError: compose_tailor_input() got an unexpected keyword 
 
 - [ ] **Step 3: Add the parameter to the composers**
 
-In `src/resume_agent/tailor/tailoring.py`, `compose_tailor_input` gains
+In `src/resume_tailor_harness/tailor/tailoring.py`, `compose_tailor_input` gains
 `coverage: str = ""` as its final parameter, and the return becomes:
 
 ```python
@@ -1298,7 +1298,7 @@ the return becomes:
     )
 ```
 
-In `src/resume_agent/tailor/panel.py`, `compose_lean_review_input` becomes:
+In `src/resume_tailor_harness/tailor/panel.py`, `compose_lean_review_input` becomes:
 
 ```python
 def compose_lean_review_input(
@@ -1323,10 +1323,10 @@ Add `coverage: str = ""` as the final keyword parameter of `run_panel`,
 
 - [ ] **Step 4: Thread coverage through the workflow**
 
-In `src/resume_agent/tailor/workflow.py`, add the import:
+In `src/resume_tailor_harness/tailor/workflow.py`, add the import:
 
 ```python
-from resume_agent.tailor.coverage import coverage_critique, format_coverage
+from resume_tailor_harness.tailor.coverage import coverage_critique, format_coverage
 ```
 
 In **both** `run_tailor_review` and `arun_tailor_review`, immediately before the
@@ -1370,8 +1370,8 @@ Expected: PASS. `aggregate` weights only `config.reviewers`, so
 - [ ] **Step 7: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tailor/
-git add src/resume_agent/tailor/ tests/test_tailor_tailoring.py tests/test_tailor_panel.py tests/test_tailor_workflow.py
+ruff check src/resume_tailor_harness/tailor/
+git add src/resume_tailor_harness/tailor/ tests/test_tailor_tailoring.py tests/test_tailor_panel.py tests/test_tailor_workflow.py
 git commit -m "feat(tailor): give the writer, reviser, and panel must-have coverage
 
 The coverage block goes into the stable region of each prompt so fixed context
@@ -1385,9 +1385,9 @@ supplying no data to do so; now it has the data."
 ### Task 6: prompt and config changes
 
 **Files:**
-- Modify: `src/resume_agent/tailor/agents.py`
+- Modify: `src/resume_tailor_harness/tailor/agents.py`
   (`_TAILOR_INSTRUCTIONS`, `_REVISER_INSTRUCTIONS`)
-- Modify: `src/resume_agent/tailor/craft.py`
+- Modify: `src/resume_tailor_harness/tailor/craft.py`
   (`CRAFT_WRITER`, `CRAFT_REVIEWERS["ats-keyword"]`)
 - Modify: `config/review.yaml`
 - Test: `tests/test_tailor_agents.py`, `tests/test_tailor_craft.py`
@@ -1402,7 +1402,7 @@ Append to `tests/test_tailor_agents.py`:
 
 ```python
 def test_writer_and_reviser_forbid_merging_two_facts_into_one_skill_entry():
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _REVISER_INSTRUCTIONS,
         _TAILOR_INSTRUCTIONS,
     )
@@ -1414,7 +1414,7 @@ def test_writer_and_reviser_forbid_merging_two_facts_into_one_skill_entry():
 
 
 def test_writer_and_reviser_forbid_derived_tenure():
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _REVISER_INSTRUCTIONS,
         _TAILOR_INSTRUCTIONS,
     )
@@ -1425,7 +1425,7 @@ def test_writer_and_reviser_forbid_derived_tenure():
 
 
 def test_writer_and_reviser_forbid_unstated_beneficiaries():
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _REVISER_INSTRUCTIONS,
         _TAILOR_INSTRUCTIONS,
     )
@@ -1439,7 +1439,7 @@ Append to `tests/test_tailor_craft.py`:
 
 ```python
 def test_ats_keyword_rubric_treats_coverage_as_authoritative():
-    from resume_agent.tailor.craft import CRAFT_REVIEWERS
+    from resume_tailor_harness.tailor.craft import CRAFT_REVIEWERS
 
     text = " ".join(CRAFT_REVIEWERS["ats-keyword"]).lower()
     assert "must-have coverage" in text
@@ -1453,7 +1453,7 @@ Expected: FAIL — `assert 'exactly one' in ...`
 
 - [ ] **Step 3: Edit the writer and reviser instructions**
 
-In `src/resume_agent/tailor/agents.py`, replace the skills bullet of
+In `src/resume_tailor_harness/tailor/agents.py`, replace the skills bullet of
 `_TAILOR_INSTRUCTIONS` (currently beginning "Every selected skill must cite the
 matching ProfileFacts Skill id.") with:
 
@@ -1495,7 +1495,7 @@ bullet with the beneficiary clause, and add the tenure bullet.
 
 - [ ] **Step 4: Edit the craft guidance**
 
-In `src/resume_agent/tailor/craft.py`, replace the first entry of `CRAFT_WRITER`
+In `src/resume_tailor_harness/tailor/craft.py`, replace the first entry of `CRAFT_WRITER`
 with:
 
 ```python
@@ -1540,8 +1540,8 @@ rather than licensing it.
 - [ ] **Step 7: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tailor/
-git add src/resume_agent/tailor/agents.py src/resume_agent/tailor/craft.py tests/test_tailor_agents.py tests/test_tailor_craft.py
+ruff check src/resume_tailor_harness/tailor/
+git add src/resume_tailor_harness/tailor/agents.py src/resume_tailor_harness/tailor/craft.py tests/test_tailor_agents.py tests/test_tailor_craft.py
 git commit -m "feat(tailor): teach the writer the rules the new gates enforce
 
 One skills entry names one fact and grouping belongs to the category key;
@@ -1588,7 +1588,7 @@ _SPEC.loader.exec_module(tailor_health)
 
 
 def _db(tmp_path: Path, critiques: list[dict]) -> Path:
-    path = tmp_path / "resume_agent.db"
+    path = tmp_path / "resume_tailor_harness.db"
     connection = sqlite3.connect(path)
     connection.execute(
         "create table resume_versions (id integer, job_id integer, round integer, "
@@ -1695,7 +1695,7 @@ Expected: PASS (2 tests)
 
 - [ ] **Step 5: Run it against the real workspace database**
 
-Run: `.venv/Scripts/python.exe scripts/tailor_health.py data/users/1398ad91b2b2/resume_agent.db`
+Run: `.venv/Scripts/python.exe scripts/tailor_health.py data/users/1398ad91b2b2/resume_tailor_harness.db`
 Expected: the historical numbers still print (77 versions, 26 jobs,
 `fact-check 50`, `provenance 19`). The new gates report zero because no stored
 round predates them — that is correct, not a failure.

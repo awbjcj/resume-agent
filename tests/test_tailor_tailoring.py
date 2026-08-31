@@ -1,19 +1,19 @@
 import pytest
 
-from resume_agent.models.evidence_portfolio import EvidencePortfolio
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.review import Severity
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue
-from resume_agent.tailor.tailoring import (
+from resume_tailor_harness.models.evidence_portfolio import EvidencePortfolio
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue
+from resume_tailor_harness.tailor.tailoring import (
     RevisionRoundContext,
     compose_revise_input,
     compose_tailor_input,
     revise,
     tailor,
 )
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 class _Result:

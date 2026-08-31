@@ -1,6 +1,6 @@
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationStatus,
     Job,

@@ -228,12 +228,12 @@ key, no network.
 
 | Path | Change |
 |---|---|
-| `src/resume_agent/llm_runner.py` | New `provider_capabilities` seam + `ProviderCapabilities`; builders attach gated kwargs |
-| `src/resume_agent/discovery/scout_models.py` | Shared citation value model |
-| `src/resume_agent/discovery/source_scout.py` | `Citation`, `ScoutCandidate` fields (`fit_score`, `signal`, `citations`); research instructions for scoring/avoid/citations |
-| `src/resume_agent/discovery/search_scout.py` | New `SuggestionKind`s, `fit_score`, `citations`; research instructions |
-| `src/resume_agent/services/source_discovery.py` | Ranking, avoid-skips-validation, citation rows |
-| `src/resume_agent/services/search_discovery.py` | Ranking, new-kind dedupe, citation rows |
+| `src/resume_tailor_harness/llm_runner.py` | New `provider_capabilities` seam + `ProviderCapabilities`; builders attach gated kwargs |
+| `src/resume_tailor_harness/discovery/scout_models.py` | Shared citation value model |
+| `src/resume_tailor_harness/discovery/source_scout.py` | `Citation`, `ScoutCandidate` fields (`fit_score`, `signal`, `citations`); research instructions for scoring/avoid/citations |
+| `src/resume_tailor_harness/discovery/search_scout.py` | New `SuggestionKind`s, `fit_score`, `citations`; research instructions |
+| `src/resume_tailor_harness/services/source_discovery.py` | Ranking, avoid-skips-validation, citation rows |
+| `src/resume_tailor_harness/services/search_discovery.py` | Ranking, new-kind dedupe, citation rows |
 | `web/src/features/sources/*` | Typed enriched Source Scout rows and accessible evidence/avoid UI |
 | `web/src/features/search-scout/*` | Typed enriched Search Scout rows, grouping, evidence, and apply mapping |
 | `tests/` | Capability probe unit tests; enriched scout service tests |

@@ -6,10 +6,10 @@ from agno.metrics import ModelMetrics, RunMetrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.config import Settings
-from resume_agent.llm_runner import AgentRunner, resolve_api_key
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.limits import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_runner import AgentRunner, resolve_api_key
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.limits import (
     BudgetExceededError,
     DEFAULT_MAX_ACTIVE_JOBS,
     DEFAULT_MAX_CONCURRENT_RUNS,
@@ -19,13 +19,13 @@ from resume_agent.tenancy.limits import (
     enforce_budget,
     weekly_usage,
 )
-from resume_agent.tenancy.system_db import (
+from resume_tailor_harness.tenancy.system_db import (
     UsageEvent,
     User,
     init_system_db,
     make_system_engine,
 )
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 class FakeAgent:
@@ -293,7 +293,7 @@ def test_usage_records_each_agno_model_detail_with_exact_provider_identity(tmp_p
     )
     agent = SimpleNamespace(model=SimpleNamespace(id="bare-id"))
     with use_context(_context(tmp_path, engine, own_keys=frozenset({"openai"}))):
-        from resume_agent.tenancy.usage import record_call
+        from resume_tailor_harness.tenancy.usage import record_call
 
         record_call(agent, response)
     with Session(engine) as session:

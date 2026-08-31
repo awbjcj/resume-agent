@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.career_skills.models import AgentFamily
-from resume_agent.career_skills.registry import (
+from resume_tailor_harness.career_skills.models import AgentFamily
+from resume_tailor_harness.career_skills.registry import (
     SkillUnavailable,
     registry_for_paths,
 )

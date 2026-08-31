@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.security.paths import PathEscapeError, confined_path
+from resume_tailor_harness.security.paths import PathEscapeError, confined_path
 
 
 def test_confined_path_keeps_a_child_beneath_its_root(tmp_path: Path):

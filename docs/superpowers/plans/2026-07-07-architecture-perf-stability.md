@@ -22,7 +22,7 @@
 
 | #   | Finding                                                                                                                                                                                                                                                                                                                  | Evidence                                                                          |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| 1   | File-backed engines are a bare `create_engine(url)` — default rollback journal, no explicit busy timeout — while the API runs concurrent writers (RunManager default pool of 2, a per-kind suggestion pool, the request threadpool). Batched ingest (task 2 of the 2026-07-02 plan) holds the write lock longer per txn. | `src/resume_agent/db.py:38-52`, `api/app.py:95-101`, `api/runs/manager.py:118`    |
+| 1   | File-backed engines are a bare `create_engine(url)` — default rollback journal, no explicit busy timeout — while the API runs concurrent writers (RunManager default pool of 2, a per-kind suggestion pool, the request threadpool). Batched ingest (task 2 of the 2026-07-02 plan) holds the write lock longer per txn. | `src/resume_tailor_harness/db.py:38-52`, `api/app.py:95-101`, `api/runs/manager.py:118`    |
 | 2   | The agents→`build_corpus_profile`→`save_facts`→`build_matrix`→`save_matrix` orchestration is implemented twice: `cli.py` `profile_build` and `services/profile_build.run_corpus_build`. The API router already calls the service.                                                                                        | `cli.py:118-199`, `services/profile_build.py:10-55`, `api/routers/profile.py:97`  |
 | 3   | `extract_fragments` and `extract_synthesis_fragments` are twin ~50-line walks: sha check, manifest bump, meta match → cache hit, error → stale fallback, atomic save, status vocabulary — differing only in meta shape and the produce step.                                                                             | `profile/fragments.py:140-261`                                                    |
 | 4   | The profile build walks documents serially; a synthesis doc costs up to 4 sequential LLM calls (synthesize → entail → repair → entail). Discovery/tailor already fan out via `gather_isolated` with the semaphore in `acall`. Every profile test fake already implements `arun` (delegating to `run`).                   | `profile/fragments.py`, `profile/synthesis.py:352-382`, `tests/test_profile_*.py` |
@@ -37,7 +37,7 @@ Task order is safest-first. Tasks 3→4 are sequential (4 rewrites 3's produce l
 
 **Files:**
 
-- Modify: `src/resume_agent/db.py:38-52` (`make_engine` file-SQLite branch)
+- Modify: `src/resume_tailor_harness/db.py:38-52` (`make_engine` file-SQLite branch)
 - Test: `tests/test_db.py` (append)
 
 **Interfaces:**
@@ -51,7 +51,7 @@ Append to `tests/test_db.py`:
 
 ```python
 def test_file_sqlite_gets_wal_and_busy_timeout(tmp_path):
-    from resume_agent.db import init_db, make_engine
+    from resume_tailor_harness.db import init_db, make_engine
 
     engine = make_engine(f"sqlite:///{tmp_path / 'wal.db'}")
     init_db(engine)
@@ -68,7 +68,7 @@ Expected: FAIL — journal_mode is `delete`, busy_timeout is `0` (SQLAlchemy pas
 
 - [ ] **Step 3: Implement the pragma hook**
 
-In `src/resume_agent/db.py`, add the import:
+In `src/resume_tailor_harness/db.py`, add the import:
 
 ```python
 from sqlalchemy import event
@@ -114,7 +114,7 @@ Expected: all PASS. (WAL creates `-wal`/`-shm` sidecar files next to the DB — 
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/db.py tests/test_db.py
+git add src/resume_tailor_harness/db.py tests/test_db.py
 git commit -m "Enables WAL and busy timeout for file-backed SQLite engines"
 ```
 
@@ -124,8 +124,8 @@ git commit -m "Enables WAL and busy timeout for file-backed SQLite engines"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/profile_build.py` (reporter becomes optional; return gains `matrixRows`)
-- Modify: `src/resume_agent/cli.py:118-199` (`profile_build` body delegates)
+- Modify: `src/resume_tailor_harness/services/profile_build.py` (reporter becomes optional; return gains `matrixRows`)
+- Modify: `src/resume_tailor_harness/cli.py:118-199` (`profile_build` body delegates)
 - Test: `tests/test_cli_profile.py` (existing tests are the conformance gate; append one delegation test)
 
 **Interfaces:**
@@ -135,7 +135,7 @@ git commit -m "Enables WAL and busy timeout for file-backed SQLite engines"
 
 - [ ] **Step 1: Make the reporter optional and add matrixRows**
 
-In `src/resume_agent/services/profile_build.py`, change the signature and guard every reporter call:
+In `src/resume_tailor_harness/services/profile_build.py`, change the signature and guard every reporter call:
 
 ```python
 def run_corpus_build(
@@ -177,23 +177,23 @@ Wrap the three reporter calls:
 
 - [ ] **Step 2: Replace the CLI orchestration with the service call**
 
-In `src/resume_agent/cli.py`, inside `profile_build`, replace the lazy-import block
+In `src/resume_tailor_harness/cli.py`, inside `profile_build`, replace the lazy-import block
 
 ```python
-    from resume_agent.profile.build import build_corpus_profile
-    from resume_agent.profile.corpus import migrate_legacy
-    from resume_agent.profile.inference import build_inference_agent
-    from resume_agent.profile.matrix import build_matrix, load_overrides, save_matrix
-    from resume_agent.profile.merge import build_bullet_dedup_agent
-    from resume_agent.profile.synthesis import build_entailment_agent, build_synthesis_agent
-    from resume_agent.taxonomy.clusters import load_cluster_map
+    from resume_tailor_harness.profile.build import build_corpus_profile
+    from resume_tailor_harness.profile.corpus import migrate_legacy
+    from resume_tailor_harness.profile.inference import build_inference_agent
+    from resume_tailor_harness.profile.matrix import build_matrix, load_overrides, save_matrix
+    from resume_tailor_harness.profile.merge import build_bullet_dedup_agent
+    from resume_tailor_harness.profile.synthesis import build_entailment_agent, build_synthesis_agent
+    from resume_tailor_harness.taxonomy.clusters import load_cluster_map
 ```
 
 with
 
 ```python
-    from resume_agent.profile.corpus import migrate_legacy
-    from resume_agent.services.profile_build import run_corpus_build
+    from resume_tailor_harness.profile.corpus import migrate_legacy
+    from resume_tailor_harness.services.profile_build import run_corpus_build
 ```
 
 Keep the key gate, the `--out` binding check, the `--refresh` check, and the `migrate_legacy` echo exactly as they are. Then replace everything from `facts, report = build_corpus_profile(` down to the final `typer.echo(f"  WARNING: {warning}")` loop with:
@@ -229,7 +229,7 @@ If `save_facts` is now unused in `cli.py`, remove its import (check with `ruff c
 - [ ] **Step 3: Run the existing CLI conformance tests**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_profile.py -v`
-Expected: all PASS **unmodified**. They already monkeypatch the source modules (`resume_agent.profile.build.build_corpus_profile`, the four builder functions), which the service's lazy imports resolve at call time — so the same patches govern the new path. If a test fails, the delegation has a semantic drift — fix the CLI/service, never the test.
+Expected: all PASS **unmodified**. They already monkeypatch the source modules (`resume_tailor_harness.profile.build.build_corpus_profile`, the four builder functions), which the service's lazy imports resolve at call time — so the same patches govern the new path. If a test fails, the delegation has a semantic drift — fix the CLI/service, never the test.
 
 - [ ] **Step 4: Write the delegation drift test**
 
@@ -255,7 +255,7 @@ def test_profile_build_delegates_to_the_service(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(cli, "resolve_api_key", lambda model: "sk-test")
     monkeypatch.setattr(
-        "resume_agent.services.profile_build.run_corpus_build", fake_run
+        "resume_tailor_harness.services.profile_build.run_corpus_build", fake_run
     )
 
     sources = _write_sources(tmp_path)
@@ -282,7 +282,7 @@ Expected: all PASS (the API path pins the reporter-passing call shape).
 
 ```bash
 ruff check
-git add src/resume_agent/cli.py src/resume_agent/services/profile_build.py tests/test_cli_profile.py
+git add src/resume_tailor_harness/cli.py src/resume_tailor_harness/services/profile_build.py tests/test_cli_profile.py
 git commit -m "Routes the CLI profile build through the single service seam"
 ```
 
@@ -292,13 +292,13 @@ git commit -m "Routes the CLI profile build through the single service seam"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/fragments.py` (replace the twin walks; public signatures unchanged)
+- Modify: `src/resume_tailor_harness/profile/fragments.py` (replace the twin walks; public signatures unchanged)
 - Test: `tests/test_profile_fragments.py` (existing tests are the conformance gate; append one shared-walk test)
 
 **Interfaces:**
 
 - Consumes: `extract_profile_facts`, `assign_fact_ids`, `synthesize_document`, `fragment_to_facts`, `read_document_text`, `SourceDoc`, `save_manifest` (all already imported by fragments.py).
-- Produces (from `resume_agent.profile.fragments`):
+- Produces (from `resume_tailor_harness.profile.fragments`):
   - `Produced` dataclass: `facts: ProfileFacts`, `evidence: dict | None = None`, `drops: list[str] | None = None`.
   - `FragmentProducer` dataclass: `selects: Callable[[SourceDoc], bool]`, `expected_meta: Callable[[SourceDoc, str], dict]`, `produce: Callable[[SourceDoc, str], Produced]`.
   - `extract_fragments(profile_dir, manifest, agent)` and `extract_synthesis_fragments(profile_dir, manifest, skeleton, synthesis_agent, entailment_agent)` — **signatures, `FragmentResult` shape, status vocabulary, and cache/meta file formats unchanged**.
@@ -311,7 +311,7 @@ Expected: PASS (these must still pass, unmodified, after the rewrite).
 
 - [ ] **Step 2: Rewrite fragments.py around one walk**
 
-Replace everything in `src/resume_agent/profile/fragments.py` from `def _meta_matches(` through the end of `extract_synthesis_fragments` (keep the module docstring, imports, `CacheStatus`, `FragmentResult`, `_paths`, `evidence_path`, `load_fragment`, `_atomic_write`) with:
+Replace everything in `src/resume_tailor_harness/profile/fragments.py` from `def _meta_matches(` through the end of `extract_synthesis_fragments` (keep the module docstring, imports, `CacheStatus`, `FragmentResult`, `_paths`, `evidence_path`, `load_fragment`, `_atomic_write`) with:
 
 ```python
 def _literal_meta(sha256: str) -> dict:
@@ -563,7 +563,7 @@ Expected: all PASS with zero edits to pre-existing tests.
 
 ```bash
 ruff check
-git add src/resume_agent/profile/fragments.py tests/test_profile_fragments.py
+git add src/resume_tailor_harness/profile/fragments.py tests/test_profile_fragments.py
 git commit -m "Collapses the twin fragment walks into one cache walk with per-mode producers"
 ```
 
@@ -573,9 +573,9 @@ git commit -m "Collapses the twin fragment walks into one cache walk with per-mo
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/extractor.py` (add `aextract_profile_facts`)
-- Modify: `src/resume_agent/profile/synthesis.py` (split `_verify` into shared helpers; add `_averify`, `asynthesize_document`, `_expect_fragment`)
-- Modify: `src/resume_agent/profile/fragments.py` (producer `produce` goes async; the serial produce loop becomes a `gather_isolated` fan-out)
+- Modify: `src/resume_tailor_harness/profile/extractor.py` (add `aextract_profile_facts`)
+- Modify: `src/resume_tailor_harness/profile/synthesis.py` (split `_verify` into shared helpers; add `_averify`, `asynthesize_document`, `_expect_fragment`)
+- Modify: `src/resume_tailor_harness/profile/fragments.py` (producer `produce` goes async; the serial produce loop becomes a `gather_isolated` fan-out)
 - Test: `tests/test_profile_fragments.py` (append a concurrency probe test)
 
 **Interfaces:**
@@ -642,7 +642,7 @@ def test_synthesis_docs_are_produced_concurrently(tmp_path):
     assert synthesis.max_active >= 2  # the two docs' synthesis calls overlapped
 ```
 
-Notes for the implementer: `.pptx` is in `SUPPORTED_SUFFIXES` and defaults to synthesis mode; `read_document_text` must be able to read the fake deck — if the markitdown reader rejects the fake bytes, monkeypatch it instead: `monkeypatch.setattr("resume_agent.profile.fragments.read_document_text", lambda path: "deck bytes " + Path(path).name)` (add `monkeypatch` to the test's parameters and `from pathlib import Path` to the imports). The deterministic checks pass because the claim has a support excerpt found in that text and no numbers/proper nouns beyond "Probe" (which is the entry title, not claim text).
+Notes for the implementer: `.pptx` is in `SUPPORTED_SUFFIXES` and defaults to synthesis mode; `read_document_text` must be able to read the fake deck — if the markitdown reader rejects the fake bytes, monkeypatch it instead: `monkeypatch.setattr("resume_tailor_harness.profile.fragments.read_document_text", lambda path: "deck bytes " + Path(path).name)` (add `monkeypatch` to the test's parameters and `from pathlib import Path` to the imports). The deterministic checks pass because the claim has a support excerpt found in that text and no numbers/proper nouns beyond "Probe" (which is the entry title, not claim text).
 
 - [ ] **Step 2: Run it to verify it fails**
 
@@ -651,7 +651,7 @@ Expected: FAIL — the serial walk gives `max_active == 1` (or a TypeError if th
 
 - [ ] **Step 3: Add the async extractor sibling**
 
-In `src/resume_agent/profile/extractor.py`, add `import asyncio` and extend the `llm_runner` import with `acall`, then append:
+In `src/resume_tailor_harness/profile/extractor.py`, add `import asyncio` and extend the `llm_runner` import with `acall`, then append:
 
 ```python
 async def aextract_profile_facts(
@@ -667,7 +667,7 @@ async def aextract_profile_facts(
 
 - [ ] **Step 4: Split synthesis verification and add the async siblings**
 
-In `src/resume_agent/profile/synthesis.py`, add `import asyncio` and extend the `llm_runner` import with `acall`. Add above `_verify`:
+In `src/resume_tailor_harness/profile/synthesis.py`, add `import asyncio` and extend the `llm_runner` import with `acall`. Add above `_verify`:
 
 ```python
 def _expect_fragment(content: object) -> SynthesizedFragment:
@@ -788,20 +788,20 @@ async def asynthesize_document(
 
 - [ ] **Step 5: Fan out the walk's produce loop**
 
-In `src/resume_agent/profile/fragments.py`:
+In `src/resume_tailor_harness/profile/fragments.py`:
 
 1. Add imports: `import asyncio`, `from collections.abc import Awaitable, Callable` (replacing the bare `Callable` import), `from typing import Any`, plus
 
 ```python
-from resume_agent.concurrency import gather_isolated
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import Runner, run_with_cleanup
-from resume_agent.profile.extractor import (
+from resume_tailor_harness.concurrency import gather_isolated
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import Runner, run_with_cleanup
+from resume_tailor_harness.profile.extractor import (
     PROMPT_VERSION,
     aextract_profile_facts,
     extract_profile_facts,
 )
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.profile.synthesis import (
     SYNTHESIS_PROMPT_VERSION,
     asynthesize_document,
     fragment_to_facts,
@@ -929,7 +929,7 @@ Expected: all PASS. Every existing fake agent already implements `arun` (verifie
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/profile/extractor.py src/resume_agent/profile/synthesis.py src/resume_agent/profile/fragments.py tests/test_profile_fragments.py
+git add src/resume_tailor_harness/profile/extractor.py src/resume_tailor_harness/profile/synthesis.py src/resume_tailor_harness/profile/fragments.py tests/test_profile_fragments.py
 git commit -m "Fans fragment production out per document with the shared LLM semaphore"
 ```
 
@@ -939,7 +939,7 @@ git commit -m "Fans fragment production out per document with the shared LLM sem
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py:98,106-193` (`run_extract` call site, `_prepare_industry_fields`, `_normalize_job_industries`)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py:98,106-193` (`run_extract` call site, `_prepare_industry_fields`, `_normalize_job_industries`)
 - Test: `tests/test_discovery_pipeline.py` (existing tests are the conformance gate; append one scoping test)
 
 **Interfaces:**
@@ -954,8 +954,8 @@ Append to `tests/test_discovery_pipeline.py` (reuse the file's existing engine/s
 
 ```python
 def test_industry_normalization_skips_untouched_rows(session, tmp_path):
-    from resume_agent.discovery.pipeline import _normalize_job_industries
-    from resume_agent.taxonomy.industries import IndustryTaxonomy, save_industry_taxonomy
+    from resume_tailor_harness.discovery.pipeline import _normalize_job_industries
+    from resume_tailor_harness.taxonomy.industries import IndustryTaxonomy, save_industry_taxonomy
 
     taxonomy_path = tmp_path / "industries.json"
     save_industry_taxonomy(
@@ -998,7 +998,7 @@ Expected: FAIL — the current full-table walk rewrites `settled.criteria_json["
 
 - [ ] **Step 3: Guard the assignment in \_prepare_industry_fields**
 
-In `src/resume_agent/discovery/pipeline.py`, change the last two lines of `_prepare_industry_fields` from
+In `src/resume_tailor_harness/discovery/pipeline.py`, change the last two lines of `_prepare_industry_fields` from
 
 ```python
     job.criteria_json = criteria
@@ -1082,7 +1082,7 @@ Expected: all PASS. If a pre-existing test calls `_normalize_job_industries` dir
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "Scopes industry normalization to the extracted batch and pending retries"
 ```
 
@@ -1092,8 +1092,8 @@ git commit -m "Scopes industry normalization to the extracted batch and pending 
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py:315-336,439-449` (`delete_job` splits out `delete_job_row`; `prune_run` batches)
-- Modify: `src/resume_agent/services/board.py:354-407` (`bulk_apply` batches: one load, one gate, one commit)
+- Modify: `src/resume_tailor_harness/tracking/repository.py:315-336,439-449` (`delete_job` splits out `delete_job_row`; `prune_run` batches)
+- Modify: `src/resume_tailor_harness/services/board.py:354-407` (`bulk_apply` batches: one load, one gate, one commit)
 - Test: `tests/test_services_board.py`, `tests/test_prune_run.py` (append)
 
 **Interfaces:**
@@ -1110,8 +1110,8 @@ Append to `tests/test_services_board.py` (reuse the file's existing session/engi
 
 ```python
 def test_bulk_apply_commits_once(session):
-    from resume_agent.services.board import BoardFilter, bulk_apply
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.board import BoardFilter, bulk_apply
+    from resume_tailor_harness.tracking.tables import Job
 
     ids = []
     for i in range(3):
@@ -1142,8 +1142,8 @@ def test_bulk_apply_commits_once(session):
 def test_bulk_apply_query_count_is_constant(session):
     from sqlalchemy import event
 
-    from resume_agent.services.board import BoardFilter, bulk_apply
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.board import BoardFilter, bulk_apply
+    from resume_tailor_harness.tracking.tables import Job
 
     def _seed(n):
         ids = []
@@ -1183,8 +1183,8 @@ Append to `tests/test_prune_run.py` (adapt to that file's fixtures):
 def test_prune_archives_share_one_commit_and_timestamp(session, prune_config):
     from sqlmodel import select
 
-    from resume_agent.tracking.repository import prune_run
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.repository import prune_run
+    from resume_tailor_harness.tracking.tables import Job
 
     for i in range(3):
         session.add(Job(source="greenhouse", company=f"Junk{i}", title="Engineer",
@@ -1216,7 +1216,7 @@ Expected: `test_bulk_apply_commits_once` FAILS (3 commits); `test_bulk_apply_que
 
 - [ ] **Step 3: Split delete_job and batch prune_run in repository.py**
 
-In `src/resume_agent/tracking/repository.py`, replace `delete_job` with:
+In `src/resume_tailor_harness/tracking/repository.py`, replace `delete_job` with:
 
 ```python
 def delete_job_row(session: Session, job: Job, *, commit: bool = True) -> None:
@@ -1281,18 +1281,18 @@ def prune_run(
 
 - [ ] **Step 4: Batch bulk_apply in board.py**
 
-In `src/resume_agent/services/board.py`, add imports (merge with existing lines):
+In `src/resume_tailor_harness/services/board.py`, add imports (merge with existing lines):
 
 ```python
 from sqlmodel import Session, select
 
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     ...existing names...,
     delete_job_row,
     job_has_progress,
     progressed_job_ids,
 )
-from resume_agent.tracking.tables import Application, Job, JobStatus, utcnow
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus, utcnow
 ```
 
 Replace the body of `bulk_apply` (signature and docstring position unchanged):
@@ -1366,7 +1366,7 @@ Expected: all PASS (only the sanctioned prune-timestamp expectation may need the
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/tracking/repository.py src/resume_agent/services/board.py tests/test_services_board.py tests/test_prune_run.py
+git add src/resume_tailor_harness/tracking/repository.py src/resume_tailor_harness/services/board.py tests/test_services_board.py tests/test_prune_run.py
 git commit -m "Batches board bulk mutations and prune into single-commit transactions"
 ```
 
@@ -1384,7 +1384,7 @@ git commit -m "Batches board bulk mutations and prune into single-commit transac
 - [ ] **Step 1: Update CLAUDE.md**
 
 1. Hot-paths table — add one row after the `profile/synthesis.py` row:
-   `| src/resume_agent/profile/fragments.py | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis), concurrent per-doc production |`
+   `| src/resume_tailor_harness/profile/fragments.py | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis), concurrent per-doc production |`
 2. "Known design notes" — append: "**Profile build fans out per document.** `extract_fragments` / `extract_synthesis_fragments` share one cache walk; production runs concurrently via `gather_isolated` with the permit acquired only in `llm_runner.acall`. The CLI and API both build through `services/profile_build.run_corpus_build` — the single place the facts+matrix bound-artifact pair is written."
 3. "Known design notes" — append: "**File SQLite runs WAL.** `make_engine` sets `journal_mode=WAL`, `busy_timeout=30000`, `synchronous=NORMAL` on every file-backed connection so the API's writer threads wait instead of failing with 'database is locked'."
 4. "Known design notes" — append: "**Industry normalization is scoped.** `_normalize_job_industries` walks only the just-extracted batch plus rows with a pending `_industry_candidate` (or legacy SIC keys) — never the whole table."

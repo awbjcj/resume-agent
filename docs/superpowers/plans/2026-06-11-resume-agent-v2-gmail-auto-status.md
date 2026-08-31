@@ -1,10 +1,10 @@
-# Resume Agent v2 — Gmail Auto-Status Implementation Plan
+# Résumé Tailor Harness v2 — Gmail Auto-Status Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Read recent Gmail messages (read-only), match each to a tracked application by company, classify it (rejection / interview / assessment / offer) with a rules pre-filter and an optional cheap-LLM fallback, and **propose** application-status transitions. `sync-status` lists the proposals; `--apply` applies them. Status is **never** flipped silently.
 
-**Architecture:** This is **Plan 5 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`), an independent leaf depending only on v1 tracking. All the decision logic — classification, matching, and the forward-only transition guard — is **pure and unit-tested**; the only un-CI-tested code is the Gmail I/O shell (like the LinkedIn driver). The human-confirm gate is the default: proposals print; applying requires the explicit `--apply` flag.
+**Architecture:** This is **Plan 5 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-tailor-harness-v2-connectors-design.md`), an independent leaf depending only on v1 tracking. All the decision logic — classification, matching, and the forward-only transition guard — is **pure and unit-tested**; the only un-CI-tested code is the Gmail I/O shell (like the LinkedIn driver). The human-confirm gate is the default: proposals print; applying requires the explicit `--apply` flag.
 
 **Tech Stack:** Python 3.13, uv, **google-api-python-client + google-auth + google-auth-oauthlib** (new deps), SQLModel, Typer, pytest.
 
@@ -26,14 +26,14 @@
 
 ```
 pyproject.toml                         # MODIFY — add google api deps
-src/resume_agent/gmail/
+src/resume_tailor_harness/gmail/
   __init__.py                          # CREATE
   client.py                            # CREATE — EmailMessage + Gmail I/O (not CI-tested)
   classify.py                          # CREATE — classify_email (rules + LLM fallback)
   match.py                             # CREATE — match_email_to_application
   propose.py                           # CREATE — Proposal + propose_transitions
-src/resume_agent/tracking/queries.py   # MODIFY — application_job_pairs
-src/resume_agent/cli.py                # MODIFY — sync-status command
+src/resume_tailor_harness/tracking/queries.py   # MODIFY — application_job_pairs
+src/resume_tailor_harness/cli.py                # MODIFY — sync-status command
 tests/test_gmail_classify.py           # CREATE
 tests/test_gmail_match.py              # CREATE
 tests/test_gmail_propose.py            # CREATE
@@ -47,7 +47,7 @@ tests/test_cli_sync_status.py          # CREATE
 **Files:**
 
 - Modify: `pyproject.toml`
-- Create: `src/resume_agent/gmail/__init__.py`, `src/resume_agent/gmail/client.py`
+- Create: `src/resume_tailor_harness/gmail/__init__.py`, `src/resume_tailor_harness/gmail/client.py`
 
 > The Gmail I/O is the only un-CI-tested code in this plan (a real OAuth-authenticated API). First run opens a consent screen once; the token caches to `data/gmail_token.json` (git-ignored), mirroring the LinkedIn burner-session pattern. `EmailMessage` (the boundary type) is plain data.
 
@@ -66,13 +66,13 @@ data/gmail_token.json
 
 - [ ] **Step 3: Implement the boundary type + client shell**
 
-Create `src/resume_agent/gmail/__init__.py`:
+Create `src/resume_tailor_harness/gmail/__init__.py`:
 
 ```python
 """Read-only Gmail integration: fetch → match → classify → PROPOSE status transitions."""
 ```
 
-Create `src/resume_agent/gmail/client.py`:
+Create `src/resume_tailor_harness/gmail/client.py`:
 
 ```python
 import base64
@@ -156,13 +156,13 @@ _ = base64
 
 - [ ] **Step 4: Verify it imports without network**
 
-Run: `uv run python -c "from resume_agent.gmail.client import EmailMessage, build_gmail_service, fetch_recent_messages; print('import ok')"`
+Run: `uv run python -c "from resume_tailor_harness.gmail.client import EmailMessage, build_gmail_service, fetch_recent_messages; print('import ok')"`
 Expected: prints `import ok` (no API call at import time).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add pyproject.toml uv.lock .gitignore src/resume_agent/gmail/__init__.py src/resume_agent/gmail/client.py
+git add pyproject.toml uv.lock .gitignore src/resume_tailor_harness/gmail/__init__.py src/resume_tailor_harness/gmail/client.py
 git commit -m "feat(gmail): deps + EmailMessage + read-only client shell" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -172,7 +172,7 @@ git commit -m "feat(gmail): deps + EmailMessage + read-only client shell" -m "Co
 
 **Files:**
 
-- Create: `src/resume_agent/gmail/classify.py`
+- Create: `src/resume_tailor_harness/gmail/classify.py`
 - Test: `tests/test_gmail_classify.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -180,8 +180,8 @@ git commit -m "feat(gmail): deps + EmailMessage + read-only client shell" -m "Co
 Create `tests/test_gmail_classify.py`:
 
 ```python
-from resume_agent.gmail.classify import classify_email
-from resume_agent.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.classify import classify_email
+from resume_tailor_harness.gmail.client import EmailMessage
 
 
 def _email(subject, snippet=""):
@@ -219,15 +219,15 @@ def test_llm_fallback_used_only_when_rules_inconclusive():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_gmail_classify.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.gmail.classify'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.gmail.classify'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/gmail/classify.py`:
+Create `src/resume_tailor_harness/gmail/classify.py`:
 
 ```python
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.llm_runner import Runner
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.llm_runner import Runner
 
 _LABELS = ("rejection", "interview", "assessment", "offer")
 
@@ -274,7 +274,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/gmail/classify.py tests/test_gmail_classify.py
+git add src/resume_tailor_harness/gmail/classify.py tests/test_gmail_classify.py
 git commit -m "feat(gmail): rules+LLM email classification" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -284,7 +284,7 @@ git commit -m "feat(gmail): rules+LLM email classification" -m "Co-Authored-By: 
 
 **Files:**
 
-- Create: `src/resume_agent/gmail/match.py`
+- Create: `src/resume_tailor_harness/gmail/match.py`
 - Test: `tests/test_gmail_match.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -292,9 +292,9 @@ git commit -m "feat(gmail): rules+LLM email classification" -m "Co-Authored-By: 
 Create `tests/test_gmail_match.py`:
 
 ```python
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.gmail.match import match_email_to_application
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.match import match_email_to_application
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _job(id_, company):
@@ -322,17 +322,17 @@ def test_no_match_returns_none():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_gmail_match.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.gmail.match'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.gmail.match'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/gmail/match.py`:
+Create `src/resume_tailor_harness/gmail/match.py`:
 
 ```python
 import re
 
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _company_token(company: str) -> str:
@@ -362,7 +362,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/gmail/match.py tests/test_gmail_match.py
+git add src/resume_tailor_harness/gmail/match.py tests/test_gmail_match.py
 git commit -m "feat(gmail): match email to tracked job by company" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -372,8 +372,8 @@ git commit -m "feat(gmail): match email to tracked job by company" -m "Co-Author
 
 **Files:**
 
-- Create: `src/resume_agent/gmail/propose.py`
-- Modify: `src/resume_agent/tracking/queries.py`
+- Create: `src/resume_tailor_harness/gmail/propose.py`
+- Modify: `src/resume_tailor_harness/tracking/queries.py`
 - Test: `tests/test_gmail_propose.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -381,9 +381,9 @@ git commit -m "feat(gmail): match email to tracked job by company" -m "Co-Author
 Create `tests/test_gmail_propose.py`:
 
 ```python
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.gmail.propose import Proposal, propose_transitions
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.propose import Proposal, propose_transitions
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job
 
 
 def _email(subject, domain="acme.com"):
@@ -433,18 +433,18 @@ def test_unmatched_or_none_email_yields_nothing():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_gmail_propose.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.gmail.propose'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.gmail.propose'`.
 
 - [ ] **Step 3: Implement the proposer**
 
-Create `src/resume_agent/gmail/propose.py`:
+Create `src/resume_tailor_harness/gmail/propose.py`:
 
 ```python
 from dataclasses import dataclass
 
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.gmail.match import match_email_to_application
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.match import match_email_to_application
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job
 
 _CLASS_TO_STATUS = {
     "rejection": ApplicationStatus.rejected.value,
@@ -494,10 +494,10 @@ def propose_transitions(emails, pairs: list[tuple[Application, Job]], classify) 
 
 - [ ] **Step 4: Add the pairs query helper**
 
-In `src/resume_agent/tracking/queries.py`, update the tables import to include `Application`:
+In `src/resume_tailor_harness/tracking/queries.py`, update the tables import to include `Application`:
 
 ```python
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 ```
 
 Add at the end of the file:
@@ -521,7 +521,7 @@ Expected: PASS (proposer tests + existing query tests still green).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/gmail/propose.py src/resume_agent/tracking/queries.py tests/test_gmail_propose.py
+git add src/resume_tailor_harness/gmail/propose.py src/resume_tailor_harness/tracking/queries.py tests/test_gmail_propose.py
 git commit -m "feat(gmail): forward-only transition proposals + pairs helper" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -531,7 +531,7 @@ git commit -m "feat(gmail): forward-only transition proposals + pairs helper" -m
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_sync_status.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -541,12 +541,12 @@ Create `tests/test_cli_sync_status.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import add_job
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.tracking.repository import application_for_job, save_application
-from resume_agent.tracking.tables import Application, ApplicationStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.tracking.repository import application_for_job, save_application
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus
 
 runner = CliRunner()
 
@@ -582,7 +582,7 @@ def test_sync_status_lists_then_applies(tmp_path, monkeypatch):
     # The seeded Acme application should now be 'interview'.
     from sqlmodel import select
 
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.tables import Job
 
     with get_session(make_engine(db_url)) as s:
         acme = s.exec(select(Job).where(Job.company == "Acme")).first()
@@ -592,25 +592,25 @@ def test_sync_status_lists_then_applies(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cli_sync_status.py -v`
-Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'build_gmail_service'`.
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.cli' has no attribute 'build_gmail_service'`.
 
 - [ ] **Step 3: Add imports**
 
-In `src/resume_agent/cli.py`, add:
+In `src/resume_tailor_harness/cli.py`, add:
 
 ```python
-from resume_agent.gmail.classify import classify_email
-from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
-from resume_agent.gmail.propose import propose_transitions
-from resume_agent.tracking.queries import application_job_pairs
-from resume_agent.tracking.repository import update_application_status
+from resume_tailor_harness.gmail.classify import classify_email
+from resume_tailor_harness.gmail.client import build_gmail_service, fetch_recent_messages
+from resume_tailor_harness.gmail.propose import propose_transitions
+from resume_tailor_harness.tracking.queries import application_job_pairs
+from resume_tailor_harness.tracking.repository import update_application_status
 ```
 
 (If `update_application_status` is already imported, don't duplicate.)
 
 - [ ] **Step 4: Add the command**
 
-Add after `dashboard_cmd` in `src/resume_agent/cli.py`:
+Add after `dashboard_cmd` in `src/resume_tailor_harness/cli.py`:
 
 ```python
 @app.command("sync-status")
@@ -647,13 +647,13 @@ Expected: PASS (1 test).
 Run: `uv run pytest -q`
 Expected: ALL pass.
 
-Run: `uv run resume-agent sync-status --help`
+Run: `uv run resume-tailor-harness sync-status --help`
 Expected: help text, exit 0.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_sync_status.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_sync_status.py
 git commit -m "feat(gmail): sync-status command (propose + --apply)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -673,4 +673,4 @@ git commit -m "feat(gmail): sync-status command (propose + --apply)" -m "Co-Auth
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-agent-v2-gmail-auto-status.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. Independent of Plans 4/6. Last leaf: **Plan 6 (application analytics)**.
+Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-tailor-harness-v2-gmail-auto-status.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. Independent of Plans 4/6. Last leaf: **Plan 6 (application analytics)**.

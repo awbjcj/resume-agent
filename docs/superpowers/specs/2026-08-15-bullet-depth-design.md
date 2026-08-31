@@ -49,7 +49,7 @@ Projects already hold the supply and under-render it:
 | Field-Trip Issue Analytics Pipeline | 13 | 2 |
 | Deep Agent | 10 | 2 |
 | MCP-Based CI/CD Orchestration Agent | 9 | 2 |
-| Resume Agent | 8 | 2 |
+| Résumé Tailor Harness | 8 | 2 |
 
 Experiences are genuinely starved:
 

@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from resume_agent.profile.coach_store import (
+from resume_tailor_harness.profile.coach_store import (
     CoachDraftNote,
     CoachTopic,
     CoachTurnRecord,
@@ -18,7 +18,7 @@ from resume_agent.profile.coach_store import (
     set_impact,
     unarchive_session,
 )
-from resume_agent.profile.interview import ResearchAction
+from resume_tailor_harness.profile.interview import ResearchAction
 
 
 def _topic(index: int) -> CoachTopic:

@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job
 from scripts.bench_board import bench, seed
 
 

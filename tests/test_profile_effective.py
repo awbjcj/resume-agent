@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from resume_agent.profile.effective import build_effective_taxonomy
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.profile.effective import build_effective_taxonomy
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )

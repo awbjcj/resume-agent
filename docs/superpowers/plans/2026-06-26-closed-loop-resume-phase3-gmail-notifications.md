@@ -23,7 +23,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/gmail/client.py:9-17` (`EmailMessage`), `:54-78` (`fetch_recent_messages`)
+- Modify: `src/resume_tailor_harness/gmail/client.py:9-17` (`EmailMessage`), `:54-78` (`fetch_recent_messages`)
 - Test: `tests/test_gmail_client.py` (append; create if absent)
 
 **Interfaces:**
@@ -34,7 +34,7 @@
 
 ```python
 # tests/test_gmail_client.py
-from resume_agent.gmail.client import EmailMessage, fetch_recent_messages
+from resume_tailor_harness.gmail.client import EmailMessage, fetch_recent_messages
 
 
 class _FakeMessages:
@@ -102,7 +102,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/gmail/client.py tests/test_gmail_client.py
+git add src/resume_tailor_harness/gmail/client.py tests/test_gmail_client.py
 git commit -m "feat: surface Gmail message_id on EmailMessage"
 ```
 
@@ -112,7 +112,7 @@ git commit -m "feat: surface Gmail message_id on EmailMessage"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py` (add `Notification` at end)
+- Modify: `src/resume_tailor_harness/tracking/tables.py` (add `Notification` at end)
 - Test: `tests/test_tracking_repository.py` (append)
 
 **Interfaces:**
@@ -125,8 +125,8 @@ git commit -m "feat: surface Gmail message_id on EmailMessage"
 # add to tests/test_tracking_repository.py
 def test_notification_table_roundtrip():
     from sqlmodel import Session
-    from resume_agent.db import init_db, make_engine
-    from resume_agent.tracking.tables import Notification
+    from resume_tailor_harness.db import init_db, make_engine
+    from resume_tailor_harness.tracking.tables import Notification
     engine = make_engine("sqlite://"); init_db(engine)
     with Session(engine) as s:
         n = Notification(application_id=1, kind="interview", proposed_status="interview",
@@ -143,7 +143,7 @@ Expected: FAIL (`ImportError: cannot import name 'Notification'`).
 
 - [ ] **Step 3: Add the model**
 
-Append to `src/resume_agent/tracking/tables.py`:
+Append to `src/resume_tailor_harness/tracking/tables.py`:
 
 ```python
 class Notification(SQLModel, table=True):
@@ -167,7 +167,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py tests/test_tracking_repository.py
+git add src/resume_tailor_harness/tracking/tables.py tests/test_tracking_repository.py
 git commit -m "feat: Notification table for Gmail-derived proposals"
 ```
 
@@ -177,7 +177,7 @@ git commit -m "feat: Notification table for Gmail-derived proposals"
 
 **Files:**
 
-- Modify: `src/resume_agent/gmail/propose.py:16-23` (`Proposal`), `:33-59` (`propose_transitions`)
+- Modify: `src/resume_tailor_harness/gmail/propose.py:16-23` (`Proposal`), `:33-59` (`propose_transitions`)
 - Test: `tests/test_gmail_propose.py` (append; mirror existing propose tests)
 
 **Interfaces:**
@@ -188,9 +188,9 @@ git commit -m "feat: Notification table for Gmail-derived proposals"
 
 ```python
 # tests/test_gmail_propose.py  (append)
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.gmail.propose import propose_transitions
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.propose import propose_transitions
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 def test_proposal_carries_message_id():
@@ -231,7 +231,7 @@ Expected: PASS (existing propose tests still green — they ignore the new field
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/gmail/propose.py tests/test_gmail_propose.py
+git add src/resume_tailor_harness/gmail/propose.py tests/test_gmail_propose.py
 git commit -m "feat: carry message_id on gmail Proposal"
 ```
 
@@ -241,8 +241,8 @@ git commit -m "feat: carry message_id on gmail Proposal"
 
 **Files:**
 
-- Create: `src/resume_agent/services/notifications.py`
-- Modify: `src/resume_agent/tracking/repository.py` (add `notification_by_key`, `pending_notifications`, `save_notification`, `get_notification`)
+- Create: `src/resume_tailor_harness/services/notifications.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py` (add `notification_by_key`, `pending_notifications`, `save_notification`, `get_notification`)
 - Test: `tests/test_services_notifications.py`
 
 **Interfaces:**
@@ -259,13 +259,13 @@ git commit -m "feat: carry message_id on gmail Proposal"
 ```python
 # tests/test_services_notifications.py
 from sqlmodel import Session
-from resume_agent.db import init_db, make_engine
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.services.notifications import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.services.notifications import (
     accept_notification, dismiss_notification, list_pending, sync_notifications,
 )
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 def _seed(s):
@@ -297,7 +297,7 @@ def test_accept_applies_transition_and_dismiss_suppresses():
         [n] = sync_notifications(s, [_email("m1")], classify=lambda e: "interview")
         accepted = accept_notification(s, n.id)
         assert accepted.state == "accepted"
-        from resume_agent.tracking.repository import get_application
+        from resume_tailor_harness.tracking.repository import get_application
         assert get_application(s, app.id).status == "interview"
         # A dismissed proposal stays out of pending even after re-sync.
         [n2] = sync_notifications(s, [_email("m2")], classify=lambda e: "interview")
@@ -313,7 +313,7 @@ Expected: FAIL (`ModuleNotFoundError`).
 
 - [ ] **Step 3: Add repository helpers**
 
-Append to `src/resume_agent/tracking/repository.py` (ensure `Notification` is imported):
+Append to `src/resume_tailor_harness/tracking/repository.py` (ensure `Notification` is imported):
 
 ```python
 def save_notification(session: Session, notification: Notification) -> Notification:
@@ -345,7 +345,7 @@ def pending_notifications(session: Session) -> list[Notification]:
 - [ ] **Step 4: Implement the service**
 
 ```python
-# src/resume_agent/services/notifications.py
+# src/resume_tailor_harness/services/notifications.py
 """Surface inbound Gmail proposals as reviewable, persisted notifications."""
 
 from __future__ import annotations
@@ -354,15 +354,15 @@ from collections.abc import Callable, Sequence
 
 from sqlmodel import Session
 
-from resume_agent.gmail.classify import classify_email
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.gmail.propose import propose_transitions
-from resume_agent.tracking.queries import application_job_pairs
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.gmail.classify import classify_email
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.propose import propose_transitions
+from resume_tailor_harness.tracking.queries import application_job_pairs
+from resume_tailor_harness.tracking.repository import (
     get_notification, notification_by_key, pending_notifications,
     save_notification, update_application_status,
 )
-from resume_agent.tracking.tables import Notification
+from resume_tailor_harness.tracking.tables import Notification
 
 
 def sync_notifications(
@@ -418,7 +418,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/services/notifications.py src/resume_agent/tracking/repository.py tests/test_services_notifications.py
+git add src/resume_tailor_harness/services/notifications.py src/resume_tailor_harness/tracking/repository.py tests/test_services_notifications.py
 git commit -m "feat: notifications service with idempotent gmail sync, accept, dismiss"
 ```
 
@@ -428,10 +428,10 @@ git commit -m "feat: notifications service with idempotent gmail sync, accept, d
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/notifications.py`
-- Create: `src/resume_agent/api/routers/notifications.py`
-- Modify: `src/resume_agent/api/routers/runs.py` (add `launch_gmail_sync`)
-- Modify: `src/resume_agent/api/app.py` (register notifications router)
+- Create: `src/resume_tailor_harness/api/schemas/notifications.py`
+- Create: `src/resume_tailor_harness/api/routers/notifications.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (add `launch_gmail_sync`)
+- Modify: `src/resume_tailor_harness/api/app.py` (register notifications router)
 - Test: `tests/api/test_notifications.py`
 
 **Interfaces:**
@@ -450,12 +450,12 @@ git commit -m "feat: notifications service with idempotent gmail sync, accept, d
 # tests/api/test_notifications.py
 def test_list_accept_dismiss(client, seed_application):
     # seed_application: persists a Job + Application, returns application id.
-    from resume_agent.api.routers import notifications as N
+    from resume_tailor_harness.api.routers import notifications as N
     app_id = seed_application
 
     # Seed one pending notification directly via the service-less path.
-    from resume_agent.tracking.tables import Notification
-    from resume_agent.tracking.repository import save_notification
+    from resume_tailor_harness.tracking.tables import Notification
+    from resume_tailor_harness.tracking.repository import save_notification
     with client.app_session() as s:  # helper exposing a Session on the test engine
         n = save_notification(s, Notification(
             application_id=app_id, kind="interview", proposed_status="interview",
@@ -479,12 +479,12 @@ Expected: FAIL (404 / no module).
 - [ ] **Step 3: Add the schema**
 
 ```python
-# src/resume_agent/api/schemas/notifications.py
+# src/resume_tailor_harness/api/schemas/notifications.py
 from __future__ import annotations
 
 from datetime import datetime
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class NotificationOut(CamelModel):
@@ -501,16 +501,16 @@ class NotificationOut(CamelModel):
 - [ ] **Step 4: Add the notifications router**
 
 ```python
-# src/resume_agent/api/routers/notifications.py
+# src/resume_tailor_harness/api/routers/notifications.py
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.notifications import NotificationOut
-from resume_agent.services.notifications import (
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.notifications import NotificationOut
+from resume_tailor_harness.services.notifications import (
     accept_notification, dismiss_notification, list_pending,
 )
 
@@ -540,7 +540,7 @@ def dismiss(notification_id: int, session: Session = Depends(get_session)):
 
 - [ ] **Step 5: Add the Gmail-sync Run**
 
-In `src/resume_agent/api/routers/runs.py`, mirror `launch_pull`:
+In `src/resume_tailor_harness/api/routers/runs.py`, mirror `launch_pull`:
 
 ```python
 @router.post("/gmail/sync", response_model=RunOut, status_code=202)
@@ -548,8 +548,8 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
     engine = _engine(request)
 
     def work(reporter):
-        from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
-        from resume_agent.services.notifications import sync_notifications
+        from resume_tailor_harness.gmail.client import build_gmail_service, fetch_recent_messages
+        from resume_tailor_harness.services.notifications import sync_notifications
         reporter.begin(1, "Scanning Gmail")
         service = build_gmail_service()
         emails = fetch_recent_messages(service)
@@ -566,7 +566,7 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
 
 - [ ] **Step 6: Register the notifications router**
 
-In `src/resume_agent/api/app.py`: `from resume_agent.api.routers import notifications as notifications_router` and `app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)`.
+In `src/resume_tailor_harness/api/app.py`: `from resume_tailor_harness.api.routers import notifications as notifications_router` and `app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)`.
 
 - [ ] **Step 7: Run tests to verify they pass**
 
@@ -576,7 +576,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/api/ tests/api/test_notifications.py
+git add src/resume_tailor_harness/api/ tests/api/test_notifications.py
 git commit -m "feat: notifications API + gmail-sync run endpoint"
 ```
 

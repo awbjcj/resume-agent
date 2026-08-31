@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import pytest
 from agno.run.agent import RunEvent
 
-from resume_agent.llm_runner import AgentRunner
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.llm_runner import AgentRunner
+from resume_tailor_harness.sessions.stream import (
     Completed,
     Failed,
     ReasoningDelta,
@@ -77,14 +77,14 @@ class _Transient(Exception):
 def _no_budget(monkeypatch):
     recorded = []
     monkeypatch.setattr(
-        "resume_agent.tenancy.limits.enforce_agent_budget", lambda agent: None
+        "resume_tailor_harness.tenancy.limits.enforce_agent_budget", lambda agent: None
     )
     monkeypatch.setattr(
-        "resume_agent.tenancy.usage.record_call",
+        "resume_tailor_harness.tenancy.usage.record_call",
         lambda agent, response: recorded.append(response),
     )
     monkeypatch.setattr(
-        "resume_agent.llm_runner.refresh_agent_api_key", lambda agent: None
+        "resume_tailor_harness.llm_runner.refresh_agent_api_key", lambda agent: None
     )
     return recorded
 
@@ -199,7 +199,7 @@ def test_run_error_event_is_terminal_and_not_followed_by_completed():
 
 def test_transient_failure_before_visible_output_retries(monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.get_settings", lambda: _settings(retries=1)
+        "resume_tailor_harness.llm_runner.get_settings", lambda: _settings(retries=1)
     )
     output = _Output("final")
     agent = _FakeAgent(
@@ -215,7 +215,7 @@ def test_transient_failure_before_visible_output_retries(monkeypatch):
 
 def test_transient_failure_after_visible_output_does_not_retry(monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.get_settings", lambda: _settings(retries=3)
+        "resume_tailor_harness.llm_runner.get_settings", lambda: _settings(retries=3)
     )
     agent = _FakeAgent(
         [[_Event(RunEvent.run_content, content="hi"), _Transient("lost")]]
@@ -230,7 +230,7 @@ def test_transient_failure_after_visible_output_does_not_retry(monkeypatch):
 
 def test_ignored_lifecycle_event_does_not_prevent_pre_output_retry(monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.get_settings", lambda: _settings(retries=1)
+        "resume_tailor_harness.llm_runner.get_settings", lambda: _settings(retries=1)
     )
     output = _Output("final")
     agent = _FakeAgent(

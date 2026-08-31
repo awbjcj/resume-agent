@@ -1,5 +1,5 @@
-from resume_agent.services import agents
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.services import agents
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 class _DummyRunner:
@@ -183,7 +183,7 @@ def test_tailor_bundle_threads_writer_tiers(monkeypatch):
 
 
 def test_tailor_bundle_builds_one_merged_advisory_agent(monkeypatch):
-    from resume_agent.tailor.panel import MERGED_ADVISORY
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY
 
     monkeypatch.setattr(agents, "build_tailor_agent", lambda **kwargs: object())
     monkeypatch.setattr(agents, "build_reviser_agent", lambda **kwargs: object())

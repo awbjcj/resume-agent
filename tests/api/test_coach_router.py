@@ -4,9 +4,9 @@ import time
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import coach as coach_router
-from resume_agent.profile.coach_store import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import coach as coach_router
+from resume_tailor_harness.profile.coach_store import (
     CoachDraftNote,
     CoachTopic,
     CoachTurnRecord,
@@ -91,7 +91,7 @@ def _view(sid="s1", status="active"):
 def test_start_guards_and_opening_run(monkeypatch, tmp_path):
     client = _client(tmp_path)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     with client:
         assert client.post("/api/profile/coach/sessions").status_code == 400
@@ -116,7 +116,7 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
     )
     client = TestClient(app)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     with client:
         _seed_primary(client)
@@ -144,7 +144,7 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
 def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
     client = _client(tmp_path)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     with client:
         _seed_primary(client)
@@ -164,7 +164,7 @@ def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
         )
 
         # A separate pending draft exercises DELETE.
-        from resume_agent.profile.coach_store import end_session
+        from resume_tailor_harness.profile.coach_store import end_session
 
         end_session(tmp_path / "data" / "profile", "s1", "done")
         create_session(
@@ -194,7 +194,7 @@ def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
 def test_end_run_returns_nested_build_id(monkeypatch, tmp_path):
     client = _client(tmp_path)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     with client:
         _seed_primary(client)

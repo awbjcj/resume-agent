@@ -1,7 +1,7 @@
 import pytest
 
-import resume_agent.llm_runner as llm_runner
-from resume_agent.llm_runner import (
+import resume_tailor_harness.llm_runner as llm_runner
+from resume_tailor_harness.llm_runner import (
     DEEPSEEK_WEB_SEARCH_TOOL,
     OPENAI_WEB_SEARCH_TOOL,
     anthropic_web_search_tool,
@@ -53,7 +53,7 @@ def test_build_off_mode_disables_advisor():
 
 
 def test_build_search_equipped_anthropic_returns_dynamic_server_tool(monkeypatch):
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda _model_id: "")
+    monkeypatch.setattr("resume_tailor_harness.llm_runner.resolve_api_key", lambda _model_id: "")
 
     _model, tools = build_search_equipped("claude-opus-4-8", "auto")
 
@@ -62,7 +62,7 @@ def test_build_search_equipped_anthropic_returns_dynamic_server_tool(monkeypatch
 
 
 def test_build_search_equipped_anthropic_haiku_uses_basic_server_tool(monkeypatch):
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda _model_id: "")
+    monkeypatch.setattr("resume_tailor_harness.llm_runner.resolve_api_key", lambda _model_id: "")
 
     _model, tools = build_search_equipped("claude-haiku-4-5", "auto")
 
@@ -83,7 +83,7 @@ def test_deepseek_server_tool_shape_is_current():
 
 
 def test_build_search_equipped_deepseek_returns_native_server_tool(monkeypatch):
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda _model_id: "")
+    monkeypatch.setattr("resume_tailor_harness.llm_runner.resolve_api_key", lambda _model_id: "")
 
     model, tools = build_search_equipped("deepseek:deepseek-v4-flash", "auto")
 

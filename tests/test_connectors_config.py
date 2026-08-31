@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.discovery.connectors.config import (
+from resume_tailor_harness.discovery.connectors.config import (
     AdzunaConfig,
     AshbyBoard,
     CompaniesConfig,

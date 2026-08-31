@@ -57,27 +57,27 @@ cross-cutting maintenance remains outside the bullet-depth UI scope.
 **Created**
 | File | Responsibility |
 | --- | --- |
-| `src/resume_agent/profile/aspects.py` | The closed `Aspect` vocabulary and its human-readable descriptions. No logic. |
-| `src/resume_agent/profile/depth.py` | Supply-side measurement over `ProfileFacts`. Pure; imports nothing from `tailor`. |
-| `src/resume_agent/tailor/depth.py` | Render-side measurement over `ResumeContent` + `ProfileFacts` + `LengthBudget`. |
+| `src/resume_tailor_harness/profile/aspects.py` | The closed `Aspect` vocabulary and its human-readable descriptions. No logic. |
+| `src/resume_tailor_harness/profile/depth.py` | Supply-side measurement over `ProfileFacts`. Pure; imports nothing from `tailor`. |
+| `src/resume_tailor_harness/tailor/depth.py` | Render-side measurement over `ResumeContent` + `ProfileFacts` + `LengthBudget`. |
 | `tests/test_profile_aspects.py`, `tests/test_profile_depth.py`, `tests/test_tailor_depth.py` | Tests for the above. |
 
 **Modified**
 | File | Change |
 | --- | --- |
-| `src/resume_agent/models/profile.py:24-25` | `Bullet.aspect` field |
-| `src/resume_agent/models/profile.py:74` | `Project.highlights: list[str]` → `list[Bullet]` + migrating validator |
-| `src/resume_agent/profile/ids.py:43-44` | assign ids to project highlights |
-| `src/resume_agent/profile/merge.py:59,531` | highlight merge and stub fallback |
-| `src/resume_agent/profile/synthesis.py:539`, `profile/coach.py:303`, `profile/project_extractor.py:41` | highlight consumers |
-| `src/resume_agent/tailor/evidence_portfolio.py:82,189` | highlight consumers |
-| `src/resume_agent/tailor/provenance.py:28-29` | index project highlight ids |
-| `src/resume_agent/tailor/review_config.py:43-62` | `LengthBudget` floors |
-| `src/resume_agent/tailor/length.py` | `format_budget` rewrite + `format_depth_plan` |
-| `src/resume_agent/tailor/tailoring.py:31-72,86-96`, `tailor/panel.py:31-43,128-148` | depth-plan prompt wiring |
-| `src/resume_agent/tailor/workflow.py:118-150` | depth critique in `_deterministic_critiques` |
-| `src/resume_agent/api/schemas/config.py:76-85` | new budget fields |
-| `src/resume_agent/cli.py` | `profile depth` command |
+| `src/resume_tailor_harness/models/profile.py:24-25` | `Bullet.aspect` field |
+| `src/resume_tailor_harness/models/profile.py:74` | `Project.highlights: list[str]` → `list[Bullet]` + migrating validator |
+| `src/resume_tailor_harness/profile/ids.py:43-44` | assign ids to project highlights |
+| `src/resume_tailor_harness/profile/merge.py:59,531` | highlight merge and stub fallback |
+| `src/resume_tailor_harness/profile/synthesis.py:539`, `profile/coach.py:303`, `profile/project_extractor.py:41` | highlight consumers |
+| `src/resume_tailor_harness/tailor/evidence_portfolio.py:82,189` | highlight consumers |
+| `src/resume_tailor_harness/tailor/provenance.py:28-29` | index project highlight ids |
+| `src/resume_tailor_harness/tailor/review_config.py:43-62` | `LengthBudget` floors |
+| `src/resume_tailor_harness/tailor/length.py` | `format_budget` rewrite + `format_depth_plan` |
+| `src/resume_tailor_harness/tailor/tailoring.py:31-72,86-96`, `tailor/panel.py:31-43,128-148` | depth-plan prompt wiring |
+| `src/resume_tailor_harness/tailor/workflow.py:118-150` | depth critique in `_deterministic_critiques` |
+| `src/resume_tailor_harness/api/schemas/config.py:76-85` | new budget fields |
+| `src/resume_tailor_harness/cli.py` | `profile depth` command |
 | 6 × `config/review*.yaml*` | new budget keys |
 
 **Key structural note.** `compose_tailor_input`, `compose_revise_input`, and `_panel_inputs` each *already* receive both `profile_facts` and the budget (`_panel_inputs` via `config.length_budget`). The depth plan is therefore composed locally inside each of the three, exactly as `format_budget` already is at `tailoring.py:41` and `:143`. **No new parameter is threaded through `workflow.py` or `service.py`.**
@@ -87,8 +87,8 @@ cross-cutting maintenance remains outside the bullet-depth UI scope.
 ### Task 1: Aspect vocabulary
 
 **Files:**
-- Create: `src/resume_agent/profile/aspects.py`
-- Modify: `src/resume_agent/models/profile.py:24-25`
+- Create: `src/resume_tailor_harness/profile/aspects.py`
+- Modify: `src/resume_tailor_harness/models/profile.py:24-25`
 - Test: `tests/test_profile_aspects.py`
 
 **Interfaces:**
@@ -99,8 +99,8 @@ cross-cutting maintenance remains outside the bullet-depth UI scope.
 
 ```python
 # tests/test_profile_aspects.py
-from resume_agent.models.profile import Bullet
-from resume_agent.profile.aspects import ASPECT_DESCRIPTIONS, ASPECTS
+from resume_tailor_harness.models.profile import Bullet
+from resume_tailor_harness.profile.aspects import ASPECT_DESCRIPTIONS, ASPECTS
 
 
 def test_aspects_are_a_closed_eight_value_vocabulary():
@@ -138,12 +138,12 @@ def test_bullet_accepts_a_known_aspect_and_rejects_an_unknown_one():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_aspects.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.profile.aspects'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.aspects'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/profile/aspects.py
+# src/resume_tailor_harness/profile/aspects.py
 """The closed vocabulary of bullet aspects.
 
 Four consumers share this list - the depth plan handed to the writer, the depth
@@ -191,10 +191,10 @@ ASPECT_DESCRIPTIONS: dict[str, str] = {
 }
 ```
 
-In `src/resume_agent/models/profile.py`, add the import and the field:
+In `src/resume_tailor_harness/models/profile.py`, add the import and the field:
 
 ```python
-from resume_agent.profile.aspects import Aspect   # near the existing imports
+from resume_tailor_harness.profile.aspects import Aspect   # near the existing imports
 
 
 class Bullet(FactItem):
@@ -205,7 +205,7 @@ class Bullet(FactItem):
     aspect: Aspect | None = None
 ```
 
-> **Import-cycle check:** `profile/aspects.py` must import nothing from `resume_agent` — it is a leaf. `models/profile.py` importing from `profile/` is the one direction that works; confirm `profile/__init__.py` does not import `models.profile` at module scope. If it does, move `Aspect` into `models/profile.py` and re-export it from `profile/aspects.py` instead.
+> **Import-cycle check:** `profile/aspects.py` must import nothing from `resume_tailor_harness` — it is a leaf. `models/profile.py` importing from `profile/` is the one direction that works; confirm `profile/__init__.py` does not import `models.profile` at module scope. If it does, move `Aspect` into `models/profile.py` and re-export it from `profile/aspects.py` instead.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -215,7 +215,7 @@ Expected: new tests PASS, full suite unchanged (no regressions).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/aspects.py src/resume_agent/models/profile.py tests/test_profile_aspects.py
+git add src/resume_tailor_harness/profile/aspects.py src/resume_tailor_harness/models/profile.py tests/test_profile_aspects.py
 git commit -m "feat(profile): add closed bullet aspect vocabulary"
 ```
 
@@ -224,8 +224,8 @@ git commit -m "feat(profile): add closed bullet aspect vocabulary"
 ### Task 2: Project highlights become Bullets
 
 **Files:**
-- Modify: `src/resume_agent/models/profile.py:74`
-- Modify: `src/resume_agent/profile/ids.py:43-44`
+- Modify: `src/resume_tailor_harness/models/profile.py:74`
+- Modify: `src/resume_tailor_harness/profile/ids.py:43-44`
 - Test: `tests/test_profile_ids.py` (append), `tests/test_profile_aspects.py` (append)
 
 **Interfaces:**
@@ -236,7 +236,7 @@ git commit -m "feat(profile): add closed bullet aspect vocabulary"
 
 ```python
 # tests/test_profile_aspects.py (append)
-from resume_agent.models.profile import Project
+from resume_tailor_harness.models.profile import Project
 
 
 def test_legacy_string_highlights_coerce_to_bullets():
@@ -257,8 +257,8 @@ def test_bullet_highlights_pass_through_unchanged():
 
 ```python
 # tests/test_profile_ids.py (append)
-from resume_agent.models.profile import Contact, ProfileFacts, Project
-from resume_agent.profile.ids import assign_fact_ids
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Project
+from resume_tailor_harness.profile.ids import assign_fact_ids
 
 
 def _facts() -> ProfileFacts:
@@ -293,7 +293,7 @@ Expected: FAIL — `highlights` still holds `str`, so `bullet.text` raises `Attr
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/models/profile.py`, change the field and add the migrating validator to `Project`:
+In `src/resume_tailor_harness/models/profile.py`, change the field and add the migrating validator to `Project`:
 
 ```python
 class Project(FactItem):
@@ -329,7 +329,7 @@ class Project(FactItem):
 
 Add `field_validator` to the pydantic import line at the top of the file.
 
-In `src/resume_agent/profile/ids.py`, replace the project loop:
+In `src/resume_tailor_harness/profile/ids.py`, replace the project loop:
 
 ```python
     for project in output.projects:
@@ -348,7 +348,7 @@ Expected: PASS. The full suite will still fail — Task 3 fixes the consumers.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/profile.py src/resume_agent/profile/ids.py tests/test_profile_aspects.py tests/test_profile_ids.py
+git add src/resume_tailor_harness/models/profile.py src/resume_tailor_harness/profile/ids.py tests/test_profile_aspects.py tests/test_profile_ids.py
 git commit -m "feat(profile): promote project highlights to addressable Bullet facts"
 ```
 
@@ -357,11 +357,11 @@ git commit -m "feat(profile): promote project highlights to addressable Bullet f
 ### Task 3: Update the highlight consumers
 
 **Files:**
-- Modify: `src/resume_agent/profile/merge.py:59,531`
-- Modify: `src/resume_agent/profile/synthesis.py:539`
-- Modify: `src/resume_agent/profile/coach.py:303`
-- Modify: `src/resume_agent/profile/project_extractor.py:41`
-- Modify: `src/resume_agent/tailor/evidence_portfolio.py:82,189`
+- Modify: `src/resume_tailor_harness/profile/merge.py:59,531`
+- Modify: `src/resume_tailor_harness/profile/synthesis.py:539`
+- Modify: `src/resume_tailor_harness/profile/coach.py:303`
+- Modify: `src/resume_tailor_harness/profile/project_extractor.py:41`
+- Modify: `src/resume_tailor_harness/tailor/evidence_portfolio.py:82,189`
 - Test: `tests/test_profile_merge.py` (append)
 
 **Interfaces:**
@@ -372,10 +372,10 @@ git commit -m "feat(profile): promote project highlights to addressable Bullet f
 
 ```python
 # tests/test_profile_merge.py (append)
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet, Contact, Experience, ProfileFacts, Project,
 )
-from resume_agent.profile.merge import apply_synthesis_fragments
+from resume_tailor_harness.profile.merge import apply_synthesis_fragments
 
 
 def test_synth_fallback_project_keeps_bullet_ids_instead_of_flattening_to_text():
@@ -404,7 +404,7 @@ def test_synth_fallback_project_keeps_bullet_ids_instead_of_flattening_to_text()
 
 
 def test_project_highlights_merge_by_text_without_duplicating():
-    from resume_agent.profile.merge import _merge_project_highlights
+    from resume_tailor_harness.profile.merge import _merge_project_highlights
 
     target = Project(id="p1", name="P", highlights=[Bullet(id="h1", text="Built a parser")])
     _merge_project_highlights(
@@ -456,7 +456,7 @@ Call `_merge_project_highlights` from `_merge_projects` (`merge.py:277`), right 
                 highlights=[Bullet(id="", text=claim.text) for claim in entry.claims],
 ```
 
-Import `Bullet` from `resume_agent.models.profile`. Ids stay empty; `assign_fact_ids` fills them.
+Import `Bullet` from `resume_tailor_harness.models.profile`. Ids stay empty; `assign_fact_ids` fills them.
 
 `profile/coach.py:303` — `len(project.highlights)` is already correct and needs no change; verify only.
 
@@ -478,7 +478,7 @@ Expected: full suite PASS, ruff clean. Any remaining failure is another highligh
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/ src/resume_agent/tailor/evidence_portfolio.py tests/test_profile_merge.py
+git add src/resume_tailor_harness/profile/ src/resume_tailor_harness/tailor/evidence_portfolio.py tests/test_profile_merge.py
 git commit -m "refactor: update project highlight consumers for Bullet elements"
 ```
 
@@ -487,7 +487,7 @@ git commit -m "refactor: update project highlight consumers for Bullet elements"
 ### Task 4: Project highlights enter the provenance index
 
 **Files:**
-- Modify: `src/resume_agent/tailor/provenance.py:28-29`
+- Modify: `src/resume_tailor_harness/tailor/provenance.py:28-29`
 - Test: `tests/test_tailor_provenance.py` (append)
 
 **Interfaces:**
@@ -500,9 +500,9 @@ This task delivers the invariant that does not exist today.
 
 ```python
 # tests/test_tailor_provenance.py (append)
-from resume_agent.models.profile import Bullet, Contact, ProfileFacts, Project
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredProject
-from resume_agent.tailor.provenance import check_provenance, index_facts
+from resume_tailor_harness.models.profile import Bullet, Contact, ProfileFacts, Project
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredProject
+from resume_tailor_harness.tailor.provenance import check_provenance, index_facts
 
 
 def _facts_with_project() -> ProfileFacts:
@@ -555,7 +555,7 @@ Expected: FAIL — `h1` is not in the index, so even the *valid* citation is rej
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/tailor/provenance.py`, extend the project loop in `index_facts`:
+In `src/resume_tailor_harness/tailor/provenance.py`, extend the project loop in `index_facts`:
 
 ```python
     for proj in facts.projects:
@@ -576,7 +576,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/provenance.py tests/test_tailor_provenance.py
+git add src/resume_tailor_harness/tailor/provenance.py tests/test_tailor_provenance.py
 git commit -m "feat(tailor): verify project bullets against highlight ids"
 ```
 
@@ -585,8 +585,8 @@ git commit -m "feat(tailor): verify project bullets against highlight ids"
 ### Task 5: LengthBudget floors
 
 **Files:**
-- Modify: `src/resume_agent/tailor/review_config.py:43-62`
-- Modify: `src/resume_agent/api/schemas/config.py:76-85`
+- Modify: `src/resume_tailor_harness/tailor/review_config.py:43-62`
+- Modify: `src/resume_tailor_harness/api/schemas/config.py:76-85`
 - Modify: `config/review.yaml`, `config/review.yaml.example`, `config/review_deep.yaml`, `config/review_deep.yaml.example`, `config/review.early_stop.yaml`, `config/review.match_plan.yaml`
 - Test: `tests/test_tailor_review_config.py` (append)
 
@@ -601,7 +601,7 @@ git commit -m "feat(tailor): verify project bullets against highlight ids"
 import pydantic
 import pytest
 
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def test_budget_defaults_target_two_pages_with_floors():
@@ -640,7 +640,7 @@ Expected: FAIL with `AttributeError: 'LengthBudget' object has no attribute 'pag
 
 - [ ] **Step 3: Write minimal implementation**
 
-Replace the `LengthBudget` body in `src/resume_agent/tailor/review_config.py`:
+Replace the `LengthBudget` body in `src/resume_tailor_harness/tailor/review_config.py`:
 
 ```python
 class LengthBudget(ExtensibleModel):
@@ -704,7 +704,7 @@ length_budget:
   max_skills_per_category: 12
 ```
 
-In `src/resume_agent/api/schemas/config.py`, add the mirrored fields after line 85, using the existing `_budget_default` helper so the API never restates a literal:
+In `src/resume_tailor_harness/api/schemas/config.py`, add the mirrored fields after line 85, using the existing `_budget_default` helper so the API never restates a literal:
 
 ```python
     page_target: int = _budget_default("page_target")
@@ -723,7 +723,7 @@ Expected: PASS. `tests/test_tailor_length.py::test_format_budget_mentions_one_pa
 ```bash
 .venv/Scripts/python.exe scripts/export_openapi.py
 bash scripts/gen_ts_client.sh
-git add src/resume_agent/tailor/review_config.py src/resume_agent/api/schemas/config.py config/ tests/test_tailor_review_config.py web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/tailor/review_config.py src/resume_tailor_harness/api/schemas/config.py config/ tests/test_tailor_review_config.py web/src/lib/api/schema.ts
 git commit -m "feat(tailor): add bullet floors and a two-page target to LengthBudget"
 ```
 
@@ -732,17 +732,17 @@ git commit -m "feat(tailor): add bullet floors and a two-page target to LengthBu
 ### Task 6: The depth plan block
 
 **Files:**
-- Modify: `src/resume_agent/tailor/length.py`
-- Create: `src/resume_agent/profile/depth.py` (the `evidence_owners` accessor only; the report lands in Task 8)
+- Modify: `src/resume_tailor_harness/tailor/length.py`
+- Create: `src/resume_tailor_harness/profile/depth.py` (the `evidence_owners` accessor only; the report lands in Task 8)
 - Test: `tests/test_tailor_length.py` (rewrite two tests, append the rest)
 
 **Interfaces:**
 - Consumes: `LengthBudget` (Task 5), `Project.highlights: list[Bullet]` (Task 2).
 - Produces:
-  - `resume_agent.profile.depth.OwnerRef` — frozen dataclass with `id: str`, `kind: Literal["experience", "project"]`, `label: str`, `bullets: list[Bullet]`
-  - `resume_agent.profile.depth.evidence_owners(facts: ProfileFacts) -> list[OwnerRef]`
-  - `resume_agent.tailor.length.format_depth_plan(facts: ProfileFacts, budget: LengthBudget) -> str`
-  - `resume_agent.tailor.length.clamped_floor(owner: OwnerRef, budget: LengthBudget) -> int`
+  - `resume_tailor_harness.profile.depth.OwnerRef` — frozen dataclass with `id: str`, `kind: Literal["experience", "project"]`, `label: str`, `bullets: list[Bullet]`
+  - `resume_tailor_harness.profile.depth.evidence_owners(facts: ProfileFacts) -> list[OwnerRef]`
+  - `resume_tailor_harness.tailor.length.format_depth_plan(facts: ProfileFacts, budget: LengthBudget) -> str`
+  - `resume_tailor_harness.tailor.length.clamped_floor(owner: OwnerRef, budget: LengthBudget) -> int`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -750,10 +750,10 @@ git commit -m "feat(tailor): add bullet floors and a two-page target to LengthBu
 # tests/test_tailor_length.py (append; also delete the obsolete
 # test_format_budget_mentions_one_page_and_numbers and replace it with the
 # first test below)
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.depth import evidence_owners
-from resume_agent.tailor.length import clamped_floor, format_budget, format_depth_plan
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.depth import evidence_owners
+from resume_tailor_harness.tailor.length import clamped_floor, format_budget, format_depth_plan
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def _facts() -> ProfileFacts:
@@ -833,7 +833,7 @@ Expected: FAIL with `ImportError: cannot import name 'format_depth_plan'`
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/profile/depth.py
+# src/resume_tailor_harness/profile/depth.py
 """Evidence owners and their bullet supply.
 
 Pure measurement over ProfileFacts. Imports nothing from `tailor` - the tailor
@@ -845,7 +845,7 @@ config in.
 from dataclasses import dataclass
 from typing import Literal
 
-from resume_agent.models.profile import Bullet, ProfileFacts
+from resume_tailor_harness.models.profile import Bullet, ProfileFacts
 
 
 @dataclass(frozen=True)
@@ -887,11 +887,11 @@ def evidence_owners(facts: ProfileFacts) -> list[OwnerRef]:
     return owners
 ```
 
-In `src/resume_agent/tailor/length.py`, rewrite `format_budget` and add the two new functions:
+In `src/resume_tailor_harness/tailor/length.py`, rewrite `format_budget` and add the two new functions:
 
 ```python
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.depth import OwnerRef, evidence_owners
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.profile.depth import OwnerRef, evidence_owners
 
 
 def format_budget(budget: LengthBudget) -> str:
@@ -993,7 +993,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/depth.py src/resume_agent/tailor/length.py tests/test_tailor_length.py
+git add src/resume_tailor_harness/profile/depth.py src/resume_tailor_harness/tailor/length.py tests/test_tailor_length.py
 git commit -m "feat(tailor): add supply-clamped per-owner bullet depth plan"
 ```
 
@@ -1002,8 +1002,8 @@ git commit -m "feat(tailor): add supply-clamped per-owner bullet depth plan"
 ### Task 7: Wire the depth plan into the prompts
 
 **Files:**
-- Modify: `src/resume_agent/tailor/tailoring.py:31-72` and `:86-96,143`
-- Modify: `src/resume_agent/tailor/panel.py:31-43,128-148`
+- Modify: `src/resume_tailor_harness/tailor/tailoring.py:31-72` and `:86-96,143`
+- Modify: `src/resume_tailor_harness/tailor/panel.py:31-43,128-148`
 - Test: `tests/test_tailor_agents.py` or `tests/test_tailor_panel.py` (append)
 
 **Interfaces:**
@@ -1014,10 +1014,10 @@ git commit -m "feat(tailor): add supply-clamped per-owner bullet depth plan"
 
 ```python
 # tests/test_tailor_panel.py (append)
-from resume_agent.models.job import JobCriteria
-from resume_agent.tailor.panel import compose_lean_review_input
-from resume_agent.tailor.review_config import LengthBudget, ReviewConfig
-from resume_agent.tailor.tailoring import compose_revise_input, compose_tailor_input
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.tailor.panel import compose_lean_review_input
+from resume_tailor_harness.tailor.review_config import LengthBudget, ReviewConfig
+from resume_tailor_harness.tailor.tailoring import compose_revise_input, compose_tailor_input
 
 
 def test_tailor_input_carries_the_depth_plan_unfenced():
@@ -1064,7 +1064,7 @@ Expected: FAIL — the block is absent; the lean-review test fails on an unexpec
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/tailor/tailoring.py`, import `format_depth_plan` and extend `budget_line` at **both** line 41 and line 143 (identical change in `compose_tailor_input` and `compose_revise_input`):
+In `src/resume_tailor_harness/tailor/tailoring.py`, import `format_depth_plan` and extend `budget_line` at **both** line 41 and line 143 (identical change in `compose_tailor_input` and `compose_revise_input`):
 
 ```python
     budget_line = (
@@ -1077,7 +1077,7 @@ In `src/resume_agent/tailor/tailoring.py`, import `format_depth_plan` and extend
 
 The depth plan rides inside `budget_line`, which already sits after the fenced JD — stable context, unfenced, and no new parameter.
 
-In `src/resume_agent/tailor/panel.py`, give `compose_lean_review_input` the block and compose it in `_panel_inputs` from data already in hand:
+In `src/resume_tailor_harness/tailor/panel.py`, give `compose_lean_review_input` the block and compose it in `_panel_inputs` from data already in hand:
 
 ```python
 def compose_lean_review_input(
@@ -1134,7 +1134,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/tailoring.py src/resume_agent/tailor/panel.py src/resume_agent/tailor/prompt_blocks.py tests/test_tailor_panel.py
+git add src/resume_tailor_harness/tailor/tailoring.py src/resume_tailor_harness/tailor/panel.py src/resume_tailor_harness/tailor/prompt_blocks.py tests/test_tailor_panel.py
 git commit -m "feat(tailor): hand the depth plan to writer, reviser, and panel"
 ```
 
@@ -1143,8 +1143,8 @@ git commit -m "feat(tailor): hand the depth plan to writer, reviser, and panel"
 ### Task 8: Supply-side depth report and the `profile depth` CLI
 
 **Files:**
-- Modify: `src/resume_agent/profile/depth.py`
-- Modify: `src/resume_agent/cli.py` (new `@profile_app.command("depth")`)
+- Modify: `src/resume_tailor_harness/profile/depth.py`
+- Modify: `src/resume_tailor_harness/cli.py` (new `@profile_app.command("depth")`)
 - Test: `tests/test_profile_depth.py`
 
 **Interfaces:**
@@ -1158,8 +1158,8 @@ git commit -m "feat(tailor): hand the depth plan to writer, reviser, and panel"
 
 ```python
 # tests/test_profile_depth.py
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.depth import SUPPLY_TARGET, owner_depth
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.depth import SUPPLY_TARGET, owner_depth
 
 
 def test_supply_target_is_ten_source_bullets():
@@ -1245,11 +1245,11 @@ Expected: FAIL with `ImportError: cannot import name 'owner_depth'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/profile/depth.py`:
+Append to `src/resume_tailor_harness/profile/depth.py`:
 
 ```python
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.profile.aspects import ASPECTS
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.profile.aspects import ASPECTS
 
 # Source bullets an owner needs so the writer has a real menu to choose five
 # from. Deliberately NOT the render floor (LengthBudget.min_bullets_per_role):
@@ -1296,7 +1296,7 @@ def owner_depth(facts: ProfileFacts, target: int = SUPPLY_TARGET) -> list[OwnerS
     return rows
 ```
 
-In `src/resume_agent/cli.py`, add alongside the other `@profile_app.command(...)` handlers. `load_facts` is already imported at `cli.py:15` and `_tenant_cli_path` / `DEFAULT_FACTS` are already in scope. `SUPPLY_TARGET` is used as a default argument value, so it must be a **module-level** import — add `from resume_agent.profile.depth import SUPPLY_TARGET` to the top of `cli.py`, not inside the function body:
+In `src/resume_tailor_harness/cli.py`, add alongside the other `@profile_app.command(...)` handlers. `load_facts` is already imported at `cli.py:15` and `_tenant_cli_path` / `DEFAULT_FACTS` are already in scope. `SUPPLY_TARGET` is used as a default argument value, so it must be a **module-level** import — add `from resume_tailor_harness.profile.depth import SUPPLY_TARGET` to the top of `cli.py`, not inside the function body:
 
 ```python
 @profile_app.command("depth")
@@ -1307,8 +1307,8 @@ def profile_depth_cmd(
     ),
 ) -> None:
     """Show bullet supply and aspect coverage per experience and project."""
-    from resume_agent.profile.aspects import ASPECTS
-    from resume_agent.profile.depth import owner_depth
+    from resume_tailor_harness.profile.aspects import ASPECTS
+    from resume_tailor_harness.profile.depth import owner_depth
 
     profile_facts = load_facts(_tenant_cli_path(facts))
     rows = owner_depth(profile_facts, target=target)
@@ -1336,13 +1336,13 @@ Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_depth.py -v && ruff 
 Expected: PASS.
 
 Then confirm the CLI runs against the real workspace:
-Run: `.venv/Scripts/python.exe -m resume_agent.cli profile depth`
+Run: `.venv/Scripts/python.exe -m resume_tailor_harness.cli profile depth`
 Expected: `GAP` rows for the roles with 3-5 source bullets, `OK` for the projects with 8+.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/depth.py src/resume_agent/cli.py tests/test_profile_depth.py
+git add src/resume_tailor_harness/profile/depth.py src/resume_tailor_harness/cli.py tests/test_profile_depth.py
 git commit -m "feat(profile): report bullet supply and aspect gaps per owner"
 ```
 
@@ -1351,8 +1351,8 @@ git commit -m "feat(profile): report bullet supply and aspect gaps per owner"
 ### Task 9: Render-side depth critique
 
 **Files:**
-- Create: `src/resume_agent/tailor/depth.py`
-- Modify: `src/resume_agent/tailor/workflow.py:118-150`
+- Create: `src/resume_tailor_harness/tailor/depth.py`
+- Modify: `src/resume_tailor_harness/tailor/workflow.py:118-150`
 - Test: `tests/test_tailor_depth.py`
 
 **Interfaces:**
@@ -1367,11 +1367,11 @@ git commit -m "feat(profile): report bullet supply and aspect gaps per owner"
 
 ```python
 # tests/test_tailor_depth.py
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import Severity
-from resume_agent.tailor.depth import DEPTH_REVIEWER, depth_critique
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.tailor.depth import DEPTH_REVIEWER, depth_critique
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def _facts(rich_aspects: bool = True) -> ProfileFacts:
@@ -1485,12 +1485,12 @@ def test_depth_critique_is_advisory_and_never_a_gate():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_depth.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.tailor.depth'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.depth'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/tailor/depth.py
+# src/resume_tailor_harness/tailor/depth.py
 """Did the resume render the depth its evidence supports?
 
 Mirrors `tailor/coverage.py` deliberately - same advisory-not-a-gate posture,
@@ -1505,13 +1505,13 @@ round". Supply lives in `profile/depth.py` and reaches the profile owner.
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.profile.depth import OwnerRef, evidence_owners
-from resume_agent.tailor.length import clamped_floor
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.profile.depth import OwnerRef, evidence_owners
+from resume_tailor_harness.tailor.length import clamped_floor
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 DEPTH_REVIEWER: str = "bullet-depth"
 
@@ -1669,7 +1669,7 @@ def depth_critique(
     )
 ```
 
-Wire it into `_deterministic_critiques` in `src/resume_agent/tailor/workflow.py`. The function needs the budget, which it can read from the config — add a `config: ReviewConfig` parameter and pass `self.request.config` from `_WorkflowState.record`:
+Wire it into `_deterministic_critiques` in `src/resume_tailor_harness/tailor/workflow.py`. The function needs the budget, which it can read from the config — add a `config: ReviewConfig` parameter and pass `self.request.config` from `_WorkflowState.record`:
 
 ```python
     if (coverage := coverage_critique(content, skill_context)) is not None:
@@ -1690,7 +1690,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/depth.py src/resume_agent/tailor/workflow.py tests/test_tailor_depth.py
+git add src/resume_tailor_harness/tailor/depth.py src/resume_tailor_harness/tailor/workflow.py tests/test_tailor_depth.py
 git commit -m "feat(tailor): measure rendered bullet depth as an advisory critique"
 ```
 
@@ -1699,8 +1699,8 @@ git commit -m "feat(tailor): measure rendered bullet depth as an advisory critiq
 ### Task 10: Aspect classification
 
 **Files:**
-- Create: `src/resume_agent/profile/aspect_classifier.py`
-- Modify: `src/resume_agent/services/profile_build.py` (call the backfill inside `run_corpus_build`)
+- Create: `src/resume_tailor_harness/profile/aspect_classifier.py`
+- Modify: `src/resume_tailor_harness/services/profile_build.py` (call the backfill inside `run_corpus_build`)
 - Test: `tests/test_profile_aspect_classifier.py`
 
 **Interfaces:**
@@ -1714,8 +1714,8 @@ git commit -m "feat(tailor): measure rendered bullet depth as an advisory critiq
 
 ```python
 # tests/test_profile_aspect_classifier.py
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.aspect_classifier import (
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.aspect_classifier import (
     AspectAssignment,
     AspectBatch,
     classify_aspects,
@@ -1836,12 +1836,12 @@ async def test_a_fully_classified_profile_makes_no_model_call():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_aspect_classifier.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.profile.aspect_classifier'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.aspect_classifier'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/profile/aspect_classifier.py
+# src/resume_tailor_harness/profile/aspect_classifier.py
 """Assign an aspect to each unclassified bullet.
 
 Idempotent by construction: only bullets with `aspect is None` are sent, so a
@@ -1855,11 +1855,11 @@ so it cannot touch fact-lock.
 
 from pydantic import Field
 
-from resume_agent.llm_runner import Runner, expect_schema
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.aspects import ASPECT_DESCRIPTIONS, ASPECTS, Aspect
-from resume_agent.profile.depth import evidence_owners
+from resume_tailor_harness.llm_runner import Runner, expect_schema
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.profile.aspects import ASPECT_DESCRIPTIONS, ASPECTS, Aspect
+from resume_tailor_harness.profile.depth import evidence_owners
 
 
 class AspectAssignment(ExtensibleModel):
@@ -1907,7 +1907,7 @@ async def classify_aspects(facts: ProfileFacts, agent: Runner) -> ProfileFacts:
 
 > `evidence_owners` returns `OwnerRef`s holding `list(...)` **copies** of the bullet lists. Mutating a bullet through that copy still mutates the same `Bullet` objects (the list is copied, the elements are not), so assignment propagates into `output`. Confirm this with `test_assignments_land_on_experience_and_project_bullets_alike` — if it fails, iterate `output.experience` and `output.projects` directly instead.
 
-In `src/resume_agent/services/profile_build.py`, call `classify_aspects` inside `run_corpus_build` after facts are merged and ids assigned, and before the facts+matrix pair is written. Build the agent at the `cheap` tier through the existing `build_model` / `model_for_tier` seam, matching how the neighbouring profile agents are constructed in that module. A classification failure must be a **build warning**, not a build failure — an unclassified bullet is valid.
+In `src/resume_tailor_harness/services/profile_build.py`, call `classify_aspects` inside `run_corpus_build` after facts are merged and ids assigned, and before the facts+matrix pair is written. Build the agent at the `cheap` tier through the existing `build_model` / `model_for_tier` seam, matching how the neighbouring profile agents are constructed in that module. A classification failure must be a **build warning**, not a build failure — an unclassified bullet is valid.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1917,7 +1917,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/aspect_classifier.py src/resume_agent/services/profile_build.py tests/test_profile_aspect_classifier.py
+git add src/resume_tailor_harness/profile/aspect_classifier.py src/resume_tailor_harness/services/profile_build.py tests/test_profile_aspect_classifier.py
 git commit -m "feat(profile): classify bullet aspects during corpus build"
 ```
 
@@ -1977,8 +1977,8 @@ git commit -m "feat(web): expose bullet floors and page target in review setting
 ### Task 12: Documentation and end-to-end verification
 
 **Files:**
-- Modify: `src/resume_agent/tailor/CLAUDE.md`
-- Modify: `src/resume_agent/profile/CLAUDE.md`
+- Modify: `src/resume_tailor_harness/tailor/CLAUDE.md`
+- Modify: `src/resume_tailor_harness/profile/CLAUDE.md`
 - Modify: `CLAUDE.md` (hot-paths table)
 
 **Interfaces:**
@@ -1998,7 +1998,7 @@ Expected: all green. Record the actual test counts — do not claim a number you
 - [ ] **Step 2: Verify against real data**
 
 ```bash
-.venv/Scripts/python.exe -m resume_agent.cli profile depth
+.venv/Scripts/python.exe -m resume_tailor_harness.cli profile depth
 ```
 
 Expected, from the measured corpus: `GAP` for UMich (4), Varian (5), CIM (3), MAXIEYE (3); `OK` for Aptiv only among experiences once its 9 are counted against a target of 10 — Aptiv should read `GAP` at 9/10. Projects `Automated_Signal_Plot` (50), `Field-Trip` (13), `Deep Agent` (10) read `OK`.
@@ -2008,7 +2008,7 @@ Then run one real tailor against a stored job and confirm the rendered shape mov
 ```bash
 .venv/Scripts/python.exe -c "
 import sqlite3, json
-con = sqlite3.connect('data/users/9127fd59b364/resume_agent.db')
+con = sqlite3.connect('data/users/9127fd59b364/resume_tailor_harness.db')
 for rid, cj in con.execute('select id, content_json from resume_versions order by created_at desc limit 3'):
     c = json.loads(cj)
     print(rid, [len(e['bullets']) for e in c['experience']], [len(p['bullets']) for p in c['projects']])
@@ -2019,7 +2019,7 @@ Expected: every experience with supply at or above its clamped floor. Aptiv 5-7,
 
 - [ ] **Step 3: Update the module references**
 
-In `src/resume_agent/tailor/CLAUDE.md`, add to the review/scoring notes:
+In `src/resume_tailor_harness/tailor/CLAUDE.md`, add to the review/scoring notes:
 
 ```markdown
 - **A cap without a floor reads as zero.** `format_budget` used to state
@@ -2045,7 +2045,7 @@ In `src/resume_agent/tailor/CLAUDE.md`, add to the review/scoring notes:
   roles score 100% — an observed regression (`exp_bullets=[5]`).
 ```
 
-In `src/resume_agent/profile/CLAUDE.md`, add:
+In `src/resume_tailor_harness/profile/CLAUDE.md`, add:
 
 ```markdown
 - **Project highlights are addressable facts.** `Project.highlights` holds
@@ -2064,7 +2064,7 @@ In the root `CLAUDE.md` hot-paths table, add rows for `profile/depth.py`, `tailo
 - [ ] **Step 4: Commit**
 
 ```bash
-git add CLAUDE.md src/resume_agent/tailor/CLAUDE.md src/resume_agent/profile/CLAUDE.md
+git add CLAUDE.md src/resume_tailor_harness/tailor/CLAUDE.md src/resume_tailor_harness/profile/CLAUDE.md
 git commit -m "docs: record the bullet-depth invariants"
 ```
 

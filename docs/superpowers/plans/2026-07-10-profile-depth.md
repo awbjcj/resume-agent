@@ -94,7 +94,7 @@ These amendments override any conflicting illustrative snippet below.
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/corpus.py`
+- Modify: `src/resume_tailor_harness/profile/corpus.py`
 - Test: `tests/test_profile_corpus.py`
 
 **Interfaces:**
@@ -116,7 +116,7 @@ repo_name: myrepo
 
 
 def test_frontmatter_repo_url_parses_and_rejects():
-    from resume_agent.profile.corpus import frontmatter_repo_url
+    from resume_tailor_harness.profile.corpus import frontmatter_repo_url
 
     assert frontmatter_repo_url(DOSSIER) == "https://github.com/me/myrepo"
     assert frontmatter_repo_url(b"# no frontmatter") is None
@@ -267,7 +267,7 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/corpus.py tests/test_profile_corpus.py
+git add src/resume_tailor_harness/profile/corpus.py tests/test_profile_corpus.py
 git commit -m "feat(profile): add source origin field, project mode, dossier frontmatter sniff"
 ```
 
@@ -277,12 +277,12 @@ git commit -m "feat(profile): add source origin field, project mode, dossier fro
 
 **Files:**
 
-- Create: `src/resume_agent/profile/project_extractor.py`
+- Create: `src/resume_tailor_harness/profile/project_extractor.py`
 - Test: `tests/test_profile_project_extractor.py`
 
 **Interfaces:**
 
-- Consumes: `AgentRunner`/`Runner`/`acall`/`build_model`/`use_json_mode_for` from `resume_agent.llm_runner`; `Project`, `Skill`, `Contact`, `ProfileFacts` from `resume_agent.models.profile`.
+- Consumes: `AgentRunner`/`Runner`/`acall`/`build_model`/`use_json_mode_for` from `resume_tailor_harness.llm_runner`; `Project`, `Skill`, `Contact`, `ProfileFacts` from `resume_tailor_harness.models.profile`.
 - Produces: `PROJECT_PROMPT_VERSION: int`; `class ProjectDocFacts(ExtensibleModel)` with `project: Project` and `skills: dict[str, list[Skill]]`; `build_project_extractor_agent(model_id: str | None = None) -> Runner`; `project_facts_to_profile(doc_facts: ProjectDocFacts) -> ProfileFacts`; `async aextract_project_facts(text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ProfileFacts`.
 
 - [ ] **Step 1: Write the failing test**
@@ -296,8 +296,8 @@ import asyncio
 
 import pytest
 
-from resume_agent.models.profile import Project, ProfileFacts, Skill
-from resume_agent.profile.project_extractor import (
+from resume_tailor_harness.models.profile import Project, ProfileFacts, Skill
+from resume_tailor_harness.profile.project_extractor import (
     ProjectDocFacts,
     aextract_project_facts,
     project_facts_to_profile,
@@ -322,9 +322,9 @@ class FakeAgent:
 def _doc_facts() -> ProjectDocFacts:
     return ProjectDocFacts(
         project=Project(
-            name="resume-agent",
+            name="resume-tailor-harness",
             description="Job-hunt automation pipeline",
-            repo_url="https://github.com/me/resume-agent",
+            repo_url="https://github.com/me/resume-tailor-harness",
             tech=["Python", "FastAPI"],
             highlights=["Cut tailoring time 80%"],
         ),
@@ -341,7 +341,7 @@ def test_schema_has_no_employment_sections():
 def test_project_facts_to_profile_wraps_fragment():
     facts = project_facts_to_profile(_doc_facts())
     assert isinstance(facts, ProfileFacts)
-    assert [p.name for p in facts.projects] == ["resume-agent"]
+    assert [p.name for p in facts.projects] == ["resume-tailor-harness"]
     assert facts.skills["backend"][0].name == "FastAPI"
     assert facts.experience == [] and facts.education == []
     assert facts.contact.name == ""
@@ -350,7 +350,7 @@ def test_project_facts_to_profile_wraps_fragment():
 def test_aextract_project_facts_validates_type():
     sem = asyncio.Semaphore(1)
     facts = asyncio.run(aextract_project_facts("doc text", FakeAgent(_doc_facts()), sem=sem))
-    assert facts.projects[0].repo_url == "https://github.com/me/resume-agent"
+    assert facts.projects[0].repo_url == "https://github.com/me/resume-tailor-harness"
 
     with pytest.raises(TypeError, match="ProjectDocFacts"):
         asyncio.run(aextract_project_facts("doc text", FakeAgent("not facts"), sem=sem))
@@ -361,9 +361,9 @@ Check how existing fakes call the runner: `tests/test_profile_fragments.py` has 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_project_extractor.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.project_extractor'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.project_extractor'`.
 
-- [ ] **Step 3: Create `src/resume_agent/profile/project_extractor.py`**
+- [ ] **Step 3: Create `src/resume_tailor_harness/profile/project_extractor.py`**
 
 ```python
 """Project-scoped extraction for repo-derived source documents (mode="project")."""
@@ -373,16 +373,16 @@ import asyncio
 from agno.agent import Agent
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     acall,
     build_model,
     use_json_mode_for,
 )
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import Contact, ProfileFacts, Project, Skill
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Project, Skill
 
 # Bump whenever _INSTRUCTIONS change so cached project fragments re-extract.
 PROJECT_PROMPT_VERSION = 1
@@ -462,7 +462,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/project_extractor.py tests/test_profile_project_extractor.py
+git add src/resume_tailor_harness/profile/project_extractor.py tests/test_profile_project_extractor.py
 git commit -m "feat(profile): project-scoped extractor emits one Project + skills only"
 ```
 
@@ -472,7 +472,7 @@ git commit -m "feat(profile): project-scoped extractor emits one Project + skill
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/fragments.py`
+- Modify: `src/resume_tailor_harness/profile/fragments.py`
 - Test: `tests/test_profile_fragments.py`
 
 **Interfaces:**
@@ -486,10 +486,10 @@ Append to `tests/test_profile_fragments.py` (reuse that file's existing fake-age
 
 ```python
 def test_project_walk_extracts_and_caches(tmp_path):
-    from resume_agent.models.profile import Project, Skill
-    from resume_agent.profile.corpus import add_source, load_manifest
-    from resume_agent.profile.fragments import extract_project_fragments
-    from resume_agent.profile.project_extractor import ProjectDocFacts
+    from resume_tailor_harness.models.profile import Project, Skill
+    from resume_tailor_harness.profile.corpus import add_source, load_manifest
+    from resume_tailor_harness.profile.fragments import extract_project_fragments
+    from resume_tailor_harness.profile.project_extractor import ProjectDocFacts
 
     resume = tmp_path / "resume.txt"
     resume.write_text("resume", encoding="utf-8")
@@ -516,8 +516,8 @@ def test_project_walk_extracts_and_caches(tmp_path):
 
 
 def test_literal_walk_skips_project_docs(tmp_path):
-    from resume_agent.profile.corpus import add_source, load_manifest
-    from resume_agent.profile.fragments import extract_fragments
+    from resume_tailor_harness.profile.corpus import add_source, load_manifest
+    from resume_tailor_harness.profile.fragments import extract_fragments
 
     resume = tmp_path / "resume.txt"
     resume.write_text("resume", encoding="utf-8")
@@ -542,7 +542,7 @@ Expected: FAIL — `ImportError: cannot import name 'extract_project_fragments'`
 Add to the imports:
 
 ```python
-from resume_agent.profile.project_extractor import (
+from resume_tailor_harness.profile.project_extractor import (
     PROJECT_PROMPT_VERSION,
     aextract_project_facts,
 )
@@ -608,7 +608,7 @@ Expected: PASS (all, including pre-existing — literal docs were the only non-s
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/fragments.py tests/test_profile_fragments.py
+git add src/resume_tailor_harness/profile/fragments.py tests/test_profile_fragments.py
 git commit -m "feat(profile): project-mode fragment walk with own prompt-version cache key"
 ```
 
@@ -618,8 +618,8 @@ git commit -m "feat(profile): project-mode fragment walk with own prompt-version
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/github.py`
-- Modify: `src/resume_agent/profile/github_ingest.py`
+- Modify: `src/resume_tailor_harness/profile/github.py`
+- Modify: `src/resume_tailor_harness/profile/github_ingest.py`
 - Test: `tests/test_profile_github.py`, `tests/test_profile_github_ingest.py`
 
 **Interfaces:**
@@ -668,7 +668,7 @@ def test_repo_to_project_byte_weighted_languages():
 
 
 def test_normalize_repo_url():
-    from resume_agent.profile.github_ingest import normalize_repo_url
+    from resume_tailor_harness.profile.github_ingest import normalize_repo_url
 
     assert (
         normalize_repo_url("HTTPS://GitHub.com/Me/Repo.git/")
@@ -758,7 +758,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/github.py src/resume_agent/profile/github_ingest.py tests/test_profile_github.py tests/test_profile_github_ingest.py
+git add src/resume_tailor_harness/profile/github.py src/resume_tailor_harness/profile/github_ingest.py tests/test_profile_github.py tests/test_profile_github_ingest.py
 git commit -m "feat(profile): GitHub contents/languages fetchers + byte-weighted project languages"
 ```
 
@@ -768,7 +768,7 @@ git commit -m "feat(profile): GitHub contents/languages fetchers + byte-weighted
 
 **Files:**
 
-- Create: `src/resume_agent/profile/github_harvest.py`
+- Create: `src/resume_tailor_harness/profile/github_harvest.py`
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
@@ -792,9 +792,9 @@ Create `tests/test_profile_github_harvest.py`:
 import httpx
 import pytest
 
-from resume_agent.profile.corpus import add_source, load_manifest
-from resume_agent.profile.github import GitHubClient
-from resume_agent.profile.github_harvest import (
+from resume_tailor_harness.profile.corpus import add_source, load_manifest
+from resume_tailor_harness.profile.github import GitHubClient
+from resume_tailor_harness.profile.github_harvest import (
     GITHUB_DOC_PREFIX,
     render_virtual_doc,
     select_repos,
@@ -972,9 +972,9 @@ def test_rate_limit_stops_early_without_removals(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_github_harvest.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.github_harvest'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.github_harvest'`.
 
-- [ ] **Step 3: Create `src/resume_agent/profile/github_harvest.py`**
+- [ ] **Step 3: Create `src/resume_tailor_harness/profile/github_harvest.py`**
 
 ```python
 """GitHub auto-harvest: qualifying repos become project-mode virtual source docs.
@@ -991,7 +991,7 @@ from pathlib import Path
 
 import httpx
 
-from resume_agent.profile.corpus import (
+from resume_tailor_harness.profile.corpus import (
     add_source,
     doc_path,
     frontmatter_repo_url,
@@ -999,8 +999,8 @@ from resume_agent.profile.corpus import (
     remove_source,
     sources_dir,
 )
-from resume_agent.profile.github import GitHubClient
-from resume_agent.profile.github_ingest import normalize_repo_url
+from resume_tailor_harness.profile.github import GitHubClient
+from resume_tailor_harness.profile.github_ingest import normalize_repo_url
 
 GITHUB_DOC_PREFIX = "github--"
 _MAX_DOC_CHARS = 30_000
@@ -1180,7 +1180,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/github_harvest.py tests/test_profile_github_harvest.py
+git add src/resume_tailor_harness/profile/github_harvest.py tests/test_profile_github_harvest.py
 git commit -m "feat(profile): GitHub auto-harvest writes project-mode virtual source docs"
 ```
 
@@ -1190,8 +1190,8 @@ git commit -m "feat(profile): GitHub auto-harvest writes project-mode virtual so
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/build.py`
-- Modify: `src/resume_agent/profile/merge.py` (repo_url merge identity)
+- Modify: `src/resume_tailor_harness/profile/build.py`
+- Modify: `src/resume_tailor_harness/profile/merge.py` (repo_url merge identity)
 - Test: `tests/test_profile_build.py`, `tests/test_profile_merge.py`
 
 **Interfaces:**
@@ -1205,24 +1205,24 @@ Append to `tests/test_profile_merge.py`:
 
 ```python
 def test_merge_facts_matches_by_repo_url_first():
-    from resume_agent.models.base import Source
-    from resume_agent.models.profile import Contact, ProfileFacts, Project
-    from resume_agent.profile.merge import merge_facts
+    from resume_tailor_harness.models.base import Source
+    from resume_tailor_harness.models.profile import Contact, ProfileFacts, Project
+    from resume_tailor_harness.profile.merge import merge_facts
 
     resume_facts = ProfileFacts(
         contact=Contact(name="A"),
         projects=[
             Project(
-                name="Resume Agent (CLI)",  # name differs from the repo's
-                repo_url="https://github.com/me/resume-agent",
+                name="Résumé Tailor Harness (CLI)",  # name differs from the repo's
+                repo_url="https://github.com/me/resume-tailor-harness",
                 description="from fragment",
             )
         ],
     )
     gh = Project(
         source=Source.github,
-        name="resume-agent",
-        repo_url="https://github.com/Me/resume-agent.git",
+        name="resume-tailor-harness",
+        repo_url="https://github.com/Me/resume-tailor-harness.git",
         stars=42,
         languages=["Python", "TypeScript"],
     )
@@ -1238,11 +1238,11 @@ Append to `tests/test_profile_build.py` (reuse its existing corpus fixtures/fake
 ```python
 def test_build_includes_project_fragments_and_degrades_github(tmp_path, monkeypatch):
     """A project-mode doc contributes its Project; a dead GitHub is a warning, not a crash."""
-    from resume_agent.models.profile import Project, Skill
-    from resume_agent.profile import build as build_mod
-    from resume_agent.profile.build import build_corpus_profile
-    from resume_agent.profile.corpus import add_source
-    from resume_agent.profile.project_extractor import ProjectDocFacts
+    from resume_tailor_harness.models.profile import Project, Skill
+    from resume_tailor_harness.profile import build as build_mod
+    from resume_tailor_harness.profile.build import build_corpus_profile
+    from resume_tailor_harness.profile.corpus import add_source
+    from resume_tailor_harness.profile.project_extractor import ProjectDocFacts
 
     profile_dir = tmp_path / "p"
     resume = tmp_path / "resume.txt"
@@ -1275,8 +1275,8 @@ def test_build_includes_project_fragments_and_degrades_github(tmp_path, monkeypa
 
 
 def test_build_warns_when_project_agent_missing(tmp_path):
-    from resume_agent.profile.build import build_corpus_profile
-    from resume_agent.profile.corpus import add_source
+    from resume_tailor_harness.profile.build import build_corpus_profile
+    from resume_tailor_harness.profile.corpus import add_source
 
     profile_dir = tmp_path / "p"
     resume = tmp_path / "resume.txt"
@@ -1312,7 +1312,7 @@ Expected: FAIL — `TypeError: build_corpus_profile() got an unexpected keyword 
 
 - [ ] **Step 3: Implement `merge_facts` repo_url identity in `merge.py`**
 
-Add import: `from resume_agent.profile.github_ingest import normalize_repo_url` and extend `_ENRICH_FIELDS`:
+Add import: `from resume_tailor_harness.profile.github_ingest import normalize_repo_url` and extend `_ENRICH_FIELDS`:
 
 ```python
 _ENRICH_FIELDS = (
@@ -1355,12 +1355,12 @@ Replace the matching loop in `merge_facts`:
 New imports:
 
 ```python
-from resume_agent.profile.fragments import (
+from resume_tailor_harness.profile.fragments import (
     extract_fragments,
     extract_project_fragments,
     extract_synthesis_fragments,
 )
-from resume_agent.profile.github_harvest import HarvestReport, sync_github_sources
+from resume_tailor_harness.profile.github_harvest import HarvestReport, sync_github_sources
 ```
 
 New signature + phase 0 (replace the current head of `build_corpus_profile`):
@@ -1400,7 +1400,7 @@ def build_corpus_profile(
     manifest = load_manifest(profile_dir)
     if not manifest.docs:
         raise ValueError(
-            "no sources registered — run 'resume-agent profile add <file>' first"
+            "no sources registered — run 'resume-tailor-harness profile add <file>' first"
         )
     agent = extractor_agent if extractor_agent is not None else build_extractor_agent()
     extraction = extract_fragments(profile_dir, manifest, agent)
@@ -1461,7 +1461,7 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/build.py src/resume_agent/profile/merge.py tests/test_profile_build.py tests/test_profile_merge.py
+git add src/resume_tailor_harness/profile/build.py src/resume_tailor_harness/profile/merge.py tests/test_profile_build.py tests/test_profile_merge.py
 git commit -m "feat(profile): build phase-0 GitHub sync, project fragments in merge, resilient metadata merge"
 ```
 
@@ -1471,10 +1471,10 @@ git commit -m "feat(profile): build phase-0 GitHub sync, project fragments in me
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/config.py` (ProfileConfigDoc)
-- Modify: `src/resume_agent/services/profile_build.py`
-- Modify: `src/resume_agent/api/routers/profile.py` (`launch_profile_build` passes config)
-- Modify: `src/resume_agent/cli.py` (`profile build` reads new yaml keys)
+- Modify: `src/resume_tailor_harness/api/schemas/config.py` (ProfileConfigDoc)
+- Modify: `src/resume_tailor_harness/services/profile_build.py`
+- Modify: `src/resume_tailor_harness/api/routers/profile.py` (`launch_profile_build` passes config)
+- Modify: `src/resume_tailor_harness/cli.py` (`profile build` reads new yaml keys)
 - Test: `tests/test_services_sources.py`-style — use `tests/api/test_profile_build_run.py` and `tests/test_cli_profile.py`
 
 **Interfaces:**
@@ -1541,7 +1541,7 @@ def run_corpus_build(
 and inside, import + construct the project agent and pass everything:
 
 ```python
-    from resume_agent.profile.project_extractor import build_project_extractor_agent
+    from resume_tailor_harness.profile.project_extractor import build_project_extractor_agent
 
     facts, report = build_corpus_profile(
         profile_dir,
@@ -1599,7 +1599,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/config.py src/resume_agent/services/profile_build.py src/resume_agent/api/routers/profile.py src/resume_agent/cli.py contracts/ tests/api/test_profile_build_run.py
+git add src/resume_tailor_harness/api/schemas/config.py src/resume_tailor_harness/services/profile_build.py src/resume_tailor_harness/api/routers/profile.py src/resume_tailor_harness/cli.py contracts/ tests/api/test_profile_build_run.py
 git commit -m "feat(profile): repo allow/deny/limit config threaded from UI+CLI into the harvest"
 ```
 
@@ -1609,12 +1609,12 @@ git commit -m "feat(profile): repo allow/deny/limit config threaded from UI+CLI 
 
 **Files:**
 
-- Create: `src/resume_agent/profile/intake.py`
+- Create: `src/resume_tailor_harness/profile/intake.py`
 - Test: `tests/test_profile_intake.py`
 
 **Interfaces:**
 
-- Consumes: `add_source` (Task 1), `html_to_text` from `resume_agent.discovery.connectors.text`.
+- Consumes: `add_source` (Task 1), `html_to_text` from `resume_tailor_harness.discovery.connectors.text`.
 - Produces: `add_note_source(profile_dir, title: str, text: str) -> SourceDoc`; `add_url_source(profile_dir, url: str, client: httpx.Client | None = None) -> SourceDoc`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1627,8 +1627,8 @@ Create `tests/test_profile_intake.py`:
 import httpx
 import pytest
 
-from resume_agent.profile.corpus import add_source, doc_path, load_manifest
-from resume_agent.profile.intake import add_note_source, add_url_source
+from resume_tailor_harness.profile.corpus import add_source, doc_path, load_manifest
+from resume_tailor_harness.profile.intake import add_note_source, add_url_source
 
 
 def _profile(tmp_path):
@@ -1682,9 +1682,9 @@ def test_add_url_source_rejects_empty_page(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_intake.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.intake'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.intake'`.
 
-- [ ] **Step 3: Create `src/resume_agent/profile/intake.py`**
+- [ ] **Step 3: Create `src/resume_tailor_harness/profile/intake.py`**
 
 ```python
 """Quick-add intake: notes and URLs become small literal markdown sources."""
@@ -1695,8 +1695,8 @@ from pathlib import Path
 
 import httpx
 
-from resume_agent.discovery.connectors.text import html_to_text
-from resume_agent.profile.corpus import SourceDoc, add_source
+from resume_tailor_harness.discovery.connectors.text import html_to_text
+from resume_tailor_harness.profile.corpus import SourceDoc, add_source
 
 _SLUG = re.compile(r"[^a-z0-9]+")
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
@@ -1753,7 +1753,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/intake.py tests/test_profile_intake.py
+git add src/resume_tailor_harness/profile/intake.py tests/test_profile_intake.py
 git commit -m "feat(profile): quick-add note and URL intake as literal sources"
 ```
 
@@ -1763,13 +1763,13 @@ git commit -m "feat(profile): quick-add note and URL intake as literal sources"
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_profile.py`
 
 **Interfaces:**
 
 - Consumes: `sync_github_sources` (Task 5), `add_note_source`/`add_url_source` (Task 8).
-- Produces: `resume-agent profile sync-github [--username U] [--dir D]`, `profile add-note TITLE TEXT [--dir D]`, `profile add-url URL [--dir D]`.
+- Produces: `resume-tailor-harness profile sync-github [--username U] [--dir D]`, `profile add-note TITLE TEXT [--dir D]`, `profile add-url URL [--dir D]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1790,10 +1790,10 @@ def test_profile_add_note_and_url(tmp_path, monkeypatch):
     assert "note--on-call.md" in result.output
 
     def fake_add_url_source(dir_, url, client=None):
-        from resume_agent.profile.intake import add_note_source
+        from resume_tailor_harness.profile.intake import add_note_source
         return add_note_source(dir_, "fetched", f"content of {url}")
 
-    monkeypatch.setattr("resume_agent.profile.intake.add_url_source", fake_add_url_source)
+    monkeypatch.setattr("resume_tailor_harness.profile.intake.add_url_source", fake_add_url_source)
     result = runner.invoke(
         app, ["profile", "add-url", "https://example.com/x", "--dir", str(profile_dir)]
     )
@@ -1806,7 +1806,7 @@ def test_profile_sync_github_requires_username(tmp_path):
     assert "username" in result.output.lower()
 ```
 
-(Note the monkeypatch target: the CLI must import `add_url_source` lazily inside the command from `resume_agent.profile.intake`, so patching the module attribute works.)
+(Note the monkeypatch target: the CLI must import `add_url_source` lazily inside the command from `resume_tailor_harness.profile.intake`, so patching the module attribute works.)
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -1823,7 +1823,7 @@ def profile_add_note(
     dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir"),
 ) -> None:
     """Save a free-text note as a literal profile source."""
-    from resume_agent.profile.intake import add_note_source
+    from resume_tailor_harness.profile.intake import add_note_source
 
     doc = add_note_source(dir, title, text)
     typer.echo(f"Registered {doc.filename} as {doc.id} mode:{doc.mode}")
@@ -1835,7 +1835,7 @@ def profile_add_url(
     dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir"),
 ) -> None:
     """Fetch a URL and save its readable text as a literal profile source."""
-    import resume_agent.profile.intake as intake
+    import resume_tailor_harness.profile.intake as intake
 
     doc = intake.add_url_source(dir, url)
     typer.echo(f"Registered {doc.filename} as {doc.id} mode:{doc.mode}")
@@ -1848,7 +1848,7 @@ def profile_sync_github(
     dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir"),
 ) -> None:
     """Refresh GitHub-derived virtual source docs without a full profile build."""
-    from resume_agent.profile.github_harvest import sync_github_sources
+    from resume_tailor_harness.profile.github_harvest import sync_github_sources
 
     cfg = load_yaml(sources) if Path(sources).exists() else {}
     user = username or cast(str | None, cfg.get("github_username"))
@@ -1882,7 +1882,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_profile.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_profile.py
 git commit -m "feat(cli): profile sync-github / add-note / add-url commands"
 ```
 
@@ -1892,8 +1892,8 @@ git commit -m "feat(cli): profile sync-github / add-note / add-url commands"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/profile.py`
-- Modify: `src/resume_agent/api/routers/profile.py`
+- Modify: `src/resume_tailor_harness/api/schemas/profile.py`
+- Modify: `src/resume_tailor_harness/api/routers/profile.py`
 - Test: `tests/api/test_profile_sources.py`
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
 
@@ -1937,7 +1937,7 @@ def test_add_url_endpoint_fetch_failure_is_422(client, monkeypatch):
     def boom(profile_dir, url, client=None):
         raise httpx.ConnectError("nope")
 
-    import resume_agent.api.routers.profile as profile_router
+    import resume_tailor_harness.api.routers.profile as profile_router
 
     monkeypatch.setattr(profile_router, "add_url_source", boom)
     resp = c.post("/api/profile/sources/url", json={"url": "https://dead.example"})
@@ -1987,7 +1987,7 @@ class UrlIn(CamelModel):
 ```python
 import httpx
 
-from resume_agent.api.schemas.profile import (
+from resume_tailor_harness.api.schemas.profile import (
     DocumentOut,
     NoteIn,
     SkeletonEntryOut,
@@ -1995,8 +1995,8 @@ from resume_agent.api.schemas.profile import (
     SourcePatch,
     UrlIn,
 )
-from resume_agent.profile.github_harvest import sync_github_sources
-from resume_agent.profile.intake import add_note_source, add_url_source
+from resume_tailor_harness.profile.github_harvest import sync_github_sources
+from resume_tailor_harness.profile.intake import add_note_source, add_url_source
 ```
 
 `_source_out` gains `origin=doc.origin`. New routes (place **before** the `{doc_id}` routes for readability; FastAPI resolves literal segments first regardless):
@@ -2064,7 +2064,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/profile.py src/resume_agent/api/routers/profile.py contracts/ tests/api/test_profile_sources.py
+git add src/resume_tailor_harness/api/schemas/profile.py src/resume_tailor_harness/api/routers/profile.py contracts/ tests/api/test_profile_sources.py
 git commit -m "feat(api): source origin, note/url intake endpoints, github sync run"
 ```
 
@@ -2315,20 +2315,20 @@ git commit -m "feat(web): github origin badge, note/url intake, sync button in S
 ````markdown
 ---
 name: project-dossier
-description: Generate an evidence-backed project dossier markdown for the resume-agent profile corpus. Use when the user asks to create a project dossier, document a repo for their resume profile, or extract a project profile from the current repository.
+description: Generate an evidence-backed project dossier markdown for the resume-tailor-harness profile corpus. Use when the user asks to create a project dossier, document a repo for their resume profile, or extract a project profile from the current repository.
 ---
 
 # Project Dossier
 
 Distill the repository you are currently working in into a single markdown
-dossier that the resume-agent profile build can ingest as a `project`-mode
+dossier that the resume-tailor-harness profile build can ingest as a `project`-mode
 source. The dossier is fact-lock input: **every claim must be verifiable from
 this repository's code, docs, or git history.**
 
 ## Output
 
 Write `<repo-name>-dossier.md` at the repository root (or where the user asks).
-The file MUST start with this frontmatter — `repo_url` is how resume-agent
+The file MUST start with this frontmatter — `repo_url` is how resume-tailor-harness
 matches the dossier to its GitHub repo and supersedes the auto-harvested doc:
 
 ```yaml
@@ -2391,7 +2391,7 @@ repo contains work that demonstrates it (not aspirations from a roadmap).
 ## Handoff
 
 Tell the user to add the file to their profile corpus:
-`resume-agent profile add <repo>-dossier.md` (it is auto-detected as a
+`resume-tailor-harness profile add <repo>-dossier.md` (it is auto-detected as a
 project-mode source via the frontmatter), then rebuild the profile.
 ````
 
@@ -2416,7 +2416,7 @@ Append to the "Known design notes" section:
 ## Handoff
 
 Tell the user to add the file to their profile corpus:
-`resume-agent profile add <repo>-dossier.md` (it is auto-detected as a
+`resume-tailor-harness profile add <repo>-dossier.md` (it is auto-detected as a
 project-mode source via the frontmatter), then rebuild the profile.
 ```
 

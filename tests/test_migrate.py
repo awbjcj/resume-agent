@@ -3,8 +3,8 @@ import json
 from sqlalchemy import text
 from sqlmodel import create_engine
 
-from resume_agent.db import init_db
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.db import init_db
+from resume_tailor_harness.tracking.migrate import (
     ensure_dedup_key_column,
     ensure_industry_labels_capitalized,
     ensure_job_location_instances,
@@ -70,7 +70,7 @@ def test_ensure_archived_at_column_adds_missing_column():
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
-    from resume_agent.tracking.migrate import ensure_archived_at_column
+    from resume_tailor_harness.tracking.migrate import ensure_archived_at_column
 
     ensure_archived_at_column(engine)
     with engine.begin() as conn:
@@ -84,7 +84,7 @@ def test_ensure_archived_at_column_is_idempotent():
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
-    from resume_agent.tracking.migrate import ensure_archived_at_column
+    from resume_tailor_harness.tracking.migrate import ensure_archived_at_column
 
     ensure_archived_at_column(engine)
     ensure_archived_at_column(engine)
@@ -94,7 +94,7 @@ def test_ensure_archived_at_column_is_idempotent():
 
 
 def test_url_index_created(tmp_path):
-    from resume_agent.db import init_db, make_engine
+    from resume_tailor_harness.db import init_db, make_engine
 
     engine = make_engine(f"sqlite:///{tmp_path / 'idx.db'}")
     init_db(engine)

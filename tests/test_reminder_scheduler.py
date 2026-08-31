@@ -3,12 +3,12 @@ import inspect
 
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.reminder_scheduler import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.reminder_scheduler import (
     REMINDER_INTERVAL_SECONDS,
     run_reminder_pass,
 )
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationEvent,
     Job,
@@ -70,7 +70,7 @@ def test_reminder_pass_still_owns_stale_follow_ups() -> None:
 
 
 def test_scheduler_is_hourly_and_gmail_sync_no_longer_mentions_reminders() -> None:
-    from resume_agent.services import gmail_sync
+    from resume_tailor_harness.services import gmail_sync
 
     assert REMINDER_INTERVAL_SECONDS == 3600
     assert "create_follow_up_reminders" not in inspect.getsource(gmail_sync)

@@ -3,8 +3,8 @@ import os
 
 import pytest
 
-from resume_agent.taxonomy import clusters
-from resume_agent.taxonomy.clusters import (
+from resume_tailor_harness.taxonomy import clusters
+from resume_tailor_harness.taxonomy.clusters import (
     ClusterMap,
     allocate_domain_ids,
     load_cluster_map,

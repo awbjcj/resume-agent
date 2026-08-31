@@ -75,7 +75,7 @@ must follow the captured payloads and these verified contracts instead.
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/text.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/text.py`
 - Test: `tests/test_connector_text.py` (extend, or create if absent)
 
 **Interfaces:**
@@ -87,8 +87,8 @@ must follow the captured payloads and these verified contracts instead.
 
 ```python
 # tests/test_connector_text.py  (append)
-from resume_agent.discovery.connectors.text import primary_location
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.text import primary_location
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_primary_location_returns_first_nonempty():
@@ -127,7 +127,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/text.py tests/test_connector_text.py
+git add src/resume_tailor_harness/discovery/connectors/text.py tests/test_connector_text.py
 git commit -m "feat: add primary_location helper for server-side location push"
 ```
 
@@ -137,10 +137,10 @@ git commit -m "feat: add primary_location helper for server-side location push"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/smartrecruiters.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/smartrecruiters.py`
 - Create: `tests/fixtures/smartrecruiters_list.json`, `tests/fixtures/smartrecruiters_detail.json`
-- Modify: `src/resume_agent/discovery/connectors/detect.py`
-- Modify: `src/resume_agent/discovery/connectors/companies.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/detect.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py`
 - Test: `tests/test_connector_smartrecruiters.py`, extend `tests/test_connector_detect.py`
 
 **Interfaces:**
@@ -174,14 +174,14 @@ Open both files and confirm the field paths used in Step 3 (`content[].id/name/l
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.smartrecruiters import (
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.smartrecruiters import (
     apply_detail,
     list_params,
     parse_postings,
     postings_url,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -232,17 +232,17 @@ Expected: FAIL — module missing.
 - [ ] **Step 4: Implement the backend**
 
 ```python
-# src/resume_agent/discovery/connectors/smartrecruiters.py
+# src/resume_tailor_harness/discovery/connectors/smartrecruiters.py
 from dataclasses import dataclass
 
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.harvest import harvest_detailed
+from resume_tailor_harness.discovery.connectors.text import html_to_markdown, primary_search_term
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _API = "https://api.smartrecruiters.com/v1/companies"
 _PAGE = 100  # SmartRecruiters postings API max page size
@@ -371,7 +371,7 @@ And an L2 marker (for SmartRecruiters embedded on a custom careers domain) in `_
 - [ ] **Step 6: Register the adapter** — in `companies.py`, add the import, adapter, and `_BACKENDS` entry:
 
 ```python
-from resume_agent.discovery.connectors.smartrecruiters import fetch_smartrecruiters
+from resume_tailor_harness.discovery.connectors.smartrecruiters import fetch_smartrecruiters
 
 
 def _smartrecruiters(target, search, limit=None, skip_seen=None):
@@ -393,7 +393,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/smartrecruiters.py tests/fixtures/smartrecruiters_*.json tests/test_connector_smartrecruiters.py src/resume_agent/discovery/connectors/detect.py src/resume_agent/discovery/connectors/companies.py tests/test_connector_detect.py
+git add src/resume_tailor_harness/discovery/connectors/smartrecruiters.py tests/fixtures/smartrecruiters_*.json tests/test_connector_smartrecruiters.py src/resume_tailor_harness/discovery/connectors/detect.py src/resume_tailor_harness/discovery/connectors/companies.py tests/test_connector_detect.py
 git commit -m "feat: add SmartRecruiters backend with server-side q narrowing"
 ```
 
@@ -415,7 +415,7 @@ field mapping differ. Do them one at a time, each a standalone commit.
    `parse_<name>(payload, company)` yields rows with `source`, `title`, non-empty
    `jd_text` (single-request) or `apply_detail` filling it (N+1). Add a detection test
    to `tests/test_connector_detect.py`.
-3. **Implement** `src/resume_agent/discovery/connectors/<name>.py` mirroring
+3. **Implement** `src/resume_tailor_harness/discovery/connectors/<name>.py` mirroring
    Greenhouse (single-request: `fetch_<name>_board` + `parse_<name>`) or SmartRecruiters
    (N+1: `_list_pages`/`_fetch_detail`/`apply_detail`). Run JD HTML through
    `html_to_markdown`. Signature: `fetch_<name>(target, search, limit=None, skip_seen=None)`.
@@ -459,7 +459,7 @@ def test_l1_recruitee_url():
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/personio.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/personio.py`
 - Create: `tests/fixtures/personio_feed.xml`
 - Modify: `detect.py`, `companies.py`
 - Test: `tests/test_connector_personio.py`, extend `tests/test_connector_detect.py`
@@ -484,7 +484,7 @@ Confirm the element names (`position`, `name`, `office`, `jobDescriptions/jobDes
 # tests/test_connector_personio.py
 from pathlib import Path
 
-from resume_agent.discovery.connectors.personio import parse_personio, feed_url
+from resume_tailor_harness.discovery.connectors.personio import parse_personio, feed_url
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -508,14 +508,14 @@ Expected: FAIL — module missing.
 - [ ] **Step 4: Implement** (Personio's XML feed is stable; parse with BeautifulSoup's XML mode)
 
 ```python
-# src/resume_agent/discovery/connectors/personio.py
+# src/resume_tailor_harness/discovery/connectors/personio.py
 from bs4 import BeautifulSoup
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.harvest import gate_and_limit  # noqa: F401 (used via fetch)
-from resume_agent.discovery.connectors.text import html_to_markdown
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.harvest import gate_and_limit  # noqa: F401 (used via fetch)
+from resume_tailor_harness.discovery.connectors.text import html_to_markdown
+from resume_tailor_harness.discovery.search_config import SearchConfig
 import httpx
 
 
@@ -577,7 +577,7 @@ with a `_l1` branch that returns `AtsTarget(ats, token=match.group("token"))` on
 In `companies.py`:
 
 ```python
-from resume_agent.discovery.connectors.personio import fetch_personio
+from resume_tailor_harness.discovery.connectors.personio import fetch_personio
 
 
 def _personio(target, search, limit=None, skip_seen=None):
@@ -603,7 +603,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/personio.py tests/fixtures/personio_feed.xml tests/test_connector_personio.py src/resume_agent/discovery/connectors/detect.py src/resume_agent/discovery/connectors/companies.py tests/test_connector_detect.py
+git add src/resume_tailor_harness/discovery/connectors/personio.py tests/fixtures/personio_feed.xml tests/test_connector_personio.py src/resume_tailor_harness/discovery/connectors/detect.py src/resume_tailor_harness/discovery/connectors/companies.py tests/test_connector_detect.py
 git commit -m "feat: add Personio XML-feed backend"
 ```
 
@@ -613,8 +613,8 @@ git commit -m "feat: add Personio XML-feed backend"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/lever.py`
-- Modify: `src/resume_agent/discovery/connectors/companies.py` (`_lever` adapter passes `search`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/lever.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py` (`_lever` adapter passes `search`)
 - Test: `tests/test_connector_lever.py` (create/extend)
 
 **Interfaces:**
@@ -626,9 +626,9 @@ git commit -m "feat: add Personio XML-feed backend"
 
 ```python
 # tests/test_connector_lever.py  (append/create)
-import resume_agent.discovery.connectors.lever as lever
-from resume_agent.discovery.connectors.lever import fetch_lever_board
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.lever as lever
+from resume_tailor_harness.discovery.connectors.lever import fetch_lever_board
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_fetch_lever_board_pushes_location(monkeypatch):
@@ -669,7 +669,7 @@ Expected: FAIL — `fetch_lever_board() got an unexpected keyword argument 'sear
 - [ ] **Step 3: Edit `fetch_lever_board`**
 
 ```python
-from resume_agent.discovery.connectors.text import html_to_markdown, primary_location
+from resume_tailor_harness.discovery.connectors.text import html_to_markdown, primary_location
 
 
 def fetch_lever_board(token: str, search: SearchConfig | None = None) -> list:
@@ -714,7 +714,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/lever.py src/resume_agent/discovery/connectors/companies.py tests/test_connector_lever.py
+git add src/resume_tailor_harness/discovery/connectors/lever.py src/resume_tailor_harness/discovery/connectors/companies.py tests/test_connector_lever.py
 git commit -m "feat: push server-side location filter to Lever boards"
 ```
 
@@ -745,7 +745,7 @@ _CANONICAL = {
 Add a test in `tests/test_source_tier.py`:
 
 ```python
-from resume_agent.discovery.source_tier import source_rank
+from resume_tailor_harness.discovery.source_tier import source_rank
 
 def test_new_ats_sources_rank_as_direct():
     for src in ("smartrecruiters", "workable", "recruitee", "personio", "breezy", "jazzhr", "bamboohr"):
@@ -766,7 +766,7 @@ Expected: PASS / no findings.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add CLAUDE.md src/resume_agent/discovery/source_tier.py tests/test_source_tier.py config/connectors.yaml.example
+git add CLAUDE.md src/resume_tailor_harness/discovery/source_tier.py tests/test_source_tier.py config/connectors.yaml.example
 git commit -m "docs: document new ATS backends and rank them as canonical sources"
 ```
 

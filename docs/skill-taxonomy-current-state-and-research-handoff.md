@@ -20,14 +20,14 @@ The codebase currently uses “skill,” “category,” and “group” for sev
 
 | Concept | Shape | Direct effect | Authoritative source |
 |---|---|---|---|
-| Profile skill fact | `Skill(name, aliases, inferred, evidence_fact_ids, category)` | Candidate truth and render eligibility | [`models/profile.py`](../src/resume_agent/models/profile.py#L32) and tenant `facts.json` |
-| Profile fact category | `hard`, `soft`, or `domain` | Controls the semantic kind of a profile skill and whether an inferred skill may be rendered; it does not define taxonomy adjacency | [`models/profile.py`](../src/resume_agent/models/profile.py#L32) |
-| Canonical skill token | Normalized string plus alias-to-canonical mapping | Defines exact-match identity | `ClusterMap.aliases` in [`taxonomy/clusters.py`](../src/resume_agent/taxonomy/clusters.py#L21) |
+| Profile skill fact | `Skill(name, aliases, inferred, evidence_fact_ids, category)` | Candidate truth and render eligibility | [`models/profile.py`](../src/resume_tailor_harness/models/profile.py#L32) and tenant `facts.json` |
+| Profile fact category | `hard`, `soft`, or `domain` | Controls the semantic kind of a profile skill and whether an inferred skill may be rendered; it does not define taxonomy adjacency | [`models/profile.py`](../src/resume_tailor_harness/models/profile.py#L32) |
+| Canonical skill token | Normalized string plus alias-to-canonical mapping | Defines exact-match identity | `ClusterMap.aliases` in [`taxonomy/clusters.py`](../src/resume_tailor_harness/taxonomy/clusters.py#L21) |
 | Taxonomy domain | Stable domain ID and human label containing canonical tokens | Defines adjacent-match membership | `ClusterMap.domain_of` and `domain_label` |
-| Fixed taxonomy category / matrix group | One of 20 fixed slugs | Parents domains and organizes display; it does not directly determine exact or adjacent coverage | [`taxonomy/vocabulary.py`](../src/resume_agent/taxonomy/vocabulary.py#L7) |
-| Matrix row | Canonical candidate skill, aliases, evidence IDs, strength, recency, display group | Supplies the candidate-side row and evidence selected during matching | [`profile/matrix.py`](../src/resume_agent/profile/matrix.py#L42) and tenant `matrix.json` |
-| Resume skill-section key | Arbitrary string key in `ResumeContent.skills: dict[str, list[TailoredSkill]]` | Becomes the rendered line label in the Skills section; writer-produced, not a taxonomy ID or validated fixed slug | [`models/resume.py`](../src/resume_agent/models/resume.py#L74) and [`templates/resume.typ`](../templates/resume.typ#L210) |
-| Career agent skill | A hash-verified local `SKILL.md` attached to an Agno agent | Adds authoring or review instructions/capabilities; it does not affect candidate matching | [`career_skills/models.py`](../src/resume_agent/career_skills/models.py#L12), [`career_skills/registry.py`](../src/resume_agent/career_skills/registry.py#L94), and `skills-lock.json` |
+| Fixed taxonomy category / matrix group | One of 20 fixed slugs | Parents domains and organizes display; it does not directly determine exact or adjacent coverage | [`taxonomy/vocabulary.py`](../src/resume_tailor_harness/taxonomy/vocabulary.py#L7) |
+| Matrix row | Canonical candidate skill, aliases, evidence IDs, strength, recency, display group | Supplies the candidate-side row and evidence selected during matching | [`profile/matrix.py`](../src/resume_tailor_harness/profile/matrix.py#L42) and tenant `matrix.json` |
+| Resume skill-section key | Arbitrary string key in `ResumeContent.skills: dict[str, list[TailoredSkill]]` | Becomes the rendered line label in the Skills section; writer-produced, not a taxonomy ID or validated fixed slug | [`models/resume.py`](../src/resume_tailor_harness/models/resume.py#L74) and [`templates/resume.typ`](../templates/resume.typ#L210) |
+| Career agent skill | A hash-verified local `SKILL.md` attached to an Agno agent | Adds authoring or review instructions/capabilities; it does not affect candidate matching | [`career_skills/models.py`](../src/resume_tailor_harness/career_skills/models.py#L12), [`career_skills/registry.py`](../src/resume_tailor_harness/career_skills/registry.py#L94), and `skills-lock.json` |
 
 The fixed taxonomy vocabulary is:
 
@@ -73,7 +73,7 @@ The structure is therefore three-level:
 fixed category -> learned domain -> canonical skill <- aliases
 ```
 
-`load_cluster_map()` validates strings, normalizes skill tokens, flattens aliases, drops invalid cycles, and defaults domains without a valid category to `other`. `save_cluster_map()` writes deterministic JSON via atomic replacement. See [`taxonomy/clusters.py`](../src/resume_agent/taxonomy/clusters.py#L21).
+`load_cluster_map()` validates strings, normalizes skill tokens, flattens aliases, drops invalid cycles, and defaults domains without a valid category to `other`. `save_cluster_map()` writes deterministic JSON via atomic replacement. See [`taxonomy/clusters.py`](../src/resume_tailor_harness/taxonomy/clusters.py#L21).
 
 ### 3.2 User correction ledger
 
@@ -87,17 +87,17 @@ User edits do not primarily mutate model output. They are stored as durable inte
 - `removed_skills`
 - `aliases`
 
-`apply_taxonomy_corrections()` replays this ledger idempotently after generated data, so valid user intent wins over LLM output. Dangling references are inert instead of corrupting the map. See [`taxonomy/corrections.py`](../src/resume_agent/taxonomy/corrections.py#L30) and [`taxonomy/corrections.py`](../src/resume_agent/taxonomy/corrections.py#L178).
+`apply_taxonomy_corrections()` replays this ledger idempotently after generated data, so valid user intent wins over LLM output. Dangling references are inert instead of corrupting the map. See [`taxonomy/corrections.py`](../src/resume_tailor_harness/taxonomy/corrections.py#L30) and [`taxonomy/corrections.py`](../src/resume_tailor_harness/taxonomy/corrections.py#L178).
 
 Within one correction replay, ordering is explicit: correction aliases are combined and flattened first; domain merges redirect and remove losing domains; skill moves are resolved through the corrected aliases and redirected merge targets; domain renames and category changes are then applied to surviving targets; finally, labels and categories for unreferenced domains are pruned. Add/remove lists influence which skills enter classification demand, while the structural replay above operates on the map. Invalid or dangling targets are skipped.
 
-`TaxonomyCustody` owns a per-workspace mutation lock and can return one coherent snapshot containing the generated map, corrections, effective map, lifecycle state, and a SHA-256 revision over all three persisted inputs. See [`taxonomy/custody.py`](../src/resume_agent/taxonomy/custody.py#L48).
+`TaxonomyCustody` owns a per-workspace mutation lock and can return one coherent snapshot containing the generated map, corrections, effective map, lifecycle state, and a SHA-256 revision over all three persisted inputs. See [`taxonomy/custody.py`](../src/resume_tailor_harness/taxonomy/custody.py#L48).
 
 ### 3.3 Lifecycle state and derived artifacts
 
-Tenant taxonomy state records the algorithm version, grouping outcomes, retired non-skills, legacy import state, and maintenance generations used for undo. Embeddings are cached separately in `skill_embeddings.json`; pre-maintenance snapshots live under `taxonomy/generations/`. See [`taxonomy/state.py`](../src/resume_agent/taxonomy/state.py#L30).
+Tenant taxonomy state records the algorithm version, grouping outcomes, retired non-skills, legacy import state, and maintenance generations used for undo. Embeddings are cached separately in `skill_embeddings.json`; pre-maintenance snapshots live under `taxonomy/generations/`. See [`taxonomy/state.py`](../src/resume_tailor_harness/taxonomy/state.py#L30).
 
-`taxonomy/skill_groups.json` is now a migration-only hint. During the first compatible profile rebuild, it may seed category hints; once its content hash is recorded in taxonomy state, the growing cluster map is the taxonomy source. The older standalone fixed-group classifier still exists in [`taxonomy/groups.py`](../src/resume_agent/taxonomy/groups.py#L130), but current production profile-build wiring does not call it.
+`taxonomy/skill_groups.json` is now a migration-only hint. During the first compatible profile rebuild, it may seed category hints; once its content hash is recorded in taxonomy state, the growing cluster map is the taxonomy source. The older standalone fixed-group classifier still exists in [`taxonomy/groups.py`](../src/resume_tailor_harness/taxonomy/groups.py#L130), but current production profile-build wiring does not call it.
 
 ### 3.4 Effective precedence
 
@@ -120,7 +120,7 @@ taxonomy category projection
   -> MatrixRow.group and group_source
 ```
 
-For matrix display, the final precedence is user group correction > profile override > taxonomy projection. This decoration does not change facts, aliases, domains, strength, recency, or provenance. See [`profile/matrix.py`](../src/resume_agent/profile/matrix.py#L404).
+For matrix display, the final precedence is user group correction > profile override > taxonomy projection. This decoration does not change facts, aliases, domains, strength, recency, or provenance. See [`profile/matrix.py`](../src/resume_tailor_harness/profile/matrix.py#L404).
 
 ## 4. How classification is produced
 
@@ -133,7 +133,7 @@ Classification demand can come from:
 - explicitly selected unassigned tokens;
 - user-added taxonomy skills.
 
-Removed skills and tokens previously adjudicated as `not_skills` are excluded. A scoped refresh only targets requested, known, currently unassigned tokens. See [`services/match_gap.py`](../src/resume_agent/services/match_gap.py#L164).
+Removed skills and tokens previously adjudicated as `not_skills` are excluded. A scoped refresh only targets requested, known, currently unassigned tokens. See [`services/match_gap.py`](../src/resume_tailor_harness/services/match_gap.py#L164).
 
 ### 4.2 Agent sequence
 
@@ -145,12 +145,12 @@ Removed skills and tokens previously adjudicated as `not_skills` are excluded. A
 | Placement floor | Deterministic | Place still-unassigned judged skills into `general-<category>` | Excludes provider-call failures and deferred tokens; honors the model's recorded category hint |
 | Maintenance | Maintenance judge, mid | Merge, split, rename, or reparent model-owned domains | Pinned user state protected, bounded churn, no increase in unassigned skills, versioned undo |
 
-The prompts and schemas are in [`tracking/canonicalize.py`](../src/resume_agent/tracking/canonicalize.py#L44). The orchestration and validation boundary is [`taxonomy/classification.py`](../src/resume_agent/taxonomy/classification.py#L354).
+The prompts and schemas are in [`tracking/canonicalize.py`](../src/resume_tailor_harness/tracking/canonicalize.py#L44). The orchestration and validation boundary is [`taxonomy/classification.py`](../src/resume_tailor_harness/taxonomy/classification.py#L354).
 
 Important policy details:
 
 - The 20 top-level categories are closed. Learned second-level domains may grow.
-- `domains_per_category_target` defaults to 12 but is a soft organizational target, not a hard cap. See [`config.py`](../src/resume_agent/config.py#L75).
+- `domains_per_category_target` defaults to 12 but is a soft organizational target, not a hard cap. See [`config.py`](../src/resume_tailor_harness/config.py#L75).
 - The domain agent must label uncertainty. Only high-confidence valid assignments are accepted on the normal path.
 - `not_skills` is terminal but reversible; it prevents phrases such as experience requirements from repeatedly consuming classification calls.
 - A provider outage is distinguished from an invalid model answer. The placement floor must not turn a transient outage into a permanent classification.
@@ -161,7 +161,7 @@ Important policy details:
 
 Before classification, retrieval narrows the existing canonicals and domains shown to the agents. The default embedding model is `openai:text-embedding-3-small`, with provider requests bounded to 256 descriptors and a persisted cache. If embeddings are unavailable or partial, an IDF-weighted lexical fallback supplies prompt candidates.
 
-Retrieval is not the classifier. It proposes a shortlist; the model response plus deterministic validation remains authoritative. An omitted existing domain is a hard veto only when retrieval mode is fully `embedding`. Under `partial` or `lexical`, the shortlist reduces prompt size but cannot forbid an otherwise valid domain reuse. See [`taxonomy/embeddings.py`](../src/resume_agent/taxonomy/embeddings.py#L471) and [`services/match_gap.py`](../src/resume_agent/services/match_gap.py#L259).
+Retrieval is not the classifier. It proposes a shortlist; the model response plus deterministic validation remains authoritative. An omitted existing domain is a hard veto only when retrieval mode is fully `embedding`. Under `partial` or `lexical`, the shortlist reduces prompt size but cannot forbid an otherwise valid domain reuse. See [`taxonomy/embeddings.py`](../src/resume_tailor_harness/taxonomy/embeddings.py#L471) and [`services/match_gap.py`](../src/resume_tailor_harness/services/match_gap.py#L259).
 
 ### 4.4 Profile-build integration
 
@@ -174,7 +174,7 @@ After facts are extracted and manual skills replayed, profile build:
 5. decorates matrix groups;
 6. writes `matrix.json`.
 
-This is implemented in [`services/profile_build.py`](../src/resume_agent/services/profile_build.py#L74).
+This is implemented in [`services/profile_build.py`](../src/resume_tailor_harness/services/profile_build.py#L74).
 
 ## 5. How the taxonomy affects tailoring
 
@@ -209,7 +209,7 @@ The candidate matrix is built from `ProfileFacts.skills`. Each canonical row car
 - strength derived from distinct evidence and recency;
 - an optional fixed display group.
 
-Taxonomy aliases affect the row identity. Profile overrides may force or forbid aliases. The fixed group is decoration and is not used to decide match coverage. See [`profile/matrix.py`](../src/resume_agent/profile/matrix.py#L278).
+Taxonomy aliases affect the row identity. Profile overrides may force or forbid aliases. The fixed group is decoration and is not used to decide match coverage. See [`profile/matrix.py`](../src/resume_tailor_harness/profile/matrix.py#L278).
 
 ### 5.3 Exact, adjacent, and gap matching
 
@@ -221,18 +221,18 @@ For each job `must_have_skills`, `nice_to_have_skills`, and `tech_stack` require
 4. otherwise finds candidate rows in the same taxonomy domain and marks the best by strength as `adjacent`;
 5. otherwise marks it `gap`.
 
-When adjacent candidates have equal strength, the canonical row key is the deterministic tie-breaker. The top-level fixed category is not consulted in this decision. Two skills are adjacent only when they share the same learned domain, not merely the same broad category. See [`profile/matrix.py`](../src/resume_agent/profile/matrix.py#L198).
+When adjacent candidates have equal strength, the canonical row key is the deterministic tie-breaker. The top-level fixed category is not consulted in this decision. Two skills are adjacent only when they share the same learned domain, not merely the same broad category. See [`profile/matrix.py`](../src/resume_tailor_harness/profile/matrix.py#L198).
 
 ### 5.4 Consumers inside tailoring
 
-The tailoring service loads facts, `matrix.json`, and the cluster map, builds a `SkillMatchContext` for every job, and passes it into `TailorWorkflow`. See [`services/tailoring.py`](../src/resume_agent/services/tailoring.py#L47) and [`tailor/service.py`](../src/resume_agent/tailor/service.py#L179).
+The tailoring service loads facts, `matrix.json`, and the cluster map, builds a `SkillMatchContext` for every job, and passes it into `TailorWorkflow`. See [`services/tailoring.py`](../src/resume_tailor_harness/services/tailoring.py#L47) and [`tailor/service.py`](../src/resume_tailor_harness/tailor/service.py#L179).
 
 That context has four effects:
 
-1. **Evidence portfolio planning.** Direct and adjacent requirements, evidence IDs, matrix strength, and recency help rank work/project evidence. The planner's output is normalized back to real fact IDs and bounded budgets. See [`tailor/evidence_portfolio.py`](../src/resume_agent/tailor/evidence_portfolio.py#L109).
-2. **Writer guidance.** `format_coverage()` emits authoritative lines for each must-have, nice-to-have, and tech-stack requirement. Covered lines include evidence IDs; adjacent lines may guide emphasis but prohibit naming the JD term; gaps must not be claimed. See [`tailor/coverage.py`](../src/resume_agent/tailor/coverage.py#L79).
-3. **Revision guidance.** The same coverage block is carried into every revision together with reviewer feedback, so a later pass does not lose the taxonomy-derived constraints. See [`tailor/workflow.py`](../src/resume_agent/tailor/workflow.py#L245).
-4. **Measurement.** A deterministic advisory critique measures whether evidenced must-haves and supporting skills were actually rendered. “Supporting” means a covered nice-to-have or tech-stack requirement. The score is the rounded percentage of evidenced must-haves rendered; if there are no evidenced must-haves, it falls back to the rendered supporting percentage. Every missed must-have produces a major issue, while supporting omissions are sampled into one bounded major issue. The critique always has `passed=true`, so it is intentionally advisory rather than a hard gate. See [`tailor/coverage.py`](../src/resume_agent/tailor/coverage.py#L143) and [`tailor/coverage.py`](../src/resume_agent/tailor/coverage.py#L212).
+1. **Evidence portfolio planning.** Direct and adjacent requirements, evidence IDs, matrix strength, and recency help rank work/project evidence. The planner's output is normalized back to real fact IDs and bounded budgets. See [`tailor/evidence_portfolio.py`](../src/resume_tailor_harness/tailor/evidence_portfolio.py#L109).
+2. **Writer guidance.** `format_coverage()` emits authoritative lines for each must-have, nice-to-have, and tech-stack requirement. Covered lines include evidence IDs; adjacent lines may guide emphasis but prohibit naming the JD term; gaps must not be claimed. See [`tailor/coverage.py`](../src/resume_tailor_harness/tailor/coverage.py#L79).
+3. **Revision guidance.** The same coverage block is carried into every revision together with reviewer feedback, so a later pass does not lose the taxonomy-derived constraints. See [`tailor/workflow.py`](../src/resume_tailor_harness/tailor/workflow.py#L245).
+4. **Measurement.** A deterministic advisory critique measures whether evidenced must-haves and supporting skills were actually rendered. “Supporting” means a covered nice-to-have or tech-stack requirement. The score is the rounded percentage of evidenced must-haves rendered; if there are no evidenced must-haves, it falls back to the rendered supporting percentage. Every missed must-have produces a major issue, while supporting omissions are sampled into one bounded major issue. The critique always has `passed=true`, so it is intentionally advisory rather than a hard gate. See [`tailor/coverage.py`](../src/resume_tailor_harness/tailor/coverage.py#L143) and [`tailor/coverage.py`](../src/resume_tailor_harness/tailor/coverage.py#L212).
 
 ### 5.5 What the taxonomy is not allowed to do
 
@@ -244,13 +244,13 @@ The taxonomy can guide selection and similarity, but it cannot create candidate 
 - Inferred soft/domain skills are removed from the writer's renderable profile.
 - Provenance, skill-naming, and numeric-evidence checks are deterministic gates on every round.
 
-These constraints are enforced in [`tailor/agents.py`](../src/resume_agent/tailor/agents.py#L41), [`tailor/provenance.py`](../src/resume_agent/tailor/provenance.py#L120), and [`tailor/workflow.py`](../src/resume_agent/tailor/workflow.py#L125).
+These constraints are enforced in [`tailor/agents.py`](../src/resume_tailor_harness/tailor/agents.py#L41), [`tailor/provenance.py`](../src/resume_tailor_harness/tailor/provenance.py#L120), and [`tailor/workflow.py`](../src/resume_tailor_harness/tailor/workflow.py#L125).
 
 ## 6. Separate system: career agent skills
 
 The `skills/` directory and `skills-lock.json` do not classify candidate technologies. They define approved instruction packages that can be attached to task agents.
 
-The registry verifies each `SKILL.md` against its manifest path, family, allowed use, version, and SHA-256 hash. The tailoring API can select a `ResumeAuthoringSkillName`; `build_tailor_bundle()` then attaches that verified local skill to both the writer and reviser. Selected reviewers may likewise receive fixed review skills such as `ats-resume-checker`, `resume-ats-optimizer`, or `resume-formatter`. See [`services/agents.py`](../src/resume_agent/services/agents.py#L98).
+The registry verifies each `SKILL.md` against its manifest path, family, allowed use, version, and SHA-256 hash. The tailoring API can select a `ResumeAuthoringSkillName`; `build_tailor_bundle()` then attaches that verified local skill to both the writer and reviser. Selected reviewers may likewise receive fixed review skills such as `ats-resume-checker`, `resume-ats-optimizer`, or `resume-formatter`. See [`services/agents.py`](../src/resume_tailor_harness/services/agents.py#L98).
 
 This affects *how an agent performs its role*. The candidate taxonomy affects *which candidate and job skills are exact, adjacent, or gaps*. The systems meet in the writer/reviser but are not one taxonomy and should not be redesigned as though they were.
 
@@ -258,7 +258,7 @@ This affects *how an agent performs its role*. The candidate taxonomy affects *w
 
 ### 7.1 Verified read-path divergence; runtime impact still needs a regression
 
-The implementation divergence is verified from the current code: match-gap and taxonomy maintenance explicitly replay `taxonomy_corrections.json`, often through `TaxonomyCustody`. The tailoring entry point loads `profile/cluster_map.json` directly, applies profile `overrides.yaml`, and does not replay the taxonomy correction ledger before building `SkillMatchContext` ([`services/tailoring.py`](../src/resume_agent/services/tailoring.py#L64)). Here, the **raw/effective-overrides map** means the generated cluster map after `overrides.yaml`; the **complete taxonomy artifact revision** is `TaxonomyCustody.revision`, which fingerprints generated data, the taxonomy correction ledger, and taxonomy lifecycle state.
+The implementation divergence is verified from the current code: match-gap and taxonomy maintenance explicitly replay `taxonomy_corrections.json`, often through `TaxonomyCustody`. The tailoring entry point loads `profile/cluster_map.json` directly, applies profile `overrides.yaml`, and does not replay the taxonomy correction ledger before building `SkillMatchContext` ([`services/tailoring.py`](../src/resume_tailor_harness/services/tailoring.py#L64)). Here, the **raw/effective-overrides map** means the generated cluster map after `overrides.yaml`; the **complete taxonomy artifact revision** is `TaxonomyCustody.revision`, which fingerprints generated data, the taxonomy correction ledger, and taxonomy lifecycle state.
 
 The following user-visible consequences are hypotheses that still require the focused regression in section 11:
 

@@ -87,12 +87,12 @@ The session list intentionally preserves the approved `ScoutSessionsOut` shape a
 
 | Path | Responsibility |
 | --- | --- |
-| `src/resume_agent/discovery/scout.py` | Turn-draft schemas, normalization, merged persona/formatter agents, prompt rendering constants, `check_source` tool |
-| `src/resume_agent/discovery/scout_store.py` | Strict session/proposal models and all `SessionStore` lifecycle/mutation functions |
-| `src/resume_agent/services/scout_context.py` | Profile/config grounding, canonical source/term/session dedupe keys, ledger/goal/transcript rendering |
-| `src/resume_agent/services/scout.py` | Start/message/recap orchestration, probe fan-out, views, approve, dismiss |
-| `src/resume_agent/api/schemas/scout.py` | Camel-case request and response contracts |
-| `src/resume_agent/api/routers/scout.py` | Run-backed turn routes and deterministic proposal/lifecycle routes |
+| `src/resume_tailor_harness/discovery/scout.py` | Turn-draft schemas, normalization, merged persona/formatter agents, prompt rendering constants, `check_source` tool |
+| `src/resume_tailor_harness/discovery/scout_store.py` | Strict session/proposal models and all `SessionStore` lifecycle/mutation functions |
+| `src/resume_tailor_harness/services/scout_context.py` | Profile/config grounding, canonical source/term/session dedupe keys, ledger/goal/transcript rendering |
+| `src/resume_tailor_harness/services/scout.py` | Start/message/recap orchestration, probe fan-out, views, approve, dismiss |
+| `src/resume_tailor_harness/api/schemas/scout.py` | Camel-case request and response contracts |
+| `src/resume_tailor_harness/api/routers/scout.py` | Run-backed turn routes and deterministic proposal/lifecycle routes |
 | `tests/test_scout.py` | Draft normalization, merged-agent tool boundary, prompt contract |
 | `tests/test_scout_store.py` | Strict persistence invariants, ids, caps, lifecycle, concurrent resolution |
 | `tests/test_scout_context.py` | Grounding, canonicalization, config/session dedupe, ledger and transcript elision |
@@ -111,12 +111,12 @@ The session list intentionally preserves the approved `ScoutSessionsOut` shape a
 
 | Path | Change |
 | --- | --- |
-| `src/resume_agent/api/app.py` | Include the Scout router |
-| `src/resume_agent/api/deps.py` | Add `get_scout_dir(request)` using the same workspace-root resolution as interviews |
-| `src/resume_agent/api/routers/sources.py` | Remove both one-shot discovery routes/imports; keep source CRUD/preview unchanged |
-| `src/resume_agent/api/schemas/sources.py` | Remove `DiscoverSourcesIn` and `DiscoverSearchIn` |
-| `src/resume_agent/prompts/registry.py` | Replace four stale Scout guidance entries with `discovery-scout` and `discovery-scout-format` |
-| `src/resume_agent/cli.py` | Replace one-shot `scout` and `scout-search` with the conversational loop |
+| `src/resume_tailor_harness/api/app.py` | Include the Scout router |
+| `src/resume_tailor_harness/api/deps.py` | Add `get_scout_dir(request)` using the same workspace-root resolution as interviews |
+| `src/resume_tailor_harness/api/routers/sources.py` | Remove both one-shot discovery routes/imports; keep source CRUD/preview unchanged |
+| `src/resume_tailor_harness/api/schemas/sources.py` | Remove `DiscoverSourcesIn` and `DiscoverSearchIn` |
+| `src/resume_tailor_harness/prompts/registry.py` | Replace four stale Scout guidance entries with `discovery-scout` and `discovery-scout-format` |
+| `src/resume_tailor_harness/cli.py` | Replace one-shot `scout` and `scout-search` with the conversational loop |
 | `tests/test_cli_scout.py` | Exercise the shared service path and command parser |
 | `tests/test_prompt_registry.py` | Assert new prompt projections and stale-key absence |
 | `tests/api/test_openapi_contract.py` | Keep the existing drift assertion; regenerated artifacts supply the new expectation |
@@ -132,10 +132,10 @@ The session list intentionally preserves the approved `ScoutSessionsOut` shape a
 
 ### Delete after replacement coverage passes
 
-- `src/resume_agent/discovery/source_scout.py`
-- `src/resume_agent/discovery/search_scout.py`
-- `src/resume_agent/services/source_discovery.py`
-- `src/resume_agent/services/search_discovery.py`
+- `src/resume_tailor_harness/discovery/source_scout.py`
+- `src/resume_tailor_harness/discovery/search_scout.py`
+- `src/resume_tailor_harness/services/source_discovery.py`
+- `src/resume_tailor_harness/services/search_discovery.py`
 - `tests/test_source_scout.py`
 - `tests/test_search_scout.py`
 - `tests/test_source_discovery.py`
@@ -157,9 +157,9 @@ The session list intentionally preserves the approved `ScoutSessionsOut` shape a
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scout.py`
+- Create: `src/resume_tailor_harness/discovery/scout.py`
 - Create: `tests/test_scout.py`
-- Modify: `src/resume_agent/prompts/registry.py`
+- Modify: `src/resume_tailor_harness/prompts/registry.py`
 - Modify: `tests/test_prompt_registry.py`
 
 **Interfaces:**
@@ -208,7 +208,7 @@ def test_agent_tools_are_search_plus_check_source(monkeypatch):
 
 Run: `.venv\Scripts\python.exe -m pytest tests/test_scout.py tests/test_prompt_registry.py -q`
 
-Expected: collection fails because `resume_agent.discovery.scout` does not exist.
+Expected: collection fails because `resume_tailor_harness.discovery.scout` does not exist.
 
 - [ ] **Step 3: Add the draft models and normalization contract**
 
@@ -292,7 +292,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_scout.py tests/test_prompt_r
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/discovery/scout.py src/resume_agent/prompts/registry.py tests/test_scout.py tests/test_prompt_registry.py
+git add src/resume_tailor_harness/discovery/scout.py src/resume_tailor_harness/prompts/registry.py tests/test_scout.py tests/test_prompt_registry.py
 git commit -m "feat: define conversational scout contracts"
 ```
 
@@ -302,7 +302,7 @@ git commit -m "feat: define conversational scout contracts"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scout_store.py`
+- Create: `src/resume_tailor_harness/discovery/scout_store.py`
 - Create: `tests/test_scout_store.py`
 
 **Interfaces:**
@@ -392,7 +392,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_scout_store.py -q`
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/discovery/scout_store.py tests/test_scout_store.py
+git add src/resume_tailor_harness/discovery/scout_store.py tests/test_scout_store.py
 git commit -m "feat: persist scout sessions and proposal state"
 ```
 
@@ -402,7 +402,7 @@ git commit -m "feat: persist scout sessions and proposal state"
 
 **Files:**
 
-- Create: `src/resume_agent/services/scout_context.py`
+- Create: `src/resume_tailor_harness/services/scout_context.py`
 - Create: `tests/test_scout_context.py`
 
 **Interfaces:**
@@ -474,7 +474,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_scout_context.py -q`
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/services/scout_context.py tests/test_scout_context.py
+git add src/resume_tailor_harness/services/scout_context.py tests/test_scout_context.py
 git commit -m "feat: build scout context and feedback ledger"
 ```
 
@@ -484,7 +484,7 @@ git commit -m "feat: build scout context and feedback ledger"
 
 **Files:**
 
-- Create: `src/resume_agent/services/scout.py`
+- Create: `src/resume_tailor_harness/services/scout.py`
 - Create: `tests/test_scout_service.py`
 
 **Interfaces:**
@@ -592,7 +592,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_scout.py tests/test_scout_st
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/services/scout.py tests/test_scout_service.py
+git add src/resume_tailor_harness/services/scout.py tests/test_scout_service.py
 git commit -m "feat: run streaming scout turns"
 ```
 
@@ -602,7 +602,7 @@ git commit -m "feat: run streaming scout turns"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/scout.py`
+- Modify: `src/resume_tailor_harness/services/scout.py`
 - Modify: `tests/test_scout_service.py`
 
 **Interfaces:**
@@ -678,7 +678,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_scout_service.py -q`
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/services/scout.py tests/test_scout_service.py
+git add src/resume_tailor_harness/services/scout.py tests/test_scout_service.py
 git commit -m "feat: approve and dismiss scout proposals"
 ```
 
@@ -688,11 +688,11 @@ git commit -m "feat: approve and dismiss scout proposals"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/scout.py`
-- Create: `src/resume_agent/api/routers/scout.py`
+- Create: `src/resume_tailor_harness/api/schemas/scout.py`
+- Create: `src/resume_tailor_harness/api/routers/scout.py`
 - Create: `tests/api/test_scout_router.py`
-- Modify: `src/resume_agent/api/deps.py`
-- Modify: `src/resume_agent/api/app.py`
+- Modify: `src/resume_tailor_harness/api/deps.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 
 **Interfaces:**
 
@@ -758,7 +758,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/api/test_scout_router.py tests/ap
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/api/schemas/scout.py src/resume_agent/api/routers/scout.py src/resume_agent/api/deps.py src/resume_agent/api/app.py tests/api/test_scout_router.py
+git add src/resume_tailor_harness/api/schemas/scout.py src/resume_tailor_harness/api/routers/scout.py src/resume_tailor_harness/api/deps.py src/resume_tailor_harness/api/app.py tests/api/test_scout_router.py
 git commit -m "feat: expose conversational scout api"
 ```
 
@@ -768,13 +768,13 @@ git commit -m "feat: expose conversational scout api"
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Modify: `tests/test_cli_scout.py`
 
 **Interfaces:**
 
 - Consumes: `active_session`, Scout service functions, `ConsoleStreamSink`, `NullSink`, `YamlConfigStore`.
-- Produces: one `resume-agent scout [initial_message]` command; removes `scout-search`.
+- Produces: one `resume-tailor-harness scout [initial_message]` command; removes `scout-search`.
 
 - [ ] **Step 1: Rewrite failing CLI tests around shared services**
 
@@ -807,7 +807,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_cli_scout.py tests/test_scou
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/cli.py tests/test_cli_scout.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_scout.py
 git commit -m "feat: make scout cli conversational"
 ```
 
@@ -817,8 +817,8 @@ git commit -m "feat: make scout cli conversational"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/sources.py`
-- Modify: `src/resume_agent/api/schemas/sources.py`
+- Modify: `src/resume_tailor_harness/api/routers/sources.py`
+- Modify: `src/resume_tailor_harness/api/schemas/sources.py`
 - Delete: the legacy backend modules/tests listed in File Structure
 - Modify: `contracts/openapi.json`
 - Modify: `contracts/ts/api.ts`
@@ -866,7 +866,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/api/test_openapi_contract.py -q`
 Expected: PASS.
 
 ```powershell
-git add src/resume_agent/api/routers/sources.py src/resume_agent/api/schemas/sources.py src/resume_agent/discovery src/resume_agent/services tests contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/api/routers/sources.py src/resume_tailor_harness/api/schemas/sources.py src/resume_tailor_harness/discovery src/resume_tailor_harness/services tests contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "refactor: retire one-shot scout flows"
 ```
 

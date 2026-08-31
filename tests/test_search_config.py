@@ -1,4 +1,4 @@
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_relevance_fields_default_empty_and_optional():

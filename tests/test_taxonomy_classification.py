@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.taxonomy.classification import (
+from resume_tailor_harness.taxonomy.classification import (
     ClassificationFailure,
     ClassificationMetrics,
     ClassificationOutcome,
@@ -13,10 +13,10 @@ from resume_agent.taxonomy.classification import (
     _project_domains,
     classify_incrementally,
 )
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.embeddings import CandidateContext
-from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.embeddings import CandidateContext
+from resume_tailor_harness.taxonomy.vocabulary import SKILL_GROUPS
+from resume_tailor_harness.tracking.canonicalize import (
     IncrementalDomainGroup,
     IncrementalSkillDomains,
     SkillClusters,
@@ -753,7 +753,7 @@ def test_retrieval_only_vetoes_a_domain_when_it_is_trustworthy():
     correct reuse far more often than it catches an invention.
     """
 
-    from resume_agent.taxonomy.classification import _project_domains
+    from resume_tailor_harness.taxonomy.classification import _project_domains
 
     response = IncrementalSkillDomains(
         domains=[
@@ -795,7 +795,7 @@ def test_retrieval_only_vetoes_a_domain_when_it_is_trustworthy():
 def test_a_declined_group_still_records_its_category_for_the_placement_floor():
     """An uncertain judgment is still a judgment about where a skill belongs."""
 
-    from resume_agent.taxonomy.classification import _project_domains
+    from resume_tailor_harness.taxonomy.classification import _project_domains
 
     result = _project_domains(
         IncrementalSkillDomains(
@@ -830,7 +830,7 @@ def test_a_status_recorded_before_phase_existed_returns_to_the_first_pass():
     does cheaply, and one re-attempt rewrites the record with a real phase.
     """
 
-    from resume_agent.taxonomy.state import GroupingStatus, TaxonomyState
+    from resume_tailor_harness.taxonomy.state import GroupingStatus, TaxonomyState
 
     legacy = TaxonomyState.model_validate(
         {"grouping_status": {"rust": {"state": "uncertain", "reason": "whatever"}}}

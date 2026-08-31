@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 import yaml
 
-from resume_agent.prompts.guidance import (
+from resume_tailor_harness.prompts.guidance import (
     GUIDANCE_HEADER,
     MAX_GUIDANCE_CHARS,
     guidance_for,

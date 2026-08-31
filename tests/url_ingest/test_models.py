@@ -1,4 +1,4 @@
-from resume_agent.discovery.url_ingest.models import ExtractedJob, PageContent
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob, PageContent
 
 
 def test_extracted_job_defaults_to_empty():

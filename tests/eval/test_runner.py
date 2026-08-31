@@ -1,12 +1,12 @@
 from evals.judge import DimensionScore, JudgeVerdict
 from evals.runner import CaseResult, run_case
 from evals.schema import EvalCase, Trap
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.services.agents import TailorBundle
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.services.agents import TailorBundle
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 class _Result:
@@ -268,7 +268,7 @@ def test_run_case_judges_the_surfaced_best_clean_round():
 
 
 def test_run_case_invokes_match_plan_when_enabled():
-    from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
+    from resume_tailor_harness.models.match_plan import MatchPlan, MatchPlanRequirement
 
     class _Planner:
         def __init__(self):

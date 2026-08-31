@@ -1,5 +1,5 @@
-from resume_agent.setup.preflight import CheckResult
-from resume_agent.setup.validate import anthropic_ping, connector_smoke
+from resume_tailor_harness.setup.preflight import CheckResult
+from resume_tailor_harness.setup.validate import anthropic_ping, connector_smoke
 
 
 class _OkClient:

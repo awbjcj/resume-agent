@@ -4,7 +4,7 @@
 
 **Goal:** Pin the shortlist filter-and-rank predicate — which genuinely runs in two runtimes — behind one cross-language behavioral contract, so the Python (Streamlit) and TypeScript (React) copies can no longer drift.
 
-**Architecture:** The filter/sort/rank predicate exists twice on purpose: `src/resume_agent/dashboard/filtering.py` filters in-process for Streamlit, `web/src/lib/filters/*` filters in-browser for instant React response. Neither can be deleted. We make the _behavior_ the interface: a checked-in fixture of `(rows, filterState) → ordered [jobId]` cases in `contracts/`, plus two thin conformance harnesses (pytest + vitest) that prove each implementation satisfies it. We also remove the one known divergence — composite rank rounds banker's-style in Python and half-up in JS — by sorting on the unrounded composite (rounding becomes display-only).
+**Architecture:** The filter/sort/rank predicate exists twice on purpose: `src/resume_tailor_harness/dashboard/filtering.py` filters in-process for Streamlit, `web/src/lib/filters/*` filters in-browser for instant React response. Neither can be deleted. We make the _behavior_ the interface: a checked-in fixture of `(rows, filterState) → ordered [jobId]` cases in `contracts/`, plus two thin conformance harnesses (pytest + vitest) that prove each implementation satisfies it. We also remove the one known divergence — composite rank rounds banker's-style in Python and half-up in JS — by sorting on the unrounded composite (rounding becomes display-only).
 
 **Tech Stack:** Python 3 / pytest / dataclasses; TypeScript / vitest / Vite. Shared artifact is a JSON contract file in the camelCase `ShortlistItem` wire shape (the same shape `contracts/openapi.json` already defines).
 
@@ -20,7 +20,7 @@
 | `contracts/README.md`                      | Document the contract + the rule "filter-behavior changes require a contract case" | Modify                       |
 | `tests/test_shortlist_filter_contract.py`  | Python conformance harness; `row_from_wire` / `filter_state_from_wire` builders    | Create                       |
 | `web/src/lib/filters/contract.test.ts`     | TS conformance harness; `rowFromWire` / `filterStateFromWire` builders             | Create                       |
-| `src/resume_agent/dashboard/filtering.py`  | Sort composite on unrounded value; keep rounded `composite_score` for display      | Modify (`88-109`, `134-135`) |
+| `src/resume_tailor_harness/dashboard/filtering.py`  | Sort composite on unrounded value; keep rounded `composite_score` for display      | Modify (`88-109`, `134-135`) |
 | `web/src/lib/filters/sort.ts`              | Same reconciliation in TS                                                          | Modify (`25-40`, `69-73`)    |
 
 Builders live inside their harness files — only one harness consumes each, so keep them local (DRY does not mean premature sharing across the language boundary).
@@ -118,8 +118,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.dashboard.filtering import FilterState, apply_filters, sort_rows
-from resume_agent.tracking.queries import ShortlistRow, SkillTag
+from resume_tailor_harness.dashboard.filtering import FilterState, apply_filters, sort_rows
+from resume_tailor_harness.tracking.queries import ShortlistRow, SkillTag
 
 CONTRACT = Path(__file__).resolve().parents[1] / "contracts" / "shortlist_filter.contract.json"
 
@@ -344,14 +344,14 @@ git commit -m "test(contracts): typescript conformance harness for filter contra
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/filtering.py:88-109,134-135`
+- Modify: `src/resume_tailor_harness/dashboard/filtering.py:88-109,134-135`
 - Modify: `web/src/lib/filters/sort.ts:25-40,69-73`
 
 **Why (no behavior change for current data):** `composite_score` rounds with Python banker's rounding; `compositeScore` rounds half-up in JS. At an exact 4th-decimal tie they disagree, which can flip two jobs' order between the two boards. The rounded value is presentation only — sorting must read the raw weighted sum (bit-identical across both IEEE-754 runtimes). This is a deepening of the _Composite rank_ term: ordering is defined on the raw score; rounding never enters it.
 
 - [ ] **Step 1: Python — split raw from rounded, sort on raw**
 
-In `src/resume_agent/dashboard/filtering.py`, replace the body of `composite_score` (lines `88-109`) with a raw helper + a rounding wrapper:
+In `src/resume_tailor_harness/dashboard/filtering.py`, replace the body of `composite_score` (lines `88-109`) with a raw helper + a rounding wrapper:
 
 ```python
 def _composite_raw(row: ShortlistRow, preset: str, now: datetime) -> float:
@@ -463,7 +463,7 @@ Expected: all PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/filtering.py web/src/lib/filters/sort.ts contracts/shortlist_filter.contract.json
+git add src/resume_tailor_harness/dashboard/filtering.py web/src/lib/filters/sort.ts contracts/shortlist_filter.contract.json
 git commit -m "fix(filters): order composite rank on unrounded score in both runtimes"
 ```
 

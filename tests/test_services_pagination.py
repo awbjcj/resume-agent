@@ -1,4 +1,4 @@
-from resume_agent.services.pagination import page_from_slice
+from resume_tailor_harness.services.pagination import page_from_slice
 
 
 def test_page_from_slice_preserves_sql_total_and_second_page_rows():

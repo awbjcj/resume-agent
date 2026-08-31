@@ -2,12 +2,12 @@ from dataclasses import dataclass
 
 from evals.schema import Trap
 from evals.textscan import trap_terms_hit
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.evidence_portfolio import EvidencePortfolio
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.provenance import check_provenance, referenced_ids
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.evidence_portfolio import EvidencePortfolio
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.provenance import check_provenance, referenced_ids
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def trap_avoided(content: ResumeContent, traps: list[Trap]) -> bool:

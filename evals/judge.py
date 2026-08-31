@@ -4,18 +4,18 @@ import json
 from agno.agent import Agent
 from pydantic import BaseModel, Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.agents import model_for_tier
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.tailor.agents import model_for_tier
 
 
 class DimensionScore(BaseModel):

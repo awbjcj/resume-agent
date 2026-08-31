@@ -45,8 +45,8 @@ not depend on the HTTP adapter and can be implemented first.
 
 **Files**
 
-- Modify: `src/resume_agent/config.py`
-- Create: `src/resume_agent/taxonomy/classification.py`
+- Modify: `src/resume_tailor_harness/config.py`
+- Create: `src/resume_tailor_harness/taxonomy/classification.py`
 - Test: `tests/test_taxonomy_classification.py`
 
 **Configuration**
@@ -117,7 +117,7 @@ Run:
 
 **Files**
 
-- Modify: `src/resume_agent/tracking/canonicalize.py`
+- Modify: `src/resume_tailor_harness/tracking/canonicalize.py`
 - Test: `tests/test_tracking_canonicalize.py`
 
 Add two prompt variants while retaining the existing whole-set builders for other
@@ -186,7 +186,7 @@ Run:
 
 **Files**
 
-- Modify: `src/resume_agent/taxonomy/clusters.py`
+- Modify: `src/resume_tailor_harness/taxonomy/clusters.py`
 - Test: `tests/test_taxonomy_clusters.py`
 
 **Interfaces**
@@ -237,8 +237,8 @@ Run:
 
 **Files**
 
-- Modify: `src/resume_agent/taxonomy/classification.py`
-- Modify: `src/resume_agent/llm_runner.py` (optional in-flight observation at the
+- Modify: `src/resume_tailor_harness/taxonomy/classification.py`
+- Modify: `src/resume_tailor_harness/llm_runner.py` (optional in-flight observation at the
   semaphore leaf)
 - Test: `tests/test_taxonomy_classification.py`
 - Test: `tests/test_llm_runner.py`
@@ -307,7 +307,7 @@ Run:
 
 **Files**
 
-- Modify: `src/resume_agent/taxonomy/classification.py`
+- Modify: `src/resume_tailor_harness/taxonomy/classification.py`
 - Test: `tests/test_taxonomy_classification.py`
 
 After successful aliases are reconciled, form a temporary merged alias view and
@@ -372,7 +372,7 @@ Run:
 
 **Files**
 
-- Modify: `src/resume_agent/services/match_gap.py`
+- Modify: `src/resume_tailor_harness/services/match_gap.py`
 - Modify: `tests/test_services_match_gap.py`
 
 **Interface**
@@ -451,7 +451,7 @@ Run:
 
 **Files**
 
-- Modify: `src/resume_agent/api/routers/match_gap.py`
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py`
 - Modify: `tests/api/test_match_gap_refresh.py`
 
 Build the two incremental runners inside the work closure. Submit with a singleton

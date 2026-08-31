@@ -3,21 +3,21 @@ from datetime import datetime, timezone
 import pytest
 from sqlmodel import Session, select
 
-from resume_agent.company_intelligence.models import (
+from resume_tailor_harness.company_intelligence.models import (
     CompanyIntelligenceDraft,
     CompanyIntelligenceEvidence,
     CompanyIntelligenceInsight,
     CompanyIntelligenceSource,
 )
-from resume_agent.config import Settings
-from resume_agent.db import init_db, make_engine
-from resume_agent.llm_runner import UnparsedAgentOutput
-from resume_agent.services.company_intelligence import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.llm_runner import UnparsedAgentOutput
+from resume_tailor_harness.services.company_intelligence import (
     generate_company_intelligence,
     load_company_intelligence,
     load_company_intelligence_history,
 )
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     CompanyIntelligenceEvidenceRow,
     CompanyIntelligenceVersionRow,
 )

@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 from typing import Any, cast
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 def _settings(**kwargs) -> Settings:

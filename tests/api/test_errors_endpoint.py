@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.services.errors import StageFailure, record_error, record_job_failure
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.services.errors import StageFailure, record_error, record_job_failure
 
 
 def _app() -> FastAPI:
@@ -14,8 +14,8 @@ def test_job_record_exposes_typed_details():
     with TestClient(app) as client:
         from sqlmodel import Session
 
-        from resume_agent.tracking.repository import save_job
-        from resume_agent.tracking.tables import Job
+        from resume_tailor_harness.tracking.repository import save_job
+        from resume_tailor_harness.tracking.tables import Job
 
         engine = app.state.engine
         with Session(engine) as session:

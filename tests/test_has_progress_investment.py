@@ -1,8 +1,8 @@
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import has_progress, progressed_job_ids
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import has_progress, progressed_job_ids
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _require_id(value: int | None) -> int:

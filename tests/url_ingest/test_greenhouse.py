@@ -1,4 +1,4 @@
-from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
+from resume_tailor_harness.discovery.url_ingest.greenhouse import read_greenhouse_posting
 
 _HTML = """
 <html><body>

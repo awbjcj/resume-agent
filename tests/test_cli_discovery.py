@@ -2,9 +2,9 @@ from sqlmodel import select
 
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 runner = CliRunner()
 
@@ -71,7 +71,7 @@ def test_discover_passes_search_and_facts_paths(tmp_path, monkeypatch):
 
 
 def test_reprocess_invokes_service(tmp_path, monkeypatch):
-    import resume_agent.cli as cli
+    import resume_tailor_harness.cli as cli
 
     captured = {}
 
@@ -98,9 +98,9 @@ def test_reprocess_invokes_service(tmp_path, monkeypatch):
 
 
 def test_refresh_invokes_service(tmp_path, monkeypatch):
-    import resume_agent.cli as cli
+    import resume_tailor_harness.cli as cli
     from pathlib import Path
-    from resume_agent.services.discovery import RefreshReport
+    from resume_tailor_harness.services.discovery import RefreshReport
 
     monkeypatch.setattr(Path, "exists", lambda self: True)
 

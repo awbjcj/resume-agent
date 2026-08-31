@@ -32,7 +32,7 @@ export function AuthLayout({
             <Sparkles className="size-4.5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-sm font-semibold tracking-tight">Resume Agent</p>
+            <p className="text-sm font-semibold tracking-tight">Résumé Tailor Harness</p>
             <p className="mt-0.5 text-[0.68rem] font-medium uppercase tracking-[0.22em] text-white/55">
               {t("auth.privateCareerWorkspace")}
             </p>
@@ -82,7 +82,7 @@ export function AuthLayout({
               <Sparkles className="size-4.5" aria-hidden="true" />
             </div>
             <div>
-              <div className="text-sm font-semibold leading-tight tracking-tight">Resume Agent</div>
+              <div className="text-sm font-semibold leading-tight tracking-tight">Résumé Tailor Harness</div>
               <div className="mt-0.5 text-[0.68rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 {t("auth.privateCareerWorkspace")}
               </div>

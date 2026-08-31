@@ -14,7 +14,7 @@
 
 - Tests run offline: `.venv/Scripts/python.exe -m pytest` — no API key, no network. Every LLM agent in tests is a fake with `run()`/`arun()` returning an object with `.content`.
 - Lint: `ruff check` must pass before every commit.
-- All new domain/LLM-facing models extend `ExtensibleModel` (`resume_agent.models.base`) — never bare `BaseModel` (except LLM-facing strict schemas mirroring `FitLocation`'s pattern, not needed here).
+- All new domain/LLM-facing models extend `ExtensibleModel` (`resume_tailor_harness.models.base`) — never bare `BaseModel` (except LLM-facing strict schemas mirroring `FitLocation`'s pattern, not needed here).
 - Fact-lock: literal claims are extraction-only; inferred skills must carry resolvable `evidence_fact_ids`; adjacent-tier matches are never claimable as the JD's token.
 - Wire format is camelCase via `CamelModel`; any API schema change requires `bash scripts/gen_ts_client.sh` and keeps `tests/api/test_openapi_contract.py` green.
 - Atomic file writes for persisted artifacts (tmp + `os.replace`, mirroring `save_cluster_map`).
@@ -95,8 +95,8 @@ their narrow unit tests while violating the design invariants.
 
 **Files:**
 
-- Modify: `src/resume_agent/models/base.py` (FactItem)
-- Modify: `src/resume_agent/models/profile.py` (Skill)
+- Modify: `src/resume_tailor_harness/models/base.py` (FactItem)
+- Modify: `src/resume_tailor_harness/models/profile.py` (Skill)
 - Test: `tests/test_models_profile.py` (append)
 
 **Interfaces:**
@@ -109,7 +109,7 @@ their narrow unit tests while violating the design invariants.
 Append to `tests/test_models_profile.py`:
 
 ```python
-from resume_agent.models.profile import ProfileFacts, Skill
+from resume_tailor_harness.models.profile import ProfileFacts, Skill
 
 
 def test_skill_inference_fields_default_off():
@@ -160,7 +160,7 @@ Expected: FAIL — `inferred` attribute missing / validation error.
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/models/base.py`, extend `FactItem`:
+In `src/resume_tailor_harness/models/base.py`, extend `FactItem`:
 
 ```python
 class FactItem(ExtensibleModel):
@@ -171,7 +171,7 @@ class FactItem(ExtensibleModel):
     source_ref: str | None = None  # corpus doc id; None for github/manual/legacy
 ```
 
-In `src/resume_agent/models/profile.py`, add `from typing import Literal`, import
+In `src/resume_tailor_harness/models/profile.py`, add `from typing import Literal`, import
 `model_validator`, and extend `Skill`:
 
 ```python
@@ -198,7 +198,7 @@ Expected: PASS (defaults keep every existing fixture valid).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/base.py src/resume_agent/models/profile.py tests/test_models_profile.py
+git add src/resume_tailor_harness/models/base.py src/resume_tailor_harness/models/profile.py tests/test_models_profile.py
 git commit -m "feat: skill inference metadata + fact source_ref"
 ```
 
@@ -208,7 +208,7 @@ git commit -m "feat: skill inference metadata + fact source_ref"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/resume_reader.py`
+- Modify: `src/resume_tailor_harness/profile/resume_reader.py`
 - Modify: `pyproject.toml` (add `python-pptx`)
 - Modify: `uv.lock` (lock the new runtime dependency)
 - Test: `tests/test_profile_resume_reader.py` (append)
@@ -229,7 +229,7 @@ Expected: `uv.lock` records `python-pptx` and the environment installs it.
 Append to `tests/test_profile_resume_reader.py`:
 
 ```python
-from resume_agent.profile.resume_reader import SUPPORTED_SUFFIXES, read_document_text
+from resume_tailor_harness.profile.resume_reader import SUPPORTED_SUFFIXES, read_document_text
 
 
 def test_read_markdown(tmp_path):
@@ -264,7 +264,7 @@ Expected: FAIL — `read_document_text` not importable.
 
 - [ ] **Step 4: Implement**
 
-Rewrite `src/resume_agent/profile/resume_reader.py`:
+Rewrite `src/resume_tailor_harness/profile/resume_reader.py`:
 
 ```python
 from pathlib import Path
@@ -334,7 +334,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/resume_reader.py pyproject.toml uv.lock tests/test_profile_resume_reader.py
+git add src/resume_tailor_harness/profile/resume_reader.py pyproject.toml uv.lock tests/test_profile_resume_reader.py
 git commit -m "feat: read .md and .pptx profile documents"
 ```
 
@@ -344,7 +344,7 @@ git commit -m "feat: read .md and .pptx profile documents"
 
 **Files:**
 
-- Create: `src/resume_agent/profile/corpus.py`
+- Create: `src/resume_tailor_harness/profile/corpus.py`
 - Test: `tests/test_profile_corpus.py`
 
 **Interfaces:**
@@ -366,7 +366,7 @@ git commit -m "feat: read .md and .pptx profile documents"
 Create `tests/test_profile_corpus.py`:
 
 ```python
-from resume_agent.profile.corpus import (
+from resume_tailor_harness.profile.corpus import (
     add_source,
     doc_path,
     load_manifest,
@@ -479,11 +479,11 @@ def test_migrate_legacy_registers_primary_once(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_corpus.py -v`
-Expected: FAIL — module `resume_agent.profile.corpus` does not exist.
+Expected: FAIL — module `resume_tailor_harness.profile.corpus` does not exist.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/profile/corpus.py`:
+Create `src/resume_tailor_harness/profile/corpus.py`:
 
 ```python
 """Source-document registry: which user documents feed the fact-lock profile."""
@@ -498,8 +498,8 @@ from pathlib import Path
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.profile.resume_reader import SUPPORTED_SUFFIXES
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.profile.resume_reader import SUPPORTED_SUFFIXES
 
 MANIFEST_NAME = "sources.json"
 SOURCES_DIRNAME = "sources"
@@ -656,7 +656,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_corpus.py -v && .ven
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/corpus.py tests/test_profile_corpus.py
+git add src/resume_tailor_harness/profile/corpus.py tests/test_profile_corpus.py
 git commit -m "feat: profile source registry (manifest, add/remove, legacy migration)"
 ```
 
@@ -666,7 +666,7 @@ git commit -m "feat: profile source registry (manifest, add/remove, legacy migra
 
 **Files:**
 
-- Create: `src/resume_agent/profile/ids.py`
+- Create: `src/resume_tailor_harness/profile/ids.py`
 - Test: `tests/test_profile_ids.py`
 
 **Interfaces:**
@@ -681,8 +681,8 @@ git commit -m "feat: profile source registry (manifest, add/remove, legacy migra
 Create `tests/test_profile_ids.py`:
 
 ```python
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
-from resume_agent.profile.ids import assign_fact_ids, deterministic_id
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.profile.ids import assign_fact_ids, deterministic_id
 
 
 def _facts():
@@ -738,7 +738,7 @@ Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/profile/ids.py`:
+Create `src/resume_tailor_harness/profile/ids.py`:
 
 ```python
 """Deterministic, content-derived fact ids so rebuilds keep provenance stable."""
@@ -746,8 +746,8 @@ Create `src/resume_agent/profile/ids.py`:
 import hashlib
 import re
 
-from resume_agent.models.base import FactItem
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.base import FactItem
+from resume_tailor_harness.models.profile import ProfileFacts
 
 _NORM = re.compile(r"[^a-z0-9]+")
 
@@ -811,7 +811,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/ids.py tests/test_profile_ids.py
+git add src/resume_tailor_harness/profile/ids.py tests/test_profile_ids.py
 git commit -m "feat: deterministic content-derived fact ids"
 ```
 
@@ -821,8 +821,8 @@ git commit -m "feat: deterministic content-derived fact ids"
 
 **Files:**
 
-- Create: `src/resume_agent/profile/fragments.py`
-- Modify: `src/resume_agent/profile/extractor.py` (PROMPT_VERSION + corpus instruction)
+- Create: `src/resume_tailor_harness/profile/fragments.py`
+- Modify: `src/resume_tailor_harness/profile/extractor.py` (PROMPT_VERSION + corpus instruction)
 - Test: `tests/test_profile_fragments.py`
 
 **Interfaces:**
@@ -840,9 +840,9 @@ git commit -m "feat: deterministic content-derived fact ids"
 Create `tests/test_profile_fragments.py`:
 
 ```python
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.corpus import add_source, load_manifest
-from resume_agent.profile.fragments import extract_fragments, load_fragment
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.corpus import add_source, load_manifest
+from resume_tailor_harness.profile.fragments import extract_fragments, load_fragment
 
 
 class _FakeResult:
@@ -933,7 +933,7 @@ Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/profile/extractor.py`, add after the imports:
+In `src/resume_tailor_harness/profile/extractor.py`, add after the imports:
 
 ```python
 # Bump whenever _INSTRUCTIONS change so cached fragments re-extract.
@@ -948,7 +948,7 @@ and append one instruction string to `_INSTRUCTIONS`:
     "for the other contact fields rather than inventing them.",
 ```
 
-Create `src/resume_agent/profile/fragments.py`:
+Create `src/resume_tailor_harness/profile/fragments.py`:
 
 ```python
 """Per-document extraction fragments, cached by content hash + prompt version."""
@@ -960,18 +960,18 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from resume_agent.llm_runner import Runner
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.corpus import (
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.profile.corpus import (
     FRAGMENTS_DIRNAME,
     SourceDoc,
     SourceManifest,
     doc_path,
     save_manifest,
 )
-from resume_agent.profile.extractor import PROMPT_VERSION, extract_profile_facts
-from resume_agent.profile.ids import assign_fact_ids
-from resume_agent.profile.resume_reader import read_document_text
+from resume_tailor_harness.profile.extractor import PROMPT_VERSION, extract_profile_facts
+from resume_tailor_harness.profile.ids import assign_fact_ids
+from resume_tailor_harness.profile.resume_reader import read_document_text
 
 
 @dataclass
@@ -1086,7 +1086,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/fragments.py src/resume_agent/profile/extractor.py tests/test_profile_fragments.py
+git add src/resume_tailor_harness/profile/fragments.py src/resume_tailor_harness/profile/extractor.py tests/test_profile_fragments.py
 git commit -m "feat: cached per-document profile fragment extraction"
 ```
 
@@ -1096,7 +1096,7 @@ git commit -m "feat: cached per-document profile fragment extraction"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/merge.py`
+- Modify: `src/resume_tailor_harness/profile/merge.py`
 - Test: `tests/test_profile_merge.py` (append)
 
 **Interfaces:**
@@ -1114,9 +1114,9 @@ git commit -m "feat: cached per-document profile fragment extraction"
 Append to `tests/test_profile_merge.py`:
 
 ```python
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.merge import BulletDupGroups, MergeReport, merge_fragments
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.merge import BulletDupGroups, MergeReport, merge_fragments
 
 
 def _doc(doc_id, primary=False):
@@ -1241,7 +1241,7 @@ Expected: existing tests PASS, new tests FAIL (imports missing).
 
 - [ ] **Step 3: Implement**
 
-Extend `src/resume_agent/profile/merge.py` while preserving the existing GitHub
+Extend `src/resume_tailor_harness/profile/merge.py` while preserving the existing GitHub
 `merge_facts` behavior. Add the agent/model/report imports shown below plus the profile
 entity classes required by the field-by-field merge. The excerpt is the dedup scaffold;
 implement the complete entity merge required by Correctness Amendment 4 rather than
@@ -1539,7 +1539,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/merge.py tests/test_profile_merge.py
+git add src/resume_tailor_harness/profile/merge.py tests/test_profile_merge.py
 git commit -m "feat: cross-document fragment merge with primary-wins conflicts"
 ```
 
@@ -1549,7 +1549,7 @@ git commit -m "feat: cross-document fragment merge with primary-wins conflicts"
 
 **Files:**
 
-- Create: `src/resume_agent/profile/inference.py`
+- Create: `src/resume_tailor_harness/profile/inference.py`
 - Test: `tests/test_profile_inference.py`
 
 **Interfaces:**
@@ -1567,8 +1567,8 @@ git commit -m "feat: cross-document fragment merge with primary-wins conflicts"
 Create `tests/test_profile_inference.py`:
 
 ```python
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
-from resume_agent.profile.inference import (
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.profile.inference import (
     InferredSkill,
     InferredSkills,
     apply_inferred,
@@ -1673,7 +1673,7 @@ Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/profile/inference.py`:
+Create `src/resume_tailor_harness/profile/inference.py`:
 
 ```python
 """Evidence-linked skill inference: derive abilities the documents demonstrate.
@@ -1687,13 +1687,13 @@ from typing import Literal
 from agno.agent import Agent
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts, Skill
-from resume_agent.profile.ids import deterministic_id
-from resume_agent.tailor.provenance import index_facts
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import ProfileFacts, Skill
+from resume_tailor_harness.profile.ids import deterministic_id
+from resume_tailor_harness.tailor.provenance import index_facts
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 
 class InferredSkill(ExtensibleModel):
@@ -1800,7 +1800,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/inference.py tests/test_profile_inference.py
+git add src/resume_tailor_harness/profile/inference.py tests/test_profile_inference.py
 git commit -m "feat: evidence-linked skill inference pass"
 ```
 
@@ -1810,7 +1810,7 @@ git commit -m "feat: evidence-linked skill inference pass"
 
 **Files:**
 
-- Create: `src/resume_agent/profile/matrix.py`
+- Create: `src/resume_tailor_harness/profile/matrix.py`
 - Test: `tests/test_profile_matrix.py`
 
 **Interfaces:**
@@ -1839,8 +1839,8 @@ Create `tests/test_profile_matrix.py`:
 ```python
 from datetime import date
 
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
-from resume_agent.profile.matrix import (
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.profile.matrix import (
     Overrides,
     build_matrix,
     effective_cluster_map,
@@ -1848,7 +1848,7 @@ from resume_agent.profile.matrix import (
     load_overrides,
     save_matrix,
 )
-from resume_agent.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
 
 
 def _facts():
@@ -1950,7 +1950,7 @@ Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/profile/matrix.py`:
+Create `src/resume_tailor_harness/profile/matrix.py`:
 
 ```python
 """Derived skill/experience matrix: canonical skills × evidence × strength."""
@@ -1967,12 +1967,12 @@ from typing import Literal
 import yaml
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.skills import split_skills
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.skills import split_skills
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 DEFAULT_MATRIX_PATH = "data/profile/matrix.json"
 DEFAULT_OVERRIDES_PATH = "data/profile/overrides.yaml"
@@ -2329,7 +2329,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/matrix.py tests/test_profile_matrix.py
+git add src/resume_tailor_harness/profile/matrix.py tests/test_profile_matrix.py
 git commit -m "feat: derived skill matrix with overrides"
 ```
 
@@ -2339,8 +2339,8 @@ git commit -m "feat: derived skill matrix with overrides"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/match_gap.py` (`refresh_clusters`)
-- Modify: `src/resume_agent/api/routers/match_gap.py` (refresh endpoint caller, line ~67)
+- Modify: `src/resume_tailor_harness/services/match_gap.py` (`refresh_clusters`)
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py` (refresh endpoint caller, line ~67)
 - Rebuild: `data/profile/matrix.json` after a successful production refresh
 - Test: `tests/test_services_match_gap.py` (append)
 
@@ -2385,7 +2385,7 @@ Expected: new test FAILS (`extra_tokens` unexpected keyword, or aliases pruned).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/services/match_gap.py`, change `refresh_clusters`:
+In `src/resume_tailor_harness/services/match_gap.py`, change `refresh_clusters`:
 
 ```python
 def refresh_clusters(
@@ -2409,7 +2409,7 @@ and inside, replace `demanded = collect_target_skill_tokens(session)` with:
 
 (`demanded` already flows to both `classify_incrementally(demanded_tokens=...)` and `prune_cluster_map(..., demanded)` — one change covers universe and keep-set.)
 
-In `src/resume_agent/api/routers/match_gap.py`, at the `refresh_clusters(` call (line ~67), load profile tokens defensively and pass them:
+In `src/resume_tailor_harness/api/routers/match_gap.py`, at the `refresh_clusters(` call (line ~67), load profile tokens defensively and pass them:
 
 ```python
     try:
@@ -2418,7 +2418,7 @@ In `src/resume_agent/api/routers/match_gap.py`, at the `refresh_clusters(` call 
         profile_tokens = set()
 ```
 
-with `from resume_agent.tracking.match_gap import profile_skill_tokens` and the router's existing facts-path constant (add `_FACTS_PATH = "data/profile/facts.json"` if the router does not already load facts — check the file; it loads facts for reports, reuse that path/constant). Pass `extra_tokens=profile_tokens`.
+with `from resume_tailor_harness.tracking.match_gap import profile_skill_tokens` and the router's existing facts-path constant (add `_FACTS_PATH = "data/profile/facts.json"` if the router does not already load facts — check the file; it loads facts for reports, reuse that path/constant). Pass `extra_tokens=profile_tokens`.
 
 Inside the refresh worker, load facts once before classification. After
 `refresh_clusters` succeeds, call `build_matrix(facts, load_cluster_map(_CLUSTER_PATH),
@@ -2433,7 +2433,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/services/match_gap.py src/resume_agent/api/routers/match_gap.py tests/test_services_match_gap.py
+git add src/resume_tailor_harness/services/match_gap.py src/resume_tailor_harness/api/routers/match_gap.py tests/test_services_match_gap.py
 git commit -m "feat: profile tokens join cluster canonical space and prune keep-set"
 ```
 
@@ -2443,11 +2443,11 @@ git commit -m "feat: profile tokens join cluster canonical space and prune keep-
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/match_gap.py` (`SkillNode`, `build_demand_graph`, `GapRow`, `match_gap`)
-- Modify: `src/resume_agent/api/schemas/match_gap.py` (`SkillNodeOut`)
-- Modify: `src/resume_agent/api/routers/match_gap.py` (load overrides and pass the effective map)
-- Modify: `src/resume_agent/cli.py` (`match-gap` uses the effective persisted map by default)
-- Modify: the mapper that builds `SkillNodeOut` (find with `rg -n "SkillNodeOut|covered=" src/resume_agent/api`)
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py` (`SkillNode`, `build_demand_graph`, `GapRow`, `match_gap`)
+- Modify: `src/resume_tailor_harness/api/schemas/match_gap.py` (`SkillNodeOut`)
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py` (load overrides and pass the effective map)
+- Modify: `src/resume_tailor_harness/cli.py` (`match-gap` uses the effective persisted map by default)
+- Modify: the mapper that builds `SkillNodeOut` (find with `rg -n "SkillNodeOut|covered=" src/resume_tailor_harness/api`)
 - Modify: `web/src/features/match-gap/{aggregate.ts,RankedList.tsx,SkillMap.tsx,SkillModal.tsx,MatchGapContainer.tsx}` and their tests (render/filter adjacent separately)
 - Test: `tests/test_tracking_match_gap.py`, `tests/api/test_schemas_match_gap.py` (append)
 - Regenerate: `contracts/openapi.json` + `contracts/ts/api.ts` + `web/src/lib/api/schema.ts`
@@ -2557,7 +2557,7 @@ Set theme `gap_count=sum(node.coverage == "gap" for node in theme_nodes)` and
 
 - [ ] **Step 4: API schema + mapper + contracts**
 
-In `src/resume_agent/api/schemas/match_gap.py` add to `SkillNodeOut` (keep `covered`):
+In `src/resume_tailor_harness/api/schemas/match_gap.py` add to `SkillNodeOut` (keep `covered`):
 
 ```python
     coverage: Literal["covered", "adjacent", "gap"] = "gap"
@@ -2598,7 +2598,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/tracking/match_gap.py src/resume_agent/api/schemas/match_gap.py src/resume_agent/api/routers/match_gap.py src/resume_agent/cli.py contracts/ web/src/lib/api/schema.ts web/src/features/match-gap tests/
+git add src/resume_tailor_harness/tracking/match_gap.py src/resume_tailor_harness/api/schemas/match_gap.py src/resume_tailor_harness/api/routers/match_gap.py src/resume_tailor_harness/cli.py contracts/ web/src/lib/api/schema.ts web/src/features/match-gap tests/
 git commit -m "feat: tri-state skill coverage (covered/adjacent/gap)"
 ```
 
@@ -2608,9 +2608,9 @@ git commit -m "feat: tri-state skill coverage (covered/adjacent/gap)"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/match_plan.py` (`compose_match_plan_input`, `_MATCH_PLAN_INSTRUCTIONS`)
-- Modify: `src/resume_agent/tailor/workflow.py` (`run_tailor_review`, `arun_tailor_review` — thread `skill_context`)
-- Modify: `src/resume_agent/tailor/service.py` (load the bound artifacts once; build/pass per-job context)
+- Modify: `src/resume_tailor_harness/tailor/match_plan.py` (`compose_match_plan_input`, `_MATCH_PLAN_INSTRUCTIONS`)
+- Modify: `src/resume_tailor_harness/tailor/workflow.py` (`run_tailor_review`, `arun_tailor_review` — thread `skill_context`)
+- Modify: `src/resume_tailor_harness/tailor/service.py` (load the bound artifacts once; build/pass per-job context)
 - Test: `tests/test_tailor_match_plan.py` or wherever `compose_match_plan_input` is currently tested (`rg -l "compose_match_plan_input" tests/`)
 
 **Interfaces:**
@@ -2622,10 +2622,10 @@ git commit -m "feat: tri-state skill coverage (covered/adjacent/gap)"
 In the test file that covers `compose_match_plan_input` (find via `rg -l "compose_match_plan_input" tests/`; create `tests/test_tailor_match_plan.py` if none):
 
 ```python
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
-from resume_agent.tailor.match_plan import compose_match_plan_input
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
+from resume_tailor_harness.tailor.match_plan import compose_match_plan_input
 
 
 def test_compose_without_skill_context_unchanged():
@@ -2709,7 +2709,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS (`skill_context` defaults to None everywhere, existing tests unaffected).
 
 ```bash
-git add src/resume_agent/tailor/match_plan.py src/resume_agent/tailor/workflow.py src/resume_agent/tailor/service.py tests/
+git add src/resume_tailor_harness/tailor/match_plan.py src/resume_tailor_harness/tailor/workflow.py src/resume_tailor_harness/tailor/service.py tests/
 git commit -m "feat: match plan consumes deterministic skill context"
 ```
 
@@ -2719,10 +2719,10 @@ git commit -m "feat: match plan consumes deterministic skill context"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/fit.py` (`compose_fit_input`, `_INSTRUCTIONS`)
-- Modify: `src/resume_agent/discovery/pipeline.py` (`run_score` — build/pass context from each job's extracted criteria)
-- Modify: `src/resume_agent/services/discovery.py` (`discover_jobs` — load bound matrix/map/overrides once)
-- Modify: `src/resume_agent/discovery/extract.py` (`_INSTRUCTIONS` — soft-skill capture)
+- Modify: `src/resume_tailor_harness/discovery/fit.py` (`compose_fit_input`, `_INSTRUCTIONS`)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py` (`run_score` — build/pass context from each job's extracted criteria)
+- Modify: `src/resume_tailor_harness/services/discovery.py` (`discover_jobs` — load bound matrix/map/overrides once)
+- Modify: `src/resume_tailor_harness/discovery/extract.py` (`_INSTRUCTIONS` — soft-skill capture)
 - Test: `tests/test_discovery_fit.py` (or the file found by `rg -l "compose_fit_input" tests/`), `tests/test_discovery_extract.py` (or equivalent)
 
 **Interfaces:**
@@ -2734,9 +2734,9 @@ git commit -m "feat: match plan consumes deterministic skill context"
 In the fit test file:
 
 ```python
-from resume_agent.discovery.fit import compose_fit_input
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
+from resume_tailor_harness.discovery.fit import compose_fit_input
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
 
 
 def test_fit_input_without_context_unchanged():
@@ -2760,7 +2760,7 @@ def test_fit_input_with_context_appends_section():
 In the extract test file, assert the prompt change is present (cheap guard that the instruction survives refactors):
 
 ```python
-from resume_agent.discovery.extract import _INSTRUCTIONS
+from resume_tailor_harness.discovery.extract import _INSTRUCTIONS
 
 
 def test_extract_instructions_capture_soft_skills():
@@ -2794,7 +2794,7 @@ def compose_fit_input(
     return "\n\n".join(sections)
 ```
 
-(`from resume_agent.profile.matrix import SkillMatchContext` — no import cycle.)
+(`from resume_tailor_harness.profile.matrix import SkillMatchContext` — no import cycle.)
 
 Append one instruction to `fit.py`'s `_INSTRUCTIONS`:
 
@@ -2828,7 +2828,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/discovery/fit.py src/resume_agent/discovery/pipeline.py src/resume_agent/services/discovery.py src/resume_agent/discovery/extract.py tests/
+git add src/resume_tailor_harness/discovery/fit.py src/resume_tailor_harness/discovery/pipeline.py src/resume_tailor_harness/services/discovery.py src/resume_tailor_harness/discovery/extract.py tests/
 git commit -m "feat: fit scoring consumes skill context; capture soft skills"
 ```
 
@@ -2838,8 +2838,8 @@ git commit -m "feat: fit scoring consumes skill context; capture soft skills"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/provenance.py` (`resolve_evidence`)
-- Modify: `src/resume_agent/tailor/agents.py` (`REVIEWER_INSTRUCTIONS["fact-check"]`)
+- Modify: `src/resume_tailor_harness/tailor/provenance.py` (`resolve_evidence`)
+- Modify: `src/resume_tailor_harness/tailor/agents.py` (`REVIEWER_INSTRUCTIONS["fact-check"]`)
 - Test: `tests/test_tailor_provenance.py` (append; find via `rg -l "resolve_evidence" tests/`)
 
 **Interfaces:**
@@ -2923,7 +2923,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/tailor/provenance.py src/resume_agent/tailor/agents.py tests/
+git add src/resume_tailor_harness/tailor/provenance.py src/resume_tailor_harness/tailor/agents.py tests/
 git commit -m "feat: fact-check gate sees inferred-skill evidence"
 ```
 
@@ -2933,7 +2933,7 @@ git commit -m "feat: fact-check gate sees inferred-skill evidence"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/build.py`
+- Modify: `src/resume_tailor_harness/profile/build.py`
 - Test: `tests/test_profile_build.py` (append)
 
 **Interfaces:**
@@ -2950,10 +2950,10 @@ Append to `tests/test_profile_build.py` (reuse the file's `_FakeAgent`/`_FakeRes
 ```python
 import pytest
 
-from resume_agent.models.profile import Bullet, Experience
-from resume_agent.profile.build import build_corpus_profile
-from resume_agent.profile.corpus import add_source
-from resume_agent.profile.inference import InferredSkill, InferredSkills
+from resume_tailor_harness.models.profile import Bullet, Experience
+from resume_tailor_harness.profile.build import build_corpus_profile
+from resume_tailor_harness.profile.corpus import add_source
+from resume_tailor_harness.profile.inference import InferredSkill, InferredSkills
 
 
 class _SequenceAgent:
@@ -3065,7 +3065,7 @@ Expected: existing tests PASS; new ones FAIL (import error).
 
 - [ ] **Step 3: Implement**
 
-Append to `src/resume_agent/profile/build.py` (new imports: `Field` from pydantic, `ExtensibleModel`, `load_manifest`, `merge_fragments`, `extract_fragments`, `apply_inferred`, `infer_skills`, `Runner`):
+Append to `src/resume_tailor_harness/profile/build.py` (new imports: `Field` from pydantic, `ExtensibleModel`, `load_manifest`, `merge_fragments`, `extract_fragments`, `apply_inferred`, `infer_skills`, `Runner`):
 
 ```python
 class BuildReport(ExtensibleModel):
@@ -3088,7 +3088,7 @@ def build_corpus_profile(
     manifest = load_manifest(profile_dir)
     if not manifest.docs:
         raise ValueError(
-            "no sources registered — run 'resume-agent profile add <file>' first"
+            "no sources registered — run 'resume-tailor-harness profile add <file>' first"
         )
     agent = extractor_agent if extractor_agent is not None else build_extractor_agent()
     result = extract_fragments(profile_dir, manifest, agent)
@@ -3134,7 +3134,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/build.py tests/test_profile_build.py
+git add src/resume_tailor_harness/profile/build.py tests/test_profile_build.py
 git commit -m "feat: corpus build orchestration with build report"
 ```
 
@@ -3144,17 +3144,17 @@ git commit -m "feat: corpus build orchestration with build report"
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (`profile_app` commands)
-- Modify: `src/resume_agent/profile/store.py` (`save_facts` becomes atomic)
+- Modify: `src/resume_tailor_harness/cli.py` (`profile_app` commands)
+- Modify: `src/resume_tailor_harness/profile/store.py` (`save_facts` becomes atomic)
 - Test: `tests/test_cli_profile.py` (append; follow that file's existing Typer `CliRunner` + monkeypatch conventions — read it first)
 
 **Interfaces:**
 
 - Produces CLI commands:
-  - `resume-agent profile add <file> [--primary] [--dir data/profile]`
-  - `resume-agent profile remove <ident> [--purge] [--dir data/profile]`
-  - `resume-agent profile sources [--dir data/profile]`
-  - `resume-agent profile build` — now: legacy migration → `build_corpus_profile` → atomic `save_facts` → matrix regeneration from the profile directory's cluster map + overrides → report printout. Keeps `--sources/--out/--refresh` options; `--out` must be `<dir>/facts.json` so consumers cannot cross profile artifact sets.
+  - `resume-tailor-harness profile add <file> [--primary] [--dir data/profile]`
+  - `resume-tailor-harness profile remove <ident> [--purge] [--dir data/profile]`
+  - `resume-tailor-harness profile sources [--dir data/profile]`
+  - `resume-tailor-harness profile build` — now: legacy migration → `build_corpus_profile` → atomic `save_facts` → matrix regeneration from the profile directory's cluster map + overrides → report printout. Keeps `--sources/--out/--refresh` options; `--out` must be `<dir>/facts.json` so consumers cannot cross profile artifact sets.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3182,8 +3182,8 @@ def test_profile_remove(tmp_path, runner):
 
 
 def test_profile_build_uses_corpus_and_writes_matrix(tmp_path, runner, monkeypatch):
-    from resume_agent.models.profile import Contact, ProfileFacts
-    from resume_agent.profile.build import BuildReport
+    from resume_tailor_harness.models.profile import Contact, ProfileFacts
+    from resume_tailor_harness.profile.build import BuildReport
 
     profile_dir = tmp_path / "p"
     doc = tmp_path / "resume.txt"
@@ -3201,13 +3201,13 @@ def test_profile_build_uses_corpus_and_writes_matrix(tmp_path, runner, monkeypat
         return facts, report
 
     monkeypatch.setattr(
-        "resume_agent.profile.build.build_corpus_profile", fake_build_corpus_profile
+        "resume_tailor_harness.profile.build.build_corpus_profile", fake_build_corpus_profile
     )
     monkeypatch.setattr(
-        "resume_agent.cli.get_settings",
+        "resume_tailor_harness.cli.get_settings",
         lambda: type("S", (), {"cheap_model": "cheap", "mid_model": "mid"})(),
     )
-    monkeypatch.setattr("resume_agent.cli.resolve_api_key", lambda _model: "sk-test")
+    monkeypatch.setattr("resume_tailor_harness.cli.resolve_api_key", lambda _model: "sk-test")
     out = profile_dir / "facts.json"
     result = runner.invoke(
         app,
@@ -3244,7 +3244,7 @@ def profile_add(
     dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir", help="Profile data directory."),
 ) -> None:
     """Register a source document in the profile corpus."""
-    from resume_agent.profile.corpus import add_source
+    from resume_tailor_harness.profile.corpus import add_source
 
     doc = add_source(dir, file, primary=primary)
     typer.echo(f"Registered {doc.filename} as {doc.id}{' (primary)' if doc.primary else ''}")
@@ -3257,7 +3257,7 @@ def profile_remove(
     dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir"),
 ) -> None:
     """Unregister a source document (and its cached fragment)."""
-    from resume_agent.profile.corpus import remove_source
+    from resume_tailor_harness.profile.corpus import remove_source
 
     doc = remove_source(dir, ident, purge=purge)
     if doc is None:
@@ -3269,12 +3269,12 @@ def profile_remove(
 @profile_app.command("sources")
 def profile_sources(dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir")) -> None:
     """List registered source documents."""
-    from resume_agent.profile.corpus import load_manifest
-    from resume_agent.profile.fragments import fragment_cache_status
+    from resume_tailor_harness.profile.corpus import load_manifest
+    from resume_tailor_harness.profile.fragments import fragment_cache_status
 
     manifest = load_manifest(dir)
     if not manifest.docs:
-        typer.echo("No sources registered. Use 'resume-agent profile add <file>'.")
+        typer.echo("No sources registered. Use 'resume-tailor-harness profile add <file>'.")
         return
     for doc in manifest.docs:
         flags = " primary" if doc.primary else ""
@@ -3296,16 +3296,16 @@ def profile_build(
     refresh: bool = typer.Option(False, "--refresh", help="Overwrite an existing facts.json."),
 ) -> None:
     """Build facts.json + matrix.json from the source corpus (+ GitHub)."""
-    from resume_agent.profile.build import build_corpus_profile
-    from resume_agent.profile.corpus import migrate_legacy
-    from resume_agent.profile.inference import build_inference_agent
-    from resume_agent.profile.matrix import (
+    from resume_tailor_harness.profile.build import build_corpus_profile
+    from resume_tailor_harness.profile.corpus import migrate_legacy
+    from resume_tailor_harness.profile.inference import build_inference_agent
+    from resume_tailor_harness.profile.matrix import (
         build_matrix,
         load_overrides,
         save_matrix,
     )
-    from resume_agent.profile.merge import build_bullet_dedup_agent
-    from resume_agent.taxonomy.clusters import load_cluster_map
+    from resume_tailor_harness.profile.merge import build_bullet_dedup_agent
+    from resume_tailor_harness.taxonomy.clusters import load_cluster_map
 
     settings = get_settings()
     required_models = {settings.cheap_model, settings.mid_model}
@@ -3363,7 +3363,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/cli.py src/resume_agent/profile/store.py tests/test_cli_profile.py tests/test_profile_store.py
+git add src/resume_tailor_harness/cli.py src/resume_tailor_harness/profile/store.py tests/test_cli_profile.py tests/test_profile_store.py
 git commit -m "feat: profile corpus CLI (add/remove/sources, corpus build + matrix)"
 ```
 
@@ -3390,8 +3390,8 @@ not same canonical token) are never claimable as the JD's own term.
 Add to the **Hot paths** table:
 
 ```markdown
-| `src/resume_agent/profile/corpus.py` | Source registry: manifest + add/remove + legacy migration |
-| `src/resume_agent/profile/matrix.py` | Derived skill matrix + overrides (ban/alias/forbid/category) |
+| `src/resume_tailor_harness/profile/corpus.py` | Source registry: manifest + add/remove + legacy migration |
+| `src/resume_tailor_harness/profile/matrix.py` | Derived skill matrix + overrides (ban/alias/forbid/category) |
 ```
 
 Add one Known design note:

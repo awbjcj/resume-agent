@@ -2,17 +2,17 @@ from typing import Any
 
 from sqlmodel import select
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import IngestOutcome, save_or_upgrade
-from resume_agent.discovery.merge import (
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.ingest import IngestOutcome, save_or_upgrade
+from resume_tailor_harness.discovery.merge import (
     IncomingJob,
     RefreshCompany,
     RefreshText,
     Skip,
     decide,
 )
-from resume_agent.tracking.dedup import compute_dedup_key
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _existing(company="acmecorp", **overrides):

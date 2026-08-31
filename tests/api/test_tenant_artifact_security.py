@@ -4,11 +4,11 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session as SystemSession
 from sqlmodel import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.db import init_db, make_engine
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import provision_workspace
-from resume_agent.tracking.tables import CoverLetter, Job, ResumeVersion
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
+from resume_tailor_harness.tracking.tables import CoverLetter, Job, ResumeVersion
 
 
 def _provision_user(app, *, username: str = "alice") -> tuple[str, Engine]:

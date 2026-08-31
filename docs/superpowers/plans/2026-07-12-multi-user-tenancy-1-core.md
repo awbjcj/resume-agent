@@ -4,7 +4,7 @@
 
 **Goal:** Build the `UserContext` tenancy seam (contextvar-propagated, ADR-0003), per-user Workspaces under `data/users/<id>/`, the shared `system.db` with the `users` table, engine registry, legacy-root adoption, and CLI workspace resolution — leaving the app functionally single-user but running on multi-user plumbing.
 
-**Architecture:** One new package `src/resume_agent/tenancy/` holds the whole seam. A `contextvars.ContextVar` carries the active `UserContext`; `get_settings()` consults it and falls back to env settings (so the 36 domain-layer call sites do not change). System tables use their own SQLAlchemy `DeclarativeBase` — never SQLModel's global metadata — so `create_all` on a workspace engine cannot leak system tables into workspace DBs and vice versa. Spec: `docs/superpowers/specs/2026-07-12-multi-user-tenancy-design.md`; decision record: `docs/adr/0003-contextvar-tenancy-propagation.md`.
+**Architecture:** One new package `src/resume_tailor_harness/tenancy/` holds the whole seam. A `contextvars.ContextVar` carries the active `UserContext`; `get_settings()` consults it and falls back to env settings (so the 36 domain-layer call sites do not change). System tables use their own SQLAlchemy `DeclarativeBase` — never SQLModel's global metadata — so `create_all` on a workspace engine cannot leak system tables into workspace DBs and vice versa. Spec: `docs/superpowers/specs/2026-07-12-multi-user-tenancy-design.md`; decision record: `docs/adr/0003-contextvar-tenancy-propagation.md`.
 
 **Tech Stack:** Python 3.12, FastAPI, SQLModel (workspace DB) + plain SQLAlchemy 2.x ORM (system DB), pydantic-settings, typer, pytest (offline — no network, no API keys).
 
@@ -62,8 +62,8 @@ These corrections are part of the plan and override later reference snippets:
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/__init__.py` (empty)
-- Create: `src/resume_agent/tenancy/context.py`
+- Create: `src/resume_tailor_harness/tenancy/__init__.py` (empty)
+- Create: `src/resume_tailor_harness/tenancy/context.py`
 - Test: `tests/tenancy/__init__.py` (empty), `tests/tenancy/test_context.py`
 
 **Interfaces:**
@@ -82,8 +82,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import (
     UserContext,
     activate,
     current_context,
@@ -157,7 +157,7 @@ def test_activate_is_process_lifetime():
         assert current_context() is ctx
     finally:
         # tests must clean up; the CLI never resets
-        from resume_agent.tenancy.context import _current
+        from resume_tailor_harness.tenancy.context import _current
         _current.reset(token)
 
 
@@ -172,12 +172,12 @@ def test_new_user_id_shape():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/tenancy/test_context.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tenancy'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tenancy'`
 
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/context.py
+# src/resume_tailor_harness/tenancy/context.py
 """The tenancy seam: a contextvar-held UserContext (ADR-0003).
 
 Exactly three places set the context: the API auth dependency (per request),
@@ -200,7 +200,7 @@ from typing import TYPE_CHECKING, Iterator
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
 
 @dataclass(frozen=True)
@@ -220,7 +220,7 @@ class UserContext:
 
 
 _current: contextvars.ContextVar[UserContext | None] = contextvars.ContextVar(
-    "resume_agent_user_context", default=None
+    "resume_tailor_harness_user_context", default=None
 )
 
 
@@ -266,7 +266,7 @@ Expected: 8 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy tests/tenancy
+git add src/resume_tailor_harness/tenancy tests/tenancy
 git commit -m "Adds UserContext contextvar seam (ADR-0003)"
 ```
 
@@ -276,9 +276,9 @@ git commit -m "Adds UserContext contextvar seam (ADR-0003)"
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py:51-54`
-- Modify: `src/resume_agent/api/routers/admin.py:85` (`get_settings.cache_clear()` call site)
-- Modify: `src/resume_agent/services/env_config.py:40` (same)
+- Modify: `src/resume_tailor_harness/config.py:51-54`
+- Modify: `src/resume_tailor_harness/api/routers/admin.py:85` (`get_settings.cache_clear()` call site)
+- Modify: `src/resume_tailor_harness/services/env_config.py:40` (same)
 - Test: `tests/tenancy/test_settings_overlay.py`
 
 **Interfaces:**
@@ -290,8 +290,8 @@ git commit -m "Adds UserContext contextvar seam (ADR-0003)"
 
 ```python
 # tests/tenancy/test_settings_overlay.py
-from resume_agent.config import Settings, env_settings, get_settings
-from resume_agent.tenancy.context import use_context
+from resume_tailor_harness.config import Settings, env_settings, get_settings
+from resume_tailor_harness.tenancy.context import use_context
 
 from tests.tenancy.test_context import make_ctx
 
@@ -318,7 +318,7 @@ Expected: FAIL — `ImportError: cannot import name 'env_settings'`
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/config.py`, replace the cached accessor (lines 51-54):
+In `src/resume_tailor_harness/config.py`, replace the cached accessor (lines 51-54):
 
 ```python
 @lru_cache
@@ -333,7 +333,7 @@ def get_settings() -> Settings:
     Never cache the result across requests: the same call site serves
     different users (ADR-0003).
     """
-    from resume_agent.tenancy.context import current_context
+    from resume_tailor_harness.tenancy.context import current_context
 
     ctx = current_context()
     if ctx is not None:
@@ -343,8 +343,8 @@ def get_settings() -> Settings:
 
 Update the two `cache_clear` call sites (they cleared the old lru_cache on `get_settings`):
 
-- `src/resume_agent/api/routers/admin.py:85`: `get_settings.cache_clear()` → `env_settings.cache_clear()` (add `env_settings` to the `from resume_agent.config import ...` line).
-- `src/resume_agent/services/env_config.py:40`: same substitution.
+- `src/resume_tailor_harness/api/routers/admin.py:85`: `get_settings.cache_clear()` → `env_settings.cache_clear()` (add `env_settings` to the `from resume_tailor_harness.config import ...` line).
+- `src/resume_tailor_harness/services/env_config.py:40`: same substitution.
 
 - [ ] **Step 4: Run the full suite — this touches everything**
 
@@ -354,7 +354,7 @@ Expected: all pass (no context is ever set yet, so every path takes the fallback
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/config.py src/resume_agent/api/routers/admin.py src/resume_agent/services/env_config.py tests/tenancy/test_settings_overlay.py
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/api/routers/admin.py src/resume_tailor_harness/services/env_config.py tests/tenancy/test_settings_overlay.py
 git commit -m "Routes get_settings() through the active UserContext"
 ```
 
@@ -364,12 +364,12 @@ git commit -m "Routes get_settings() through the active UserContext"
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/workspace.py`
+- Create: `src/resume_tailor_harness/tenancy/workspace.py`
 - Test: `tests/tenancy/test_workspace.py`
 
 **Interfaces:**
 
-- Consumes: `Settings` from `resume_agent.config`.
+- Consumes: `Settings` from `resume_tailor_harness.config`.
 - Produces:
   - `WorkspacePaths` (frozen dataclass over `root: Path`) with properties `db_file`, `db_url` (str, `sqlite:///` + posix path), `profile_dir`, `config_dir`, `secrets_env`, `output_dir`, `runs_root`.
   - `workspace_paths(data_root: Path, user_id: str) -> WorkspacePaths`
@@ -382,8 +382,8 @@ git commit -m "Routes get_settings() through the active UserContext"
 # tests/tenancy/test_workspace.py
 from pathlib import Path
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.workspace import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.workspace import (
     effective_settings,
     provision_workspace,
     workspace_paths,
@@ -393,7 +393,7 @@ from resume_agent.tenancy.workspace import (
 def test_workspace_paths_shape(tmp_path):
     ws = workspace_paths(tmp_path, "abc123def456")
     assert ws.root == tmp_path / "users" / "abc123def456"
-    assert ws.db_url == f"sqlite:///{(ws.root / 'resume_agent.db').as_posix()}"
+    assert ws.db_url == f"sqlite:///{(ws.root / 'resume_tailor_harness.db').as_posix()}"
     assert ws.config_dir == ws.root / "config"
     assert ws.secrets_env == ws.root / "secrets.env"
 
@@ -459,7 +459,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/workspace.py
+# src/resume_tailor_harness/tenancy/workspace.py
 """Workspace layout, provisioning, and the effective-Settings overlay.
 
 A Workspace is one user's tree under ``data/users/<user_id>/`` — the unit of
@@ -477,7 +477,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 #: config templates copied (as ``<name>``) from ``<template_dir>/<name>.example``
 _TEMPLATE_CONFIGS = ("search.yaml", "connectors.yaml", "review.yaml", "prune.yaml")
@@ -499,7 +499,7 @@ class WorkspacePaths:
 
     @property
     def db_file(self) -> Path:
-        return self.root / "resume_agent.db"
+        return self.root / "resume_tailor_harness.db"
 
     @property
     def db_url(self) -> str:
@@ -564,7 +564,7 @@ Expected: 6 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/workspace.py tests/tenancy/test_workspace.py
+git add src/resume_tailor_harness/tenancy/workspace.py tests/tenancy/test_workspace.py
 git commit -m "Adds Workspace layout, provisioning, and effective-Settings overlay"
 ```
 
@@ -574,12 +574,12 @@ git commit -m "Adds Workspace layout, provisioning, and effective-Settings overl
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/system_db.py`
+- Create: `src/resume_tailor_harness/tenancy/system_db.py`
 - Test: `tests/tenancy/test_system_db.py`
 
 **Interfaces:**
 
-- Consumes: `_enable_sqlite_write_concurrency` from `resume_agent.db` (reuse the WAL pragmas).
+- Consumes: `_enable_sqlite_write_concurrency` from `resume_tailor_harness.db` (reuse the WAL pragmas).
 - Produces:
   - `SystemBase` (SQLAlchemy `DeclarativeBase` with **its own metadata** — deliberately not SQLModel).
   - `User` ORM model: `id: str` PK, `username: str` unique+indexed, `password_hash: str`, `role: str` default `"user"`, `disabled_at: datetime | None`, `weekly_token_budget: int | None`, `max_active_jobs: int | None`, `max_concurrent_runs: int | None`, `created_at`, `updated_at`.
@@ -595,8 +595,8 @@ from pathlib import Path
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tenancy.system_db import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tenancy.system_db import (
     User,
     init_system_db,
     make_system_engine,
@@ -651,7 +651,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/system_db.py
+# src/resume_tailor_harness/tenancy/system_db.py
 """Shared system database: users (Plan 2 adds invites, tokens, usage, settings).
 
 Deliberately plain SQLAlchemy with a private DeclarativeBase: SQLModel's
@@ -670,7 +670,7 @@ from sqlalchemy import DateTime, Integer, String, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from resume_agent.db import _enable_sqlite_write_concurrency
+from resume_tailor_harness.db import _enable_sqlite_write_concurrency
 
 
 def utc_now() -> datetime:
@@ -726,7 +726,7 @@ Expected: 4 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/system_db.py tests/tenancy/test_system_db.py
+git add src/resume_tailor_harness/tenancy/system_db.py tests/tenancy/test_system_db.py
 git commit -m "Adds system.db with isolated metadata and the User table"
 ```
 
@@ -736,12 +736,12 @@ git commit -m "Adds system.db with isolated metadata and the User table"
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/engines.py`
+- Create: `src/resume_tailor_harness/tenancy/engines.py`
 - Test: `tests/tenancy/test_engines.py`
 
 **Interfaces:**
 
-- Consumes: `make_engine`, `init_db` from `resume_agent.db`.
+- Consumes: `make_engine`, `init_db` from `resume_tailor_harness.db`.
 - Produces: `EngineRegistry` with `get(user_id: str, db_url: str) -> Engine` (lazy create + `init_db` once, cached), `evict(user_id: str) -> None` (dispose + drop — the delete-user precondition), `close_all() -> None` (shutdown).
 
 - [ ] **Step 1: Write the failing tests**
@@ -750,7 +750,7 @@ git commit -m "Adds system.db with isolated metadata and the User table"
 # tests/tenancy/test_engines.py
 from sqlalchemy import inspect
 
-from resume_agent.tenancy.engines import EngineRegistry
+from resume_tailor_harness.tenancy.engines import EngineRegistry
 
 
 def _url(tmp_path, name):
@@ -795,7 +795,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/engines.py
+# src/resume_tailor_harness/tenancy/engines.py
 """Per-user workspace engine registry.
 
 Engines are created lazily through the existing make_engine (WAL + busy
@@ -811,7 +811,7 @@ import threading
 
 from sqlalchemy.engine import Engine
 
-from resume_agent.db import init_db, make_engine
+from resume_tailor_harness.db import init_db, make_engine
 
 
 class EngineRegistry:
@@ -850,7 +850,7 @@ Expected: 4 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/engines.py tests/tenancy/test_engines.py
+git add src/resume_tailor_harness/tenancy/engines.py tests/tenancy/test_engines.py
 git commit -m "Adds per-user workspace EngineRegistry"
 ```
 
@@ -860,7 +860,7 @@ git commit -m "Adds per-user workspace EngineRegistry"
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/migrate.py`
+- Create: `src/resume_tailor_harness/tenancy/migrate.py`
 - Test: `tests/tenancy/test_migrate.py`
 
 **Interfaces:**
@@ -874,13 +874,13 @@ git commit -m "Adds per-user workspace EngineRegistry"
 # tests/tenancy/test_migrate.py
 import pytest
 
-from resume_agent.tenancy.migrate import AdoptionError, adopt_legacy_root, is_legacy_root
+from resume_tailor_harness.tenancy.migrate import AdoptionError, adopt_legacy_root, is_legacy_root
 
 
 def _make_legacy_root(tmp_path):
     root = tmp_path / "data"
     root.mkdir()
-    (root / "resume_agent.db").write_bytes(b"sqlite-bytes")
+    (root / "resume_tailor_harness.db").write_bytes(b"sqlite-bytes")
     (root / "profile").mkdir()
     (root / "profile" / "facts.json").write_text("{}", encoding="utf-8")
     (root / "output").mkdir()
@@ -906,12 +906,12 @@ def test_adopt_moves_children_into_workspace(tmp_path):
     root = _make_legacy_root(tmp_path)
     moved = adopt_legacy_root(root, "abc123def456")
     ws = root / "users" / "abc123def456"
-    assert (ws / "resume_agent.db").read_bytes() == b"sqlite-bytes"
+    assert (ws / "resume_tailor_harness.db").read_bytes() == b"sqlite-bytes"
     assert (ws / "profile" / "facts.json").is_file()
     assert (ws / "secrets.env").read_text(encoding="utf-8") == "GITHUB_TOKEN=tok\n"
     assert not (root / "profile").exists()
     assert not (root / ".env").exists()
-    assert set(moved) == {"resume_agent.db", "profile", "output", ".env"}
+    assert set(moved) == {"resume_tailor_harness.db", "profile", "output", ".env"}
     assert not is_legacy_root(root)
 
 
@@ -920,9 +920,9 @@ def test_adopt_resumes_after_partial_move(tmp_path):
     root = _make_legacy_root(tmp_path)
     ws = root / "users" / "abc123def456"
     ws.mkdir(parents=True)
-    (root / "resume_agent.db").rename(ws / "resume_agent.db")  # simulate crash after 1 move
+    (root / "resume_tailor_harness.db").rename(ws / "resume_tailor_harness.db")  # simulate crash after 1 move
     moved = adopt_legacy_root(root, "abc123def456")
-    assert "resume_agent.db" not in moved
+    assert "resume_tailor_harness.db" not in moved
     assert (ws / "profile").is_dir()
     assert not is_legacy_root(root)
 
@@ -945,7 +945,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/migrate.py
+# src/resume_tailor_harness/tenancy/migrate.py
 """One-time adoption of a legacy single-user data root into the first
 admin's Workspace.
 
@@ -964,9 +964,9 @@ from pathlib import Path
 #: everything a legacy root may contain, in move order (DB artifacts first so
 #: a resumed adoption never sees a root DB without its WAL sidecars)
 _LEGACY_CHILDREN = (
-    "resume_agent.db",
-    "resume_agent.db-wal",
-    "resume_agent.db-shm",
+    "resume_tailor_harness.db",
+    "resume_tailor_harness.db-wal",
+    "resume_tailor_harness.db-shm",
     "profile",
     "config",
     "output",
@@ -1023,7 +1023,7 @@ Expected: 5 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/migrate.py tests/tenancy/test_migrate.py
+git add src/resume_tailor_harness/tenancy/migrate.py tests/tenancy/test_migrate.py
 git commit -m "Adds resumable legacy-root adoption into the admin workspace"
 ```
 
@@ -1033,7 +1033,7 @@ git commit -m "Adds resumable legacy-root adoption into the admin workspace"
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/bootstrap.py`
+- Create: `src/resume_tailor_harness/tenancy/bootstrap.py`
 - Test: `tests/tenancy/test_bootstrap.py`
 
 **Interfaces:**
@@ -1052,14 +1052,14 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.bootstrap import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.bootstrap import (
     BootstrapError,
     build_context,
     ensure_bootstrapped,
 )
-from resume_agent.tenancy.engines import EngineRegistry
-from resume_agent.tenancy.system_db import User, init_system_db, make_system_engine
+from resume_tailor_harness.tenancy.engines import EngineRegistry
+from resume_tailor_harness.tenancy.system_db import User, init_system_db, make_system_engine
 
 
 def _settings(**overrides) -> Settings:
@@ -1119,7 +1119,7 @@ def test_build_context(tmp_path, system_engine):
     assert ctx.user_id == admin.id
     assert ctx.is_admin
     assert ctx.workspace == root / "users" / admin.id
-    assert ctx.settings.db_url.endswith(f"users/{admin.id}/resume_agent.db")
+    assert ctx.settings.db_url.endswith(f"users/{admin.id}/resume_tailor_harness.db")
     assert ctx.engine is registry.get(admin.id, ctx.settings.db_url)
     registry.close_all()
 ```
@@ -1132,7 +1132,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/bootstrap.py
+# src/resume_tailor_harness/tenancy/bootstrap.py
 """First-boot seeding and legacy adoption.
 
 AUTH_USERNAME/AUTH_PASSWORD_HASH are seed-only: read exactly once, when the
@@ -1148,12 +1148,12 @@ from sqlalchemy import select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import UserContext, new_user_id
-from resume_agent.tenancy.engines import EngineRegistry
-from resume_agent.tenancy.migrate import adopt_legacy_root, is_legacy_root
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import UserContext, new_user_id
+from resume_tailor_harness.tenancy.engines import EngineRegistry
+from resume_tailor_harness.tenancy.migrate import adopt_legacy_root, is_legacy_root
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import (
     effective_settings,
     provision_workspace,
     workspace_paths,
@@ -1227,7 +1227,7 @@ Expected: 5 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/bootstrap.py tests/tenancy/test_bootstrap.py
+git add src/resume_tailor_harness/tenancy/bootstrap.py tests/tenancy/test_bootstrap.py
 git commit -m "Adds seed-only bootstrap and the server UserContext constructor"
 ```
 
@@ -1237,9 +1237,9 @@ git commit -m "Adds seed-only bootstrap and the server UserContext constructor"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/app.py` (lifespan, guarded dependencies)
-- Modify: `src/resume_agent/api/deps.py` (`get_session`, new `get_user_context`)
-- Modify: `src/resume_agent/api/runs/manager.py:220-236` (`submit` context capture)
+- Modify: `src/resume_tailor_harness/api/app.py` (lifespan, guarded dependencies)
+- Modify: `src/resume_tailor_harness/api/deps.py` (`get_session`, new `get_user_context`)
+- Modify: `src/resume_tailor_harness/api/runs/manager.py:220-236` (`submit` context capture)
 - Test: `tests/api/test_multi_user_boot.py`, extend `tests/tenancy/test_context.py` coverage via a RunManager test in `tests/api/test_multi_user_boot.py`
 
 **Interfaces:**
@@ -1262,9 +1262,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.tenancy.context import current_context, use_context
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.tenancy.context import current_context, use_context
 
 from tests.tenancy.test_context import make_ctx
 
@@ -1345,7 +1345,7 @@ Expected: FAIL — `app.state` has no `system_engine` / `default_context`; run w
 
 - [ ] **Step 3: Implement the RunManager propagation**
 
-In `src/resume_agent/api/runs/manager.py`, add `import contextvars` to the imports, then in `submit` change the executor call (currently `future = executor.submit(_runner)`):
+In `src/resume_tailor_harness/api/runs/manager.py`, add `import contextvars` to the imports, then in `submit` change the executor call (currently `future = executor.submit(_runner)`):
 
 ```python
             # ADR-0003: the worker runs in the submitting caller's context so
@@ -1359,8 +1359,8 @@ In `src/resume_agent/api/runs/manager.py`, add `import contextvars` to the impor
 - [ ] **Step 4: Implement `get_user_context` and context-aware `get_session` in `deps.py`**
 
 ```python
-# add to src/resume_agent/api/deps.py
-from resume_agent.tenancy.context import UserContext, current_context, use_context
+# add to src/resume_tailor_harness/api/deps.py
+from resume_tailor_harness.tenancy.context import UserContext, current_context, use_context
 
 
 def get_user_context(request: Request) -> Iterator[UserContext | None]:
@@ -1394,10 +1394,10 @@ def get_session(request: Request) -> Iterator[Session]:
 Add imports:
 
 ```python
-from resume_agent.api.deps import get_settings_dep, get_user_context, require_token
-from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
-from resume_agent.tenancy.engines import EngineRegistry
-from resume_agent.tenancy.system_db import init_system_db, make_system_engine
+from resume_tailor_harness.api.deps import get_settings_dep, get_user_context, require_token
+from resume_tailor_harness.tenancy.bootstrap import build_context, ensure_bootstrapped
+from resume_tailor_harness.tenancy.engines import EngineRegistry
+from resume_tailor_harness.tenancy.system_db import init_system_db, make_system_engine
 ```
 
 Add the boot-mode predicate next to `spa_dist_dir`:
@@ -1469,7 +1469,7 @@ Expected: full suite green (every existing API test uses in-memory SQLite or no 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/app.py src/resume_agent/api/deps.py src/resume_agent/api/runs/manager.py tests/api/test_multi_user_boot.py
+git add src/resume_tailor_harness/api/app.py src/resume_tailor_harness/api/deps.py src/resume_tailor_harness/api/runs/manager.py tests/api/test_multi_user_boot.py
 git commit -m "Boots multi-user apps through UserContext with run propagation"
 ```
 
@@ -1479,8 +1479,8 @@ git commit -m "Boots multi-user apps through UserContext with run propagation"
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/local.py`
-- Modify: `src/resume_agent/cli.py` (root `@app.callback()`)
+- Create: `src/resume_tailor_harness/tenancy/local.py`
+- Modify: `src/resume_tailor_harness/cli.py` (root `@app.callback()`)
 - Modify: `CLAUDE.md` (tenancy section)
 - Test: `tests/tenancy/test_local.py`
 
@@ -1496,8 +1496,8 @@ git commit -m "Boots multi-user apps through UserContext with run propagation"
 import pytest
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.local import resolve_local_context
-from resume_agent.tenancy.system_db import User, init_system_db, make_system_engine
+from resume_tailor_harness.tenancy.local import resolve_local_context
+from resume_tailor_harness.tenancy.system_db import User, init_system_db, make_system_engine
 
 
 def _seed(tmp_path, *users):
@@ -1554,7 +1554,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/local.py
+# src/resume_tailor_harness/tenancy/local.py
 """CLI-side context resolution (the third ADR-0003 set-point).
 
 Operator affordance only: the domain CLI works on a local data root
@@ -1570,11 +1570,11 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.config import env_settings
-from resume_agent.db import init_db, make_engine
-from resume_agent.tenancy.context import UserContext, activate
-from resume_agent.tenancy.system_db import User, init_system_db, make_system_engine
-from resume_agent.tenancy.workspace import effective_settings, workspace_paths
+from resume_tailor_harness.config import env_settings
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tenancy.context import UserContext, activate
+from resume_tailor_harness.tenancy.system_db import User, init_system_db, make_system_engine
+from resume_tailor_harness.tenancy.workspace import effective_settings, workspace_paths
 
 
 def resolve_local_context(
@@ -1628,7 +1628,7 @@ def activate_local_context(data_root: Path | str, username: str | None) -> UserC
 
 - [ ] **Step 4: Wire the CLI**
 
-In `src/resume_agent/cli.py`, directly under `app = typer.Typer(...)` (line 41), add:
+In `src/resume_tailor_harness/cli.py`, directly under `app = typer.Typer(...)` (line 41), add:
 
 ```python
 @app.callback()
@@ -1639,7 +1639,7 @@ def _main(
         help="Workspace username on a multi-user data root (default: first admin).",
     ),
 ) -> None:
-    from resume_agent.tenancy.local import activate_local_context
+    from resume_tailor_harness.tenancy.local import activate_local_context
 
     activate_local_context(Path("data"), user)
 ```
@@ -1671,7 +1671,7 @@ use their own SQLAlchemy metadata so they never leak into workspace DBs.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/local.py src/resume_agent/cli.py tests/tenancy/test_local.py CLAUDE.md
+git add src/resume_tailor_harness/tenancy/local.py src/resume_tailor_harness/cli.py tests/tenancy/test_local.py CLAUDE.md
 git commit -m "Resolves CLI workspace context on multi-user data roots"
 ```markdown
 ### Tenancy context (ADR-0003)
@@ -1689,6 +1689,6 @@ use their own SQLAlchemy metadata so they never leak into workspace DBs.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/local.py src/resume_agent/cli.py tests/tenancy/test_local.py CLAUDE.md
+git add src/resume_tailor_harness/tenancy/local.py src/resume_tailor_harness/cli.py tests/tenancy/test_local.py CLAUDE.md
 git commit -m "Resolves CLI workspace context on multi-user data roots"
 ```

@@ -7,16 +7,16 @@ import json as json_module
 import httpx
 import pytest
 
-import resume_agent.discovery.connectors.workday as workday
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.workday import (
+import resume_tailor_harness.discovery.connectors.workday as workday
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.workday import (
     apply_detail,
     cxs_detail_url,
     cxs_jobs_url,
     list_request_body,
     parse_list_rows,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers")
 FACETED_PAGE = json.loads(
@@ -58,9 +58,9 @@ def test_default_facets_dir_falls_back_without_context():
 
 
 def test_default_facets_dir_resolves_per_tenant_workspace(tmp_path):
-    from resume_agent.config import Settings
-    from resume_agent.tenancy.context import UserContext, use_context
-    from resume_agent.tenancy.workspace import WorkspacePaths
+    from resume_tailor_harness.config import Settings
+    from resume_tailor_harness.tenancy.context import UserContext, use_context
+    from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
     root = tmp_path / "users" / "abc123def456"
     context = UserContext(
@@ -304,7 +304,7 @@ def test_checked_passes_a_successful_response_through():
 
 
 def test_workday_inherits_the_shared_retry_constants():
-    from resume_agent.discovery.connectors import http as board
+    from resume_tailor_harness.discovery.connectors import http as board
 
     assert workday._RETRY_STATUSES is board.RETRY_STATUSES
     assert workday._RETRY_ATTEMPTS == board.RETRY_ATTEMPTS
@@ -317,7 +317,7 @@ def test_fetch_workday_recovers_when_list_page_throttled(monkeypatch):
     lives in the pool, so patching ``board.post`` would replace the very layer
     under test.
     """
-    from resume_agent.discovery.connectors.http import BoardSession, board_session
+    from resume_tailor_harness.discovery.connectors.http import BoardSession, board_session
 
     monkeypatch.setattr("time.sleep", lambda _seconds: None)
     attempts: list[str] = []
@@ -527,7 +527,7 @@ def test_apply_detail_ignores_a_blank_hiring_organization():
 def test_workday_detail_renders_time_and_remote_type():
     """`timeType` and `remoteType` are the only statement of the employment and
     workplace types -- neither appears in `jobDescription`."""
-    from resume_agent.discovery.connectors.workday import WorkdayRow, apply_detail
+    from resume_tailor_harness.discovery.connectors.workday import WorkdayRow, apply_detail
 
     row = WorkdayRow(
         source="workday",

@@ -1,32 +1,32 @@
 """Contract tests for the production agents' stable system instructions."""
 
-from resume_agent.cover_letter.agents import (
+from resume_tailor_harness.cover_letter.agents import (
     _DRAFT_INSTRUCTIONS as COVER_DRAFT_INSTRUCTIONS,
     _REVISE_INSTRUCTIONS as COVER_REVISE_INSTRUCTIONS,
     _REVISION_INSTRUCTIONS as COVER_REVISION_INSTRUCTIONS,
 )
-from resume_agent.discovery.extract import _INSTRUCTIONS as EXTRACT_INSTRUCTIONS
-from resume_agent.discovery.fit import _INSTRUCTIONS as FIT_INSTRUCTIONS
-from resume_agent.discovery.relevance import _INSTRUCTIONS as RELEVANCE_INSTRUCTIONS
-from resume_agent.discovery.url_ingest.llm import (
+from resume_tailor_harness.discovery.extract import _INSTRUCTIONS as EXTRACT_INSTRUCTIONS
+from resume_tailor_harness.discovery.fit import _INSTRUCTIONS as FIT_INSTRUCTIONS
+from resume_tailor_harness.discovery.relevance import _INSTRUCTIONS as RELEVANCE_INSTRUCTIONS
+from resume_tailor_harness.discovery.url_ingest.llm import (
     _INSTRUCTIONS as URL_EXTRACT_INSTRUCTIONS,
 )
-from resume_agent.profile.extractor import _INSTRUCTIONS as PROFILE_INSTRUCTIONS
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.profile.extractor import _INSTRUCTIONS as PROFILE_INSTRUCTIONS
+from resume_tailor_harness.profile.synthesis import (
     _ENTAILMENT_INSTRUCTIONS,
     _SYNTHESIS_INSTRUCTIONS,
 )
-from resume_agent.suggestions.agents import (
+from resume_tailor_harness.suggestions.agents import (
     _FORMAT_INSTRUCTIONS as SUGGESTION_FORMAT_INSTRUCTIONS,
     _SEARCH_INSTRUCTIONS as SUGGESTION_SEARCH_INSTRUCTIONS,
 )
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.tailor.agents import (
     _REVISER_INSTRUCTIONS as RESUME_REVISER_INSTRUCTIONS,
     _REVISION_INSTRUCTIONS as RESUME_REVISION_INSTRUCTIONS,
     _TAILOR_INSTRUCTIONS,
     _reviewer_instructions,
 )
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.tracking.canonicalize import (
     _INSTRUCTIONS as CANONICALIZE_INSTRUCTIONS,
     _THEME_INSTRUCTIONS,
 )

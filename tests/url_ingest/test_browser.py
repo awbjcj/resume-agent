@@ -3,7 +3,7 @@ from typing import Any, cast
 import pytest
 from playwright.sync_api import Error as PlaywrightError
 
-import resume_agent.discovery.url_ingest.browser as browser
+import resume_tailor_harness.discovery.url_ingest.browser as browser
 
 
 class _FakePage:

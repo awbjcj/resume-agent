@@ -1,5 +1,5 @@
-from resume_agent.discovery.source_resolution import identity
-from resume_agent.discovery.source_resolution.identity import (
+from resume_tailor_harness.discovery.source_resolution import identity
+from resume_tailor_harness.discovery.source_resolution.identity import (
     company_claims_from_html,
     company_names_match,
     page_matches_company,

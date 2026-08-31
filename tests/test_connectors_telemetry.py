@@ -1,4 +1,4 @@
-from resume_agent.discovery.connectors.telemetry import read_runs, record_run
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs, record_run
 
 
 def test_read_runs_missing_file_returns_empty(tmp_path):

@@ -27,15 +27,15 @@ from typing import cast
 
 import pytest
 
-import resume_agent.discovery.relevance as relevance_mod
-from resume_agent.cover_letter.agents import build_cover_letter_agent
-from resume_agent.discovery.extract import build_extract_agent
-from resume_agent.discovery.fit import build_fit_agent
-from resume_agent.discovery.relevance import build_relevance_agent
-from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
-from resume_agent.llm_runner import AgentRunner, build_model, use_json_mode_for
-from resume_agent.profile.extractor import build_extractor_agent
-from resume_agent.tailor.agents import build_reviewer_agent, build_tailor_agent
+import resume_tailor_harness.discovery.relevance as relevance_mod
+from resume_tailor_harness.cover_letter.agents import build_cover_letter_agent
+from resume_tailor_harness.discovery.extract import build_extract_agent
+from resume_tailor_harness.discovery.fit import build_fit_agent
+from resume_tailor_harness.discovery.relevance import build_relevance_agent
+from resume_tailor_harness.discovery.url_ingest.llm import build_url_extract_agent
+from resume_tailor_harness.llm_runner import AgentRunner, build_model, use_json_mode_for
+from resume_tailor_harness.profile.extractor import build_extractor_agent
+from resume_tailor_harness.tailor.agents import build_reviewer_agent, build_tailor_agent
 
 # (model_id, expected use_json_mode): every provider keeps native structured
 # outputs. JSON mode now has exactly one trigger, covered separately below:

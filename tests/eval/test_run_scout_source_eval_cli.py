@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 import evals.run_scout_source_eval as run_scout_source_eval
-from resume_agent.discovery.source_resolution.models import CompanySourceResolution
+from resume_tailor_harness.discovery.source_resolution.models import CompanySourceResolution
 
 
 def test_live_source_cli_writes_a_read_only_result_report(tmp_path, monkeypatch):

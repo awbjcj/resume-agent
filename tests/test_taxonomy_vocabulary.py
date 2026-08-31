@@ -1,6 +1,6 @@
 """Fixed category vocabulary invariants."""
 
-from resume_agent.taxonomy.vocabulary import (
+from resume_tailor_harness.taxonomy.vocabulary import (
     LEGACY_GROUP_REMAP,
     SKILL_GROUPS,
     SOFT_CATEGORY_SLUGS,
@@ -44,6 +44,6 @@ def test_legacy_remap_covers_clean_renames_but_not_ambiguous_splits():
 
 
 def test_groups_module_reexports_vocabulary():
-    from resume_agent.taxonomy import groups
+    from resume_tailor_harness.taxonomy import groups
 
     assert groups.SKILL_GROUPS is SKILL_GROUPS

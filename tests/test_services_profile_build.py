@@ -1,19 +1,19 @@
 import pytest
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.build import BuildReport
-from resume_agent.profile.manual_skills import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.build import BuildReport
+from resume_tailor_harness.profile.manual_skills import (
     ManualSkillEntry,
     ManualSkillsLedger,
     save_manual_skills,
 )
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.effective import build_effective_taxonomy
-from resume_agent.profile.store import load_facts
-from resume_agent.services.profile_build import run_corpus_build
-from resume_agent.taxonomy.groups import group_map_path, load_group_map
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.state import load_taxonomy_state
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.effective import build_effective_taxonomy
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.services.profile_build import run_corpus_build
+from resume_tailor_harness.taxonomy.groups import group_map_path, load_group_map
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.state import load_taxonomy_state
 
 
 def test_run_corpus_build_derives_groups_from_the_shared_taxonomy_tree(
@@ -32,20 +32,20 @@ def test_run_corpus_build_derives_groups_from_the_shared_taxonomy_tree(
     def fake_build(*_args, **_kwargs):
         return facts, BuildReport()
 
-    monkeypatch.setattr("resume_agent.profile.build.build_corpus_profile", fake_build)
+    monkeypatch.setattr("resume_tailor_harness.profile.build.build_corpus_profile", fake_build)
     for target in (
-        "resume_agent.profile.inference.build_inference_agent",
-        "resume_agent.profile.merge.build_bullet_dedup_agent",
-        "resume_agent.profile.synthesis.build_synthesis_agent",
-        "resume_agent.profile.synthesis.build_entailment_agent",
-        "resume_agent.profile.project_extractor.build_project_extractor_agent",
-        "resume_agent.tracking.canonicalize.build_incremental_canonicalizer_agent",
-        "resume_agent.tracking.canonicalize.build_incremental_themer_agent",
+        "resume_tailor_harness.profile.inference.build_inference_agent",
+        "resume_tailor_harness.profile.merge.build_bullet_dedup_agent",
+        "resume_tailor_harness.profile.synthesis.build_synthesis_agent",
+        "resume_tailor_harness.profile.synthesis.build_entailment_agent",
+        "resume_tailor_harness.profile.project_extractor.build_project_extractor_agent",
+        "resume_tailor_harness.tracking.canonicalize.build_incremental_canonicalizer_agent",
+        "resume_tailor_harness.tracking.canonicalize.build_incremental_themer_agent",
     ):
         monkeypatch.setattr(target, lambda: object())
 
     legacy_path = group_map_path(profile_dir)
-    from resume_agent.taxonomy.groups import save_group_map
+    from resume_tailor_harness.taxonomy.groups import save_group_map
 
     save_group_map({"python": "languages", "kubernetes": "cloud-infra"}, legacy_path)
     calls: list[set[str]] = []
@@ -65,7 +65,7 @@ def test_run_corpus_build_derives_groups_from_the_shared_taxonomy_tree(
         )
         return {}
 
-    monkeypatch.setattr("resume_agent.services.match_gap.refresh_clusters", refresh)
+    monkeypatch.setattr("resume_tailor_harness.services.match_gap.refresh_clusters", refresh)
 
     first = run_corpus_build(
         profile_dir=profile_dir,
@@ -96,7 +96,7 @@ def test_run_corpus_build_derives_groups_from_the_shared_taxonomy_tree(
     # the matrix decorator may consult it again.  A later edit is deliberately
     # not an implicit taxonomy correction.
     monkeypatch.setattr(
-        "resume_agent.taxonomy.groups.load_group_map",
+        "resume_tailor_harness.taxonomy.groups.load_group_map",
         lambda _path: (_ for _ in ()).throw(AssertionError("legacy map reread")),
     )
     run_corpus_build(
@@ -116,17 +116,17 @@ def test_run_corpus_build_replays_manual_skills_onto_fresh_facts(tmp_path, monke
     )
 
     monkeypatch.setattr(
-        "resume_agent.profile.build.build_corpus_profile",
+        "resume_tailor_harness.profile.build.build_corpus_profile",
         lambda *_a, **_k: (facts, BuildReport()),
     )
     for target in (
-        "resume_agent.profile.inference.build_inference_agent",
-        "resume_agent.profile.merge.build_bullet_dedup_agent",
-        "resume_agent.profile.synthesis.build_synthesis_agent",
-        "resume_agent.profile.synthesis.build_entailment_agent",
-        "resume_agent.profile.project_extractor.build_project_extractor_agent",
-        "resume_agent.tracking.canonicalize.build_incremental_canonicalizer_agent",
-        "resume_agent.tracking.canonicalize.build_incremental_themer_agent",
+        "resume_tailor_harness.profile.inference.build_inference_agent",
+        "resume_tailor_harness.profile.merge.build_bullet_dedup_agent",
+        "resume_tailor_harness.profile.synthesis.build_synthesis_agent",
+        "resume_tailor_harness.profile.synthesis.build_entailment_agent",
+        "resume_tailor_harness.profile.project_extractor.build_project_extractor_agent",
+        "resume_tailor_harness.tracking.canonicalize.build_incremental_canonicalizer_agent",
+        "resume_tailor_harness.tracking.canonicalize.build_incremental_themer_agent",
     ):
         monkeypatch.setattr(target, lambda: object())
 
@@ -142,7 +142,7 @@ def test_run_corpus_build_replays_manual_skills_onto_fresh_facts(tmp_path, monke
         )
         return {}
 
-    monkeypatch.setattr("resume_agent.services.match_gap.refresh_clusters", refresh)
+    monkeypatch.setattr("resume_tailor_harness.services.match_gap.refresh_clusters", refresh)
 
     save_manual_skills(
         ManualSkillsLedger(
@@ -189,20 +189,20 @@ def test_run_corpus_build_does_not_publish_facts_when_classification_fails(
         skills={"Languages": [Skill(name="Python")]},
     )
     monkeypatch.setattr(
-        "resume_agent.profile.build.build_corpus_profile",
+        "resume_tailor_harness.profile.build.build_corpus_profile",
         lambda *_a, **_k: (fresh, BuildReport()),
     )
     for target in (
-        "resume_agent.profile.inference.build_inference_agent",
-        "resume_agent.profile.merge.build_bullet_dedup_agent",
-        "resume_agent.profile.synthesis.build_synthesis_agent",
-        "resume_agent.profile.synthesis.build_entailment_agent",
-        "resume_agent.profile.project_extractor.build_project_extractor_agent",
-        "resume_agent.profile.aspect_classifier.build_aspect_classifier_agent",
+        "resume_tailor_harness.profile.inference.build_inference_agent",
+        "resume_tailor_harness.profile.merge.build_bullet_dedup_agent",
+        "resume_tailor_harness.profile.synthesis.build_synthesis_agent",
+        "resume_tailor_harness.profile.synthesis.build_entailment_agent",
+        "resume_tailor_harness.profile.project_extractor.build_project_extractor_agent",
+        "resume_tailor_harness.profile.aspect_classifier.build_aspect_classifier_agent",
     ):
         monkeypatch.setattr(target, lambda: object())
     monkeypatch.setattr(
-        "resume_agent.services.match_gap.refresh_clusters",
+        "resume_tailor_harness.services.match_gap.refresh_clusters",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("classification failed")),
     )
 
@@ -240,20 +240,20 @@ def test_run_corpus_build_rolls_back_facts_when_matrix_publication_fails(
         skills={"Languages": [Skill(name="Python")]},
     )
     monkeypatch.setattr(
-        "resume_agent.profile.build.build_corpus_profile",
+        "resume_tailor_harness.profile.build.build_corpus_profile",
         lambda *_a, **_k: (fresh, BuildReport()),
     )
     for target in (
-        "resume_agent.profile.inference.build_inference_agent",
-        "resume_agent.profile.merge.build_bullet_dedup_agent",
-        "resume_agent.profile.synthesis.build_synthesis_agent",
-        "resume_agent.profile.synthesis.build_entailment_agent",
-        "resume_agent.profile.project_extractor.build_project_extractor_agent",
-        "resume_agent.profile.aspect_classifier.build_aspect_classifier_agent",
+        "resume_tailor_harness.profile.inference.build_inference_agent",
+        "resume_tailor_harness.profile.merge.build_bullet_dedup_agent",
+        "resume_tailor_harness.profile.synthesis.build_synthesis_agent",
+        "resume_tailor_harness.profile.synthesis.build_entailment_agent",
+        "resume_tailor_harness.profile.project_extractor.build_project_extractor_agent",
+        "resume_tailor_harness.profile.aspect_classifier.build_aspect_classifier_agent",
     ):
         monkeypatch.setattr(target, lambda: object())
     monkeypatch.setattr(
-        "resume_agent.profile.matrix.save_matrix",
+        "resume_tailor_harness.profile.matrix.save_matrix",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("matrix write failed")),
     )
 
@@ -272,15 +272,15 @@ def _stub_build_agents(monkeypatch, facts):
     def fake_build(*_args, **_kwargs):
         return facts, BuildReport()
 
-    monkeypatch.setattr("resume_agent.profile.build.build_corpus_profile", fake_build)
+    monkeypatch.setattr("resume_tailor_harness.profile.build.build_corpus_profile", fake_build)
     for target in (
-        "resume_agent.profile.inference.build_inference_agent",
-        "resume_agent.profile.merge.build_bullet_dedup_agent",
-        "resume_agent.profile.synthesis.build_synthesis_agent",
-        "resume_agent.profile.synthesis.build_entailment_agent",
-        "resume_agent.profile.project_extractor.build_project_extractor_agent",
-        "resume_agent.tracking.canonicalize.build_incremental_canonicalizer_agent",
-        "resume_agent.tracking.canonicalize.build_incremental_themer_agent",
+        "resume_tailor_harness.profile.inference.build_inference_agent",
+        "resume_tailor_harness.profile.merge.build_bullet_dedup_agent",
+        "resume_tailor_harness.profile.synthesis.build_synthesis_agent",
+        "resume_tailor_harness.profile.synthesis.build_entailment_agent",
+        "resume_tailor_harness.profile.project_extractor.build_project_extractor_agent",
+        "resume_tailor_harness.tracking.canonicalize.build_incremental_canonicalizer_agent",
+        "resume_tailor_harness.tracking.canonicalize.build_incremental_themer_agent",
     ):
         monkeypatch.setattr(target, lambda: object())
 
@@ -306,7 +306,7 @@ def test_run_corpus_build_carries_the_regroup_telemetry(tmp_path, monkeypatch):
         )
         return {"elapsedMs": 12, "embeddingCacheHits": 3}
 
-    monkeypatch.setattr("resume_agent.services.match_gap.refresh_clusters", refresh)
+    monkeypatch.setattr("resume_tailor_harness.services.match_gap.refresh_clusters", refresh)
 
     report = run_corpus_build(
         profile_dir=profile_dir,

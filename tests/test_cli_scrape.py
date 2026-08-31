@@ -1,8 +1,8 @@
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
-from resume_agent.services import discovery as discovery_service
+from resume_tailor_harness import cli
+from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob
+from resume_tailor_harness.services import discovery as discovery_service
 
 runner = CliRunner()
 

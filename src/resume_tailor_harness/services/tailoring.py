@@ -1,0 +1,105 @@
+"""Tailor use-case: resolve targets, load config/facts, build agents, run the loop."""
+
+from __future__ import annotations
+
+
+from sqlmodel import Session
+
+from resume_tailor_harness.career_skills.models import ResumeAuthoringSkillName
+from resume_tailor_harness.career_skills.registry import CareerSkillRegistry
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.profile.effective import build_effective_taxonomy
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.render.export import export_job_artifacts
+from resume_tailor_harness.services.agents import TailorBundle, build_tailor_bundle  # noqa: F401  (TailorBundle re-exported for callers/tests)
+from resume_tailor_harness.tailor.agents import model_for_tier
+from resume_tailor_harness.tailor.review_config import load_review_config
+from resume_tailor_harness.tailor.service import TailorOutcome, tailor_jobs
+from resume_tailor_harness.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tracking.repository import get_job, jobs_by_status
+from resume_tailor_harness.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tenancy.limits import enforce_active_budget
+from resume_tailor_harness.tenancy.paths import (
+    FACTS_PATH as DEFAULT_FACTS,
+    REVIEW_DEEP_PATH as DEFAULT_REVIEW_DEEP,  # noqa: F401  (re-exported for the runs router)
+    REVIEW_PATH as DEFAULT_REVIEW,
+    resolve_tenant_path,
+)
+
+
+def resolve_targets(
+    session: Session, *, job_ids: list[int] | None, approved: bool
+) -> list[Job]:
+    if job_ids:
+        found = [get_job(session, jid) for jid in job_ids]
+        return [j for j in found if j is not None]
+    if approved:
+        return jobs_by_status(session, JobStatus.approved.value)
+    return []
+
+
+def tailor(
+    session: Session,
+    *,
+    job_ids: list[int] | None = None,
+    approved: bool = False,
+    review_path: str = DEFAULT_REVIEW,
+    facts_path: str = DEFAULT_FACTS,
+    reporter: ProgressReporter | None = None,
+    fail_on_partial: bool = False,
+    authoring_skill: ResumeAuthoringSkillName | str | None = None,
+    registry: CareerSkillRegistry | None = None,
+) -> TailorOutcome:
+    targets = resolve_targets(session, job_ids=job_ids, approved=approved)
+    if not targets:
+        return TailorOutcome()
+    config = load_review_config(review_path)
+    enforce_active_budget()
+    facts = load_facts(facts_path)
+    profile_dir = resolve_tenant_path(facts_path).parent
+    taxonomy = build_effective_taxonomy(profile_dir)
+    matrix_facts = facts if isinstance(facts, ProfileFacts) else None
+    skill_matrix = load_matrix(
+        profile_dir / "matrix.json", facts=matrix_facts, taxonomy=taxonomy
+    )
+    style_guide = load_style_guide(config.style_guide_path)
+    if authoring_skill is None and registry is None:
+        bundle = build_tailor_bundle(config, style_guide=style_guide)
+    else:
+        bundle = build_tailor_bundle(
+            config,
+            style_guide=style_guide,
+            authoring_skill=authoring_skill,
+            registry=registry,
+        )
+    # Mirrors build_tailor_bundle's own tier lookup, so `model` records the
+    # model that actually ran.
+    model = model_for_tier(getattr(config, "tailor_tier", "premium"))
+    outcome = tailor_jobs(
+        session,
+        targets,
+        facts,
+        config,
+        bundle.tailor,
+        bundle.reviewers,
+        bundle.reviser,
+        reporter=reporter,
+        # Compatibility keyword for adapters/tests written before the
+        # evidence-portfolio rename. `tailor_jobs` resolves it as the planner.
+        match_plan_agent=bundle.evidence_portfolio or bundle.match_plan,
+        skill_matrix=skill_matrix,
+        cluster_map=taxonomy.cluster_map,
+        model=model,
+        taxonomy=taxonomy,
+    )
+    for job_id in outcome.versions:
+        export_job_artifacts(session, job_id)
+    if fail_on_partial and outcome.failures and not outcome.versions:
+        job_id, failure = next(iter(outcome.failures.items()))
+        raise RuntimeError(
+            f"Tailoring failed for all {len(outcome.failures)} job(s). "
+            f"First cause (job {job_id}): {failure.error_type}: {failure.message}"
+        )
+    return outcome

@@ -12,7 +12,7 @@
 
 ## Evidence This Plan Is Built On
 
-Measured against `data/users/1398ad91b2b2/resume_agent.db` (77 `resume_versions`, 26 jobs) and the shipped configs, 2026-07-27. Every row was reproduced, not inferred.
+Measured against `data/users/1398ad91b2b2/resume_tailor_harness.db` (77 `resume_versions`, 26 jobs) and the shipped configs, 2026-07-27. Every row was reproduced, not inferred.
 
 ### Scoring and the gate
 
@@ -99,17 +99,17 @@ A revision costs one LLM call per job per round and is, measurably, a coin flip.
 
 | Path | Change |
 |---|---|
-| `src/resume_agent/tailor/verdict.py` | `aggregate_score: int \| None`; `None` means "no advisory bar ran", never `0`. |
-| `src/resume_agent/tailor/workflow.py` | Panel always runs; citation-slip free retry; revise from the best round. |
-| `src/resume_agent/tailor/provenance.py` | `renderable_profile()` projection; `summary_provenance` joins the checked uses. |
-| `src/resume_agent/tailor/tailoring.py` | Writer/reviser inputs use `renderable_profile`; **reviser receives `jd_text`**. |
-| `src/resume_agent/tailor/agents.py` | Inferred-skill rule; normalization contradiction resolved; outcome rule; summary rule. |
-| `src/resume_agent/tailor/review_config.py` | `provenance_retry_budget: int = 1`. |
-| `src/resume_agent/tailor/service.py` | Persists `review_score=None` correctly. |
-| `src/resume_agent/models/resume.py` | `ResumeContent.summary_provenance: list[str]`. |
-| `src/resume_agent/tracking/repository.py` | `_score_key` orders `None` last. |
-| `src/resume_agent/api/schemas/jobs.py` | `ResumeVersionOut.failed_gates: list[str]`. |
-| `src/resume_agent/api/routers/jobs.py` | Project `failed_gates` from `critique_json`. |
+| `src/resume_tailor_harness/tailor/verdict.py` | `aggregate_score: int \| None`; `None` means "no advisory bar ran", never `0`. |
+| `src/resume_tailor_harness/tailor/workflow.py` | Panel always runs; citation-slip free retry; revise from the best round. |
+| `src/resume_tailor_harness/tailor/provenance.py` | `renderable_profile()` projection; `summary_provenance` joins the checked uses. |
+| `src/resume_tailor_harness/tailor/tailoring.py` | Writer/reviser inputs use `renderable_profile`; **reviser receives `jd_text`**. |
+| `src/resume_tailor_harness/tailor/agents.py` | Inferred-skill rule; normalization contradiction resolved; outcome rule; summary rule. |
+| `src/resume_tailor_harness/tailor/review_config.py` | `provenance_retry_budget: int = 1`. |
+| `src/resume_tailor_harness/tailor/service.py` | Persists `review_score=None` correctly. |
+| `src/resume_tailor_harness/models/resume.py` | `ResumeContent.summary_provenance: list[str]`. |
+| `src/resume_tailor_harness/tracking/repository.py` | `_score_key` orders `None` last. |
+| `src/resume_tailor_harness/api/schemas/jobs.py` | `ResumeVersionOut.failed_gates: list[str]`. |
+| `src/resume_tailor_harness/api/routers/jobs.py` | Project `failed_gates` from `critique_json`. |
 | `config/review.yaml.example`, `config/review_deep.yaml.example` | `score_bands: true`; deep gains `early_stop_on_regression: true`. |
 
 **Modified web files**
@@ -134,7 +134,7 @@ A revision costs one LLM call per job per round and is, measurably, a coin flip.
 
 ## Task 1: The score is unknown, not zero
 
-**Files:** modify `src/resume_agent/tailor/verdict.py`, `src/resume_agent/tracking/repository.py` · test `tests/test_tailor_verdict.py`
+**Files:** modify `src/resume_tailor_harness/tailor/verdict.py`, `src/resume_tailor_harness/tracking/repository.py` · test `tests/test_tailor_verdict.py`
 
 **Step 1 — Failing tests.**
 - [ ] `aggregate([provenance_fail], cfg).aggregate_score is None`.
@@ -152,7 +152,7 @@ A revision costs one LLM call per job per round and is, measurably, a coin flip.
 
 ## Task 2: The panel always runs
 
-**Files:** modify `src/resume_agent/tailor/workflow.py` · test `tests/test_tailor_workflow.py`
+**Files:** modify `src/resume_tailor_harness/tailor/workflow.py` · test `tests/test_tailor_workflow.py`
 
 The skip saved one merged advisory call and cost a blind revision on 25% of rounds.
 
@@ -167,7 +167,7 @@ The skip saved one merged advisory call and cost a blind revision on 25% of roun
 
 ## Task 3: A citation slip does not consume a round
 
-**Files:** modify `src/resume_agent/tailor/workflow.py`, `src/resume_agent/tailor/review_config.py` · test `tests/test_tailor_workflow.py`
+**Files:** modify `src/resume_tailor_harness/tailor/workflow.py`, `src/resume_tailor_harness/tailor/review_config.py` · test `tests/test_tailor_workflow.py`
 
 **Step 1 — Failing tests.**
 - [ ] Provenance fails round 1, everything passes round 2 → a **third** round runs despite `max_rounds: 2`.
@@ -179,7 +179,7 @@ The skip saved one merged advisory call and cost a blind revision on 25% of roun
 - [ ] `ReviewConfig.provenance_retry_budget: int = Field(default=1, ge=0)`.
 - [ ] Track `free_retries_used` in both loop bodies.
 
-> **⚑ Your input wanted here.** The predicate deciding when a round is "only a citation slip" is a policy judgement that governs how much LLM budget a bad draft can burn — not boilerplate. Write `_is_citation_slip` in `src/resume_agent/tailor/workflow.py`; the signature and docstring will be prepared for you:
+> **⚑ Your input wanted here.** The predicate deciding when a round is "only a citation slip" is a policy judgement that governs how much LLM budget a bad draft can burn — not boilerplate. Write `_is_citation_slip` in `src/resume_tailor_harness/tailor/workflow.py`; the signature and docstring will be prepared for you:
 >
 > ```python
 > def _is_citation_slip(verdict: PanelVerdict, config: ReviewConfig) -> bool:
@@ -211,7 +211,7 @@ The skip saved one merged advisory call and cost a blind revision on 25% of roun
 
 ## Task 4: The writer never sees a fact it may not render
 
-**Files:** modify `src/resume_agent/tailor/provenance.py`, `src/resume_agent/tailor/tailoring.py` · test `tests/test_tailor_provenance.py`, `tests/test_tailor_tailoring.py`
+**Files:** modify `src/resume_tailor_harness/tailor/provenance.py`, `src/resume_tailor_harness/tailor/tailoring.py` · test `tests/test_tailor_provenance.py`, `tests/test_tailor_tailoring.py`
 
 `provenance.py:90` forbids rendering an inferred skill whose `category != "hard"`. The evidence profile contains six — `Stakeholder Communication`, `Mentoring`, `Issue Triage`, `SOP Development`, `NHTSA Regulations`, `Human Factors Engineering` — every one an obvious resume line, dumped to the writer unmarked. This single mismatch caused 20 of 25 provenance failures.
 
@@ -230,7 +230,7 @@ The skip saved one merged advisory call and cost a blind revision on 25% of roun
 
 ## Task 5: The summary becomes checkable
 
-**Files:** modify `src/resume_agent/models/resume.py`, `src/resume_agent/tailor/provenance.py` · test `tests/test_tailor_provenance.py`, `tests/test_models_resume.py`
+**Files:** modify `src/resume_tailor_harness/models/resume.py`, `src/resume_tailor_harness/tailor/provenance.py` · test `tests/test_tailor_provenance.py`, `tests/test_models_resume.py`
 
 `summary` is bare `str | None`, so the gate cannot see it and `resolve_evidence` ships the reviewer only facts cited by *other* sections — a true summary claim whose supporting fact is not otherwise cited is structurally guaranteed to read as unsupported.
 
@@ -248,7 +248,7 @@ The skip saved one merged advisory call and cost a blind revision on 25% of roun
 
 ## Task 6: The writer and the reviewer stop contradicting each other
 
-**Files:** modify `src/resume_agent/tailor/agents.py` · test `tests/test_prompt_registry.py`, `tests/test_agent_prompt_contracts.py`, `tests/test_tailor_agents.py`
+**Files:** modify `src/resume_tailor_harness/tailor/agents.py` · test `tests/test_prompt_registry.py`, `tests/test_agent_prompt_contracts.py`, `tests/test_tailor_agents.py`
 
 Three instruction defects, in descending measured cost:
 
@@ -275,7 +275,7 @@ Three instruction defects, in descending measured cost:
 
 ## Task 7: The reviser sees the job description
 
-**Files:** modify `src/resume_agent/tailor/tailoring.py`, `src/resume_agent/tailor/workflow.py` · test `tests/test_tailor_tailoring.py`, `tests/test_tailoring.py`, `tests/test_tailor_workflow.py`
+**Files:** modify `src/resume_tailor_harness/tailor/tailoring.py`, `src/resume_tailor_harness/tailor/workflow.py` · test `tests/test_tailor_tailoring.py`, `tests/test_tailoring.py`, `tests/test_tailor_workflow.py`
 
 `compose_revise_input` takes no `jd_text`. The reviser is handed `ats-keyword` issues ("the resume does not cover the job's must-have terms") and `hiring-manager` issues ("the experience does not demonstrate the job's core responsibilities") and asked to fix them **without ever seeing the job**. Its own sibling — `cover_letter/drafting.compose_revise_input` — already receives `job.jd_text` at `cover_letter/service.py:39`.
 
@@ -294,7 +294,7 @@ Three instruction defects, in descending measured cost:
 
 ## Task 8: Revise from the best round, not the last
 
-**Files:** modify `src/resume_agent/tailor/workflow.py` · test `tests/test_tailor_workflow.py`
+**Files:** modify `src/resume_tailor_harness/tailor/workflow.py` · test `tests/test_tailor_workflow.py`
 
 Today `content = revise(...)` always builds on the latest content, so a regressed round becomes the base for the next one and 13 observed regressions compound. `pick_best` already surfaces the best clean version to the user — the loop should optimize from the same place.
 
@@ -349,7 +349,7 @@ Today `content = revise(...)` always builds on the latest content, so a regresse
 
 ## Task 12: The badge names the gate that actually failed
 
-**Files:** modify `src/resume_agent/api/schemas/jobs.py`, `src/resume_agent/api/routers/jobs.py`, `web/src/features/job/VersionRow.tsx` · test `tests/api/test_job_detail.py`, `web/src/features/job/VersionRow.test.tsx`
+**Files:** modify `src/resume_tailor_harness/api/schemas/jobs.py`, `src/resume_tailor_harness/api/routers/jobs.py`, `web/src/features/job/VersionRow.tsx` · test `tests/api/test_job_detail.py`, `web/src/features/job/VersionRow.test.tsx`
 
 `tailor/service.py:72` writes `fact_check_passed = verdict.gate_passed` — provenance AND fact-check. `VersionRow.tsx:68` therefore renders **"Fact-check failed"** on 19 rounds where fact-check never ran. The column's meaning ("all gates clean") is correct and `pick_best` depends on it, so keep the column and the wire field; fix the label and add detail.
 

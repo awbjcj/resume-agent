@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let `resume-agent addjob --url <URL>` fetch a LinkedIn/Greenhouse/company job page and self-extract company, title, location, and JD text, then insert through the existing dedupe path.
+**Goal:** Let `resume-tailor-harness addjob --url <URL>` fetch a LinkedIn/Greenhouse/company job page and self-extract company, title, location, and JD text, then insert through the existing dedupe path.
 
 **Architecture:** A new `discovery/url_ingest/` package fetches a page (HTTP-first, Playwright fallback), routes to a deterministic parser for known domains (LinkedIn, Greenhouse) or a cheap-model LLM extractor for unknown sites, and returns a `RawJob`. The `addjob` CLI command calls it and feeds the result to the existing `add_job()`. A standalone one-shot `fetch_rendered()` reuses the logged-in LinkedIn `user_data_dir`; `LinkedInScraper` is left untouched.
 
@@ -16,8 +16,8 @@
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/url_ingest/__init__.py`
-- Create: `src/resume_agent/discovery/url_ingest/models.py`
+- Create: `src/resume_tailor_harness/discovery/url_ingest/__init__.py`
+- Create: `src/resume_tailor_harness/discovery/url_ingest/models.py`
 - Test: `tests/url_ingest/__init__.py`, `tests/url_ingest/test_models.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -27,7 +27,7 @@
 `tests/url_ingest/test_models.py`:
 
 ```python
-from resume_agent.discovery.url_ingest.models import ExtractedJob, PageContent
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob, PageContent
 
 
 def test_extracted_job_defaults_to_empty():
@@ -48,17 +48,17 @@ def test_page_content_carries_fetch_metadata():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python -m pytest tests/url_ingest/test_models.py -q`
-Expected: FAIL with `ModuleNotFoundError: resume_agent.discovery.url_ingest`.
+Expected: FAIL with `ModuleNotFoundError: resume_tailor_harness.discovery.url_ingest`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-`src/resume_agent/discovery/url_ingest/__init__.py`:
+`src/resume_tailor_harness/discovery/url_ingest/__init__.py`:
 
 ```python
 """Add a job from a URL: fetch a posting page and self-extract its fields."""
 ```
 
-`src/resume_agent/discovery/url_ingest/models.py`:
+`src/resume_tailor_harness/discovery/url_ingest/models.py`:
 
 ```python
 from dataclasses import dataclass
@@ -92,7 +92,7 @@ Expected: PASS (2 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/url_ingest/__init__.py src/resume_agent/discovery/url_ingest/models.py tests/url_ingest/
+git add src/resume_tailor_harness/discovery/url_ingest/__init__.py src/resume_tailor_harness/discovery/url_ingest/models.py tests/url_ingest/
 git commit -m "feat(url-ingest): add package skeleton and shared models"
 ```
 
@@ -102,8 +102,8 @@ git commit -m "feat(url-ingest): add package skeleton and shared models"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/scraper/models.py`
-- Modify: `src/resume_agent/discovery/scraper/parser.py`
+- Modify: `src/resume_tailor_harness/discovery/scraper/models.py`
+- Modify: `src/resume_tailor_harness/discovery/scraper/parser.py`
 - Test: `tests/test_scraper_parser.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -111,7 +111,7 @@ git commit -m "feat(url-ingest): add package skeleton and shared models"
 Append to `tests/test_scraper_parser.py`:
 
 ```python
-from resume_agent.discovery.scraper.parser import parse_detail_meta
+from resume_tailor_harness.discovery.scraper.parser import parse_detail_meta
 
 _DETAIL_HTML = """
 <html><body>
@@ -144,7 +144,7 @@ Expected: FAIL with `ImportError: cannot import name 'parse_detail_meta'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/discovery/scraper/models.py`:
+Append to `src/resume_tailor_harness/discovery/scraper/models.py`:
 
 ```python
 @dataclass
@@ -156,16 +156,16 @@ class DetailMeta:
     location: str | None
 ```
 
-In `src/resume_agent/discovery/scraper/parser.py`, change the models import and add the function. Replace:
+In `src/resume_tailor_harness/discovery/scraper/parser.py`, change the models import and add the function. Replace:
 
 ```python
-from resume_agent.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
 ```
 
 with:
 
 ```python
-from resume_agent.discovery.scraper.models import DetailMeta, ScrapedCard
+from resume_tailor_harness.discovery.scraper.models import DetailMeta, ScrapedCard
 ```
 
 Append at the end of `parser.py`:
@@ -189,7 +189,7 @@ Expected: PASS (all existing + 2 new).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/models.py src/resume_agent/discovery/scraper/parser.py tests/test_scraper_parser.py
+git add src/resume_tailor_harness/discovery/scraper/models.py src/resume_tailor_harness/discovery/scraper/parser.py tests/test_scraper_parser.py
 git commit -m "feat(scraper): parse title/company/location from LinkedIn detail page"
 ```
 
@@ -199,7 +199,7 @@ git commit -m "feat(scraper): parse title/company/location from LinkedIn detail 
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/url_ingest/greenhouse.py`
+- Create: `src/resume_tailor_harness/discovery/url_ingest/greenhouse.py`
 - Test: `tests/url_ingest/test_greenhouse.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -207,7 +207,7 @@ git commit -m "feat(scraper): parse title/company/location from LinkedIn detail 
 `tests/url_ingest/test_greenhouse.py`:
 
 ```python
-from resume_agent.discovery.url_ingest.greenhouse import parse_greenhouse
+from resume_tailor_harness.discovery.url_ingest.greenhouse import parse_greenhouse
 
 _HTML = """
 <html><body>
@@ -244,13 +244,13 @@ Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-`src/resume_agent/discovery/url_ingest/greenhouse.py`:
+`src/resume_tailor_harness/discovery/url_ingest/greenhouse.py`:
 
 ```python
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from resume_agent.discovery.url_ingest.models import ExtractedJob
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob
 
 
 def _text(soup: BeautifulSoup, selector: str) -> str | None:
@@ -288,7 +288,7 @@ Expected: PASS (2 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/url_ingest/greenhouse.py tests/url_ingest/test_greenhouse.py
+git add src/resume_tailor_harness/discovery/url_ingest/greenhouse.py tests/url_ingest/test_greenhouse.py
 git commit -m "feat(url-ingest): add deterministic Greenhouse parser"
 ```
 
@@ -298,7 +298,7 @@ git commit -m "feat(url-ingest): add deterministic Greenhouse parser"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/url_ingest/llm.py`
+- Create: `src/resume_tailor_harness/discovery/url_ingest/llm.py`
 - Test: `tests/url_ingest/test_llm.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -308,8 +308,8 @@ git commit -m "feat(url-ingest): add deterministic Greenhouse parser"
 ```python
 from dataclasses import dataclass
 
-from resume_agent.discovery.url_ingest.llm import extract_fields, html_to_text
-from resume_agent.discovery.url_ingest.models import ExtractedJob
+from resume_tailor_harness.discovery.url_ingest.llm import extract_fields, html_to_text
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob
 
 
 def test_html_to_text_strips_scripts_and_chrome():
@@ -360,16 +360,16 @@ Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-`src/resume_agent/discovery/url_ingest/llm.py`:
+`src/resume_tailor_harness/discovery/url_ingest/llm.py`:
 
 ```python
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 from bs4 import BeautifulSoup
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.url_ingest.models import ExtractedJob
-from resume_agent.llm_runner import AgentRunner, Runner
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob
+from resume_tailor_harness.llm_runner import AgentRunner, Runner
 
 _INSTRUCTIONS = [
     "Extract the company, job title, location, and full job-description text.",
@@ -415,7 +415,7 @@ Expected: PASS (4 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/url_ingest/llm.py tests/url_ingest/test_llm.py
+git add src/resume_tailor_harness/discovery/url_ingest/llm.py tests/url_ingest/test_llm.py
 git commit -m "feat(url-ingest): add HTML cleaner and LLM field extractor"
 ```
 
@@ -425,7 +425,7 @@ git commit -m "feat(url-ingest): add HTML cleaner and LLM field extractor"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/url_ingest/browser.py`
+- Create: `src/resume_tailor_harness/discovery/url_ingest/browser.py`
 - Test: `tests/url_ingest/test_browser.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -433,7 +433,7 @@ git commit -m "feat(url-ingest): add HTML cleaner and LLM field extractor"
 `tests/url_ingest/test_browser.py`:
 
 ```python
-import resume_agent.discovery.url_ingest.browser as browser
+import resume_tailor_harness.discovery.url_ingest.browser as browser
 
 
 class _FakePage:
@@ -506,7 +506,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-`src/resume_agent/discovery/url_ingest/browser.py`:
+`src/resume_tailor_harness/discovery/url_ingest/browser.py`:
 
 ```python
 import time
@@ -514,7 +514,7 @@ import time
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
-from resume_agent.config import get_settings
+from resume_tailor_harness.config import get_settings
 
 
 def fetch_rendered(
@@ -557,7 +557,7 @@ Expected: PASS (1 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/url_ingest/browser.py tests/url_ingest/test_browser.py
+git add src/resume_tailor_harness/discovery/url_ingest/browser.py tests/url_ingest/test_browser.py
 git commit -m "feat(url-ingest): add one-shot rendered fetch via Playwright"
 ```
 
@@ -567,7 +567,7 @@ git commit -m "feat(url-ingest): add one-shot rendered fetch via Playwright"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/url_ingest/fetch.py`
+- Create: `src/resume_tailor_harness/discovery/url_ingest/fetch.py`
 - Test: `tests/url_ingest/test_fetch.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -575,7 +575,7 @@ git commit -m "feat(url-ingest): add one-shot rendered fetch via Playwright"
 `tests/url_ingest/test_fetch.py`:
 
 ```python
-import resume_agent.discovery.url_ingest.fetch as fetch
+import resume_tailor_harness.discovery.url_ingest.fetch as fetch
 
 
 class _Resp:
@@ -660,7 +660,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-`src/resume_agent/discovery/url_ingest/fetch.py`:
+`src/resume_tailor_harness/discovery/url_ingest/fetch.py`:
 
 ```python
 from urllib.parse import urlsplit
@@ -668,10 +668,10 @@ from urllib.parse import urlsplit
 import httpx
 from bs4 import BeautifulSoup
 
-from resume_agent.discovery.url_ingest.browser import fetch_rendered
-from resume_agent.discovery.url_ingest.models import PageContent
+from resume_tailor_harness.discovery.url_ingest.browser import fetch_rendered
+from resume_tailor_harness.discovery.url_ingest.models import PageContent
 
-_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; resume-agent/1.0)"}
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; resume-tailor-harness/1.0)"}
 _LINKEDIN_DETAIL_SELECTOR = "div.show-more-less-html__markup, .description__text"
 _SHELL_TEXT_THRESHOLD = 200
 
@@ -712,7 +712,7 @@ Expected: PASS (4 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/url_ingest/fetch.py tests/url_ingest/test_fetch.py
+git add src/resume_tailor_harness/discovery/url_ingest/fetch.py tests/url_ingest/test_fetch.py
 git commit -m "feat(url-ingest): route fetching HTTP-first with browser fallback"
 ```
 
@@ -722,7 +722,7 @@ git commit -m "feat(url-ingest): route fetching HTTP-first with browser fallback
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/url_ingest/service.py`
+- Create: `src/resume_tailor_harness/discovery/url_ingest/service.py`
 - Test: `tests/url_ingest/test_service.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -730,8 +730,8 @@ git commit -m "feat(url-ingest): route fetching HTTP-first with browser fallback
 `tests/url_ingest/test_service.py`:
 
 ```python
-import resume_agent.discovery.url_ingest.service as service
-from resume_agent.discovery.url_ingest.models import ExtractedJob, PageContent
+import resume_tailor_harness.discovery.url_ingest.service as service
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob, PageContent
 
 
 def _patch_fetch(monkeypatch, html, final_url):
@@ -812,18 +812,18 @@ Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-`src/resume_agent/discovery/url_ingest/service.py`:
+`src/resume_tailor_harness/discovery/url_ingest/service.py`:
 
 ```python
 from urllib.parse import urlsplit
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
-from resume_agent.discovery.url_ingest.fetch import fetch_page
-from resume_agent.discovery.url_ingest.greenhouse import parse_greenhouse
-from resume_agent.discovery.url_ingest.llm import extract_fields, html_to_text
-from resume_agent.discovery.url_ingest.models import ExtractedJob
-from resume_agent.llm_runner import Runner
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.scraper.parser import parse_detail_meta, parse_job_detail
+from resume_tailor_harness.discovery.url_ingest.fetch import fetch_page
+from resume_tailor_harness.discovery.url_ingest.greenhouse import parse_greenhouse
+from resume_tailor_harness.discovery.url_ingest.llm import extract_fields, html_to_text
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob
+from resume_tailor_harness.llm_runner import Runner
 
 
 def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJob | None:
@@ -866,7 +866,7 @@ Expected: PASS (4 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/url_ingest/service.py tests/url_ingest/test_service.py
+git add src/resume_tailor_harness/discovery/url_ingest/service.py tests/url_ingest/test_service.py
 git commit -m "feat(url-ingest): add job_from_url orchestrator with domain routing"
 ```
 
@@ -876,7 +876,7 @@ git commit -m "feat(url-ingest): add job_from_url orchestrator with domain routi
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py:14` (imports) and `src/resume_agent/cli.py:93-112` (`addjob`)
+- Modify: `src/resume_tailor_harness/cli.py:14` (imports) and `src/resume_tailor_harness/cli.py:93-112` (`addjob`)
 - Test: `tests/test_cli_addjob_url.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -884,8 +884,8 @@ git commit -m "feat(url-ingest): add job_from_url orchestrator with domain routi
 `tests/test_cli_addjob_url.py`:
 
 ```python
-import resume_agent.cli as cli
-from resume_agent.discovery.connectors.base import RawJob
+import resume_tailor_harness.cli as cli
+from resume_tailor_harness.discovery.connectors.base import RawJob
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -942,15 +942,15 @@ def test_addjob_url_no_extraction_failure(monkeypatch, tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python -m pytest tests/test_cli_addjob_url.py -q`
-Expected: FAIL with `AttributeError: module 'resume_agent.cli' has no attribute 'job_from_url'`.
+Expected: FAIL with `AttributeError: module 'resume_tailor_harness.cli' has no attribute 'job_from_url'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/cli.py`, add imports next to the other discovery imports (near line 14):
+In `src/resume_tailor_harness/cli.py`, add imports next to the other discovery imports (near line 14):
 
 ```python
-from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
-from resume_agent.discovery.url_ingest.service import job_from_url
+from resume_tailor_harness.discovery.url_ingest.llm import build_url_extract_agent
+from resume_tailor_harness.discovery.url_ingest.service import job_from_url
 ```
 
 Replace the whole `addjob` function (lines 93-112) with:
@@ -1007,7 +1007,7 @@ Expected: PASS (3 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_addjob_url.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_addjob_url.py
 git commit -m "feat(cli): addjob --url fetches and auto-extracts a posting"
 ```
 
@@ -1024,12 +1024,12 @@ Expected: PASS (all green, including the new `tests/url_ingest/` modules and pri
 
 - [ ] **Step 2: Lint the new and changed files**
 
-Run: `uvx ruff check src/resume_agent/discovery/url_ingest/ src/resume_agent/cli.py src/resume_agent/discovery/scraper/`
+Run: `uvx ruff check src/resume_tailor_harness/discovery/url_ingest/ src/resume_tailor_harness/cli.py src/resume_tailor_harness/discovery/scraper/`
 Expected: `All checks passed!`
 
 - [ ] **Step 3: Smoke-test the CLI help**
 
-Run: `.venv/Scripts/python -m resume_agent.cli addjob --help`
+Run: `.venv/Scripts/python -m resume_tailor_harness.cli addjob --help`
 Expected: help text shows `--url`, `--no-browser`, `--jd-file`, and override options.
 
 - [ ] **Step 4: Commit any lint fixes (if needed)**

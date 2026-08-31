@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.tenancy.system_db import UsageEvent, User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.tenancy.system_db import UsageEvent, User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 
 def _login(client, username="owner", password="owner-password"):
@@ -107,7 +107,7 @@ def test_admin_invites_defaults_usage_and_failure_safe_delete(mu_app, mu_client)
 def test_delete_restores_user_and_workspace_when_cleanup_fails(
     mu_app, mu_client, monkeypatch
 ):
-    from resume_agent.api.routers import admin_users
+    from resume_tailor_harness.api.routers import admin_users
 
     alice_id = _add_user(mu_app)
     workspace = mu_app.state.data_dir / "users" / alice_id
@@ -222,7 +222,7 @@ def test_whole_root_export_is_admin_only_and_snapshots_all_databases(mu_app, mu_
     assert response.status_code == 200
     names = tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz").getnames()
     assert "system.db" in names
-    assert any(name.endswith("resume_agent.db") for name in names)
+    assert any(name.endswith("resume_tailor_harness.db") for name in names)
 
 
 def test_active_job_limit_applies_to_manual_ingest(mu_app, mu_client):

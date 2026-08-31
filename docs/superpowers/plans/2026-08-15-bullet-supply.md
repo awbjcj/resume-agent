@@ -34,7 +34,7 @@ supersede any conflicting detail in the task text below:
 
 ## DEPENDENCY: Spec A must ship first
 
-This plan calls `owner_depth()`, `evidence_owners()`, `OwnerRef`, and `SUPPLY_TARGET` from `src/resume_agent/profile/depth.py`. **That module does not exist yet.** It is created by Spec A:
+This plan calls `owner_depth()`, `evidence_owners()`, `OwnerRef`, and `SUPPLY_TARGET` from `src/resume_tailor_harness/profile/depth.py`. **That module does not exist yet.** It is created by Spec A:
 
 - Spec: `docs/superpowers/specs/2026-08-15-bullet-depth-design.md`
 - Plan: `docs/superpowers/plans/2026-08-15-bullet-depth.md` (Tasks 6 and 8 create `profile/depth.py`)
@@ -67,15 +67,15 @@ This plan calls `owner_depth()`, `evidence_owners()`, `OwnerRef`, and `SUPPLY_TA
 **Modified**
 | File | Change |
 | --- | --- |
-| `src/resume_agent/profile/coach_store.py:17-23` | `CoachTopic.owner_id` |
-| `src/resume_agent/profile/coach.py:92-99` | `_make_topic` carries `owner_id` |
-| `src/resume_agent/profile/coach.py:111-140` | `normalize_opening` accepts seeded topics |
-| `src/resume_agent/profile/coach.py:288` | `profile_overview` states target + aspects |
-| `src/resume_agent/profile/intake.py:25-38` | `_stage_and_add` / `add_note_source` take `anchor` |
-| `src/resume_agent/services/profile_coach.py:149-183` | `run_opening_turn` seeds the agenda |
-| `src/resume_agent/services/profile_coach.py:301-325` | `approve_draft` passes the anchor |
-| `src/resume_agent/api/schemas/coach.py:26-32` | `CoachTopicOut.owner_id` |
-| `src/resume_agent/profile/depth.py` | `depth_topics`, `UnminedSource`, `unmined_sources`, `unmined_block` |
+| `src/resume_tailor_harness/profile/coach_store.py:17-23` | `CoachTopic.owner_id` |
+| `src/resume_tailor_harness/profile/coach.py:92-99` | `_make_topic` carries `owner_id` |
+| `src/resume_tailor_harness/profile/coach.py:111-140` | `normalize_opening` accepts seeded topics |
+| `src/resume_tailor_harness/profile/coach.py:288` | `profile_overview` states target + aspects |
+| `src/resume_tailor_harness/profile/intake.py:25-38` | `_stage_and_add` / `add_note_source` take `anchor` |
+| `src/resume_tailor_harness/services/profile_coach.py:149-183` | `run_opening_turn` seeds the agenda |
+| `src/resume_tailor_harness/services/profile_coach.py:301-325` | `approve_draft` passes the anchor |
+| `src/resume_tailor_harness/api/schemas/coach.py:26-32` | `CoachTopicOut.owner_id` |
+| `src/resume_tailor_harness/profile/depth.py` | `depth_topics`, `UnminedSource`, `unmined_sources`, `unmined_block` |
 
 **Created**
 | File | Responsibility |
@@ -91,9 +91,9 @@ This plan calls `owner_depth()`, `evidence_owners()`, `OwnerRef`, and `SUPPLY_TA
 ### Task 1: `CoachTopic.owner_id`
 
 **Files:**
-- Modify: `src/resume_agent/profile/coach_store.py:17-23`
-- Modify: `src/resume_agent/profile/coach.py:92-99`
-- Modify: `src/resume_agent/api/schemas/coach.py:26-32`
+- Modify: `src/resume_tailor_harness/profile/coach_store.py:17-23`
+- Modify: `src/resume_tailor_harness/profile/coach.py:92-99`
+- Modify: `src/resume_tailor_harness/api/schemas/coach.py:26-32`
 - Test: `tests/test_coach_store.py` (append)
 
 **Interfaces:**
@@ -104,8 +104,8 @@ This plan calls `owner_depth()`, `evidence_owners()`, `OwnerRef`, and `SUPPLY_TA
 
 ```python
 # tests/test_coach_store.py (append)
-from resume_agent.profile.coach import NewTopic, _make_topic
-from resume_agent.profile.coach_store import CoachTopic
+from resume_tailor_harness.profile.coach import NewTopic, _make_topic
+from resume_tailor_harness.profile.coach_store import CoachTopic
 
 
 def test_owner_id_defaults_to_empty_so_stored_sessions_still_load():
@@ -136,7 +136,7 @@ Expected: FAIL with `AttributeError: 'CoachTopic' object has no attribute 'owner
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/profile/coach_store.py`:
+In `src/resume_tailor_harness/profile/coach_store.py`:
 
 ```python
 class CoachTopic(ExtensibleModel):
@@ -153,7 +153,7 @@ class CoachTopic(ExtensibleModel):
     note_doc_id: str | None = None
 ```
 
-In `src/resume_agent/profile/coach.py`:
+In `src/resume_tailor_harness/profile/coach.py`:
 
 ```python
 def _make_topic(
@@ -168,7 +168,7 @@ def _make_topic(
     )
 ```
 
-In `src/resume_agent/api/schemas/coach.py`, add to `CoachTopicOut` after `related_ref`:
+In `src/resume_tailor_harness/api/schemas/coach.py`, add to `CoachTopicOut` after `related_ref`:
 
 ```python
     owner_id: str = ""
@@ -186,7 +186,7 @@ Expected: PASS.
 ```bash
 .venv/Scripts/python.exe scripts/export_openapi.py
 bash scripts/gen_ts_client.sh
-git add src/resume_agent/profile/coach_store.py src/resume_agent/profile/coach.py src/resume_agent/api/schemas/coach.py tests/test_coach_store.py web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/profile/coach_store.py src/resume_tailor_harness/profile/coach.py src/resume_tailor_harness/api/schemas/coach.py tests/test_coach_store.py web/src/lib/api/schema.ts
 git commit -m "feat(coach): carry an evidence owner on seeded topics"
 ```
 
@@ -195,7 +195,7 @@ git commit -m "feat(coach): carry an evidence owner on seeded topics"
 ### Task 2: Anchored note intake
 
 **Files:**
-- Modify: `src/resume_agent/profile/intake.py:25-38`
+- Modify: `src/resume_tailor_harness/profile/intake.py:25-38`
 - Test: `tests/test_profile_intake.py` (append)
 
 **Interfaces:**
@@ -206,8 +206,8 @@ git commit -m "feat(coach): carry an evidence owner on seeded topics"
 
 ```python
 # tests/test_profile_intake.py (append)
-from resume_agent.profile.corpus import add_source, load_manifest
-from resume_agent.profile.intake import add_note_source
+from resume_tailor_harness.profile.corpus import add_source, load_manifest
+from resume_tailor_harness.profile.intake import add_note_source
 
 
 def _seed_primary(tmp_path, monkeypatch):
@@ -252,7 +252,7 @@ Expected: FAIL with `TypeError: add_note_source() got an unexpected keyword argu
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/profile/intake.py`:
+In `src/resume_tailor_harness/profile/intake.py`:
 
 ```python
 def _stage_and_add(
@@ -316,7 +316,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/intake.py tests/test_profile_intake.py
+git add src/resume_tailor_harness/profile/intake.py tests/test_profile_intake.py
 git commit -m "feat(profile): route anchored notes through synthesis intake"
 ```
 
@@ -325,7 +325,7 @@ git commit -m "feat(profile): route anchored notes through synthesis intake"
 ### Task 3: `approve_draft` passes the anchor
 
 **Files:**
-- Modify: `src/resume_agent/services/profile_coach.py:301-325`
+- Modify: `src/resume_tailor_harness/services/profile_coach.py:301-325`
 - Test: `tests/test_profile_coach_service.py` (append)
 
 **Interfaces:**
@@ -336,8 +336,8 @@ git commit -m "feat(profile): route anchored notes through synthesis intake"
 
 ```python
 # tests/test_profile_coach_service.py (append)
-from resume_agent.profile.corpus import load_manifest
-from resume_agent.services.profile_coach import approve_draft
+from resume_tailor_harness.profile.corpus import load_manifest
+from resume_tailor_harness.services.profile_coach import approve_draft
 
 
 def test_approving_a_seeded_topics_draft_anchors_the_note(coach_workspace):
@@ -405,7 +405,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_coach.py tests/test_profile_coach_service.py
+git add src/resume_tailor_harness/services/profile_coach.py tests/test_profile_coach_service.py
 git commit -m "feat(coach): anchor an approved note to its topic's evidence owner"
 ```
 
@@ -438,9 +438,9 @@ technical, lead, vsda, team} - Jaccard ~0.22 - and states no dates, so
 The bullets landed as a DUPLICATE role.
 """
 
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.merge import apply_synthesis_fragments
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.merge import apply_synthesis_fragments
 
 
 def _merged() -> ProfileFacts:
@@ -542,7 +542,7 @@ git commit -m "test(coach): prove anchored note bullets reach their role"
 > **BLOCKED until Spec A Task 8 is merged** — needs `owner_depth`, `evidence_owners`, and `SUPPLY_TARGET` in `profile/depth.py`.
 
 **Files:**
-- Modify: `src/resume_agent/profile/depth.py`
+- Modify: `src/resume_tailor_harness/profile/depth.py`
 - Test: `tests/test_profile_depth_topics.py`
 
 **Interfaces:**
@@ -553,8 +553,8 @@ git commit -m "test(coach): prove anchored note bullets reach their role"
 
 ```python
 # tests/test_profile_depth_topics.py
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.depth import depth_topics
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.depth import depth_topics
 
 
 def _facts() -> ProfileFacts:
@@ -642,10 +642,10 @@ Expected: FAIL with `ImportError: cannot import name 'depth_topics'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/profile/depth.py`:
+Append to `src/resume_tailor_harness/profile/depth.py`:
 
 ```python
-from resume_agent.profile.coach_store import CoachTopic
+from resume_tailor_harness.profile.coach_store import CoachTopic
 
 # Mirrors coach.AGENDA_CAP. Imported rather than restated would be circular -
 # coach.py imports from this module - so the default is passed by the caller in
@@ -704,7 +704,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/depth.py tests/test_profile_depth_topics.py
+git add src/resume_tailor_harness/profile/depth.py tests/test_profile_depth_topics.py
 git commit -m "feat(coach): seed the agenda from measured supply gaps"
 ```
 
@@ -715,8 +715,8 @@ git commit -m "feat(coach): seed the agenda from measured supply gaps"
 > **BLOCKED until Task 5.**
 
 **Files:**
-- Modify: `src/resume_agent/profile/coach.py:111-140`
-- Modify: `src/resume_agent/services/profile_coach.py:149-183`
+- Modify: `src/resume_tailor_harness/profile/coach.py:111-140`
+- Modify: `src/resume_tailor_harness/services/profile_coach.py:149-183`
 - Test: `tests/test_profile_coach.py` (append)
 
 **Interfaces:**
@@ -729,9 +729,9 @@ git commit -m "feat(coach): seed the agenda from measured supply gaps"
 # tests/test_profile_coach.py (append)
 import pytest
 
-from resume_agent.profile.coach import NewTopic, OpeningTurn, normalize_opening
-from resume_agent.profile.coach_store import CoachTopic
-from resume_agent.sessions.turns import TurnRejected
+from resume_tailor_harness.profile.coach import NewTopic, OpeningTurn, normalize_opening
+from resume_tailor_harness.profile.coach_store import CoachTopic
+from resume_tailor_harness.sessions.turns import TurnRejected
 
 
 def _seeded() -> list[CoachTopic]:
@@ -792,7 +792,7 @@ Expected: FAIL with `TypeError: normalize_opening() got an unexpected keyword ar
 
 - [ ] **Step 3: Write minimal implementation**
 
-Replace `normalize_opening` in `src/resume_agent/profile/coach.py`:
+Replace `normalize_opening` in `src/resume_tailor_harness/profile/coach.py`:
 
 ```python
 def normalize_opening(
@@ -843,8 +843,8 @@ In `run_opening_turn` (`services/profile_coach.py:149`), compute the seed and bi
 ```python
 from functools import partial
 
-from resume_agent.profile.depth import depth_topics
-from resume_agent.profile.store import load_facts
+from resume_tailor_harness.profile.depth import depth_topics
+from resume_tailor_harness.profile.store import load_facts
 
     facts_path = root / "facts.json"
     seeded = depth_topics(load_facts(facts_path)) if facts_path.exists() else []
@@ -878,7 +878,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/coach.py src/resume_agent/services/profile_coach.py tests/test_profile_coach.py
+git add src/resume_tailor_harness/profile/coach.py src/resume_tailor_harness/services/profile_coach.py tests/test_profile_coach.py
 git commit -m "feat(coach): open sessions on a gap-seeded agenda"
 ```
 
@@ -889,7 +889,7 @@ git commit -m "feat(coach): open sessions on a gap-seeded agenda"
 > **BLOCKED until Spec A Tasks 2 and 6 are merged** — `_fact_totals` reads bullets through `evidence_owners`, and before Spec A a `Project.highlights` entry is a bare `str` carrying no `source_ref`, so "which document produced this project bullet" cannot be answered at all.
 
 **Files:**
-- Modify: `src/resume_agent/profile/depth.py`
+- Modify: `src/resume_tailor_harness/profile/depth.py`
 - Test: `tests/test_profile_unmined.py`
 
 **Interfaces:**
@@ -903,7 +903,7 @@ git commit -m "feat(coach): open sessions on a gap-seeded agenda"
 
 ```python
 # tests/test_profile_unmined.py
-from resume_agent.profile.depth import unmined_block, unmined_sources
+from resume_tailor_harness.profile.depth import unmined_block, unmined_sources
 
 
 def test_a_document_contributing_no_bullets_is_unmined(profile_workspace):
@@ -959,12 +959,12 @@ Expected: FAIL with `ImportError: cannot import name 'unmined_sources'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/profile/depth.py`:
+Append to `src/resume_tailor_harness/profile/depth.py`:
 
 ```python
-from resume_agent.profile.corpus import doc_path, load_manifest
-from resume_agent.profile.resume_reader import read_document_text
-from resume_agent.profile.store import load_facts
+from resume_tailor_harness.profile.corpus import doc_path, load_manifest
+from resume_tailor_harness.profile.resume_reader import read_document_text
+from resume_tailor_harness.profile.store import load_facts
 
 _UNMINED_BUDGET = 12_000
 
@@ -1074,7 +1074,7 @@ Then confirm against real data:
 
 ```bash
 .venv/Scripts/python.exe -c "
-from resume_agent.profile.depth import unmined_sources
+from resume_tailor_harness.profile.depth import unmined_sources
 for row in unmined_sources('data/users/9127fd59b364/profile'):
     print(row.fact_total, row.doc_id)
 "
@@ -1085,7 +1085,7 @@ Expected: `2026-goal-setting` with 0, then `2025-goal-setting` with 6. No `resum
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/depth.py tests/test_profile_unmined.py
+git add src/resume_tailor_harness/profile/depth.py tests/test_profile_unmined.py
 git commit -m "feat(profile): surface documents that produced no resume bullet"
 ```
 
@@ -1096,7 +1096,7 @@ git commit -m "feat(profile): surface documents that produced no resume bullet"
 > **BLOCKED until Spec A Task 8 and this plan's Task 7.**
 
 **Files:**
-- Modify: `src/resume_agent/profile/coach.py:288` (`profile_overview`)
+- Modify: `src/resume_tailor_harness/profile/coach.py:288` (`profile_overview`)
 - Test: `tests/test_profile_coach.py` (append)
 
 **Interfaces:**
@@ -1107,7 +1107,7 @@ git commit -m "feat(profile): surface documents that produced no resume bullet"
 
 ```python
 # tests/test_profile_coach.py (append)
-from resume_agent.profile.coach import profile_overview
+from resume_tailor_harness.profile.coach import profile_overview
 
 
 def test_overview_states_the_supply_target_not_just_a_count(profile_workspace):
@@ -1149,7 +1149,7 @@ Expected: FAIL — the overview prints bare counts and carries no unmined block.
 In `profile_overview` (`coach.py:288`), replace the experience/project fact lines with target-aware ones built from `owner_depth`, and append the unmined block:
 
 ```python
-    from resume_agent.profile.depth import SUPPLY_TARGET, owner_depth, unmined_block
+    from resume_tailor_harness.profile.depth import SUPPLY_TARGET, owner_depth, unmined_block
 
     fact_lines: list[str] = []
     facts_path = root / "facts.json"
@@ -1189,7 +1189,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/coach.py tests/test_profile_coach.py
+git add src/resume_tailor_harness/profile/coach.py tests/test_profile_coach.py
 git commit -m "feat(coach): ground questions in unmined sources and supply targets"
 ```
 
@@ -1198,8 +1198,8 @@ git commit -m "feat(coach): ground questions in unmined sources and supply targe
 ### Task 9: Documentation and end-to-end verification
 
 **Files:**
-- Modify: `src/resume_agent/profile/CLAUDE.md`
-- Modify: `src/resume_agent/sessions/CLAUDE.md`
+- Modify: `src/resume_tailor_harness/profile/CLAUDE.md`
+- Modify: `src/resume_tailor_harness/sessions/CLAUDE.md`
 
 - [ ] **Step 1: Verify the whole suite**
 
@@ -1214,7 +1214,7 @@ Expected: all green. Record the actual counts — do not claim a number you did 
 - [ ] **Step 2: Verify one real coaching loop**
 
 ```bash
-.venv/Scripts/python.exe -m resume_agent.cli profile coach
+.venv/Scripts/python.exe -m resume_tailor_harness.cli profile coach
 ```
 
 Confirm, in order:
@@ -1224,7 +1224,7 @@ Confirm, in order:
 
 ```bash
 .venv/Scripts/python.exe -c "
-from resume_agent.profile.corpus import load_manifest
+from resume_tailor_harness.profile.corpus import load_manifest
 for d in load_manifest('data/users/9127fd59b364/profile').docs:
     if d.filename.startswith('note--'):
         print(d.id, d.mode, d.anchor)
@@ -1249,7 +1249,7 @@ Expected: still **5** experiences, with the discussed role's count risen. Six ex
 
 - [ ] **Step 3: Update the module references**
 
-In `src/resume_agent/profile/CLAUDE.md`:
+In `src/resume_tailor_harness/profile/CLAUDE.md`:
 
 ```markdown
 - **An anchored coach note rides synthesis, and that is load-bearing.** An
@@ -1280,12 +1280,12 @@ In `src/resume_agent/profile/CLAUDE.md`:
   and degrading to empty on any read failure. The user's answer is the fact.
 ```
 
-In `src/resume_agent/sessions/CLAUDE.md`, add one line noting that a coach topic now carries an `owner_id` that becomes a corpus anchor on approval, and that stored sessions predating it default to `""`.
+In `src/resume_tailor_harness/sessions/CLAUDE.md`, add one line noting that a coach topic now carries an `owner_id` that becomes a corpus anchor on approval, and that stored sessions predating it default to `""`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/profile/CLAUDE.md src/resume_agent/sessions/CLAUDE.md
+git add src/resume_tailor_harness/profile/CLAUDE.md src/resume_tailor_harness/sessions/CLAUDE.md
 git commit -m "docs: record the coach anchoring and agenda-seeding invariants"
 ```
 

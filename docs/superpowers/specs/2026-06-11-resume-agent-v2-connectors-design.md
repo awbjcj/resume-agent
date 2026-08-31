@@ -1,8 +1,8 @@
-# Resume Agent v2 — Multi-Connector Job Sourcing + Quality-of-Life — Design Spec
+# Résumé Tailor Harness v2 — Multi-Connector Job Sourcing + Quality-of-Life — Design Spec
 
 - **Date:** 2026-06-11
 - **Status:** Approved (design) — ready for implementation planning
-- **Scope of this document:** Full v2 design. Builds on the v1 spec (`2026-06-08-resume-agent-design.md`, §10 roadmap memo).
+- **Scope of this document:** Full v2 design. Builds on the v1 spec (`2026-06-08-resume-tailor-harness-design.md`, §10 roadmap memo).
 - **Successor planning:** one spec → phased, independently-executable component plans (mirrors v1's spec→multi-plan pattern).
 
 ---
@@ -59,7 +59,7 @@ Each connector is a self-contained unit answering "what market does it cover, ho
                  ▼
         build_connectors() → [ Connector ]   each pre-bound to its params
                  │
- [0] PULL  (resume-agent pull)
+ [0] PULL  (resume-tailor-harness pull)
      for connector in ORDER(ATS → feeds → aggregator → LinkedIn):
          raw_jobs = connector.fetch(SearchConfig, limit=limit)  # client-side keyword filter
          ingest_jobs(session, raw_jobs)                # normalize + dedupe (url|exact-JD|dedup_key)
@@ -68,8 +68,8 @@ Each connector is a self-contained unit answering "what market does it cover, ho
                  │
  [1..4] DISCOVER → APPROVE → TAILOR → RENDER  (UNCHANGED from v1)
                  │
- [+] COVER-LETTER  (resume-agent cover-letter)   fact-locked draft → light review → Typst → PDF
- [+] SYNC-STATUS   (resume-agent sync-status)    Gmail read → match → classify → PROPOSE transitions
+ [+] COVER-LETTER  (resume-tailor-harness cover-letter)   fact-locked draft → light review → Typst → PDF
+ [+] SYNC-STATUS   (resume-tailor-harness sync-status)    Gmail read → match → classify → PROPOSE transitions
  [+] ANALYTICS     (dashboard page)              jobs ⋈ applications → rates by source / fit-band
 ```
 
@@ -198,7 +198,7 @@ Per-connector run records (last run timestamp, jobs added, last error string) dr
 ## 7. Project layout (additions)
 
 ```
-src/resume_agent/discovery/
+src/resume_tailor_harness/discovery/
   connectors/                 # NEW — the connector framework
     __init__.py
     base.py                   # Connector protocol + RawJob
@@ -210,10 +210,10 @@ src/resume_agent/discovery/
     lever.py  ashby.py  weworkremotely.py  hn.py   # siblings (copy-the-reference)
   scraper/linkedin.py         # MODIFY — implement Connector.fetch
   ingest.py                   # MODIFY — ingest_jobs() + dedup_key
-src/resume_agent/cover_letter/   # NEW — model, agent, service
-src/resume_agent/gmail/          # NEW — client (read-only), match, classify
-src/resume_agent/dashboard/app.py  # MODIFY — analytics page + sync-status proposals
-src/resume_agent/cli.py            # MODIFY — pull, sources, cover-letter, sync-status
+src/resume_tailor_harness/cover_letter/   # NEW — model, agent, service
+src/resume_tailor_harness/gmail/          # NEW — client (read-only), match, classify
+src/resume_tailor_harness/dashboard/app.py  # MODIFY — analytics page + sync-status proposals
+src/resume_tailor_harness/cli.py            # MODIFY — pull, sources, cover-letter, sync-status
 config/connectors.yaml(.example)   # NEW
 templates/cover_letter.typ         # NEW
 tests/fixtures/{greenhouse,adzuna,remoteok,gmail}/   # NEW — saved payloads

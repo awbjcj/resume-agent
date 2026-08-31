@@ -1,8 +1,8 @@
 import pytest
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
-from resume_agent.discovery.connectors.detect import AtsInspection, AtsTarget
-from resume_agent.services import sources as svc
+from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob
+from resume_tailor_harness.discovery.connectors.detect import AtsInspection, AtsTarget
+from resume_tailor_harness.services import sources as svc
 
 
 def test_preview_undetectable_is_not_ok(monkeypatch):

@@ -1,4 +1,4 @@
 def test_package_imports():
-    import resume_agent
+    import resume_tailor_harness
 
-    assert resume_agent.__version__ == "0.1.0"
+    assert resume_tailor_harness.__version__ == "0.1.0"

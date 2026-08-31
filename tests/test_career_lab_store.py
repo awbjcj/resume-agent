@@ -3,12 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.career_lab.models import (
+from resume_tailor_harness.career_lab.models import (
     CareerLabArtifactMeta,
     CareerLabSession,
     CareerLabTurnRecord,
 )
-from resume_agent.career_lab.store import (
+from resume_tailor_harness.career_lab.store import (
     active_session_for_job,
     append_clarification_turns,
     append_turns,
@@ -31,7 +31,7 @@ def test_assistant_turn_requires_agent_metadata():
 
 
 def test_assistant_turn_accepts_tool_free_router_clarification():
-    from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+    from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta
 
     turn = CareerLabTurnRecord(
         turn_id="t1",
@@ -50,7 +50,7 @@ def test_assistant_turn_accepts_tool_free_router_clarification():
 
 
 def test_assistant_turn_requires_matching_run_metadata():
-    from resume_agent.career_skills.models import AgentFamily, AgentRunMeta, SkillRef
+    from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta, SkillRef
 
     skill = SkillRef(
         name="salary-negotiation-prep",
@@ -132,7 +132,7 @@ def test_delete_sessions_for_job_spares_other_threads(tmp_path):
 
 def test_append_turns_round_trips_typed_artifact(tmp_path):
     create_session(tmp_path, session_id="s1")
-    from resume_agent.career_skills.models import AgentFamily, AgentRunMeta, SkillRef
+    from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta, SkillRef
 
     skill = SkillRef(
         name="salary-negotiation-prep",
@@ -167,7 +167,7 @@ def test_append_turns_round_trips_typed_artifact(tmp_path):
 
 def test_append_clarification_turns_round_trips_without_a_skill(tmp_path):
     create_session(tmp_path, session_id="s1")
-    from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+    from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta
 
     append_clarification_turns(
         tmp_path,

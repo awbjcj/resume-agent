@@ -24,11 +24,11 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.api.mappers import to_board_page
-from resume_agent.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.board import list_board
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.api.mappers import to_board_page
+from resume_tailor_harness.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.board import list_board
+from resume_tailor_harness.tracking.tables import Job
 
 BOARDS = ("shortlist", "triage", "pipeline")
 ITEM_MODELS = {

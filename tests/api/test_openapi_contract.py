@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 CONTRACT = Path("contracts/openapi.json")
 

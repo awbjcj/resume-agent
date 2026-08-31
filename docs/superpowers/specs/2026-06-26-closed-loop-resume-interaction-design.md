@@ -6,7 +6,7 @@
 
 ## Summary
 
-Three semi-independent enhancements that, together, make the resume-agent
+Three semi-independent enhancements that, together, make the resume-tailor-harness
 workflow closed-loop:
 
 1. **Prompt-driven revision** — the user gives a free-text instruction to revise
@@ -145,7 +145,7 @@ output/{company}-{title}-{jobId}/
 - **Render writes in place.** The render path writes its PDF straight into the
   per-job folder (one canonical location, no copies); `export` fills in
   `content.json` + `manifest.json` and organizes the tree.
-- **CLI `resume-agent export [--all]`** — backfills `content.json`/`manifest.json`
+- **CLI `resume-tailor-harness export [--all]`** — backfills `content.json`/`manifest.json`
   and reorganizes existing jobs in one shot.
 
 All filesystem-layout logic lives in this one testable projection; the render

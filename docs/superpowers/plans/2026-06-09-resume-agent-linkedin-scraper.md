@@ -1,4 +1,4 @@
-# Resume Agent — LinkedIn Scraper Implementation Plan
+# Résumé Tailor Harness — LinkedIn Scraper Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -29,14 +29,14 @@ Design spec §5.2 + Decisions #3/#4 + Risk #1. Decisions for this plan:
 
 ```
 pyproject.toml                                  # MODIFY: add playwright + beautifulsoup4
-src/resume_agent/discovery/scraper/
+src/resume_tailor_harness/discovery/scraper/
   __init__.py                                   # CREATE
   models.py                                     # CREATE: ScrapedCard dataclass
   parser.py                                     # CREATE: parse_search_cards() + parse_job_detail()
   ingest.py                                     # CREATE: JobSource protocol + ingest_scraped()
   linkedin.py                                   # CREATE: LinkedInScraper (Playwright; not CI-tested)
 .gitignore                                      # MODIFY: ignore persistent browser profile + live calibration captures
-src/resume_agent/cli.py                         # MODIFY: add `scrape` command
+src/resume_tailor_harness/cli.py                         # MODIFY: add `scrape` command
 tests/fixtures/linkedin/
   search.html                                   # CREATE: representative search-results HTML
   job.html                                      # CREATE: representative job-detail HTML
@@ -53,7 +53,7 @@ tests/
 **Files:**
 
 - Modify: `pyproject.toml`, `.gitignore`
-- Create: `src/resume_agent/discovery/scraper/__init__.py`, `src/resume_agent/discovery/scraper/models.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/__init__.py`, `src/resume_tailor_harness/discovery/scraper/models.py`
 - Test: `tests/test_scraper_parser.py` (model portion only this task)
 
 - [ ] **Step 1: Add dependencies**
@@ -80,7 +80,7 @@ tests/fixtures/linkedin/*_live.html
 Create `tests/test_scraper_parser.py`:
 
 ```python
-from resume_agent.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
 
 
 def test_scraped_card_fields():
@@ -103,17 +103,17 @@ Run:
 uv run pytest tests/test_scraper_parser.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.scraper'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.scraper'`.
 
 - [ ] **Step 5: Implement**
 
-Create `src/resume_agent/discovery/scraper/__init__.py`:
+Create `src/resume_tailor_harness/discovery/scraper/__init__.py`:
 
 ```python
 """LinkedIn scraper: Playwright driver + pure HTML parsers (fixture-tested)."""
 ```
 
-Create `src/resume_agent/discovery/scraper/models.py`:
+Create `src/resume_tailor_harness/discovery/scraper/models.py`:
 
 ```python
 from dataclasses import dataclass
@@ -143,7 +143,7 @@ Expected: PASS (1 test).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml uv.lock .gitignore src/resume_agent/discovery/scraper/__init__.py src/resume_agent/discovery/scraper/models.py tests/test_scraper_parser.py
+git add pyproject.toml uv.lock .gitignore src/resume_tailor_harness/discovery/scraper/__init__.py src/resume_tailor_harness/discovery/scraper/models.py tests/test_scraper_parser.py
 git commit -m "feat(scraper): deps + ScrapedCard model" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -153,7 +153,7 @@ git commit -m "feat(scraper): deps + ScrapedCard model" -m "Co-Authored-By: Clau
 
 **Files:**
 
-- Create: `tests/fixtures/linkedin/search.html`, `tests/fixtures/linkedin/job.html`, `src/resume_agent/discovery/scraper/parser.py`
+- Create: `tests/fixtures/linkedin/search.html`, `tests/fixtures/linkedin/job.html`, `src/resume_tailor_harness/discovery/scraper/parser.py`
 - Test: `tests/test_scraper_parser.py` (append)
 
 - [ ] **Step 1: Create the fixtures**
@@ -228,7 +228,7 @@ Append to `tests/test_scraper_parser.py`:
 ```python
 from pathlib import Path
 
-from resume_agent.discovery.scraper.parser import parse_job_detail, parse_search_cards
+from resume_tailor_harness.discovery.scraper.parser import parse_job_detail, parse_search_cards
 
 FIXTURES = Path(__file__).parent / "fixtures" / "linkedin"
 
@@ -263,16 +263,16 @@ Run:
 uv run pytest tests/test_scraper_parser.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.scraper.parser'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.scraper.parser'`.
 
 - [ ] **Step 4: Implement**
 
-Create `src/resume_agent/discovery/scraper/parser.py`:
+Create `src/resume_tailor_harness/discovery/scraper/parser.py`:
 
 ```python
 from bs4 import BeautifulSoup
 
-from resume_agent.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
 
 
 def _text(node) -> str | None:
@@ -329,7 +329,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tests/fixtures/linkedin/search.html tests/fixtures/linkedin/job.html src/resume_agent/discovery/scraper/parser.py tests/test_scraper_parser.py
+git add tests/fixtures/linkedin/search.html tests/fixtures/linkedin/job.html src/resume_tailor_harness/discovery/scraper/parser.py tests/test_scraper_parser.py
 git commit -m "feat(scraper): fixture-driven LinkedIn HTML parsers" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -339,7 +339,7 @@ git commit -m "feat(scraper): fixture-driven LinkedIn HTML parsers" -m "Co-Autho
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/ingest.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/ingest.py`
 - Test: `tests/test_scraper_ingest.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -349,11 +349,11 @@ Create `tests/test_scraper_ingest.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.scraper.ingest import ingest_scraped
-from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.tracking.repository import jobs_by_status
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.scraper.ingest import ingest_scraped
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.tracking.repository import jobs_by_status
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 class _FakeSource:
@@ -413,20 +413,20 @@ Run:
 uv run pytest tests/test_scraper_ingest.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.scraper.ingest'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.scraper.ingest'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/discovery/scraper/ingest.py`:
+Create `src/resume_tailor_harness/discovery/scraper/ingest.py`:
 
 ```python
 from typing import Protocol
 
 from sqlmodel import Session
 
-from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 class JobSource(Protocol):
@@ -473,7 +473,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/ingest.py tests/test_scraper_ingest.py
+git add src/resume_tailor_harness/discovery/scraper/ingest.py tests/test_scraper_ingest.py
 git commit -m "feat(scraper): JobSource protocol + ingest_scraped orchestrator" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -483,13 +483,13 @@ git commit -m "feat(scraper): JobSource protocol + ingest_scraped orchestrator" 
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/linkedin.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/linkedin.py`
 
 > This task has **no unit test** — it drives a real browser against a live, changing site. Its parsing logic is already covered by Task 2's fixture tests; this file is the thin, manually-maintained I/O shell. Correctness is checked in Task 6 (calibration).
 
 - [ ] **Step 1: Implement the driver**
 
-Create `src/resume_agent/discovery/scraper/linkedin.py`:
+Create `src/resume_tailor_harness/discovery/scraper/linkedin.py`:
 
 ```python
 import time
@@ -497,10 +497,10 @@ import urllib.parse
 
 from playwright.sync_api import sync_playwright
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.scraper.parser import parse_job_detail, parse_search_cards
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.parser import parse_job_detail, parse_search_cards
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _SEARCH_URL = "https://www.linkedin.com/jobs/search/"
 
@@ -561,7 +561,7 @@ def build_linkedin_scraper() -> LinkedInScraper:
 Run:
 
 ```bash
-uv run python -c "from resume_agent.discovery.scraper.linkedin import LinkedInScraper, build_linkedin_scraper; print('import ok')"
+uv run python -c "from resume_tailor_harness.discovery.scraper.linkedin import LinkedInScraper, build_linkedin_scraper; print('import ok')"
 ```
 
 Expected: prints `import ok` (importing must not launch a browser).
@@ -569,7 +569,7 @@ Expected: prints `import ok` (importing must not launch a browser).
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/linkedin.py
+git add src/resume_tailor_harness/discovery/scraper/linkedin.py
 git commit -m "feat(scraper): Playwright LinkedIn driver (persistent burner profile)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -579,7 +579,7 @@ git commit -m "feat(scraper): Playwright LinkedIn driver (persistent burner prof
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_scrape.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -589,7 +589,7 @@ Create `tests/test_cli_scrape.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
+from resume_tailor_harness import cli
 
 runner = CliRunner()
 
@@ -614,15 +614,15 @@ Run:
 uv run pytest tests/test_cli_scrape.py -v
 ```
 
-Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'build_linkedin_scraper'`.
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.cli' has no attribute 'build_linkedin_scraper'`.
 
 - [ ] **Step 3: Implement**
 
-Add imports near the other imports in `src/resume_agent/cli.py`:
+Add imports near the other imports in `src/resume_tailor_harness/cli.py`:
 
 ```python
-from resume_agent.discovery.scraper.ingest import ingest_scraped
-from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
+from resume_tailor_harness.discovery.scraper.ingest import ingest_scraped
+from resume_tailor_harness.discovery.scraper.linkedin import build_linkedin_scraper
 ```
 
 (`load_search_config` is already imported from the Discovery task — do not duplicate.)
@@ -660,7 +660,7 @@ Expected: PASS (1 test). (The scraper + ingest are patched, so no browser launch
 Run:
 
 ```bash
-uv run resume-agent scrape --help
+uv run resume-tailor-harness scrape --help
 uv run pytest -q
 ```
 
@@ -669,7 +669,7 @@ Expected: help text (exit 0); all tests pass (Tracking total + scraper additions
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_scrape.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_scrape.py
 git commit -m "feat(scraper): scrape CLI command" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -721,7 +721,7 @@ The `*_live.html` files are ignored. Before committing any fixture update, sanit
 Run the parser over the live HTML:
 
 ```bash
-uv run python -c "from resume_agent.discovery.scraper.parser import parse_search_cards; print(len(parse_search_cards(open('tests/fixtures/linkedin/search_live.html', encoding='utf-8').read())))"
+uv run python -c "from resume_tailor_harness.discovery.scraper.parser import parse_search_cards; print(len(parse_search_cards(open('tests/fixtures/linkedin/search_live.html', encoding='utf-8').read())))"
 ```
 
 If it prints `0`, the live DOM differs. Inspect `search_live.html`, update the CSS selectors in `parser.py` (e.g. the card container, title, subtitle, location, link), and re-run until cards are extracted. Repeat for `parse_job_detail` against `job_live.html`. Then update `tests/fixtures/linkedin/search.html` / `job.html` (or add `*_live`-derived fixtures) so Task 2's tests reflect the real structure.
@@ -731,13 +731,13 @@ If it prints `0`, the live DOM differs. Inspect `search_live.html`, update the C
 Run:
 
 ```bash
-uv run resume-agent scrape --limit 3
+uv run resume-tailor-harness scrape --limit 3
 ```
 
-Expected: "Added N new job(s)." Then `uv run resume-agent discover` should extract/filter/score them. If selectors changed, commit the parser + fixture updates:
+Expected: "Added N new job(s)." Then `uv run resume-tailor-harness discover` should extract/filter/score them. If selectors changed, commit the parser + fixture updates:
 
 ```bash
-git add src/resume_agent/discovery/scraper/parser.py tests/fixtures/linkedin/ tests/test_scraper_parser.py
+git add src/resume_tailor_harness/discovery/scraper/parser.py tests/fixtures/linkedin/ tests/test_scraper_parser.py
 git commit -m "fix(scraper): calibrate selectors against live LinkedIn HTML" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

@@ -1,9 +1,9 @@
 import pytest
 
-from resume_agent.llm_runner import AgentRunner
+from resume_tailor_harness.llm_runner import AgentRunner
 
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.extractor import build_extractor_agent, extract_profile_facts
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.extractor import build_extractor_agent, extract_profile_facts
 
 
 class _FakeResult:
@@ -48,7 +48,7 @@ def test_extractor_defaults_to_mid_tier(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     captured = {}
 
-    import resume_agent.profile.extractor as extractor_mod
+    import resume_tailor_harness.profile.extractor as extractor_mod
 
     def _fake_build_model(model_id, api_key=None, **kwargs):
         captured["id"] = model_id

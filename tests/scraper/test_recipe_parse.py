@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.scraper.recipe import Pagination, ScrapeRecipe
-from resume_agent.discovery.scraper.recipe_parse import (
+from resume_tailor_harness.discovery.scraper.recipe import Pagination, ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.recipe_parse import (
     has_job_like_content,
     parse_cards,
     parse_detail,

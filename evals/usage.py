@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from resume_agent.llm_runner import Runner
+from resume_tailor_harness.llm_runner import Runner
 
 
 @dataclass(frozen=True)

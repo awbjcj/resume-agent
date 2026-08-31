@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel, FactItem, Source, new_id
+from resume_tailor_harness.models.base import ExtensibleModel, FactItem, Source, new_id
 
 
 def test_new_id_is_unique_and_short():
@@ -61,7 +61,7 @@ def test_nullable_collection_field_keeps_none():
 
 
 def test_profilefacts_coerces_null_collections():
-    from resume_agent.models.profile import ProfileFacts
+    from resume_tailor_harness.models.profile import ProfileFacts
 
     facts = ProfileFacts.model_validate(
         {

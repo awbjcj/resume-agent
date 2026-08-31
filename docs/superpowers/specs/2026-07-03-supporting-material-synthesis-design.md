@@ -17,7 +17,7 @@ gaps keep supporting material from becoming useful profile facts:
    `python-docx`, `python-pptx`) emit unstructured text: headings, tables, and
    slide boundaries are lost before the extractor ever sees them.
 3. **Ingest is CLI-only.** Adding sources, choosing a primary, and rebuilding
-   all happen through `resume-agent profile ...`; there is no web surface.
+   all happen through `resume-tailor-harness profile ...`; there is no web surface.
 
 ## 2. Decisions locked during brainstorming
 
@@ -265,15 +265,15 @@ conflicts, anchor decisions, verification drops with reasons).
 
 | Path                                                | Change                                                                       |
 | --------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `src/resume_agent/profile/resume_reader.py`         | markitdown delegation; `CONVERTER_VERSION`; new suffixes.                    |
-| `src/resume_agent/profile/corpus.py`                | `SourceDoc.mode`/`anchor`; add-time defaults + validation.                   |
-| `src/resume_agent/profile/fragments.py`             | Cache key gains converter version + mode + anchor; synthesis dispatch.       |
-| `src/resume_agent/profile/synthesis.py`             | NEW — synthesis agent, layered verification, repair round, evidence sidecar. |
-| `src/resume_agent/profile/merge.py`                 | Anchored append-by-id phase; report lines.                                   |
-| `src/resume_agent/profile/build.py`                 | Skeleton composition; two-pass merge; report fields.                         |
-| `src/resume_agent/models/base.py`                   | `FactItem.synthesized`.                                                      |
-| `src/resume_agent/cli.py`                           | `--mode`/`--anchor`; report sections.                                        |
-| `src/resume_agent/api/routers/profile.py` + schemas | NEW — sources CRUD, upload, skeleton, build run.                             |
+| `src/resume_tailor_harness/profile/resume_reader.py`         | markitdown delegation; `CONVERTER_VERSION`; new suffixes.                    |
+| `src/resume_tailor_harness/profile/corpus.py`                | `SourceDoc.mode`/`anchor`; add-time defaults + validation.                   |
+| `src/resume_tailor_harness/profile/fragments.py`             | Cache key gains converter version + mode + anchor; synthesis dispatch.       |
+| `src/resume_tailor_harness/profile/synthesis.py`             | NEW — synthesis agent, layered verification, repair round, evidence sidecar. |
+| `src/resume_tailor_harness/profile/merge.py`                 | Anchored append-by-id phase; report lines.                                   |
+| `src/resume_tailor_harness/profile/build.py`                 | Skeleton composition; two-pass merge; report fields.                         |
+| `src/resume_tailor_harness/models/base.py`                   | `FactItem.synthesized`.                                                      |
+| `src/resume_tailor_harness/cli.py`                           | `--mode`/`--anchor`; report sections.                                        |
+| `src/resume_tailor_harness/api/routers/profile.py` + schemas | NEW — sources CRUD, upload, skeleton, build run.                             |
 | `contracts/openapi.json`, `contracts/ts/api.ts`     | Regenerated.                                                                 |
 | `web/src/features/profile-sources/*`                | NEW — sources page.                                                          |
 | `pyproject.toml`, `uv.lock`                         | `markitdown` in; `pypdf`/`python-docx`/`python-pptx` out.                    |

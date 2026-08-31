@@ -6,16 +6,16 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
-from resume_agent.api.app import create_app
-from resume_agent.company_intelligence import agents as company_agents
-from resume_agent.company_intelligence.models import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.company_intelligence import agents as company_agents
+from resume_tailor_harness.company_intelligence.models import (
     CompanyIntelligenceDraft,
     CompanyIntelligenceInsight,
     CompanyIntelligenceSource,
     CompanyResearchDepth,
 )
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import CompanyIntelligenceEvidenceRow, Job
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import CompanyIntelligenceEvidenceRow, Job
 
 
 class _InlineExecutor(Executor):

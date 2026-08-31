@@ -1,7 +1,7 @@
 from datetime import date
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -9,7 +9,7 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
-from resume_agent.profile.matrix import (
+from resume_tailor_harness.profile.matrix import (
     MatrixRow,
     Overrides,
     SkillMatrix,
@@ -25,15 +25,15 @@ from resume_agent.profile.matrix import (
     rebuild_saved_matrix,
     save_matrix,
 )
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.profile.group_corrections import (
     GroupCorrection,
     GroupCorrections,
     corrections_path,
     save_group_corrections,
 )
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.groups import group_map_path, save_group_map
-from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.groups import group_map_path, save_group_map
+from resume_tailor_harness.taxonomy.snapshot import EffectiveTaxonomy
 
 
 def _facts():
@@ -194,7 +194,7 @@ def test_load_matrix_accepts_a_matching_revision(tmp_path):
 
 
 def test_a_regroup_timestamp_does_not_invalidate_a_saved_matrix(tmp_path):
-    from resume_agent.taxonomy.state import GroupingStatus, TaxonomyState
+    from resume_tailor_harness.taxonomy.state import GroupingStatus, TaxonomyState
 
     facts = ProfileFacts(contact=Contact(name="A"), skills={"hard": [Skill(name="py")]})
     cluster_map = ClusterMap(aliases={"py": "python"})

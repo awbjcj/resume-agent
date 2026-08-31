@@ -1,4 +1,4 @@
-# Resume Agent — Tracking (SQLite + Streamlit) Implementation Plan
+# Résumé Tailor Harness — Tracking (SQLite + Streamlit) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -28,7 +28,7 @@ Design spec §5.5. Decisions for this plan:
 
 ```
 pyproject.toml                       # MODIFY: add `streamlit` dependency
-src/resume_agent/
+src/resume_tailor_harness/
   tracking/
     tables.py                        # MODIFY: applications.updated_at onupdate
     repository.py                    # MODIFY: application CRUD + latest_resume_version
@@ -51,7 +51,7 @@ tests/
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py`
+- Modify: `src/resume_tailor_harness/tracking/tables.py`
 - Test: `tests/test_tables_onupdate.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -59,7 +59,7 @@ tests/
 Create `tests/test_tables_onupdate.py`:
 
 ```python
-from resume_agent.tracking.tables import Application
+from resume_tailor_harness.tracking.tables import Application
 
 
 def test_application_updated_at_has_onupdate():
@@ -79,7 +79,7 @@ Expected: FAIL — `assert None is not None`.
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/tracking/tables.py`, change the `Application.updated_at` field:
+In `src/resume_tailor_harness/tracking/tables.py`, change the `Application.updated_at` field:
 
 ```python
     updated_at: datetime = Field(
@@ -100,7 +100,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py tests/test_tables_onupdate.py
+git add src/resume_tailor_harness/tracking/tables.py tests/test_tables_onupdate.py
 git commit -m "feat(tracking): applications.updated_at auto-bump on update" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -110,7 +110,7 @@ git commit -m "feat(tracking): applications.updated_at auto-bump on update" -m "
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_applications_repository.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -120,7 +120,7 @@ Create `tests/test_applications_repository.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     applications_by_status,
     get_application,
@@ -130,7 +130,7 @@ from resume_agent.tracking.repository import (
     save_resume_version,
     update_application_status,
 )
-from resume_agent.tracking.tables import Application, ApplicationStatus, ResumeVersion
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, ResumeVersion
 
 
 def _session() -> Session:
@@ -189,10 +189,10 @@ Expected: FAIL — `ImportError` (`save_application`, etc. not defined).
 
 - [ ] **Step 3: Implement**
 
-Add to `src/resume_agent/tracking/repository.py`. First extend the tables import line:
+Add to `src/resume_tailor_harness/tracking/repository.py`. First extend the tables import line:
 
 ```python
-from resume_agent.tracking.tables import Application, Job, ResumeVersion
+from resume_tailor_harness.tracking.tables import Application, Job, ResumeVersion
 ```
 
 Then append:
@@ -261,7 +261,7 @@ Expected: PASS (new application tests + existing repository tests stay green).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_applications_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_applications_repository.py
 git commit -m "feat(tracking): applications repository + latest_resume_version" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -271,7 +271,7 @@ git commit -m "feat(tracking): applications repository + latest_resume_version" 
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/queries.py`
+- Create: `src/resume_tailor_harness/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -281,9 +281,9 @@ Create `tests/test_tracking_queries.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.repository import save_application, save_job, save_resume_version
-from resume_agent.tracking.queries import pipeline_rows, shortlist_rows
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job, JobStatus, ResumeVersion
+from resume_tailor_harness.tracking.repository import save_application, save_job, save_resume_version
+from resume_tailor_harness.tracking.queries import pipeline_rows, shortlist_rows
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job, JobStatus, ResumeVersion
 
 
 def _session() -> Session:
@@ -346,23 +346,23 @@ Run:
 uv run pytest tests/test_tracking_queries.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.queries'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.queries'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tracking/queries.py`:
+Create `src/resume_tailor_harness/tracking/queries.py`:
 
 ```python
 from dataclasses import dataclass
 
 from sqlmodel import Session, select
 
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     latest_rendered_resume_version,
     latest_resume_version,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @dataclass
@@ -450,7 +450,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/queries.py tests/test_tracking_queries.py
+git add src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py
 git commit -m "feat(tracking): shortlist + pipeline read-model queries" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -460,7 +460,7 @@ git commit -m "feat(tracking): shortlist + pipeline read-model queries" -m "Co-A
 
 **Files:**
 
-- Create: `src/resume_agent/dashboard/__init__.py`, `src/resume_agent/dashboard/app.py`
+- Create: `src/resume_tailor_harness/dashboard/__init__.py`, `src/resume_tailor_harness/dashboard/app.py`
 - Test: `tests/test_dashboard_app.py`
 
 - [ ] **Step 1: Add the dependency**
@@ -482,7 +482,7 @@ import importlib
 
 
 def test_dashboard_module_exposes_render_functions():
-    app = importlib.import_module("resume_agent.dashboard.app")
+    app = importlib.import_module("resume_tailor_harness.dashboard.app")
     # The page renderers and entrypoint exist and are callable.
     assert callable(app.render_shortlist_page)
     assert callable(app.render_pipeline_page)
@@ -497,32 +497,32 @@ Run:
 uv run pytest tests/test_dashboard_app.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.dashboard'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.dashboard'`.
 
 - [ ] **Step 4: Implement**
 
-Create `src/resume_agent/dashboard/__init__.py`:
+Create `src/resume_tailor_harness/dashboard/__init__.py`:
 
 ```python
 """Streamlit dashboard: shortlist checkpoint + pipeline board."""
 ```
 
-Create `src/resume_agent/dashboard/app.py`:
+Create `src/resume_tailor_harness/dashboard/app.py`:
 
 ```python
 import streamlit as st
 
-from resume_agent.config import get_settings
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.queries import pipeline_rows, shortlist_rows
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.queries import pipeline_rows, shortlist_rows
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     get_job,
     save_application,
     save_job,
     update_application_status,
 )
-from resume_agent.tracking.tables import ApplicationStatus, JobStatus
+from resume_tailor_harness.tracking.tables import ApplicationStatus, JobStatus
 
 
 def _engine():
@@ -535,7 +535,7 @@ def render_shortlist_page(session) -> None:
     st.header("Shortlist — approve jobs to tailor")
     rows = shortlist_rows(session)
     if not rows:
-        st.info("No shortlisted jobs. Run `resume-agent discover` first.")
+        st.info("No shortlisted jobs. Run `resume-tailor-harness discover` first.")
         return
     for row in rows:
         with st.container(border=True):
@@ -588,13 +588,13 @@ def render_pipeline_page(session) -> None:
 
 
 def _new_application(job_id: int, status: str, notes: str):
-    from resume_agent.tracking.tables import Application
+    from resume_tailor_harness.tracking.tables import Application
 
     return Application(job_id=job_id, status=status, notes=notes or None)
 
 
 def main() -> None:
-    st.set_page_config(page_title="Resume Agent", layout="wide")
+    st.set_page_config(page_title="Résumé Tailor Harness", layout="wide")
     page = st.sidebar.radio("Page", ["Shortlist", "Pipeline board"])
     engine = _engine()
     with get_session(engine) as session:
@@ -623,7 +623,7 @@ Expected: PASS (1 test). Importing the module must not require a running Streaml
 Run:
 
 ```bash
-uv run streamlit run src/resume_agent/dashboard/app.py
+uv run streamlit run src/resume_tailor_harness/dashboard/app.py
 ```
 
 With a populated DB: confirm the Shortlist page lists shortlisted jobs and "Approve" flips one to `approved`; the Pipeline board groups jobs, shows the PDF path, and saves an application status. Stop the server when done.
@@ -631,7 +631,7 @@ With a populated DB: confirm the Shortlist page lists shortlisted jobs and "Appr
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/dashboard/__init__.py src/resume_agent/dashboard/app.py tests/test_dashboard_app.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/dashboard/__init__.py src/resume_tailor_harness/dashboard/app.py tests/test_dashboard_app.py
 git commit -m "feat(tracking): Streamlit shortlist + pipeline dashboard" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -641,7 +641,7 @@ git commit -m "feat(tracking): Streamlit shortlist + pipeline dashboard" -m "Co-
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_dashboard.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -651,7 +651,7 @@ Create `tests/test_cli_dashboard.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
+from resume_tailor_harness import cli
 
 runner = CliRunner()
 
@@ -684,11 +684,11 @@ Run:
 uv run pytest tests/test_cli_dashboard.py -v
 ```
 
-Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'subprocess'` (or no `dashboard` command).
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.cli' has no attribute 'subprocess'` (or no `dashboard` command).
 
 - [ ] **Step 3: Implement**
 
-Add these imports at the top of `src/resume_agent/cli.py`:
+Add these imports at the top of `src/resume_tailor_harness/cli.py`:
 
 ```python
 import os
@@ -725,7 +725,7 @@ Expected: PASS (1 test).
 Run:
 
 ```bash
-uv run resume-agent dashboard --help
+uv run resume-tailor-harness dashboard --help
 ```
 
 Expected: help text (exit 0).
@@ -743,7 +743,7 @@ Expected: all tests pass (Render total + Tracking additions).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_dashboard.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_dashboard.py
 git commit -m "feat(tracking): dashboard CLI command" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

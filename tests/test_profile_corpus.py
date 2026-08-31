@@ -1,6 +1,6 @@
 import pytest
 
-from resume_agent.profile.corpus import (
+from resume_tailor_harness.profile.corpus import (
     SourceDoc,
     SourceManifest,
     add_source,
@@ -13,7 +13,7 @@ from resume_agent.profile.corpus import (
     update_source,
     frontmatter_repo_url,
 )
-from resume_agent.security.paths import PathEscapeError
+from resume_tailor_harness.security.paths import PathEscapeError
 
 
 def _make_doc(tmp_path, name="resume.txt", content="Ada Lovelace"):

@@ -33,7 +33,7 @@ module.exports = function autoI18nPlugin({ types: t }) {
     && (callee.property.name === "NumberFormat" || callee.property.name === "DateTimeFormat");
 
   return {
-    name: "resume-agent-auto-i18n",
+    name: "resume-tailor-harness-auto-i18n",
     visitor: {
       Program: {
         enter(programPath, state) {

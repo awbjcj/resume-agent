@@ -1,13 +1,13 @@
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.recruitee import (
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.recruitee import (
     fetch_recruitee,
     offers_url,
     parse_recruitee,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_recruitee_maps_public_offers_payload():
@@ -37,7 +37,7 @@ def test_recruitee_fetch_reads_public_offers(monkeypatch):
         def json(self):
             return payload
 
-    import resume_agent.discovery.connectors.recruitee as connector
+    import resume_tailor_harness.discovery.connectors.recruitee as connector
 
     monkeypatch.setattr(connector.board, "get", lambda *args, **kwargs: Response())
     assert fetch_recruitee(AtsTarget("recruitee", "transperfect"), SearchConfig())[

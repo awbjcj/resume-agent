@@ -1,7 +1,7 @@
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services import board
-from resume_agent.services.pagination import paginate
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services import board
+from resume_tailor_harness.services.pagination import paginate
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():

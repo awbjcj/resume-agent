@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.discovery.scraper.recipe import (
+from resume_tailor_harness.discovery.scraper.recipe import (
     Pagination,
     RECIPE_SCHEMA_VERSION,
     ScrapeRecipe,

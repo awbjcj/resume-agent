@@ -1,12 +1,12 @@
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
 )
-from resume_agent.tailor.length import format_budget, format_depth_plan, resume_stats
-from resume_agent.tailor.review_config import LengthBudget, ReviewConfig
+from resume_tailor_harness.tailor.length import format_budget, format_depth_plan, resume_stats
+from resume_tailor_harness.tailor.review_config import LengthBudget, ReviewConfig
 
 
 def test_length_budget_defaults_present_on_config():

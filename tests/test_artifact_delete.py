@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from resume_agent.services import board
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.services import board
+from resume_tailor_harness.tracking.repository import (
     get_cover_letter,
     get_resume_version,
     has_progress,
@@ -20,7 +20,7 @@ from resume_agent.tracking.repository import (
     save_job,
     save_resume_version,
 )
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     CoverLetter,
     Job,
@@ -167,7 +167,7 @@ def test_the_primitive_clears_the_application_pointer_even_though_the_gate_block
     """`delete_artifact_rows` is unguarded, so it must not be able to leave an
     application citing a version that no longer exists — whichever caller
     reaches it. The service refuses this case, so nothing else covers it."""
-    from resume_agent.tracking.repository import delete_artifact_rows
+    from resume_tailor_harness.tracking.repository import delete_artifact_rows
 
     with _session() as s:
         job_id = _job(s)

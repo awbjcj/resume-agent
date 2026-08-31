@@ -13,7 +13,7 @@
 - Test command: `.venv/Scripts/python.exe -m pytest` (offline — browser + LLM faked). Lint: `.venv/Scripts/python.exe -m ruff check .`.
 - **Depends on the skip-known plan** (`2026-07-01-skip-known-pull.md`) for the `skip_seen` predicate the connector accepts. If unmerged, `DashboardScraper.fetch` still takes `skip_seen=None` and simply skips the pruning line.
 - Recipes are cached JSON at `data/scraper_recipes/{host}.json`, keyed by normalized host; a `schema_version` mismatch or unreadable file is a cache-miss.
-- Learn on cache-miss; **guarded auto-relearn once per target per pull** when replay yields zero cards AND `has_job_like_content(html)` is True; `resume-agent pull --relearn` forces a fresh learn.
+- Learn on cache-miss; **guarded auto-relearn once per target per pull** when replay yields zero cards AND `has_job_like_content(html)` is True; `resume-tailor-harness pull --relearn` forces a fresh learn.
 - Crawl = search box + pagination only (structured filter widgets deferred). Enumerate → `title_relevance_gate` + `skip_seen` prune **before** detail fetch. Cap pages at `recipe.pagination.max_pages`.
 - Routing = explicit opt-in `scrape:` config section + its own connector, disabled by default. No automatic fallback from `companies.urls`.
 - Source string = `"scrape"` (canonical tier). JD source text only — fact-lock untouched.
@@ -63,7 +63,7 @@ repository and current Agno, Playwright, and Pydantic documentation.
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/recipe.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/recipe.py`
 - Test: `tests/scraper/test_recipe.py`
 
 **Interfaces:**
@@ -80,7 +80,7 @@ repository and current Agno, Playwright, and Pydantic documentation.
 # tests/scraper/test_recipe.py
 from datetime import datetime, timezone
 
-from resume_agent.discovery.scraper.recipe import (
+from resume_tailor_harness.discovery.scraper.recipe import (
     Pagination,
     RECIPE_SCHEMA_VERSION,
     ScrapeRecipe,
@@ -123,12 +123,12 @@ def test_search_is_optional():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/scraper/test_recipe.py -v`
-Expected: FAIL — `ModuleNotFoundError: resume_agent.discovery.scraper.recipe`.
+Expected: FAIL — `ModuleNotFoundError: resume_tailor_harness.discovery.scraper.recipe`.
 
 - [ ] **Step 3: Implement the model**
 
 ```python
-# src/resume_agent/discovery/scraper/recipe.py
+# src/resume_tailor_harness/discovery/scraper/recipe.py
 from datetime import datetime
 from typing import Literal
 
@@ -171,7 +171,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/recipe.py tests/scraper/test_recipe.py
+git add src/resume_tailor_harness/discovery/scraper/recipe.py tests/scraper/test_recipe.py
 git commit -m "feat: add ScrapeRecipe model for learned dashboard selectors"
 ```
 
@@ -181,7 +181,7 @@ git commit -m "feat: add ScrapeRecipe model for learned dashboard selectors"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/recipe_store.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/recipe_store.py`
 - Test: `tests/scraper/test_recipe_store.py`
 
 **Interfaces:**
@@ -201,8 +201,8 @@ git commit -m "feat: add ScrapeRecipe model for learned dashboard selectors"
 # tests/scraper/test_recipe_store.py
 from datetime import datetime, timezone
 
-from resume_agent.discovery.scraper.recipe import Pagination, RECIPE_SCHEMA_VERSION, ScrapeRecipe
-from resume_agent.discovery.scraper.recipe_store import (
+from resume_tailor_harness.discovery.scraper.recipe import Pagination, RECIPE_SCHEMA_VERSION, ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.recipe_store import (
     host_key,
     load_recipe,
     recipe_path,
@@ -256,13 +256,13 @@ Expected: FAIL — module missing.
 - [ ] **Step 3: Implement the store**
 
 ```python
-# src/resume_agent/discovery/scraper/recipe_store.py
+# src/resume_tailor_harness/discovery/scraper/recipe_store.py
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
-from resume_agent.discovery.scraper.recipe import RECIPE_SCHEMA_VERSION, ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.recipe import RECIPE_SCHEMA_VERSION, ScrapeRecipe
 
 RECIPES_DIR = "data/scraper_recipes"
 
@@ -304,7 +304,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/recipe_store.py tests/scraper/test_recipe_store.py
+git add src/resume_tailor_harness/discovery/scraper/recipe_store.py tests/scraper/test_recipe_store.py
 git commit -m "feat: cache learned scrape recipes as per-host JSON"
 ```
 
@@ -314,7 +314,7 @@ git commit -m "feat: cache learned scrape recipes as per-host JSON"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/recipe_parse.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/recipe_parse.py`
 - Create: `tests/scraper/fixtures/board_list.html`, `tests/scraper/fixtures/board_detail.html`
 - Test: `tests/scraper/test_recipe_parse.py`
 
@@ -378,8 +378,8 @@ git commit -m "feat: cache learned scrape recipes as per-host JSON"
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.scraper.recipe import Pagination, ScrapeRecipe
-from resume_agent.discovery.scraper.recipe_parse import (
+from resume_tailor_harness.discovery.scraper.recipe import Pagination, ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.recipe_parse import (
     has_job_like_content,
     parse_cards,
     parse_detail,
@@ -433,13 +433,13 @@ Expected: FAIL — module missing.
 - [ ] **Step 4: Implement the parser**
 
 ```python
-# src/resume_agent/discovery/scraper/recipe_parse.py
+# src/resume_tailor_harness/discovery/scraper/recipe_parse.py
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from resume_agent.discovery.connectors.text import clean_job_description_text, html_to_markdown
-from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.scraper.recipe import ScrapeRecipe
+from resume_tailor_harness.discovery.connectors.text import clean_job_description_text, html_to_markdown
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.recipe import ScrapeRecipe
 
 # A page "has job-like content" when several sibling-ish blocks look like listings.
 _MIN_JOB_LINKS = 3
@@ -514,7 +514,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/recipe_parse.py tests/scraper/test_recipe_parse.py tests/scraper/fixtures/board_list.html tests/scraper/fixtures/board_detail.html
+git add src/resume_tailor_harness/discovery/scraper/recipe_parse.py tests/scraper/test_recipe_parse.py tests/scraper/fixtures/board_list.html tests/scraper/fixtures/board_detail.html
 git commit -m "feat: deterministic card/detail parsing from a scrape recipe"
 ```
 
@@ -524,7 +524,7 @@ git commit -m "feat: deterministic card/detail parsing from a scrape recipe"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/learn.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/learn.py`
 - Test: `tests/scraper/test_learn.py`
 
 **Interfaces:**
@@ -545,8 +545,8 @@ git commit -m "feat: deterministic card/detail parsing from a scrape recipe"
 # tests/scraper/test_learn.py
 from datetime import datetime, timezone
 
-from resume_agent.discovery.scraper.learn import MAX_LEARN_CHARS, learn_recipe, prune_html
-from resume_agent.discovery.scraper.recipe import Pagination, RECIPE_SCHEMA_VERSION, ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.learn import MAX_LEARN_CHARS, learn_recipe, prune_html
+from resume_tailor_harness.discovery.scraper.recipe import Pagination, RECIPE_SCHEMA_VERSION, ScrapeRecipe
 
 
 def test_prune_html_drops_scripts_and_styles():
@@ -597,19 +597,19 @@ Expected: FAIL — module missing.
 - [ ] **Step 3: Implement the learner**
 
 ```python
-# src/resume_agent/discovery/scraper/learn.py
+# src/resume_tailor_harness/discovery/scraper/learn.py
 from bs4 import BeautifulSoup, Comment
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.scraper.recipe import RECIPE_SCHEMA_VERSION, ScrapeRecipe
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.scraper.recipe import RECIPE_SCHEMA_VERSION, ScrapeRecipe
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.tracking.tables import utcnow
+from resume_tailor_harness.tracking.tables import utcnow
 
 MAX_LEARN_CHARS = 60_000
 
@@ -673,7 +673,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/learn.py tests/scraper/test_learn.py
+git add src/resume_tailor_harness/discovery/scraper/learn.py tests/scraper/test_learn.py
 git commit -m "feat: prune HTML and learn a scrape recipe via the LLM seam"
 ```
 
@@ -683,7 +683,7 @@ git commit -m "feat: prune HTML and learn a scrape recipe via the LLM seam"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/dashboard.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/dashboard.py`
 - Test: `tests/scraper/test_dashboard.py`
 
 **Interfaces:**
@@ -707,9 +707,9 @@ This task implements the happy path **without** the guarded relearn or the
 # tests/scraper/test_dashboard.py
 from datetime import datetime, timezone
 
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
-from resume_agent.discovery.scraper.recipe import Pagination, ScrapeRecipe
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper
+from resume_tailor_harness.discovery.scraper.recipe import Pagination, ScrapeRecipe
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 class _Target:
@@ -810,23 +810,23 @@ Expected: FAIL — module missing.
 - [ ] **Step 3: Implement the core connector**
 
 ```python
-# src/resume_agent/discovery/scraper/dashboard.py
+# src/resume_tailor_harness/discovery/scraper/dashboard.py
 import time
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
-from resume_agent.discovery.connectors.harvest import gate_and_limit
-from resume_agent.discovery.connectors.text import primary_search_term, title_relevance_gate
-from resume_agent.discovery.scraper.learn import build_learn_agent, learn_recipe, prune_html
-from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.scraper.recipe import ScrapeRecipe
-from resume_agent.discovery.scraper.recipe_parse import parse_cards, parse_detail
-from resume_agent.discovery.scraper.recipe_store import RECIPES_DIR, host_key, load_recipe, save_recipe
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.llm_runner import Runner
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob
+from resume_tailor_harness.discovery.connectors.harvest import gate_and_limit
+from resume_tailor_harness.discovery.connectors.text import primary_search_term, title_relevance_gate
+from resume_tailor_harness.discovery.scraper.learn import build_learn_agent, learn_recipe, prune_html
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.recipe import ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.recipe_parse import parse_cards, parse_detail
+from resume_tailor_harness.discovery.scraper.recipe_store import RECIPES_DIR, host_key, load_recipe, save_recipe
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.llm_runner import Runner
 
 
 class DashboardScraper:
@@ -1019,7 +1019,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/dashboard.py tests/scraper/test_dashboard.py
+git add src/resume_tailor_harness/discovery/scraper/dashboard.py tests/scraper/test_dashboard.py
 git commit -m "feat: DashboardScraper core replay (learn-on-miss, enumerate, gate, skip, detail)"
 ```
 
@@ -1029,7 +1029,7 @@ git commit -m "feat: DashboardScraper core replay (learn-on-miss, enumerate, gat
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/scraper/dashboard.py`
+- Modify: `src/resume_tailor_harness/discovery/scraper/dashboard.py`
 - Test: `tests/scraper/test_dashboard.py` (extend)
 
 **Interfaces:**
@@ -1043,7 +1043,7 @@ git commit -m "feat: DashboardScraper core replay (learn-on-miss, enumerate, gat
 
 ```python
 # tests/scraper/test_dashboard.py  (append)
-from resume_agent.discovery.scraper.recipe import ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.recipe import ScrapeRecipe
 
 
 class _RelearnLearn:
@@ -1092,7 +1092,7 @@ class _EmptyJdScraper(_Scraper):
 
 class _FakeExtract:
     def run(self, prompt):
-        from resume_agent.discovery.url_ingest.models import ExtractedJob
+        from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob
         class _R: ...
         r = _R(); r.content = ExtractedJob(jd_text="Recovered JD body from raw page text.")
         return r
@@ -1119,10 +1119,10 @@ Expected: FAIL — no relearn (learn.calls == 1) / empty JD (no jobs).
 Add imports:
 
 ```python
-from resume_agent.discovery.scraper.recipe_parse import has_job_like_content, parse_cards, parse_detail
-from resume_agent.discovery.url_ingest.llm import build_url_extract_agent, extract_fields, html_to_text
-from resume_agent.discovery.scraper.learn import build_learn_agent, learn_recipe, prune_html
-from resume_agent.discovery.scraper.recipe_store import RECIPES_DIR, host_key, load_recipe, save_recipe
+from resume_tailor_harness.discovery.scraper.recipe_parse import has_job_like_content, parse_cards, parse_detail
+from resume_tailor_harness.discovery.url_ingest.llm import build_url_extract_agent, extract_fields, html_to_text
+from resume_tailor_harness.discovery.scraper.learn import build_learn_agent, learn_recipe, prune_html
+from resume_tailor_harness.discovery.scraper.recipe_store import RECIPES_DIR, host_key, load_recipe, save_recipe
 ```
 
 Add the extractor seam:
@@ -1175,7 +1175,7 @@ Expected: PASS (all).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/dashboard.py tests/scraper/test_dashboard.py
+git add src/resume_tailor_harness/discovery/scraper/dashboard.py tests/scraper/test_dashboard.py
 git commit -m "feat: guarded relearn and per-card extract_fields fallback for the scraper"
 ```
 
@@ -1185,9 +1185,9 @@ git commit -m "feat: guarded relearn and per-card extract_fields fallback for th
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/config.py`
-- Modify: `src/resume_agent/discovery/connectors/registry.py`
-- Modify: `src/resume_agent/discovery/source_tier.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/config.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py`
+- Modify: `src/resume_tailor_harness/discovery/source_tier.py`
 - Test: `tests/scraper/test_scrape_registry.py`, extend `tests/test_source_tier.py`
 
 **Interfaces:**
@@ -1203,10 +1203,10 @@ git commit -m "feat: guarded relearn and per-card extract_fields fallback for th
 
 ```python
 # tests/scraper/test_scrape_registry.py
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.config import ConnectorsConfig, ScrapeConfig, ScrapeTarget
-from resume_agent.discovery.connectors.registry import build_connectors
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig, ScrapeConfig, ScrapeTarget
+from resume_tailor_harness.discovery.connectors.registry import build_connectors
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper
 
 
 def test_scrape_connector_built_when_enabled():
@@ -1226,7 +1226,7 @@ Add to `tests/test_source_tier.py`:
 
 ```python
 def test_scrape_source_is_canonical():
-    from resume_agent.discovery.source_tier import source_rank
+    from resume_tailor_harness.discovery.source_tier import source_rank
     assert source_rank("scrape") == 0
 ```
 
@@ -1287,8 +1287,8 @@ In `build_source_connectors`, before the return:
 Add imports at the top of `registry.py`:
 
 ```python
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
-from resume_agent.discovery.scraper.recipe_store import host_key
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper
+from resume_tailor_harness.discovery.scraper.recipe_store import host_key
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -1299,7 +1299,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/config.py src/resume_agent/discovery/connectors/registry.py src/resume_agent/discovery/source_tier.py tests/scraper/test_scrape_registry.py tests/test_source_tier.py
+git add src/resume_tailor_harness/discovery/connectors/config.py src/resume_tailor_harness/discovery/connectors/registry.py src/resume_tailor_harness/discovery/source_tier.py tests/scraper/test_scrape_registry.py tests/test_source_tier.py
 git commit -m "feat: opt-in scrape config section + canonical scrape source"
 ```
 
@@ -1309,15 +1309,15 @@ git commit -m "feat: opt-in scrape config section + canonical scrape source"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/discovery.py` (`pull_jobs` → pass `relearn` to the scraper)
-- Modify: `src/resume_agent/cli.py` (`pull_cmd` `--relearn` flag)
+- Modify: `src/resume_tailor_harness/services/discovery.py` (`pull_jobs` → pass `relearn` to the scraper)
+- Modify: `src/resume_tailor_harness/cli.py` (`pull_cmd` `--relearn` flag)
 - Modify: `config/connectors.yaml.example`, `CLAUDE.md`
 - Test: `tests/test_pull_refresh.py` (extend) or a small new test.
 
 **Interfaces:**
 
 - Produces: `pull_jobs(..., relearn: bool = False)` forwards to the scraper build; a
-  `resume-agent pull --relearn` flag sets it. Because the scraper is built inside
+  `resume-tailor-harness pull --relearn` flag sets it. Because the scraper is built inside
   `build_source_connectors`, thread `relearn` by setting it on the built
   `DashboardScraper` instances after construction.
 
@@ -1325,17 +1325,17 @@ git commit -m "feat: opt-in scrape config section + canonical scrape source"
 
 ```python
 # tests/test_pull_refresh.py  (append)
-import resume_agent.services.discovery as disc
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
+import resume_tailor_harness.services.discovery as disc
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper
 
 
 def test_pull_jobs_sets_relearn_on_scraper(monkeypatch, tmp_path):
     scraper = DashboardScraper([])
     monkeypatch.setattr(disc, "build_source_connectors", lambda *a, **k: [scraper])
     monkeypatch.setattr(disc, "run_pull", lambda *a, **k: __import__(
-        "resume_agent.discovery.connectors.runner", fromlist=["PullReport"]).PullReport())
+        "resume_tailor_harness.discovery.connectors.runner", fromlist=["PullReport"]).PullReport())
     monkeypatch.setattr(disc, "load_search_config", lambda p: __import__(
-        "resume_agent.discovery.search_config", fromlist=["SearchConfig"]).SearchConfig())
+        "resume_tailor_harness.discovery.search_config", fromlist=["SearchConfig"]).SearchConfig())
     monkeypatch.setattr(disc, "load_connectors_config", lambda p: object())
 
     disc.pull_jobs(session=None, relearn=True)
@@ -1379,7 +1379,7 @@ def pull_jobs(
     )
 ```
 
-Add the import: `from resume_agent.discovery.scraper.dashboard import DashboardScraper`.
+Add the import: `from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper`.
 
 In `cli.py` `pull_cmd`, add the flag and pass it:
 
@@ -1426,7 +1426,7 @@ Expected: PASS / no findings.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/services/discovery.py src/resume_agent/cli.py config/connectors.yaml.example CLAUDE.md tests/test_pull_refresh.py
+git add src/resume_tailor_harness/services/discovery.py src/resume_tailor_harness/cli.py config/connectors.yaml.example CLAUDE.md tests/test_pull_refresh.py
 git commit -m "feat: pull --relearn flag, example scrape config, and docs"
 ```
 

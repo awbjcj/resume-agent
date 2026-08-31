@@ -4,7 +4,7 @@ from contextlib import closing
 
 import pytest
 
-from resume_agent.services.backup import (
+from resume_tailor_harness.services.backup import (
     InvalidArchiveError,
     UnsafeArchiveError,
     export_data_root,
@@ -19,7 +19,7 @@ def _make_root(tmp_path, name="data"):
     (root / "profile").mkdir(parents=True)
     (root / "profile" / "facts.json").write_text('{"facts": []}', encoding="utf-8")
     (root / ".env").write_text("KEY=value\n", encoding="utf-8")
-    db = root / "resume_agent.db"
+    db = root / "resume_tailor_harness.db"
     with closing(sqlite3.connect(db)) as connection:
         connection.execute("CREATE TABLE job (id INTEGER PRIMARY KEY, title TEXT)")
         connection.execute("INSERT INTO job (title) VALUES ('Engineer')")
@@ -34,13 +34,13 @@ def test_sqlite_snapshot_and_export_are_wal_safe(tmp_path):
     with closing(sqlite3.connect(snapshot)) as connection:
         assert connection.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
 
-    (root / "resume_agent.db-wal").write_bytes(b"")
+    (root / "resume_tailor_harness.db-wal").write_bytes(b"")
     archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
     with tarfile.open(archive) as tar:
         names = tar.getnames()
     assert "profile/facts.json" in names
-    assert "resume_agent.db" in names
-    assert "resume_agent.db-wal" not in names
+    assert "resume_tailor_harness.db" in names
+    assert "resume_tailor_harness.db-wal" not in names
 
 
 def test_import_roundtrip_full_replaces_root(tmp_path):
@@ -108,7 +108,7 @@ def test_archive_limits_are_checked_before_extraction(tmp_path):
 
 
 def test_import_rolls_back_when_install_move_fails(tmp_path, monkeypatch):
-    from resume_agent.services import backup
+    from resume_tailor_harness.services import backup
 
     root, db = _make_root(tmp_path)
     archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
@@ -128,7 +128,7 @@ def test_import_rolls_back_when_install_move_fails(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="injected"):
         import_data_root(archive, root)
     assert (root / "profile" / "facts.json").exists()
-    with closing(sqlite3.connect(root / "resume_agent.db")) as connection:
+    with closing(sqlite3.connect(root / "resume_tailor_harness.db")) as connection:
         assert connection.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
 
 
@@ -150,7 +150,7 @@ def test_import_rolls_back_when_post_swap_validation_fails(tmp_path):
 def test_import_preserves_rollback_directory_when_restore_also_fails(
     tmp_path, monkeypatch
 ):
-    from resume_agent.services import backup
+    from resume_tailor_harness.services import backup
 
     root, db = _make_root(tmp_path)
     archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
@@ -162,7 +162,7 @@ def test_import_preserves_rollback_directory_when_restore_also_fails(
             raise OSError("install failed")
         if (
             ".ra-import-rollback-" in str(source_path.parent)
-            and source_path.name == "resume_agent.db"
+            and source_path.name == "resume_tailor_harness.db"
         ):
             raise OSError("restore failed")
         return original_move(source, destination)
@@ -173,16 +173,16 @@ def test_import_preserves_rollback_directory_when_restore_also_fails(
         import_data_root(archive, root)
     rollback_dirs = list(root.glob(".ra-import-rollback-*"))
     assert len(rollback_dirs) == 1
-    assert (rollback_dirs[0] / "resume_agent.db").is_file()
+    assert (rollback_dirs[0] / "resume_tailor_harness.db").is_file()
 
 
 def test_pack_local_checkout_builds_importable_volume_layout(tmp_path):
-    from resume_agent.services.backup import pack_local_checkout
+    from resume_tailor_harness.services.backup import pack_local_checkout
 
     repo = tmp_path / "repo"
     (repo / "data" / "profile").mkdir(parents=True)
     (repo / "data" / "profile" / "facts.json").write_text("{}", encoding="utf-8")
-    db = repo / "data" / "resume_agent.db"
+    db = repo / "data" / "resume_tailor_harness.db"
     with closing(sqlite3.connect(db)) as connection:
         connection.execute("CREATE TABLE job (id INTEGER PRIMARY KEY)")
         connection.commit()
@@ -197,14 +197,14 @@ def test_pack_local_checkout_builds_importable_volume_layout(tmp_path):
     import_data_root(archive, restored)
 
     assert (restored / "profile" / "facts.json").is_file()
-    assert (restored / "resume_agent.db").is_file()
+    assert (restored / "resume_tailor_harness.db").is_file()
     assert (restored / "config" / "search.yaml").is_file()
     assert (restored / "output" / "resume.pdf").is_file()
     assert (restored / ".env").is_file()
 
 
 def test_pack_local_checkout_rejects_empty_or_symlinked_state(tmp_path):
-    from resume_agent.services.backup import pack_local_checkout
+    from resume_tailor_harness.services.backup import pack_local_checkout
 
     repo = tmp_path / "repo"
     (repo / "data").mkdir(parents=True)

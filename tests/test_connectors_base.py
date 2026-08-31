@@ -1,5 +1,5 @@
-from resume_agent.discovery.connectors.base import Connector, FetchResult, RawJob
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import Connector, FetchResult, RawJob
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_rawjob_carries_its_own_source():

@@ -29,7 +29,7 @@ applies to the profile matrix and its web page only.
 
 ## 1. Group vocabulary
 
-A fixed constant (in `resume_agent/taxonomy/`, exported for reuse):
+A fixed constant (in `resume_tailor_harness/taxonomy/`, exported for reuse):
 
 ```
 languages, frameworks, cloud-infra, data-ml, databases, devops-tooling,

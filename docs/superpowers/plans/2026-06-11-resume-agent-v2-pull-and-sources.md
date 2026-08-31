@@ -1,10 +1,10 @@
-# Resume Agent v2 — Unified `pull` + Connector Health (`sources`) Implementation Plan
+# Résumé Tailor Harness v2 — Unified `pull` + Connector Health (`sources`) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** One command — `resume-agent pull` — runs every _enabled_ connector in canonical dedup order, ingests through the shared dedupe, records per-connector telemetry, and prints a per-source count table. A second command — `resume-agent sources` — shows each connector's last run, jobs added, and last error. `scrape` survives as a thin LinkedIn-only alias.
+**Goal:** One command — `resume-tailor-harness pull` — runs every _enabled_ connector in canonical dedup order, ingests through the shared dedupe, records per-connector telemetry, and prints a per-source count table. A second command — `resume-tailor-harness sources` — shows each connector's last run, jobs added, and last error. `scrape` survives as a thin LinkedIn-only alias.
 
-**Architecture:** This is **Plan 3 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`). The deep module here is `run_pull`: it concentrates "iterate connectors → fetch → ingest → isolate failures → record telemetry → tally" in one place, so the CLI command is a thin shell and the orchestration is unit-tested with fake connectors (including one that raises). Telemetry is a **JSON state file** (`data/connector_runs.json`) — chosen over a DB table to avoid schema churn, per the spec's lean.
+**Architecture:** This is **Plan 3 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-tailor-harness-v2-connectors-design.md`). The deep module here is `run_pull`: it concentrates "iterate connectors → fetch → ingest → isolate failures → record telemetry → tally" in one place, so the CLI command is a thin shell and the orchestration is unit-tested with fake connectors (including one that raises). Telemetry is a **JSON state file** (`data/connector_runs.json`) — chosen over a DB table to avoid schema churn, per the spec's lean.
 
 **Tech Stack:** Python 3.13, uv, Typer, SQLModel, pytest. No new deps.
 
@@ -25,10 +25,10 @@
 ## File Structure
 
 ```
-src/resume_agent/discovery/connectors/
+src/resume_tailor_harness/discovery/connectors/
   telemetry.py            # CREATE — read_runs / record_run over a JSON file
   runner.py               # CREATE — run_pull(session, connectors, search, telemetry_path, limit)
-src/resume_agent/cli.py   # MODIFY — add `pull` and `sources` commands
+src/resume_tailor_harness/cli.py   # MODIFY — add `pull` and `sources` commands
 tests/test_connectors_telemetry.py   # CREATE
 tests/test_connectors_runner.py      # CREATE
 tests/test_cli_pull.py               # CREATE
@@ -41,7 +41,7 @@ tests/test_cli_sources.py            # CREATE
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/telemetry.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/telemetry.py`
 - Test: `tests/test_connectors_telemetry.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -49,7 +49,7 @@ tests/test_cli_sources.py            # CREATE
 Create `tests/test_connectors_telemetry.py`:
 
 ```python
-from resume_agent.discovery.connectors.telemetry import read_runs, record_run
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs, record_run
 
 
 def test_read_runs_missing_file_returns_empty(tmp_path):
@@ -78,11 +78,11 @@ def test_record_run_overwrites_previous_entry_for_same_source(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connectors_telemetry.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.telemetry'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.telemetry'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/discovery/connectors/telemetry.py`:
+Create `src/resume_tailor_harness/discovery/connectors/telemetry.py`:
 
 ```python
 import json
@@ -119,7 +119,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/telemetry.py tests/test_connectors_telemetry.py
+git add src/resume_tailor_harness/discovery/connectors/telemetry.py tests/test_connectors_telemetry.py
 git commit -m "feat(pull): connector run telemetry (JSON state file)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -129,7 +129,7 @@ git commit -m "feat(pull): connector run telemetry (JSON state file)" -m "Co-Aut
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/runner.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/runner.py`
 - Test: `tests/test_connectors_runner.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -139,12 +139,12 @@ Create `tests/test_connectors_runner.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.runner import run_pull
-from resume_agent.discovery.connectors.telemetry import read_runs
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.tracking.repository import jobs_by_status
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.runner import run_pull
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.tracking.repository import jobs_by_status
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 def _session():
@@ -183,21 +183,21 @@ def test_run_pull_ingests_counts_and_isolates_failures(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connectors_runner.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.runner'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.runner'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/discovery/connectors/runner.py`:
+Create `src/resume_tailor_harness/discovery/connectors/runner.py`:
 
 ```python
 from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.discovery.connectors.base import Connector
-from resume_agent.discovery.connectors.telemetry import record_run
-from resume_agent.discovery.ingest import ingest_jobs
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import Connector
+from resume_tailor_harness.discovery.connectors.telemetry import record_run
+from resume_tailor_harness.discovery.ingest import ingest_jobs
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def run_pull(
@@ -233,7 +233,7 @@ Expected: PASS (1 test).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/runner.py tests/test_connectors_runner.py
+git add src/resume_tailor_harness/discovery/connectors/runner.py tests/test_connectors_runner.py
 git commit -m "feat(pull): run_pull orchestrator with per-connector failure isolation" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -243,7 +243,7 @@ git commit -m "feat(pull): run_pull orchestrator with per-connector failure isol
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_pull.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -253,8 +253,8 @@ Create `tests/test_cli_pull.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.discovery.connectors.base import RawJob
+from resume_tailor_harness import cli
+from resume_tailor_harness.discovery.connectors.base import RawJob
 
 runner = CliRunner()
 
@@ -295,16 +295,16 @@ def test_pull_reports_missing_connectors_config(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cli_pull.py -v`
-Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'build_connectors'`.
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.cli' has no attribute 'build_connectors'`.
 
 - [ ] **Step 3: Implement — imports + constants**
 
-In `src/resume_agent/cli.py`, add near the other discovery imports:
+In `src/resume_tailor_harness/cli.py`, add near the other discovery imports:
 
 ```python
-from resume_agent.discovery.connectors.config import load_connectors_config
-from resume_agent.discovery.connectors.registry import build_connectors
-from resume_agent.discovery.connectors.runner import run_pull
+from resume_tailor_harness.discovery.connectors.config import load_connectors_config
+from resume_tailor_harness.discovery.connectors.registry import build_connectors
+from resume_tailor_harness.discovery.connectors.runner import run_pull
 ```
 
 Add a default path constant near `DEFAULT_SEARCH`:
@@ -316,7 +316,7 @@ CONNECTOR_RUNS_PATH = "data/connector_runs.json"
 
 - [ ] **Step 4: Implement — the command**
 
-Add this command after `scrape_cmd` in `src/resume_agent/cli.py`:
+Add this command after `scrape_cmd` in `src/resume_tailor_harness/cli.py`:
 
 ```python
 @app.command("pull")
@@ -355,7 +355,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_pull.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_pull.py
 git commit -m "feat(pull): pull CLI command (all enabled connectors)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -365,7 +365,7 @@ git commit -m "feat(pull): pull CLI command (all enabled connectors)" -m "Co-Aut
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_sources.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -375,8 +375,8 @@ Create `tests/test_cli_sources.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.discovery.connectors.telemetry import record_run
+from resume_tailor_harness import cli
+from resume_tailor_harness.discovery.connectors.telemetry import record_run
 
 runner = CliRunner()
 
@@ -408,10 +408,10 @@ Expected: FAIL — `typer` reports no such command `sources` (exit code != 0).
 
 - [ ] **Step 3: Implement**
 
-Add the import near the other connector imports in `src/resume_agent/cli.py`:
+Add the import near the other connector imports in `src/resume_tailor_harness/cli.py`:
 
 ```python
-from resume_agent.discovery.connectors.telemetry import read_runs
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs
 ```
 
 Add this command after `pull_cmd`:
@@ -422,7 +422,7 @@ def sources_cmd() -> None:
     """Show each connector's last run: when, jobs added, and last error."""
     runs = read_runs(CONNECTOR_RUNS_PATH)
     if not runs:
-        typer.echo("No connector runs recorded yet. Run `resume-agent pull` first.")
+        typer.echo("No connector runs recorded yet. Run `resume-tailor-harness pull` first.")
         raise typer.Exit(code=0)
     for name, info in sorted(runs.items()):
         status = info.get("error") or f"+{info.get('added', 0)} added"
@@ -437,13 +437,13 @@ Expected: PASS (2 tests).
 Run: `uv run pytest -q`
 Expected: ALL pass.
 
-Run: `uv run resume-agent pull --help && uv run resume-agent sources --help`
+Run: `uv run resume-tailor-harness pull --help && uv run resume-tailor-harness sources --help`
 Expected: help text for both, exit 0.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_sources.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_sources.py
 git commit -m "feat(pull): sources connector-health command" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -461,4 +461,4 @@ git commit -m "feat(pull): sources connector-health command" -m "Co-Authored-By:
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-agent-v2-pull-and-sources.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. This closes the connector backbone (Plans 1→2→3). The remaining three are independent leaves: **Plan 4 (cover letters)**, **Plan 5 (Gmail auto-status)**, **Plan 6 (analytics)** — buildable in any order.
+Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-tailor-harness-v2-pull-and-sources.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. This closes the connector backbone (Plans 1→2→3). The remaining three are independent leaves: **Plan 4 (cover letters)**, **Plan 5 (Gmail auto-status)**, **Plan 6 (analytics)** — buildable in any order.

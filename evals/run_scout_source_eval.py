@@ -19,8 +19,8 @@ from evals.scout_source_eval import (
     load_source_cases,
     run_source_case,
 )
-from resume_agent.discovery.source_resolution.resolver import CompanySourceResolver
-from resume_agent.tenancy.paths import SEARCH_PATH
+from resume_tailor_harness.discovery.source_resolution.resolver import CompanySourceResolver
+from resume_tailor_harness.tenancy.paths import SEARCH_PATH
 
 
 def build_argparser() -> argparse.ArgumentParser:

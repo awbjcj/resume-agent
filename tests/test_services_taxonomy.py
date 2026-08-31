@@ -2,8 +2,8 @@
 
 import pytest
 
-import resume_agent.services.taxonomy as service
-from resume_agent.services.taxonomy import (
+import resume_tailor_harness.services.taxonomy as service
+from resume_tailor_harness.services.taxonomy import (
     AliasCycleError,
     DomainMergeCycleError,
     NewDomainSpec,
@@ -17,8 +17,8 @@ from resume_agent.services.taxonomy import (
     patch_domain,
     remove_skill,
 )
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import load_taxonomy_corrections
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import load_taxonomy_corrections
 
 
 def _paths(tmp_path):

@@ -4,8 +4,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.gmail import auth as gmail_auth
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.gmail import auth as gmail_auth
 
 
 @pytest.fixture()
@@ -65,7 +65,7 @@ class _FakeFlow:
 
 
 def _patch_flow(monkeypatch):
-    from resume_agent.api.routers import gmail as gmail_router
+    from resume_tailor_harness.api.routers import gmail as gmail_router
 
     flow = _FakeFlow()
     monkeypatch.setattr(
@@ -79,8 +79,8 @@ def test_build_flow_disables_pkce():
     generated at connect cannot survive to the callback's token exchange. For a
     confidential web client (client_secret) PKCE must be off, else Google rejects
     with invalid_grant 'Missing code verifier'."""
-    from resume_agent.api.routers.gmail import _build_flow
-    from resume_agent.config import Settings
+    from resume_tailor_harness.api.routers.gmail import _build_flow
+    from resume_tailor_harness.config import Settings
 
     settings = Settings(google_oauth_client_id="cid", google_oauth_client_secret="cs")
     flow = _build_flow(settings, "https://example.test/api/gmail/callback")

@@ -1,4 +1,4 @@
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 def test_taxonomy_soft_target_accepts_the_legacy_cap_environment_alias(monkeypatch):

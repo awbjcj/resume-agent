@@ -1,11 +1,11 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
-from resume_agent.discovery.connectors.runner import run_pull
-from resume_agent.discovery.connectors.telemetry import read_runs
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.tracking.repository import jobs_by_status, save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob, SkipSeen
+from resume_tailor_harness.discovery.connectors.runner import run_pull
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.tracking.repository import jobs_by_status, save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():
@@ -57,7 +57,7 @@ def test_run_pull_ingests_counts_and_isolates_failures(tmp_path):
 
 
 def test_run_pull_reports_progress_with_added_total(tmp_path):
-    from resume_agent.progress import ProgressReporter, read_progress
+    from resume_tailor_harness.progress import ProgressReporter, read_progress
 
     with _session() as s:
         run_pull(

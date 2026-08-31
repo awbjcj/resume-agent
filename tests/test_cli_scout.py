@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.discovery import scout_store
-from resume_agent.services import scout as scout_service
+from resume_tailor_harness import cli
+from resume_tailor_harness.discovery import scout_store
+from resume_tailor_harness.services import scout as scout_service
 
 
 def _proposal(pid, label, *, kind="source"):

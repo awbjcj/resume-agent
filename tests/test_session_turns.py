@@ -2,7 +2,7 @@
 
 import pytest
 
-from resume_agent.sessions.turns import DraftRejected, TurnRejected, format_with_retry
+from resume_tailor_harness.sessions.turns import DraftRejected, TurnRejected, format_with_retry
 
 
 class _Out:
@@ -73,16 +73,16 @@ def test_draft_rejected_remains_a_turn_rejection():
 
 
 def test_turn_rejected_is_one_class_everywhere():
-    from resume_agent.interview.agent import TurnRejected as interview_cls
-    from resume_agent.profile.coach import TurnRejected as coach_cls
+    from resume_tailor_harness.interview.agent import TurnRejected as interview_cls
+    from resume_tailor_harness.profile.coach import TurnRejected as coach_cls
 
     assert coach_cls is TurnRejected
     assert interview_cls is TurnRejected
 
 
 def test_missing_model_keys_labels(monkeypatch):
-    from resume_agent import llm_runner
-    from resume_agent.config import Settings
+    from resume_tailor_harness import llm_runner
+    from resume_tailor_harness.config import Settings
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
     monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model, **_kwargs: None)
@@ -96,8 +96,8 @@ def test_missing_model_keys_labels(monkeypatch):
 
 
 def test_missing_model_keys_uses_the_supplied_settings(monkeypatch):
-    from resume_agent import llm_runner
-    from resume_agent.config import Settings
+    from resume_tailor_harness import llm_runner
+    from resume_tailor_harness.config import Settings
 
     settings = Settings(
         _env_file=None,  # type: ignore[call-arg]

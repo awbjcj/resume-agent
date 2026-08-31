@@ -8,8 +8,8 @@ import evals.run_cl_eval as run_cl_eval
 from evals.cl_runner import CLCaseResult
 from evals.judge import JudgeVerdict
 from evals.usage import UsageTotals
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import Contact
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import Contact
 
 
 def _write_case(case_dir: Path, case_id: str, target: str) -> None:

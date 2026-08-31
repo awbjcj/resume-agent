@@ -34,9 +34,9 @@ the subscription registry.
 
 **Files**
 
-- Create: `src/resume_agent/api/runs/models.py`
-- Modify: `src/resume_agent/api/runs/manager.py`
-- Modify: `src/resume_agent/api/runs/sse.py`
+- Create: `src/resume_tailor_harness/api/runs/models.py`
+- Modify: `src/resume_tailor_harness/api/runs/manager.py`
+- Modify: `src/resume_tailor_harness/api/runs/sse.py`
 - Test: `tests/api/test_run_manager.py`
 - Test: `tests/api/test_runs_sse.py`
 
@@ -106,8 +106,8 @@ Expected: all snapshot, route-projection, cancellation, and SSE tests pass.
 
 **Files**
 
-- Modify: `src/resume_agent/api/runs/manager.py`
-- Modify: `src/resume_agent/api/app.py`
+- Modify: `src/resume_tailor_harness/api/runs/manager.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_run_manager.py`
 
 **Interfaces**
@@ -158,7 +158,7 @@ waits on the classification file lock.
 
 **Files**
 
-- Modify: `src/resume_agent/api/runs/manager.py`
+- Modify: `src/resume_tailor_harness/api/runs/manager.py`
 - Test: `tests/api/test_run_manager.py`
 
 **Interface change (additive)**
@@ -206,8 +206,8 @@ Run:
 
 **Files**
 
-- Modify: `src/resume_agent/api/schemas/runs.py`
-- Modify: `src/resume_agent/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py`
 - Create: `tests/api/test_runs_list.py`
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
 

@@ -95,12 +95,12 @@ These amendments are binding and supersede narrower snippets later in the plan.
 
 | File                                                   | Responsibility                                                                                                |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `src/resume_agent/tracking/timeline_pivot.py`          | **Create.** Event log → one row per application. The single source the grid, both CSVs, and the exports read. |
-| `src/resume_agent/tracking/funnel.py`                  | **Create.** Sankey flows + stage cycle times. Aggregation only, no serialization.                             |
-| `src/resume_agent/api/schemas/timeline_analytics.py`   | **Create.** Pivot and analytics response models.                                                              |
-| `src/resume_agent/api/routers/applications.py`         | **Create.** Grid + both CSVs.                                                                                 |
-| `src/resume_agent/api/routers/analytics.py`            | **Modify.** Add `GET /analytics/timeline`. Existing route untouched.                                          |
-| `src/resume_agent/api/app.py`                          | **Modify.** Register the applications router.                                                                 |
+| `src/resume_tailor_harness/tracking/timeline_pivot.py`          | **Create.** Event log → one row per application. The single source the grid, both CSVs, and the exports read. |
+| `src/resume_tailor_harness/tracking/funnel.py`                  | **Create.** Sankey flows + stage cycle times. Aggregation only, no serialization.                             |
+| `src/resume_tailor_harness/api/schemas/timeline_analytics.py`   | **Create.** Pivot and analytics response models.                                                              |
+| `src/resume_tailor_harness/api/routers/applications.py`         | **Create.** Grid + both CSVs.                                                                                 |
+| `src/resume_tailor_harness/api/routers/analytics.py`            | **Modify.** Add `GET /analytics/timeline`. Existing route untouched.                                          |
+| `src/resume_tailor_harness/api/app.py`                          | **Modify.** Register the applications router.                                                                 |
 | `web/src/features/applications/use-applications.ts`    | **Create.** Grid query hook.                                                                                  |
 | `web/src/features/applications/ApplicationsTable.tsx`  | **Create.** The pivoted grid.                                                                                 |
 | `web/src/features/applications/ApplicationsPage.tsx`   | **Create.** Page shell, filters, export buttons.                                                              |
@@ -120,7 +120,7 @@ These amendments are binding and supersede narrower snippets later in the plan.
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/timeline_pivot.py`
+- Create: `src/resume_tailor_harness/tracking/timeline_pivot.py`
 - Test: `tests/test_timeline_pivot.py`
 
 **Interfaces:**
@@ -142,9 +142,9 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.timeline_pivot import build_pivot
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.timeline_pivot import build_pivot
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _at(day):
@@ -289,11 +289,11 @@ def test_rows_sort_by_most_recent_activity_first():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_timeline_pivot.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.timeline_pivot'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.timeline_pivot'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/tracking/timeline_pivot.py`:
+Create `src/resume_tailor_harness/tracking/timeline_pivot.py`:
 
 - The three dataclasses above, all frozen except `PivotTable`.
 - `build_pivot(session, *, max_technical_rounds=6)`:
@@ -317,8 +317,8 @@ Expected: PASS (10 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/timeline_pivot.py tests/test_timeline_pivot.py
-git add src/resume_agent/tracking/timeline_pivot.py tests/test_timeline_pivot.py
+ruff check src/resume_tailor_harness/tracking/timeline_pivot.py tests/test_timeline_pivot.py
+git add src/resume_tailor_harness/tracking/timeline_pivot.py tests/test_timeline_pivot.py
 git commit -m "feat(tracking): pivot the event log into application rows"
 ```
 
@@ -328,7 +328,7 @@ git commit -m "feat(tracking): pivot the event log into application rows"
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/funnel.py`
+- Create: `src/resume_tailor_harness/tracking/funnel.py`
 - Test: `tests/test_funnel.py`
 
 **Interfaces:**
@@ -352,9 +352,9 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.funnel import stage_cycle_times, stage_flows
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.funnel import stage_cycle_times, stage_flows
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _at(day):
@@ -505,11 +505,11 @@ def test_empty_database_returns_empty_lists():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_funnel.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.funnel'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.funnel'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/tracking/funnel.py`:
+Create `src/resume_tailor_harness/tracking/funnel.py`:
 
 - `_sequences(session) -> list[tuple[Application, list[ApplicationEvent]]]`: one batched load (reuse `upcoming_event_rows`-style joining, or add a sibling query), archived jobs excluded, events filtered to `kind in FUNNEL_KINDS` **and** `occurred_at is not None`, sorted by date. This filter is where `custom` drops out.
 - `stage_flows`: consecutive pairs → edges, counted in a `Counter[(source, target)]`. Then the exit edge: if `application.status in {"rejected", "closed"}` emit `→ "rejected"` (or `→ "withdrawn"` for `closed`); elif the last event's `result == "no_response"` emit `→ "no_response"`; else nothing.
@@ -524,8 +524,8 @@ Expected: PASS (11 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/funnel.py tests/test_funnel.py
-git add src/resume_agent/tracking/funnel.py tests/test_funnel.py
+ruff check src/resume_tailor_harness/tracking/funnel.py tests/test_funnel.py
+git add src/resume_tailor_harness/tracking/funnel.py tests/test_funnel.py
 git commit -m "feat(tracking): funnel flows and stage cycle times"
 ```
 
@@ -535,9 +535,9 @@ git commit -m "feat(tracking): funnel flows and stage cycle times"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/timeline_analytics.py`
-- Create: `src/resume_agent/api/routers/applications.py`
-- Modify: `src/resume_agent/api/app.py`
+- Create: `src/resume_tailor_harness/api/schemas/timeline_analytics.py`
+- Create: `src/resume_tailor_harness/api/routers/applications.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_applications_routes.py`
 
 **Interfaces:**
@@ -558,7 +558,7 @@ import io
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client():
@@ -684,8 +684,8 @@ Expected: PASS (7 tests)
 
 ```bash
 make openapi && make client
-ruff check src/resume_agent/api/
-git add src/resume_agent/api/ tests/api/test_applications_routes.py contracts/ web/src/lib/api/schema.ts
+ruff check src/resume_tailor_harness/api/
+git add src/resume_tailor_harness/api/ tests/api/test_applications_routes.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(api): applications grid and wide/long CSV exports"
 ```
 
@@ -695,8 +695,8 @@ git commit -m "feat(api): applications grid and wide/long CSV exports"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/analytics.py`
-- Modify: `src/resume_agent/api/schemas/timeline_analytics.py`
+- Modify: `src/resume_tailor_harness/api/routers/analytics.py`
+- Modify: `src/resume_tailor_harness/api/schemas/timeline_analytics.py`
 - Test: `tests/api/test_timeline_analytics.py`
 
 **Interfaces:**
@@ -712,7 +712,7 @@ git commit -m "feat(api): applications grid and wide/long CSV exports"
 # tests/api/test_timeline_analytics.py
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client():
@@ -834,8 +834,8 @@ Expected: PASS (7 tests)
 
 ```bash
 make openapi && make client
-ruff check src/resume_agent/api/
-git add src/resume_agent/api/ tests/api/test_timeline_analytics.py contracts/ web/src/lib/api/schema.ts
+ruff check src/resume_tailor_harness/api/
+git add src/resume_tailor_harness/api/ tests/api/test_timeline_analytics.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(api): timeline analytics endpoint"
 ```
 
@@ -1405,7 +1405,7 @@ This step exists because none of it is provable in jsdom: recharts measures zero
 
 - [ ] **Step 3: Document**
 
-Add an "Analytics over the timeline" section to `src/resume_agent/tracking/CLAUDE.md`:
+Add an "Analytics over the timeline" section to `src/resume_tailor_harness/tracking/CLAUDE.md`:
 
 - `timeline_pivot.py` is the single source for the grid, both CSVs, and the exports — presentations must never compute their own pivot.
 - The technical-round cap is display-only; the wide CSV is uncapped, and truncating an export is a data-loss bug.
@@ -1417,13 +1417,13 @@ Add to the root `CLAUDE.md` hot-paths table:
 
 | Path                                          | Role                                                                 |
 | --------------------------------------------- | -------------------------------------------------------------------- |
-| `src/resume_agent/tracking/timeline_pivot.py` | Event log → application rows; the one source for grid, CSVs, exports |
-| `src/resume_agent/tracking/funnel.py`         | Sankey flow edges + median stage cycle times                         |
+| `src/resume_tailor_harness/tracking/timeline_pivot.py` | Event log → application rows; the one source for grid, CSVs, exports |
+| `src/resume_tailor_harness/tracking/funnel.py`         | Sankey flow edges + median stage cycle times                         |
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add CLAUDE.md src/resume_agent/tracking/CLAUDE.md
+git add CLAUDE.md src/resume_tailor_harness/tracking/CLAUDE.md
 git commit -m "docs: timeline analytics notes"
 ```
 

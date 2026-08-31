@@ -1,15 +1,15 @@
 from typer.testing import CliRunner
 
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     Project,
     ProfileFacts,
 )
-from resume_agent.profile.build import BuildReport
-from resume_agent.profile.store import save_facts
-from resume_agent import cli
+from resume_tailor_harness.profile.build import BuildReport
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness import cli
 
 runner = CliRunner()
 
@@ -27,7 +27,7 @@ def _write_sources(tmp_path):
 
 def _configure_build(monkeypatch, facts):
     monkeypatch.setattr(
-        "resume_agent.profile.build.build_corpus_profile",
+        "resume_tailor_harness.profile.build.build_corpus_profile",
         lambda dir_, github_username, **kwargs: (facts, BuildReport()),
     )
     monkeypatch.setattr(
@@ -37,23 +37,23 @@ def _configure_build(monkeypatch, facts):
     )
     monkeypatch.setattr(cli, "resolve_api_key", lambda model: "sk-test")
     monkeypatch.setattr(
-        "resume_agent.profile.merge.build_bullet_dedup_agent", lambda: object()
+        "resume_tailor_harness.profile.merge.build_bullet_dedup_agent", lambda: object()
     )
     monkeypatch.setattr(
-        "resume_agent.profile.inference.build_inference_agent", lambda: object()
+        "resume_tailor_harness.profile.inference.build_inference_agent", lambda: object()
     )
     monkeypatch.setattr(
-        "resume_agent.profile.synthesis.build_synthesis_agent", lambda: object()
+        "resume_tailor_harness.profile.synthesis.build_synthesis_agent", lambda: object()
     )
     monkeypatch.setattr(
-        "resume_agent.profile.synthesis.build_entailment_agent", lambda: object()
+        "resume_tailor_harness.profile.synthesis.build_entailment_agent", lambda: object()
     )
     monkeypatch.setattr(
-        "resume_agent.profile.project_extractor.build_project_extractor_agent",
+        "resume_tailor_harness.profile.project_extractor.build_project_extractor_agent",
         lambda: object(),
     )
     monkeypatch.setattr(
-        "resume_agent.taxonomy.groups.build_group_classifier_agent", lambda: object()
+        "resume_tailor_harness.taxonomy.groups.build_group_classifier_agent", lambda: object()
     )
 
 
@@ -216,7 +216,7 @@ def test_profile_build_prints_report(tmp_path, monkeypatch):
     )
     _configure_build(monkeypatch, facts)
     monkeypatch.setattr(
-        "resume_agent.profile.build.build_corpus_profile",
+        "resume_tailor_harness.profile.build.build_corpus_profile",
         lambda dir_, github_username, **kwargs: (facts, report),
     )
     profile_dir = tmp_path / "profile"
@@ -276,7 +276,7 @@ def test_profile_build_delegates_to_the_service(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(cli, "resolve_api_key", lambda model: "sk-test")
     monkeypatch.setattr(
-        "resume_agent.services.profile_build.run_corpus_build", fake_run
+        "resume_tailor_harness.services.profile_build.run_corpus_build", fake_run
     )
 
     sources = _write_sources(tmp_path)
@@ -329,9 +329,9 @@ def test_profile_add_note_url_and_sync_github_commands(tmp_path, monkeypatch):
     assert "note--on-call.md" in note.output
 
     monkeypatch.setattr(
-        "resume_agent.profile.intake.add_url_source",
+        "resume_tailor_harness.profile.intake.add_url_source",
         lambda directory, url: __import__(
-            "resume_agent.profile.intake", fromlist=["add_note_source"]
+            "resume_tailor_harness.profile.intake", fromlist=["add_note_source"]
         ).add_note_source(directory, "fetched", f"content of {url}"),
     )
     added_url = runner.invoke(
@@ -340,10 +340,10 @@ def test_profile_add_note_url_and_sync_github_commands(tmp_path, monkeypatch):
     )
     assert added_url.exit_code == 0, added_url.output
 
-    from resume_agent.profile.github_harvest import HarvestReport
+    from resume_tailor_harness.profile.github_harvest import HarvestReport
 
     monkeypatch.setattr(
-        "resume_agent.profile.github_harvest.sync_github_sources",
+        "resume_tailor_harness.profile.github_harvest.sync_github_sources",
         lambda *_args, **_kwargs: HarvestReport(written=["github--repo.md"]),
     )
     missing = runner.invoke(

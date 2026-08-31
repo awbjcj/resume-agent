@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import Any, Literal, cast, get_args, get_origin
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 ROOT = Path(__file__).resolve().parents[1]

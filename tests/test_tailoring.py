@@ -1,7 +1,7 @@
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.tailor.tailoring import compose_revise_input
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.tailor.tailoring import compose_revise_input
 
 
 def _critique() -> ReviewCritique:

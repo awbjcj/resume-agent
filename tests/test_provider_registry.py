@@ -1,10 +1,10 @@
-from resume_agent.config import Settings
-from resume_agent.llm_routing import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_routing import (
     DIRECT_API_BASE_URL_FIELDS,
     ROUTE_MODE_FIELDS,
     SUB2API_KEY_FIELDS,
 )
-from resume_agent.provider_registry import PROVIDERS, PROVIDER_SPECS
+from resume_tailor_harness.provider_registry import PROVIDERS, PROVIDER_SPECS
 
 
 def test_provider_registry_references_real_settings_fields():

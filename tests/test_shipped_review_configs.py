@@ -1,5 +1,5 @@
-from resume_agent.setup import preflight
-from resume_agent.tailor.review_config import load_review_config
+from resume_tailor_harness.setup import preflight
+from resume_tailor_harness.tailor.review_config import load_review_config
 
 
 def test_shipped_fast_config_shape():

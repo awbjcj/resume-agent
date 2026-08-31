@@ -31,11 +31,11 @@
 - none
 
 **Backend — modify:**
-- `src/resume_agent/api/runs/models.py` — `RunSnapshot.announced_at` + parsing
-- `src/resume_agent/api/runs/manager.py` — `mark_announced()`, widened `list_rehydratable()`, late-binding notify closure
-- `src/resume_agent/api/schemas/runs.py` — `RunOut.announced_at`, `AckRunsIn`, `AckRunsOut`
-- `src/resume_agent/api/routers/runs.py` — `POST /api/runs/ack`, pass the announce window into `list_rehydratable`
-- `src/resume_agent/config.py` — `run_announce_window_seconds`
+- `src/resume_tailor_harness/api/runs/models.py` — `RunSnapshot.announced_at` + parsing
+- `src/resume_tailor_harness/api/runs/manager.py` — `mark_announced()`, widened `list_rehydratable()`, late-binding notify closure
+- `src/resume_tailor_harness/api/schemas/runs.py` — `RunOut.announced_at`, `AckRunsIn`, `AckRunsOut`
+- `src/resume_tailor_harness/api/routers/runs.py` — `POST /api/runs/ack`, pass the announce window into `list_rehydratable`
+- `src/resume_tailor_harness/config.py` — `run_announce_window_seconds`
 - `.env.example`, `docs/configuration.md` — required by `tests/test_config_documentation.py`
 - `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` — regenerated
 
@@ -65,7 +65,7 @@
 Pure data-model change. No behavior yet — later tasks read this field.
 
 **Files:**
-- Modify: `src/resume_agent/api/runs/models.py:27-45` (dataclass), `:97-127` (parser)
+- Modify: `src/resume_tailor_harness/api/runs/models.py:27-45` (dataclass), `:97-127` (parser)
 - Test: `tests/api/test_run_manager.py`
 
 **Interfaces:**
@@ -126,7 +126,7 @@ Expected: FAIL — `AttributeError: 'RunSnapshot' object has no attribute 'annou
 
 - [ ] **Step 3: Add the field and parse it**
 
-In `src/resume_agent/api/runs/models.py`, add to the `RunSnapshot` dataclass, after `meta`:
+In `src/resume_tailor_harness/api/runs/models.py`, add to the `RunSnapshot` dataclass, after `meta`:
 
 ```python
     announced_at: datetime | None = None
@@ -151,7 +151,7 @@ Expected: PASS, with no existing test broken (the field is optional with a defau
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/models.py tests/api/test_run_manager.py && git commit -m "feat(runs): parse announced_at on the run snapshot"
+git add src/resume_tailor_harness/api/runs/models.py tests/api/test_run_manager.py && git commit -m "feat(runs): parse announced_at on the run snapshot"
 ```
 
 ---
@@ -161,7 +161,7 @@ git add src/resume_agent/api/runs/models.py tests/api/test_run_manager.py && git
 The locked read-modify-write that stamps a terminal run as announced.
 
 **Files:**
-- Modify: `src/resume_agent/api/runs/manager.py` (add the method next to `get`, around `:517`)
+- Modify: `src/resume_tailor_harness/api/runs/manager.py` (add the method next to `get`, around `:517`)
 - Test: `tests/api/test_run_manager.py`
 
 **Interfaces:**
@@ -221,7 +221,7 @@ Expected: FAIL — `AttributeError: 'RunManager' object has no attribute 'mark_a
 
 - [ ] **Step 3: Implement the method**
 
-In `src/resume_agent/api/runs/manager.py`, add immediately after `def get(...)`:
+In `src/resume_tailor_harness/api/runs/manager.py`, add immediately after `def get(...)`:
 
 ```python
     def mark_announced(self, run_id: str, *, now: str | None = None) -> bool:
@@ -259,7 +259,7 @@ Expected: PASS, ruff clean.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/manager.py tests/api/test_run_manager.py && git commit -m "feat(runs): add RunManager.mark_announced for terminal-run acknowledgement"
+git add src/resume_tailor_harness/api/runs/manager.py tests/api/test_run_manager.py && git commit -m "feat(runs): add RunManager.mark_announced for terminal-run acknowledgement"
 ```
 
 ---
@@ -267,7 +267,7 @@ git add src/resume_agent/api/runs/manager.py tests/api/test_run_manager.py && gi
 ### Task 3: `list_rehydratable` returns unannounced terminal runs
 
 **Files:**
-- Modify: `src/resume_agent/api/runs/manager.py:534-583`, `src/resume_agent/config.py`, `.env.example`, `docs/configuration.md`
+- Modify: `src/resume_tailor_harness/api/runs/manager.py:534-583`, `src/resume_tailor_harness/config.py`, `.env.example`, `docs/configuration.md`
 - Test: `tests/api/test_run_manager.py`
 
 **Interfaces:**
@@ -325,7 +325,7 @@ Expected: FAIL — `TypeError: list_rehydratable() got an unexpected keyword arg
 
 - [ ] **Step 3: Widen the method**
 
-In `src/resume_agent/api/runs/manager.py`, change the import line to:
+In `src/resume_tailor_harness/api/runs/manager.py`, change the import line to:
 
 ```python
 from datetime import datetime, timedelta, timezone
@@ -367,7 +367,7 @@ Immediately after the `visible = {...}` comprehension, insert:
 
 - [ ] **Step 4: Add the setting, its env example, and its doc row**
 
-In `src/resume_agent/config.py`, next to the other run settings:
+In `src/resume_tailor_harness/config.py`, next to the other run settings:
 
 ```python
     # How recently a terminal run must have finished to still be worth
@@ -399,7 +399,7 @@ Expected: PASS. If `test_config_documentation.py` fails, the `.env.example` line
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/manager.py src/resume_agent/config.py .env.example docs/configuration.md tests/api/test_run_manager.py && git commit -m "feat(runs): surface unannounced terminal runs from list_rehydratable"
+git add src/resume_tailor_harness/api/runs/manager.py src/resume_tailor_harness/config.py .env.example docs/configuration.md tests/api/test_run_manager.py && git commit -m "feat(runs): surface unannounced terminal runs from list_rehydratable"
 ```
 
 ---
@@ -407,7 +407,7 @@ git add src/resume_agent/api/runs/manager.py src/resume_agent/config.py .env.exa
 ### Task 4: `POST /api/runs/ack` and `RunOut.announcedAt`
 
 **Files:**
-- Modify: `src/resume_agent/api/schemas/runs.py:23-34`, `src/resume_agent/api/runs/sse.py:29-42` (`record_to_run`), `src/resume_agent/api/routers/runs.py:507-529`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py:23-34`, `src/resume_tailor_harness/api/runs/sse.py:29-42` (`record_to_run`), `src/resume_tailor_harness/api/routers/runs.py:507-529`
 - Create: `tests/api/test_run_ack_route.py`
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 
@@ -430,7 +430,7 @@ from concurrent.futures import Executor, Future
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 class InlineExecutor(Executor):
@@ -497,7 +497,7 @@ Expected: FAIL — 404 on `/api/runs/ack`, and `KeyError: 'announcedAt'`.
 
 - [ ] **Step 3: Add the schemas**
 
-In `src/resume_agent/api/schemas/runs.py`, add `announced_at` as the last field of `RunOut`:
+In `src/resume_tailor_harness/api/schemas/runs.py`, add `announced_at` as the last field of `RunOut`:
 
 ```python
     announced_at: datetime | None = None
@@ -516,7 +516,7 @@ class AckRunsOut(CamelModel):
     acknowledged: int
 ```
 
-In `src/resume_agent/api/runs/sse.py`, add to the `RunOut(...)` construction in `record_to_run`:
+In `src/resume_tailor_harness/api/runs/sse.py`, add to the `RunOut(...)` construction in `record_to_run`:
 
 ```python
         announced_at=snapshot.announced_at,
@@ -524,7 +524,7 @@ In `src/resume_agent/api/runs/sse.py`, add to the `RunOut(...)` construction in 
 
 - [ ] **Step 4: Add the route and pass the window**
 
-In `src/resume_agent/api/routers/runs.py`, add `AckRunsIn` and `AckRunsOut` to the existing `from resume_agent.api.schemas.runs import (...)` block, then change `list_runs` to pass the window and add the ack route after it:
+In `src/resume_tailor_harness/api/routers/runs.py`, add `AckRunsIn` and `AckRunsOut` to the existing `from resume_tailor_harness.api.schemas.runs import (...)` block, then change `list_runs` to pass the window and add the ack route after it:
 
 ```python
 @router.get("/runs", response_model=Page[RunOut])
@@ -570,7 +570,7 @@ def ack_runs(body: AckRunsIn, mgr: RunManager = Depends(get_run_manager)):
     return AckRunsOut(acknowledged=acknowledged)
 ```
 
-`get_settings` is already imported in this file (`from resume_agent.config import get_settings`).
+`get_settings` is already imported in this file (`from resume_tailor_harness.config import get_settings`).
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
@@ -591,7 +591,7 @@ Confirm `announcedAt`, `AckRunsIn`, and `/api/runs/ack` appear in `web/src/lib/a
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_run_ack_route.py contracts web/src/lib/api/schema.ts && git commit -m "feat(api): add POST /api/runs/ack and expose announcedAt on RunOut"
+git add src/resume_tailor_harness/api tests/api/test_run_ack_route.py contracts web/src/lib/api/schema.ts && git commit -m "feat(api): add POST /api/runs/ack and expose announcedAt on RunOut"
 ```
 
 ---
@@ -601,7 +601,7 @@ git add src/resume_agent/api tests/api/test_run_ack_route.py contracts web/src/l
 Independent of the ack work. A reconnected SSE stream currently gets no wakeups because the worker holds a bound method on a `StreamNotifier` the manager has already discarded.
 
 **Files:**
-- Modify: `src/resume_agent/api/runs/manager.py:306-320` (`reporter`)
+- Modify: `src/resume_tailor_harness/api/runs/manager.py:306-320` (`reporter`)
 - Test: `tests/api/test_run_manager.py`
 
 **Interfaces:**
@@ -652,7 +652,7 @@ Expected: FAIL — `AssertionError: reporter woke a discarded notifier`.
 
 - [ ] **Step 3: Make the binding late**
 
-In `src/resume_agent/api/runs/manager.py`, inside `def reporter(...)`, change:
+In `src/resume_tailor_harness/api/runs/manager.py`, inside `def reporter(...)`, change:
 
 ```python
             notify=self.notifier(run_id).notify,
@@ -679,7 +679,7 @@ Expected: PASS, ruff clean.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/manager.py tests/api/test_run_manager.py && git commit -m "fix(runs): resolve the stream notifier at wake time, not reporter construction"
+git add src/resume_tailor_harness/api/runs/manager.py tests/api/test_run_manager.py && git commit -m "fix(runs): resolve the stream notifier at wake time, not reporter construction"
 ```
 
 ---

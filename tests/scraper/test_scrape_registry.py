@@ -3,17 +3,17 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.config import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.config import (
     ConnectorsConfig,
     ScrapeConfig,
     ScrapeTarget,
 )
-from resume_agent.discovery.connectors.registry import (
+from resume_tailor_harness.discovery.connectors.registry import (
     build_connectors,
     build_source_connectors,
 )
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper
 
 
 def _settings():

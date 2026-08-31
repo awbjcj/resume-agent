@@ -60,7 +60,7 @@ def test_sse_accepts_only_the_owner_purpose_bound_link(mu_app, mu_client):
     assert '"state": "done"' in response.text
 
     wrong_purpose = mu_app.state.settings
-    from resume_agent.api.auth import issue_link_token
+    from resume_tailor_harness.api.auth import issue_link_token
 
     download_token = issue_link_token(
         wrong_purpose, user_id=owner_id, purpose="download"

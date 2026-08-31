@@ -27,13 +27,13 @@
 
 **Files:**
 
-- Create: `src/resume_agent/interview/__init__.py` (empty)
-- Create: `src/resume_agent/interview/store.py`
+- Create: `src/resume_tailor_harness/interview/__init__.py` (empty)
+- Create: `src/resume_tailor_harness/interview/store.py`
 - Test: `tests/test_interview_store.py`
 
 **Interfaces:**
 
-- Consumes: `resume_agent.models.base.ExtensibleModel`, `resume_agent.progress.atomic_write_text` (both exist).
+- Consumes: `resume_tailor_harness.models.base.ExtensibleModel`, `resume_tailor_harness.progress.atomic_write_text` (both exist).
 - Produces (used by Tasks 2–4, 11):
   - Models: `InterviewStyle`, `InterviewContext`, `PlanItem`, `InterviewTurnRecord`, `QuestionReview`, `InterviewDebrief`, `InterviewSession`
   - `interview_lock() -> ContextManager[None]`
@@ -53,7 +53,7 @@
 
 import pytest
 
-from resume_agent.interview.store import (
+from resume_tailor_harness.interview.store import (
     InterviewContext,
     InterviewDebrief,
     InterviewStyle,
@@ -198,14 +198,14 @@ def test_unknown_session_raises(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_interview_store.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.interview'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.interview'`
 
 - [ ] **Step 3: Implement the store**
 
-Create empty `src/resume_agent/interview/__init__.py`, then:
+Create empty `src/resume_tailor_harness/interview/__init__.py`, then:
 
 ```python
-# src/resume_agent/interview/store.py
+# src/resume_tailor_harness/interview/store.py
 """Durable Mock Interview sessions with delta-under-lock mutations."""
 
 from __future__ import annotations
@@ -221,8 +221,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.progress import atomic_write_text
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.progress import atomic_write_text
 
 _INTERVIEW_LOCK = threading.RLock()
 _SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
@@ -485,13 +485,13 @@ def delete_sessions_for_job(interview_dir: Path | str, job_id: int) -> int:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_interview_store.py -q && ruff check src/resume_agent/interview tests/test_interview_store.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_interview_store.py -q && ruff check src/resume_tailor_harness/interview tests/test_interview_store.py`
 Expected: all PASS, ruff clean
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/interview tests/test_interview_store.py
+git add src/resume_tailor_harness/interview tests/test_interview_store.py
 git commit -m "feat: add durable mock interview session store"
 ```
 
@@ -501,7 +501,7 @@ git commit -m "feat: add durable mock interview session store"
 
 **Files:**
 
-- Create: `src/resume_agent/interview/agent.py`
+- Create: `src/resume_tailor_harness/interview/agent.py`
 - Test: `tests/test_interview_agent.py`
 
 **Interfaces:**
@@ -529,7 +529,7 @@ git commit -m "feat: add durable mock interview session store"
 
 import pytest
 
-from resume_agent.interview.agent import (
+from resume_tailor_harness.interview.agent import (
     DebriefTurn,
     InterviewTurn,
     NewPlanItem,
@@ -542,7 +542,7 @@ from resume_agent.interview.agent import (
     persona_instructions,
     render_transcript,
 )
-from resume_agent.interview.store import InterviewStyle
+from resume_tailor_harness.interview.store import InterviewStyle
 
 
 def _session(plan_statuses, turns=()):
@@ -660,12 +660,12 @@ def test_persona_instructions_reflect_style():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_interview_agent.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.interview.agent'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.interview.agent'`
 
 - [ ] **Step 3: Implement the agent module**
 
 ```python
-# src/resume_agent/interview/agent.py
+# src/resume_tailor_harness/interview/agent.py
 """Mock interviewer schemas, validation, context assembly, and agent builders."""
 
 from __future__ import annotations
@@ -677,22 +677,22 @@ from typing import Literal
 from agno.agent import Agent
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.interview.store import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.interview.store import (
     InterviewDebrief,
     InterviewStyle,
     InterviewTurnRecord,
     PlanItem,
     QuestionReview,
 )
-from resume_agent.llm_runner import (
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.models.base import ExtensibleModel
 
 FOLLOWUP_CAP = 2
 TRANSCRIPT_CHAR_CAP = 12_000
@@ -998,13 +998,13 @@ def build_interview_formatter_agent(schema: type[ExtensibleModel]) -> Runner:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_interview_agent.py tests/test_interview_store.py -q && ruff check src/resume_agent/interview`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_interview_agent.py tests/test_interview_store.py -q && ruff check src/resume_tailor_harness/interview`
 Expected: all PASS, ruff clean
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/interview/agent.py tests/test_interview_agent.py
+git add src/resume_tailor_harness/interview/agent.py tests/test_interview_agent.py
 git commit -m "feat: add interviewer schemas, validation, and agent builders"
 ```
 
@@ -1014,12 +1014,12 @@ git commit -m "feat: add interviewer schemas, validation, and agent builders"
 
 **Files:**
 
-- Create: `src/resume_agent/services/mock_interview.py`
+- Create: `src/resume_tailor_harness/services/mock_interview.py`
 - Test: `tests/test_mock_interview_service.py`
 
 **Interfaces:**
 
-- Consumes: Tasks 1–2; `resume_agent.db.get_session`; `resume_agent.tracking.tables.Job/ResumeVersion`.
+- Consumes: Tasks 1–2; `resume_tailor_harness.db.get_session`; `resume_tailor_harness.tracking.tables.Job/ResumeVersion`.
 - Produces (used by Task 4 router):
   - `run_opening_turn(reporter, *, interview_dir, engine, job_id: int, resume_version_id: int, style: dict, interviewer_agent=None, formatter_agent=None) -> dict` (session view incl. `sessionId`)
   - `run_answer_turn(reporter, *, interview_dir, session_id: str, message: str, interviewer_agent=None, formatter_agent=None) -> dict`
@@ -1040,15 +1040,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.interview.agent import (
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.interview.agent import (
     DebriefTurn,
     InterviewTurn,
     NewPlanItem,
     OpeningInterview,
     ReviewItem,
 )
-from resume_agent.services.mock_interview import (
+from resume_tailor_harness.services.mock_interview import (
     load_context,
     run_answer_turn,
     run_debrief_turn,
@@ -1056,7 +1056,7 @@ from resume_agent.services.mock_interview import (
     session_view,
     sessions_view,
 )
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 
 class FakeRunner:
@@ -1197,14 +1197,14 @@ def test_load_context_guards(engine):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_mock_interview_service.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.mock_interview'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.mock_interview'`
 
 Note: if `make_engine`/`init_db`/`get_session` import paths differ, mirror the imports used by `tests/api/conftest.py` and `services/profile_coach.py`.
 
 - [ ] **Step 3: Implement the service**
 
 ```python
-# src/resume_agent/services/mock_interview.py
+# src/resume_tailor_harness/services/mock_interview.py
 """Mock interview turns, debrief, and camelCase session views."""
 
 from __future__ import annotations
@@ -1212,7 +1212,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from resume_agent.interview.agent import (
+from resume_tailor_harness.interview.agent import (
     DebriefTurn,
     InterviewTurn,
     JD_CHAR_CAP,
@@ -1228,7 +1228,7 @@ from resume_agent.interview.agent import (
     render_plan,
     render_transcript,
 )
-from resume_agent.interview.store import (
+from resume_tailor_harness.interview.store import (
     InterviewContext,
     InterviewStyle,
     apply_answer_delta,
@@ -1237,14 +1237,14 @@ from resume_agent.interview.store import (
     list_sessions,
     load_session,
 )
-from resume_agent.llm_runner import Runner
+from resume_tailor_harness.llm_runner import Runner
 
 _MAX_MESSAGE_CHARS = 100_000
 
 
 def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContext:
-    from resume_agent.db import get_session
-    from resume_agent.tracking.tables import Job, ResumeVersion
+    from resume_tailor_harness.db import get_session
+    from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
     with get_session(engine) as db:
         job = db.get(Job, job_id)
@@ -1534,13 +1534,13 @@ def run_debrief_turn(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_mock_interview_service.py -q && ruff check src/resume_agent/services/mock_interview.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_mock_interview_service.py -q && ruff check src/resume_tailor_harness/services/mock_interview.py`
 Expected: all PASS, ruff clean
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/mock_interview.py tests/test_mock_interview_service.py
+git add src/resume_tailor_harness/services/mock_interview.py tests/test_mock_interview_service.py
 git commit -m "feat: add mock interview service turns and views"
 ```
 
@@ -1550,10 +1550,10 @@ git commit -m "feat: add mock interview service turns and views"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/interview.py`
-- Create: `src/resume_agent/api/routers/interview.py`
-- Modify: `src/resume_agent/api/deps.py` (add `get_interview_dir`)
-- Modify: `src/resume_agent/api/app.py` (register router, next to the coach router at ~line 231)
+- Create: `src/resume_tailor_harness/api/schemas/interview.py`
+- Create: `src/resume_tailor_harness/api/routers/interview.py`
+- Modify: `src/resume_tailor_harness/api/deps.py` (add `get_interview_dir`)
+- Modify: `src/resume_tailor_harness/api/app.py` (register router, next to the coach router at ~line 231)
 - Test: `tests/api/test_interview_router.py`
 
 **Interfaces:**
@@ -1561,7 +1561,7 @@ git commit -m "feat: add mock interview service turns and views"
 - Consumes: Task 3 service; `get_run_manager`, `get_settings_dep`, `get_session`, `get_workspace_paths` from `api/deps.py`; `record_to_run`; `ApiException`; run singleton conflict classes (mirror `api/routers/coach.py`).
 - Produces: routes `POST /api/interview/sessions`, `POST /api/interview/sessions/{session_id}/messages`, `POST /api/interview/sessions/{session_id}/end`, `GET /api/interview/sessions`, `GET /api/interview/sessions/{session_id}`; run kinds `mock-interview-open|turn|end`; singleton key `"mock-interview"`; error codes `INTERVIEW_BUSY`, `SESSION_ACTIVE`; dep `get_interview_dir(request) -> Path`.
 
-- [ ] **Step 1: Add `get_interview_dir` to `src/resume_agent/api/deps.py`** (below `get_profile_dir`):
+- [ ] **Step 1: Add `get_interview_dir` to `src/resume_tailor_harness/api/deps.py`** (below `get_profile_dir`):
 
 ```python
 def get_interview_dir(request: Request):
@@ -1580,7 +1580,7 @@ Mirror the client/app fixtures used by `tests/api/test_coach_router.py` (in-memo
 
 # Use the same conftest fixtures as tests/api/test_coach_router.py (client factory,
 # settings with fake keys). Fake the agents by monkeypatching
-# resume_agent.services.mock_interview.build_interviewer_agent /
+# resume_tailor_harness.services.mock_interview.build_interviewer_agent /
 # build_debrief_agent / build_interview_formatter_agent to return FakeRunners.
 
 
@@ -1663,14 +1663,14 @@ Expected: FAIL — 404s on `/api/interview/...` (router not registered)
 - [ ] **Step 4: Implement schemas and router**
 
 ```python
-# src/resume_agent/api/schemas/interview.py
+# src/resume_tailor_harness/api/schemas/interview.py
 """Mock interview request and response schemas."""
 
 from __future__ import annotations
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class InterviewStyleIn(CamelModel):
@@ -1763,7 +1763,7 @@ class InterviewSessionsOut(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/interview.py
+# src/resume_tailor_harness/api/routers/interview.py
 """Mock interview endpoints: run-backed turns over durable session files."""
 
 from __future__ import annotations
@@ -1771,38 +1771,38 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
-from resume_agent.api.deps import (
+from resume_tailor_harness.api.deps import (
     get_interview_dir,
     get_run_manager,
     get_session,
     get_settings_dep,
 )
-from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.manager import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.runs.manager import (
     RunManager,
     RunQuotaError,
     RunResetConflict,
     RunSingletonConflict,
 )
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.interview import (
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.interview import (
     InterviewMessageIn,
     InterviewSessionOut,
     InterviewSessionsOut,
     InterviewStartIn,
 )
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.config import Settings
-from resume_agent.interview.store import active_session
-from resume_agent.llm_runner import resolve_api_key
-from resume_agent.services.mock_interview import (
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.interview.store import active_session
+from resume_tailor_harness.llm_runner import resolve_api_key
+from resume_tailor_harness.services.mock_interview import (
     run_answer_turn,
     run_debrief_turn,
     run_opening_turn,
     session_view,
     sessions_view,
 )
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 router = APIRouter()
 _SINGLETON = "mock-interview"
@@ -1962,10 +1962,10 @@ def get_interview_session(session_id: str, request: Request):
         raise _value_error(exc) from exc
 ```
 
-Register in `src/resume_agent/api/app.py` next to the coach router:
+Register in `src/resume_tailor_harness/api/app.py` next to the coach router:
 
 ```python
-from resume_agent.api.routers import interview as interview_router
+from resume_tailor_harness.api.routers import interview as interview_router
 # ... alongside line ~231:
 app.include_router(interview_router.router, prefix="/api", dependencies=guarded)
 ```
@@ -1974,13 +1974,13 @@ Note: `POST /interview/sessions/{session_id}/end` takes no body — the intervie
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_interview_router.py tests/test_mock_interview_service.py -q && ruff check src/resume_agent/api`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_interview_router.py tests/test_mock_interview_service.py -q && ruff check src/resume_tailor_harness/api`
 Expected: all PASS, ruff clean
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_interview_router.py
+git add src/resume_tailor_harness/api tests/api/test_interview_router.py
 git commit -m "feat: expose mock interview endpoints"
 ```
 
@@ -1990,10 +1990,10 @@ git commit -m "feat: expose mock interview endpoints"
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py` (add `transcribe_model: str = "gemini:gemini-2.5-flash"` next to the tier models at ~line 30)
-- Modify: `src/resume_agent/llm_runner.py` (add `transcribe`, `transcription_available`)
-- Create: `src/resume_agent/api/routers/transcribe.py`
-- Modify: `src/resume_agent/api/app.py` (register router)
+- Modify: `src/resume_tailor_harness/config.py` (add `transcribe_model: str = "gemini:gemini-2.5-flash"` next to the tier models at ~line 30)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (add `transcribe`, `transcription_available`)
+- Create: `src/resume_tailor_harness/api/routers/transcribe.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register router)
 - Test: `tests/test_llm_runner_transcribe.py`, `tests/api/test_transcribe_router.py`
 
 **Interfaces:**
@@ -2011,7 +2011,7 @@ git commit -m "feat: expose mock interview endpoints"
 
 import pytest
 
-from resume_agent import llm_runner
+from resume_tailor_harness import llm_runner
 
 
 def test_transcribe_rejects_provider_without_audio(monkeypatch):
@@ -2037,7 +2037,7 @@ def test_availability_follows_key_and_provider(monkeypatch):
 # tests/api/test_transcribe_router.py
 """Transcribe endpoint: availability, caps, and faked transcription."""
 
-from resume_agent import llm_runner
+from resume_tailor_harness import llm_runner
 
 
 def test_availability_endpoint(client, monkeypatch):
@@ -2072,22 +2072,22 @@ def test_transcribe_rejects_bad_mime(client, monkeypatch):
     assert response.status_code == 422
 ```
 
-(The router must call `llm_runner.transcribe` / `llm_runner.transcription_available` through the module — `from resume_agent import llm_runner` — so these monkeypatches take effect.)
+(The router must call `llm_runner.transcribe` / `llm_runner.transcription_available` through the module — `from resume_tailor_harness import llm_runner` — so these monkeypatches take effect.)
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_transcribe.py tests/api/test_transcribe_router.py -q`
-Expected: FAIL — `AttributeError: module 'resume_agent.llm_runner' has no attribute 'transcribe'` and 404s
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.llm_runner' has no attribute 'transcribe'` and 404s
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/config.py`, next to the tier models:
+In `src/resume_tailor_harness/config.py`, next to the tier models:
 
 ```python
     transcribe_model: str = "gemini:gemini-2.5-flash"
 ```
 
-Append to `src/resume_agent/llm_runner.py`:
+Append to `src/resume_tailor_harness/llm_runner.py`:
 
 ```python
 _TRANSCRIBE_PROVIDERS = ("gemini", "openai")
@@ -2150,7 +2150,7 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
 ```
 
 ```python
-# src/resume_agent/api/routers/transcribe.py
+# src/resume_tailor_harness/api/routers/transcribe.py
 """LLM voice transcription: synchronous, in-memory, never persisted."""
 
 from __future__ import annotations
@@ -2158,9 +2158,9 @@ from __future__ import annotations
 from fastapi import APIRouter, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from resume_agent import llm_runner
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness import llm_runner
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 router = APIRouter()
 
@@ -2217,13 +2217,13 @@ Register in `app.py`: `app.include_router(transcribe_router.router, prefix="/api
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_transcribe.py tests/api/test_transcribe_router.py -q && ruff check src/resume_agent`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_transcribe.py tests/api/test_transcribe_router.py -q && ruff check src/resume_tailor_harness`
 Expected: all PASS, ruff clean
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/config.py src/resume_agent/llm_runner.py src/resume_agent/api tests/test_llm_runner_transcribe.py tests/api/test_transcribe_router.py
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/llm_runner.py src/resume_tailor_harness/api tests/test_llm_runner_transcribe.py tests/api/test_transcribe_router.py
 git commit -m "feat: add LLM voice transcription seam and endpoint"
 ```
 
@@ -2710,7 +2710,7 @@ git commit -m "feat(web): shared voice transcription button in coach and intervi
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/jobs.py` (delete endpoint, ~line 90)
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py` (delete endpoint, ~line 90)
 - Modify: `CLAUDE.md` (known design notes + hot paths)
 - Test: extend `tests/api/test_interview_router.py`
 
@@ -2735,11 +2735,11 @@ def test_job_delete_removes_interview_sessions(client, tmp_interview_session):
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_interview_router.py::test_job_delete_removes_interview_sessions -q`
 Expected: FAIL — session still readable after delete
 
-- [ ] **Step 3: Implement** — in the `delete_job_endpoint` in `src/resume_agent/api/routers/jobs.py`, after a successful `board.delete(...)`:
+- [ ] **Step 3: Implement** — in the `delete_job_endpoint` in `src/resume_tailor_harness/api/routers/jobs.py`, after a successful `board.delete(...)`:
 
 ```python
-from resume_agent.api.deps import get_interview_dir
-from resume_agent.interview.store import delete_sessions_for_job
+from resume_tailor_harness.api.deps import get_interview_dir
+from resume_tailor_harness.interview.store import delete_sessions_for_job
 # inside the endpoint, after the successful delete:
 delete_sessions_for_job(get_interview_dir(request), job_id)
 ```
@@ -2764,7 +2764,7 @@ delete_sessions_for_job(get_interview_dir(request), job_id)
 Hot-path table row:
 
 ```markdown
-| `src/resume_agent/interview/agent.py` | Mock interviewer persona, turn/debrief validation, transcript elision |
+| `src/resume_tailor_harness/interview/agent.py` | Mock interviewer persona, turn/debrief validation, transcript elision |
 ```
 
 - [ ] **Step 5: Run the full suites**
@@ -2778,7 +2778,7 @@ Expected: full web suite PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/jobs.py tests/api/test_interview_router.py CLAUDE.md
+git add src/resume_tailor_harness/api/routers/jobs.py tests/api/test_interview_router.py CLAUDE.md
 git commit -m "feat: clean up interview sessions on job delete; document the feature"
 ```
 

@@ -3,9 +3,9 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.models.base import Source
-from resume_agent.models.profile import Project, Skill
-from resume_agent.profile.project_extractor import (
+from resume_tailor_harness.models.base import Source
+from resume_tailor_harness.models.profile import Project, Skill
+from resume_tailor_harness.profile.project_extractor import (
     _INSTRUCTIONS,
     ProjectDocFacts,
     aextract_project_facts,

@@ -5,17 +5,17 @@ important one: if a fabricated metric ever stops failing the round, fact-lock ha
 been weakened and the rest of this file is worthless.
 """
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredSkill,
 )
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.workflow import run_tailor_review
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.workflow import run_tailor_review
 
 
 class _Result:

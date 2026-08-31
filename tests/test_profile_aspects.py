@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.models.profile import Bullet, Project
+from resume_tailor_harness.models.profile import Bullet, Project
 
 
 def test_bullet_aspect_is_optional_but_closed():
@@ -36,11 +36,11 @@ def test_legacy_project_highlights_become_stable_addressable_bullets():
 
 
 def test_all_extraction_prompts_require_a_closed_bullet_aspect():
-    from resume_agent.profile.extractor import _INSTRUCTIONS as extractor_instructions
-    from resume_agent.profile.project_extractor import (
+    from resume_tailor_harness.profile.extractor import _INSTRUCTIONS as extractor_instructions
+    from resume_tailor_harness.profile.project_extractor import (
         _INSTRUCTIONS as project_instructions,
     )
-    from resume_agent.profile.synthesis import _SYNTHESIS_INSTRUCTIONS
+    from resume_tailor_harness.profile.synthesis import _SYNTHESIS_INSTRUCTIONS
 
     for instructions in (
         extractor_instructions,

@@ -6,15 +6,15 @@ import asyncio
 import json
 from types import SimpleNamespace
 
-from resume_agent.api.runs import stream_sse
-from resume_agent.api.runs.notify import StreamNotifier
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.api.runs import stream_sse
+from resume_tailor_harness.api.runs.notify import StreamNotifier
+from resume_tailor_harness.sessions.stream import (
     Completed,
     RunStreamSink,
     TextDelta,
     read_stream,
 )
-from resume_agent.sessions.turns import ProseEmitter
+from resume_tailor_harness.sessions.turns import ProseEmitter
 
 
 class _Clock:

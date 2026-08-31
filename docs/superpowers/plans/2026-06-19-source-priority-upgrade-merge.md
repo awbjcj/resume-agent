@@ -16,9 +16,9 @@
 
 | File                                              | Responsibility                                                                             | Action        |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------- |
-| `src/resume_agent/discovery/source_tier.py`       | `source_rank` — fixed direct>aggregator tier                                               | Create        |
-| `src/resume_agent/discovery/ingest.py`            | `IngestOutcome`, `IngestCounts`, `save_or_upgrade`, thin `add_job`, counted ingest helpers | Modify        |
-| `src/resume_agent/discovery/connectors/runner.py` | Use outcome-aware ingest counts in pull telemetry                                          | Modify        |
+| `src/resume_tailor_harness/discovery/source_tier.py`       | `source_rank` — fixed direct>aggregator tier                                               | Create        |
+| `src/resume_tailor_harness/discovery/ingest.py`            | `IngestOutcome`, `IngestCounts`, `save_or_upgrade`, thin `add_job`, counted ingest helpers | Modify        |
+| `src/resume_tailor_harness/discovery/connectors/runner.py` | Use outcome-aware ingest counts in pull telemetry                                          | Modify        |
 | `tests/test_source_tier.py`                       | tier ranking                                                                               | Create        |
 | `tests/test_discovery_ingest.py`                  | upgrade/skip/freeze behavior of `save_or_upgrade`/`add_job`                                | Modify        |
 | `tests/test_ingest_jobs.py`                       | upgrade not double-counted; cross-run upgrade                                              | Modify        |
@@ -32,14 +32,14 @@ No change to `repository.py`, `cli.py`, config, or schema.
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/source_tier.py`
+- Create: `src/resume_tailor_harness/discovery/source_tier.py`
 - Test: `tests/test_source_tier.py`
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_source_tier.py
-from resume_agent.discovery.source_tier import source_rank
+from resume_tailor_harness.discovery.source_tier import source_rank
 
 
 def test_direct_sources_outrank_aggregators():
@@ -65,7 +65,7 @@ Expected: FAIL — `ModuleNotFoundError: source_tier`
 - [ ] **Step 3: Implement the tier**
 
 ```python
-# src/resume_agent/discovery/source_tier.py
+# src/resume_tailor_harness/discovery/source_tier.py
 """Fixed source priority: a job's canonical (direct/ATS) copy beats an aggregator copy.
 
 Lower rank == higher priority. Calibration is a tier label, not a per-source number.
@@ -90,7 +90,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/source_tier.py tests/test_source_tier.py
+git add src/resume_tailor_harness/discovery/source_tier.py tests/test_source_tier.py
 git commit -m "feat: fixed direct>aggregator source tier"
 ```
 
@@ -100,15 +100,15 @@ git commit -m "feat: fixed direct>aggregator source tier"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/ingest.py`
+- Modify: `src/resume_tailor_harness/discovery/ingest.py`
 - Test: `tests/test_discovery_ingest.py`
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 # append to tests/test_discovery_ingest.py
-from resume_agent.discovery.ingest import save_or_upgrade, IngestOutcome
-from resume_agent.tracking.tables import Application, ApplicationStatus
+from resume_tailor_harness.discovery.ingest import save_or_upgrade, IngestOutcome
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus
 
 
 def test_save_or_upgrade_inserts_new():
@@ -178,8 +178,8 @@ Expected: FAIL — `cannot import name 'save_or_upgrade'`
 ```python
 # ingest.py — add imports
 from enum import Enum
-from resume_agent.discovery.source_tier import source_rank
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.source_tier import source_rank
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 ```
 
 ```python
@@ -288,7 +288,7 @@ Expected: PASS. The pre-existing `test_add_job_dedupes_*` tests stay green: in e
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/ingest.py tests/test_discovery_ingest.py
+git add src/resume_tailor_harness/discovery/ingest.py tests/test_discovery_ingest.py
 git commit -m "feat: save_or_upgrade with tier-based upgrade-on-better-source"
 ```
 
@@ -305,7 +305,7 @@ git commit -m "feat: save_or_upgrade with tier-based upgrade-on-better-source"
 
 ```python
 # append to tests/test_discovery_ingest.py
-from resume_agent.tracking.repository import application_for_job
+from resume_tailor_harness.tracking.repository import application_for_job
 
 
 def test_upgrade_preserves_application_and_status():
@@ -381,14 +381,14 @@ git commit -m "test: upgrade preserves progress and freezes post-raw text"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/ingest.py` (`ingest_jobs`)
+- Modify: `src/resume_tailor_harness/discovery/ingest.py` (`ingest_jobs`)
 - Test: `tests/test_ingest_jobs.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # append to tests/test_ingest_jobs.py
-from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+from resume_tailor_harness.discovery.ingest import ingest_jobs_with_outcomes
 
 
 def test_cross_run_upgrade_not_counted_as_new_add():
@@ -474,7 +474,7 @@ Expected: PASS. `test_ingest_jobs_dedupes_same_posting_across_sources` stays gre
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/ingest.py tests/test_ingest_jobs.py
+git add src/resume_tailor_harness/discovery/ingest.py tests/test_ingest_jobs.py
 git commit -m "feat: ingest_jobs counts inserts, not upgrades"
 ```
 
@@ -484,7 +484,7 @@ git commit -m "feat: ingest_jobs counts inserts, not upgrades"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/runner.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/runner.py`
 - Test: `tests/test_connector_runner.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -493,12 +493,12 @@ git commit -m "feat: ingest_jobs counts inserts, not upgrades"
 # append to tests/test_connector_runner.py
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.runner import run_pull
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.telemetry import read_runs
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.connectors.runner import run_pull
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session() -> Session:
@@ -541,7 +541,7 @@ Expected: FAIL — `run_pull` still calls insert-only `ingest_jobs`, so the upgr
 
 ```python
 # runner.py — import the counted helper
-from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+from resume_tailor_harness.discovery.ingest import ingest_jobs_with_outcomes
 ```
 
 ```python
@@ -585,7 +585,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/runner.py tests/test_connector_runner.py
+git add src/resume_tailor_harness/discovery/connectors/runner.py tests/test_connector_runner.py
 git commit -m "feat: surface source upgrades in pull telemetry"
 ```
 
@@ -600,7 +600,7 @@ Expected: PASS. Pay attention to `test_discovery_pipeline.py` and `test_reposito
 
 - [ ] **Step 2: Lint**
 
-Run: `ruff check src/resume_agent/discovery/ingest.py src/resume_agent/discovery/source_tier.py`
+Run: `ruff check src/resume_tailor_harness/discovery/ingest.py src/resume_tailor_harness/discovery/source_tier.py`
 Expected: clean (remove any import left unused after moving logic into `save_or_upgrade`).
 
 - [ ] **Step 3: Commit any fixes**

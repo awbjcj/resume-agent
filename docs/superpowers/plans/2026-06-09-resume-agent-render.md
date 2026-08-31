@@ -1,4 +1,4 @@
-# Resume Agent — Render (Typst → PDF) Implementation Plan
+# Résumé Tailor Harness — Render (Typst → PDF) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -31,7 +31,7 @@ Design spec §5.4. Decisions for this plan:
 pyproject.toml                       # MODIFY: add `typst` dependency
 templates/resume.typ                 # CREATE: single-column ATS template
 config/render.yaml.example           # CREATE
-src/resume_agent/
+src/resume_tailor_harness/
   render/
     __init__.py                      # CREATE
     render_config.py                 # CREATE: RenderConfig + load_render_config()
@@ -55,7 +55,7 @@ tests/
 **Files:**
 
 - Modify: `pyproject.toml`
-- Create: `src/resume_agent/render/__init__.py`, `src/resume_agent/render/render_config.py`
+- Create: `src/resume_tailor_harness/render/__init__.py`, `src/resume_tailor_harness/render/render_config.py`
 - Test: `tests/test_render_config.py`
 
 - [ ] **Step 1: Add the dependency**
@@ -83,7 +83,7 @@ Expected: prints `typst ok`.
 Create `tests/test_render_config.py`:
 
 ```python
-from resume_agent.render.render_config import RenderConfig, load_render_config
+from resume_tailor_harness.render.render_config import RenderConfig, load_render_config
 
 
 def test_defaults():
@@ -110,23 +110,23 @@ Run:
 uv run pytest tests/test_render_config.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.render'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.render'`.
 
 - [ ] **Step 5: Implement**
 
-Create `src/resume_agent/render/__init__.py`:
+Create `src/resume_tailor_harness/render/__init__.py`:
 
 ```python
 """Render component: ResumeContent -> Typst -> PDF (deterministic, no LLM)."""
 ```
 
-Create `src/resume_agent/render/render_config.py`:
+Create `src/resume_tailor_harness/render/render_config.py`:
 
 ```python
 from pathlib import Path
 
-from resume_agent.config import load_yaml
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class RenderConfig(ExtensibleModel):
@@ -151,7 +151,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/render/__init__.py src/resume_agent/render/render_config.py tests/test_render_config.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/render/__init__.py src/resume_tailor_harness/render/render_config.py tests/test_render_config.py
 git commit -m "feat(render): add typst dep + RenderConfig" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -161,7 +161,7 @@ git commit -m "feat(render): add typst dep + RenderConfig" -m "Co-Authored-By: C
 
 **Files:**
 
-- Create: `templates/resume.typ`, `src/resume_agent/render/renderer.py`
+- Create: `templates/resume.typ`, `src/resume_tailor_harness/render/renderer.py`
 - Test: `tests/test_renderer.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -171,15 +171,15 @@ Create `tests/test_renderer.py`:
 ```python
 from pathlib import Path
 
-from resume_agent.models.profile import Contact, Education
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact, Education
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
     TailoredSkill,
 )
-from resume_agent.render.renderer import output_filename, render_pdf
+from resume_tailor_harness.render.renderer import output_filename, render_pdf
 
 
 def test_output_filename_slugifies():
@@ -235,7 +235,7 @@ Run:
 uv run pytest tests/test_renderer.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.render.renderer'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.render.renderer'`.
 
 - [ ] **Step 3: Implement the template**
 
@@ -330,7 +330,7 @@ Create `templates/resume.typ`:
 
 - [ ] **Step 4: Implement the renderer**
 
-Create `src/resume_agent/render/renderer.py`:
+Create `src/resume_tailor_harness/render/renderer.py`:
 
 ```python
 import re
@@ -338,7 +338,7 @@ from pathlib import Path
 
 import typst
 
-from resume_agent.models.resume import ResumeContent
+from resume_tailor_harness.models.resume import ResumeContent
 
 
 def _slug(text: str) -> str:
@@ -380,7 +380,7 @@ Expected: PASS (2 tests). If the compile errors on Typst syntax, fix `templates/
 Run:
 
 ```bash
-uv run python -c "from tests.test_renderer import _full_content; from resume_agent.render.renderer import render_pdf; render_pdf(_full_content(), 'output/_sample.pdf'); print('wrote output/_sample.pdf')"
+uv run python -c "from tests.test_renderer import _full_content; from resume_tailor_harness.render.renderer import render_pdf; render_pdf(_full_content(), 'output/_sample.pdf'); print('wrote output/_sample.pdf')"
 ```
 
 Open `output/_sample.pdf` to confirm it looks like a one-page resume. (Delete it afterward; `output/` holds generated artifacts.)
@@ -388,7 +388,7 @@ Open `output/_sample.pdf` to confirm it looks like a one-page resume. (Delete it
 - [ ] **Step 7: Commit**
 
 ```bash
-git add templates/resume.typ src/resume_agent/render/renderer.py tests/test_renderer.py
+git add templates/resume.typ src/resume_tailor_harness/render/renderer.py tests/test_renderer.py
 git commit -m "feat(render): Typst template + render_pdf" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -398,7 +398,7 @@ git commit -m "feat(render): Typst template + render_pdf" -m "Co-Authored-By: Cl
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -408,8 +408,8 @@ Append to `tests/test_repository.py`:
 ```python
 def test_get_resume_version_roundtrip():
     from sqlmodel import SQLModel, create_engine, Session
-    from resume_agent.tracking.repository import get_resume_version, save_resume_version
-    from resume_agent.tracking.tables import ResumeVersion
+    from resume_tailor_harness.tracking.repository import get_resume_version, save_resume_version
+    from resume_tailor_harness.tracking.tables import ResumeVersion
 
     engine = create_engine("sqlite://")
     SQLModel.metadata.create_all(engine)
@@ -433,7 +433,7 @@ Expected: FAIL — `ImportError: cannot import name 'get_resume_version'`.
 
 - [ ] **Step 3: Implement**
 
-Add to `src/resume_agent/tracking/repository.py` (after `resume_versions_for_job`):
+Add to `src/resume_tailor_harness/tracking/repository.py` (after `resume_versions_for_job`):
 
 ```python
 def get_resume_version(session: Session, version_id: int) -> ResumeVersion | None:
@@ -453,7 +453,7 @@ Expected: PASS (all existing repo tests + the new one).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_repository.py
 git commit -m "feat(render): get_resume_version repository fn" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -463,7 +463,7 @@ git commit -m "feat(render): get_resume_version repository fn" -m "Co-Authored-B
 
 **Files:**
 
-- Create: `src/resume_agent/render/service.py`
+- Create: `src/resume_tailor_harness/render/service.py`
 - Test: `tests/test_render_service.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -475,12 +475,12 @@ from pathlib import Path
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.profile import Contact
-from resume_agent.render.render_config import RenderConfig
-from resume_agent.render.service import render_version
-from resume_agent.tracking.repository import get_resume_version, save_job, save_resume_version
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.render.render_config import RenderConfig
+from resume_tailor_harness.render.service import render_version
+from resume_tailor_harness.tracking.repository import get_resume_version, save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def _session() -> Session:
@@ -532,11 +532,11 @@ Run:
 uv run pytest tests/test_render_service.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.render.service'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.render.service'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/render/service.py`:
+Create `src/resume_tailor_harness/render/service.py`:
 
 ```python
 from pathlib import Path
@@ -544,11 +544,11 @@ from typing import Callable
 
 from sqlmodel import Session
 
-from resume_agent.models.resume import ResumeContent
-from resume_agent.render.render_config import RenderConfig
-from resume_agent.render.renderer import output_filename, render_pdf
-from resume_agent.tracking.repository import get_job, get_resume_version, save_job, save_resume_version
-from resume_agent.tracking.tables import JobStatus, ResumeVersion, utcnow
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.render.render_config import RenderConfig
+from resume_tailor_harness.render.renderer import output_filename, render_pdf
+from resume_tailor_harness.tracking.repository import get_job, get_resume_version, save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import JobStatus, ResumeVersion, utcnow
 
 RenderFn = Callable[[ResumeContent, str | Path, str | Path], Path]
 
@@ -594,7 +594,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/render/service.py tests/test_render_service.py
+git add src/resume_tailor_harness/render/service.py tests/test_render_service.py
 git commit -m "feat(render): render_version persistence service" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -604,7 +604,7 @@ git commit -m "feat(render): render_version persistence service" -m "Co-Authored
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Create: `config/render.yaml.example`
 - Test: `tests/test_cli_render.py`
 
@@ -617,9 +617,9 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 runner = CliRunner()
 
@@ -665,15 +665,15 @@ Run:
 uv run pytest tests/test_cli_render.py -v
 ```
 
-Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'load_render_config'`.
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.cli' has no attribute 'load_render_config'`.
 
 - [ ] **Step 3: Implement**
 
-Add imports near the other imports in `src/resume_agent/cli.py`:
+Add imports near the other imports in `src/resume_tailor_harness/cli.py`:
 
 ```python
-from resume_agent.render.render_config import load_render_config
-from resume_agent.render.service import render_version
+from resume_tailor_harness.render.render_config import load_render_config
+from resume_tailor_harness.render.service import render_version
 ```
 
 Add the command AFTER the `tailor` command and BEFORE `if __name__ == "__main__":`:
@@ -691,7 +691,7 @@ def render_cmd(
     """Render a stored resume version to a PDF."""
     render_config = load_render_config(config) if Path(config).exists() else None
     if render_config is None:
-        from resume_agent.render.render_config import RenderConfig
+        from resume_tailor_harness.render.render_config import RenderConfig
 
         render_config = RenderConfig()
     engine = _engine(db_url)
@@ -726,7 +726,7 @@ Expected: PASS (1 test).
 Run:
 
 ```bash
-uv run resume-agent render --help
+uv run resume-tailor-harness render --help
 ```
 
 Expected: help text (exit 0).
@@ -744,7 +744,7 @@ Expected: all tests pass (101 prior + Render additions).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/cli.py config/render.yaml.example tests/test_cli_render.py
+git add src/resume_tailor_harness/cli.py config/render.yaml.example tests/test_cli_render.py
 git commit -m "feat(render): render CLI command + render.yaml example" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

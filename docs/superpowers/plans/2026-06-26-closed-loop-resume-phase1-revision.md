@@ -14,7 +14,7 @@
 - **Tests are offline.** No API key, no network. All LLM agents are faked/monkeypatched; assert against fixture content. Run: `.venv/Scripts/python.exe -m pytest`.
 - **Wire format is camelCase.** API schemas subclass `CamelModel` (`alias_generator=to_camel`, `from_attributes=True`); Python stays snake_case.
 - **Contracts are generated.** After any endpoint/schema change, regenerate `contracts/openapi.json` + `contracts/ts/api.ts` via `bash scripts/gen_ts_client.sh`; `tests/api/test_openapi_contract.py` is a drift gate.
-- **Migrations are idempotent SQLite helpers.** New columns on existing tables use `ensure_*_column(engine)` helpers (PRAGMA check + `ALTER TABLE`) registered in `init_db` (`src/resume_agent/db.py`); new tables come from `SQLModel.metadata.create_all`.
+- **Migrations are idempotent SQLite helpers.** New columns on existing tables use `ensure_*_column(engine)` helpers (PRAGMA check + `ALTER TABLE`) registered in `init_db` (`src/resume_tailor_harness/db.py`); new tables come from `SQLModel.metadata.create_all`.
 - **Revision is synchronous.** These endpoints return `200` with the new version directly (a deliberate exception to "long ops = Run + SSE", which is reserved for multi-job batches).
 - **Lint clean:** `ruff check` must pass.
 
@@ -24,9 +24,9 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py:61-73` (`ResumeVersion`)
-- Modify: `src/resume_agent/tracking/migrate.py` (add helper at end)
-- Modify: `src/resume_agent/db.py:8-14,51-57` (import + call helper)
+- Modify: `src/resume_tailor_harness/tracking/tables.py:61-73` (`ResumeVersion`)
+- Modify: `src/resume_tailor_harness/tracking/migrate.py` (add helper at end)
+- Modify: `src/resume_tailor_harness/db.py:8-14,51-57` (import + call helper)
 - Test: `tests/test_tracking_migrate.py` (create if absent)
 
 **Interfaces:**
@@ -40,10 +40,10 @@
 from sqlalchemy import text
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import save_resume_version
-from resume_agent.tracking.tables import Job, ResumeVersion
-from resume_agent.tracking.repository import save_job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import save_resume_version
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.tracking.repository import save_job
 
 
 def test_resume_version_has_revision_columns():
@@ -72,7 +72,7 @@ def test_ensure_resume_version_revision_columns_backfills_origin():
             "fact_check_passed BOOLEAN, critique_json JSON, schema_version INTEGER, created_at DATETIME)"
         ))
         conn.execute(text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 0)"))
-    from resume_agent.tracking.migrate import ensure_resume_version_revision_columns
+    from resume_tailor_harness.tracking.migrate import ensure_resume_version_revision_columns
     ensure_resume_version_revision_columns(engine)
     with engine.begin() as conn:
         origin = conn.execute(text("SELECT origin FROM resume_versions WHERE id = 1")).scalar()
@@ -86,7 +86,7 @@ Expected: FAIL (`TypeError: 'origin' is an invalid keyword argument` / `ImportEr
 
 - [ ] **Step 3: Add the model columns**
 
-In `src/resume_agent/tracking/tables.py`, inside `class ResumeVersion`, after `critique_json` (line ~71):
+In `src/resume_tailor_harness/tracking/tables.py`, inside `class ResumeVersion`, after `critique_json` (line ~71):
 
 ```python
     origin: str = Field(default="tailor", index=True)  # "tailor" | "revision"
@@ -96,7 +96,7 @@ In `src/resume_agent/tracking/tables.py`, inside `class ResumeVersion`, after `c
 
 - [ ] **Step 4: Add the migration helper**
 
-Append to `src/resume_agent/tracking/migrate.py`:
+Append to `src/resume_tailor_harness/tracking/migrate.py`:
 
 ```python
 def ensure_resume_version_revision_columns(engine: Engine) -> None:
@@ -116,10 +116,10 @@ def ensure_resume_version_revision_columns(engine: Engine) -> None:
 
 - [ ] **Step 5: Register it in `init_db`**
 
-In `src/resume_agent/db.py`, add to the import block (line 8-14) and call it in `init_db` after `ensure_content_fingerprint_column(engine)`:
+In `src/resume_tailor_harness/db.py`, add to the import block (line 8-14) and call it in `init_db` after `ensure_content_fingerprint_column(engine)`:
 
 ```python
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.tracking.migrate import (
     ensure_archived_at_column,
     ensure_content_fingerprint_column,
     ensure_dedup_key_column,
@@ -141,7 +141,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_tracking_migrate.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_tracking_migrate.py
 git commit -m "feat: add revision lineage columns to resume_versions"
 ```
 
@@ -151,9 +151,9 @@ git commit -m "feat: add revision lineage columns to resume_versions"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py:90-100` (`CoverLetter`), `:76-87` (`Application`)
-- Modify: `src/resume_agent/tracking/migrate.py`
-- Modify: `src/resume_agent/db.py` (call new helpers)
+- Modify: `src/resume_tailor_harness/tracking/tables.py:90-100` (`CoverLetter`), `:76-87` (`Application`)
+- Modify: `src/resume_tailor_harness/tracking/migrate.py`
+- Modify: `src/resume_tailor_harness/db.py` (call new helpers)
 - Test: `tests/test_tracking_migrate.py`
 
 **Interfaces:**
@@ -167,8 +167,8 @@ git commit -m "feat: add revision lineage columns to resume_versions"
 def test_cover_letter_and_application_revision_columns():
     engine = make_engine("sqlite://")
     init_db(engine)
-    from resume_agent.tracking.tables import Application, CoverLetter
-    from resume_agent.tracking.repository import save_cover_letter, save_application
+    from resume_tailor_harness.tracking.tables import Application, CoverLetter
+    from resume_tailor_harness.tracking.repository import save_cover_letter, save_application
     with Session(engine) as s:
         job = save_job(s, Job(source="url", company="Acme", title="Eng"))
         cl = save_cover_letter(
@@ -248,7 +248,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_tracking_migrate.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_tracking_migrate.py
 git commit -m "feat: add revision columns to cover_letters and application.cover_letter_id"
 ```
 
@@ -258,8 +258,8 @@ git commit -m "feat: add revision columns to cover_letters and application.cover
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/agents.py` (add `build_revision_agent`)
-- Create: `src/resume_agent/tailor/revision.py` (composer + run helper)
+- Modify: `src/resume_tailor_harness/tailor/agents.py` (add `build_revision_agent`)
+- Create: `src/resume_tailor_harness/tailor/revision.py` (composer + run helper)
 - Test: `tests/test_tailor_revision.py`
 
 **Interfaces:**
@@ -271,9 +271,9 @@ git commit -m "feat: add revision columns to cover_letters and application.cover
 
 ```python
 # tests/test_tailor_revision.py
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.revision import apply_revision, compose_user_revision_input
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.tailor.revision import apply_revision, compose_user_revision_input
 
 
 class _FakeResult:
@@ -305,15 +305,15 @@ def test_apply_revision_returns_content():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_revision.py -v`
-Expected: FAIL (`ModuleNotFoundError: resume_agent.tailor.revision`).
+Expected: FAIL (`ModuleNotFoundError: resume_tailor_harness.tailor.revision`).
 
 - [ ] **Step 3: Create the composer + run helper**
 
 ```python
-# src/resume_agent/tailor/revision.py
-from resume_agent.llm_runner import Runner
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
+# src/resume_tailor_harness/tailor/revision.py
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
 
 
 def compose_user_revision_input(
@@ -338,7 +338,7 @@ def apply_revision(input_text: str, agent: Runner) -> ResumeContent:
 
 - [ ] **Step 4: Add the agent builder**
 
-Append to `src/resume_agent/tailor/agents.py`:
+Append to `src/resume_tailor_harness/tailor/agents.py`:
 
 ```python
 _REVISION_INSTRUCTIONS = [
@@ -371,7 +371,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/revision.py src/resume_agent/tailor/agents.py tests/test_tailor_revision.py
+git add src/resume_tailor_harness/tailor/revision.py src/resume_tailor_harness/tailor/agents.py tests/test_tailor_revision.py
 git commit -m "feat: add resume revision agent and instruction composer"
 ```
 
@@ -381,7 +381,7 @@ git commit -m "feat: add resume revision agent and instruction composer"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/agents.py:38-43` (`TailorBundle`), `:60-71` (`build_tailor_bundle`), `:81-90` (`__all__`)
+- Modify: `src/resume_tailor_harness/services/agents.py:38-43` (`TailorBundle`), `:60-71` (`build_tailor_bundle`), `:81-90` (`__all__`)
 - Test: `tests/test_services_agents.py` (create if absent)
 
 **Interfaces:**
@@ -393,7 +393,7 @@ git commit -m "feat: add resume revision agent and instruction composer"
 
 ```python
 # tests/test_services_agents.py
-from resume_agent.services import agents as A
+from resume_tailor_harness.services import agents as A
 
 
 def test_tailor_bundle_includes_revision(monkeypatch):
@@ -418,7 +418,7 @@ Expected: FAIL (`AttributeError: 'TailorBundle' object has no attribute 'revisio
 In `services/agents.py`: import `build_revision_agent` alongside the other tailor builders; add `revision: Runner` to `TailorBundle`; set it in `build_tailor_bundle`:
 
 ```python
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.tailor.agents import (
     build_reviewer_agent,
     build_reviser_agent,
     build_revision_agent,
@@ -455,7 +455,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/agents.py tests/test_services_agents.py
+git add src/resume_tailor_harness/services/agents.py tests/test_services_agents.py
 git commit -m "feat: expose revision agent on TailorBundle"
 ```
 
@@ -465,12 +465,12 @@ git commit -m "feat: expose revision agent on TailorBundle"
 
 **Files:**
 
-- Create: `src/resume_agent/services/revision.py`
+- Create: `src/resume_tailor_harness/services/revision.py`
 - Test: `tests/test_services_revision.py`
 
 **Interfaces:**
 
-- Consumes: `get_resume_version`, `get_job`, `save_resume_version`, `load_facts`, `build_tailor_bundle`, `compose_user_revision_input`/`apply_revision` (Task 3), `provenance_critique` (`resume_agent.tailor.provenance`), `run_panel`/`aggregate` for the optional re-review.
+- Consumes: `get_resume_version`, `get_job`, `save_resume_version`, `load_facts`, `build_tailor_bundle`, `compose_user_revision_input`/`apply_revision` (Task 3), `provenance_critique` (`resume_tailor_harness.tailor.provenance`), `run_panel`/`aggregate` for the optional re-review.
 - Produces: `revise_resume_version(session, version_id: int, instruction: str, *, re_review: bool = False, review_path: str = DEFAULT_REVIEW, facts_path: str = DEFAULT_FACTS, bundle: TailorBundle | None = None) -> ResumeVersion | None`. Returns the new version, or `None` if `version_id` does not exist.
 
 - [ ] **Step 1: Write the failing test**
@@ -479,13 +479,13 @@ git commit -m "feat: expose revision agent on TailorBundle"
 # tests/test_services_revision.py
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredExperience, TailoredBullet
-from resume_agent.services.agents import TailorBundle
-from resume_agent.services.revision import revise_resume_version
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredExperience, TailoredBullet
+from resume_tailor_harness.services.agents import TailorBundle
+from resume_tailor_harness.services.revision import revise_resume_version
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 
 class _Result:
@@ -564,27 +564,27 @@ def test_revision_missing_version_returns_none(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_revision.py -v`
-Expected: FAIL (`ModuleNotFoundError: resume_agent.services.revision`).
+Expected: FAIL (`ModuleNotFoundError: resume_tailor_harness.services.revision`).
 
 - [ ] **Step 3: Implement the service**
 
 ```python
-# src/resume_agent/services/revision.py
+# src/resume_tailor_harness/services/revision.py
 """Use-case: apply a user instruction to a resume version, producing a new one."""
 
 from __future__ import annotations
 
 from sqlmodel import Session
 
-from resume_agent.models.resume import ResumeContent
-from resume_agent.profile.store import load_facts
-from resume_agent.services.agents import TailorBundle, build_tailor_bundle
-from resume_agent.tailor.provenance import provenance_critique
-from resume_agent.tailor.review_config import load_review_config
-from resume_agent.tailor.revision import apply_revision, compose_user_revision_input
-from resume_agent.tailor.style_guide import load_style_guide
-from resume_agent.tracking.repository import get_resume_version, save_resume_version
-from resume_agent.tracking.tables import ResumeVersion
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.services.agents import TailorBundle, build_tailor_bundle
+from resume_tailor_harness.tailor.provenance import provenance_critique
+from resume_tailor_harness.tailor.review_config import load_review_config
+from resume_tailor_harness.tailor.revision import apply_revision, compose_user_revision_input
+from resume_tailor_harness.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tracking.repository import get_resume_version, save_resume_version
+from resume_tailor_harness.tracking.tables import ResumeVersion
 
 DEFAULT_REVIEW = "config/review.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -618,10 +618,10 @@ def revise_resume_version(
     provenance = provenance_critique(revised, facts)
     review_score: int | None = None
     if re_review and provenance.passed:
-        from resume_agent.tailor.panel import run_panel
-        from resume_agent.tailor.verdict import aggregate
+        from resume_tailor_harness.tailor.panel import run_panel
+        from resume_tailor_harness.tailor.verdict import aggregate
         job = None  # jd_text not needed for scoring-only; pass parent's job text
-        from resume_agent.tracking.repository import get_job
+        from resume_tailor_harness.tracking.repository import get_job
         job = get_job(session, parent.job_id)
         panel = run_panel(revised, facts, job.jd_text if job else "", config, bundle.reviewers)
         review_score = aggregate([provenance, *panel], config).aggregate_score
@@ -647,7 +647,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/revision.py tests/test_services_revision.py
+git add src/resume_tailor_harness/services/revision.py tests/test_services_revision.py
 git commit -m "feat: resume version revision service with fact-gate flagging"
 ```
 
@@ -657,10 +657,10 @@ git commit -m "feat: resume version revision service with fact-gate flagging"
 
 **Files:**
 
-- Modify: `src/resume_agent/cover_letter/agents.py` (add `build_cover_letter_revision_agent`)
-- Modify: `src/resume_agent/cover_letter/drafting.py` (add `compose_user_revision_input` + run helper)
-- Modify: `src/resume_agent/services/agents.py` (`CoverLetterBundle.revision`)
-- Create: `src/resume_agent/services/cover_letter_revision.py`
+- Modify: `src/resume_tailor_harness/cover_letter/agents.py` (add `build_cover_letter_revision_agent`)
+- Modify: `src/resume_tailor_harness/cover_letter/drafting.py` (add `compose_user_revision_input` + run helper)
+- Modify: `src/resume_tailor_harness/services/agents.py` (`CoverLetterBundle.revision`)
+- Create: `src/resume_tailor_harness/services/cover_letter_revision.py`
 - Test: `tests/test_services_cover_letter_revision.py`
 
 **Interfaces:**
@@ -673,13 +673,13 @@ git commit -m "feat: resume version revision service with fact-gate flagging"
 # tests/test_services_cover_letter_revision.py
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.services.agents import CoverLetterBundle
-from resume_agent.services.cover_letter_revision import revise_cover_letter_version
-from resume_agent.tracking.repository import save_cover_letter, save_job
-from resume_agent.tracking.tables import CoverLetter, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.services.agents import CoverLetterBundle
+from resume_tailor_harness.services.cover_letter_revision import revise_cover_letter_version
+from resume_tailor_harness.tracking.repository import save_cover_letter, save_job
+from resume_tailor_harness.tracking.tables import CoverLetter, Job
 
 
 class _Result:
@@ -722,7 +722,7 @@ Expected: FAIL (`ModuleNotFoundError`).
 
 - [ ] **Step 3: Add agent builder**
 
-Append to `src/resume_agent/cover_letter/agents.py`:
+Append to `src/resume_tailor_harness/cover_letter/agents.py`:
 
 ```python
 _CL_REVISION_INSTRUCTIONS = [
@@ -748,7 +748,7 @@ def build_cover_letter_revision_agent(model_id: str | None = None) -> Runner:
 
 - [ ] **Step 4: Add composer + run helper**
 
-Append to `src/resume_agent/cover_letter/drafting.py`:
+Append to `src/resume_tailor_harness/cover_letter/drafting.py`:
 
 ```python
 def compose_cl_user_revision_input(
@@ -776,7 +776,7 @@ def apply_cl_revision(input_text: str, agent: Runner) -> CoverLetterContent:
 In `services/agents.py`: import `build_cover_letter_revision_agent`; add `revision: Runner` to `CoverLetterBundle`; set it in `build_cover_letter_bundle`; add the name to `__all__`.
 
 ```python
-from resume_agent.cover_letter.agents import (
+from resume_tailor_harness.cover_letter.agents import (
     build_cover_letter_agent,
     build_cover_letter_reviser_agent,
     build_cover_letter_revision_agent,
@@ -803,20 +803,20 @@ def build_cover_letter_bundle() -> CoverLetterBundle:
 - [ ] **Step 6: Implement the service**
 
 ```python
-# src/resume_agent/services/cover_letter_revision.py
+# src/resume_tailor_harness/services/cover_letter_revision.py
 """Use-case: apply a user instruction to a cover letter, producing a new one."""
 
 from __future__ import annotations
 
 from sqlmodel import Session
 
-from resume_agent.cover_letter.drafting import apply_cl_revision, compose_cl_user_revision_input
-from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.profile.store import load_facts
-from resume_agent.services.agents import CoverLetterBundle, build_cover_letter_bundle
-from resume_agent.tracking.repository import get_cover_letter, save_cover_letter
-from resume_agent.tracking.tables import CoverLetter
+from resume_tailor_harness.cover_letter.drafting import apply_cl_revision, compose_cl_user_revision_input
+from resume_tailor_harness.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.services.agents import CoverLetterBundle, build_cover_letter_bundle
+from resume_tailor_harness.tracking.repository import get_cover_letter, save_cover_letter
+from resume_tailor_harness.tracking.tables import CoverLetter
 
 DEFAULT_FACTS = "data/profile/facts.json"
 
@@ -860,7 +860,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/cover_letter/agents.py src/resume_agent/cover_letter/drafting.py src/resume_agent/services/agents.py src/resume_agent/services/cover_letter_revision.py tests/test_services_cover_letter_revision.py
+git add src/resume_tailor_harness/cover_letter/agents.py src/resume_tailor_harness/cover_letter/drafting.py src/resume_tailor_harness/services/agents.py src/resume_tailor_harness/services/cover_letter_revision.py tests/test_services_cover_letter_revision.py
 git commit -m "feat: cover-letter revision agent, composer, and service"
 ```
 
@@ -870,7 +870,7 @@ git commit -m "feat: cover-letter revision agent, composer, and service"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/board.py:438-446` (after `upsert_application`)
+- Modify: `src/resume_tailor_harness/services/board.py:438-446` (after `upsert_application`)
 - Test: `tests/test_services_board.py`
 
 **Interfaces:**
@@ -882,9 +882,9 @@ git commit -m "feat: cover-letter revision agent, composer, and service"
 
 ```python
 # add to tests/test_services_board.py
-from resume_agent.services.board import select_resume_version, select_cover_letter
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.services.board import select_resume_version, select_cover_letter
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 
 def test_select_resume_version_sets_application_link(session):
@@ -903,7 +903,7 @@ Expected: FAIL (`ImportError: cannot import name 'select_resume_version'`).
 
 - [ ] **Step 3: Implement the selectors**
 
-Append to `src/resume_agent/services/board.py`:
+Append to `src/resume_tailor_harness/services/board.py`:
 
 ```python
 def select_resume_version(session: Session, job_id: int, version_id: int) -> Application:
@@ -930,7 +930,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/board.py tests/test_services_board.py
+git add src/resume_tailor_harness/services/board.py tests/test_services_board.py
 git commit -m "feat: application resume/cover-letter selection services"
 ```
 
@@ -940,8 +940,8 @@ git commit -m "feat: application resume/cover-letter selection services"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/jobs.py:73-81` (`ResumeVersionOut`), add `ReviseRequest`
-- Modify: `src/resume_agent/api/routers/resumes.py` (add endpoints)
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py:73-81` (`ResumeVersionOut`), add `ReviseRequest`
+- Modify: `src/resume_tailor_harness/api/routers/resumes.py` (add endpoints)
 - Test: `tests/api/test_resumes_revise.py`
 
 **Interfaces:**
@@ -953,18 +953,18 @@ git commit -m "feat: application resume/cover-letter selection services"
 
 ```python
 # tests/api/test_resumes_revise.py
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.profile import Contact
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.profile import Contact
 # Reuse the app/client + monkeypatch fixtures the other api tests use.
 # This test asserts the endpoint shape; the revision service is faked.
 
 def test_revise_endpoint_returns_new_version(client, seed_resume_version, monkeypatch):
-    from resume_agent.api.routers import resumes as R
+    from resume_tailor_harness.api.routers import resumes as R
     new = seed_resume_version  # a persisted parent ResumeVersion id
 
     def fake_revise(session, version_id, instruction, **k):
-        from resume_agent.tracking.tables import ResumeVersion
-        from resume_agent.tracking.repository import save_resume_version
+        from resume_tailor_harness.tracking.tables import ResumeVersion
+        from resume_tailor_harness.tracking.repository import save_resume_version
         return save_resume_version(session, ResumeVersion(
             job_id=1, round=1, content_json={}, origin="revision", instruction=instruction))
     monkeypatch.setattr(R, "revise_resume_version", fake_revise)
@@ -985,7 +985,7 @@ Expected: FAIL (404 / missing route).
 
 - [ ] **Step 3: Extend the schema**
 
-In `src/resume_agent/api/schemas/jobs.py`, add to `ResumeVersionOut`:
+In `src/resume_tailor_harness/api/schemas/jobs.py`, add to `ResumeVersionOut`:
 
 ```python
     origin: str = "tailor"
@@ -1003,12 +1003,12 @@ class ReviseRequest(CamelModel):
 
 - [ ] **Step 4: Add the endpoints**
 
-In `src/resume_agent/api/routers/resumes.py`:
+In `src/resume_tailor_harness/api/routers/resumes.py`:
 
 ```python
-from resume_agent.api.schemas.jobs import ApplicationOut, ResumeVersionOut, ReviseRequest
-from resume_agent.services.revision import revise_resume_version
-from resume_agent.services.board import select_resume_version
+from resume_tailor_harness.api.schemas.jobs import ApplicationOut, ResumeVersionOut, ReviseRequest
+from resume_tailor_harness.services.revision import revise_resume_version
+from resume_tailor_harness.services.board import select_resume_version
 
 
 @router.post("/resume-versions/{version_id}/revise", response_model=ResumeVersionOut)
@@ -1033,7 +1033,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/jobs.py src/resume_agent/api/routers/resumes.py tests/api/test_resumes_revise.py
+git add src/resume_tailor_harness/api/schemas/jobs.py src/resume_tailor_harness/api/routers/resumes.py tests/api/test_resumes_revise.py
 git commit -m "feat: resume revise + select-resume API endpoints"
 ```
 
@@ -1043,10 +1043,10 @@ git commit -m "feat: resume revise + select-resume API endpoints"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/jobs.py` (add `CoverLetterOut`; add `cover_letters` + `application` already present)
-- Modify: `src/resume_agent/tracking/queries.py` (`job_detail_row` to include cover letters — locate the DTO it returns)
-- Create: `src/resume_agent/api/routers/cover_letters.py`
-- Modify: `src/resume_agent/api/app.py:16-22,83-91` (register router)
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py` (add `CoverLetterOut`; add `cover_letters` + `application` already present)
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (`job_detail_row` to include cover letters — locate the DTO it returns)
+- Create: `src/resume_tailor_harness/api/routers/cover_letters.py`
+- Modify: `src/resume_tailor_harness/api/app.py:16-22,83-91` (register router)
 - Test: `tests/api/test_cover_letters_revise.py`
 
 **Interfaces:**
@@ -1059,12 +1059,12 @@ git commit -m "feat: resume revise + select-resume API endpoints"
 ```python
 # tests/api/test_cover_letters_revise.py
 def test_cover_letter_revise_endpoint(client, seed_cover_letter, monkeypatch):
-    from resume_agent.api.routers import cover_letters as C
+    from resume_tailor_harness.api.routers import cover_letters as C
     cid = seed_cover_letter
 
     def fake_revise(session, cover_letter_id, instruction, **k):
-        from resume_agent.tracking.tables import CoverLetter
-        from resume_agent.tracking.repository import save_cover_letter
+        from resume_tailor_harness.tracking.tables import CoverLetter
+        from resume_tailor_harness.tracking.repository import save_cover_letter
         return save_cover_letter(session, CoverLetter(
             job_id=1, content_json={}, origin="revision", instruction=instruction))
     monkeypatch.setattr(C, "revise_cover_letter_version", fake_revise)
@@ -1081,7 +1081,7 @@ Expected: FAIL (404 / no module).
 
 - [ ] **Step 3: Add `CoverLetterOut` and extend `JobDetail`**
 
-In `src/resume_agent/api/schemas/jobs.py`:
+In `src/resume_tailor_harness/api/schemas/jobs.py`:
 
 ```python
 class CoverLetterOut(CamelModel):
@@ -1099,12 +1099,12 @@ Add to `JobDetail`: `cover_letters: list[CoverLetterOut] = []` and `cover_letter
 
 - [ ] **Step 4: Include cover letters in the detail query**
 
-In `src/resume_agent/tracking/queries.py`, locate `job_detail_row` and the DTO it builds; add a `cover_letters` field populated via `select(CoverLetter).where(CoverLetter.job_id == job_id)` ordered by `created_at`, parallel to how `resume_versions` is loaded. (Read the function first; mirror the existing resume-version loading exactly.)
+In `src/resume_tailor_harness/tracking/queries.py`, locate `job_detail_row` and the DTO it builds; add a `cover_letters` field populated via `select(CoverLetter).where(CoverLetter.job_id == job_id)` ordered by `created_at`, parallel to how `resume_versions` is loaded. (Read the function first; mirror the existing resume-version loading exactly.)
 
 - [ ] **Step 5: Create the router**
 
 ```python
-# src/resume_agent/api/routers/cover_letters.py
+# src/resume_tailor_harness/api/routers/cover_letters.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -1113,12 +1113,12 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.jobs import ApplicationOut, CoverLetterOut, ReviseRequest
-from resume_agent.services.board import select_cover_letter
-from resume_agent.services.cover_letter_revision import revise_cover_letter_version
-from resume_agent.tracking.repository import get_cover_letter
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.jobs import ApplicationOut, CoverLetterOut, ReviseRequest
+from resume_tailor_harness.services.board import select_cover_letter
+from resume_tailor_harness.services.cover_letter_revision import revise_cover_letter_version
+from resume_tailor_harness.tracking.repository import get_cover_letter
 
 router = APIRouter()
 
@@ -1153,7 +1153,7 @@ def download_cover_letter_pdf(
 
 - [ ] **Step 6: Register the router**
 
-In `src/resume_agent/api/app.py`, import `from resume_agent.api.routers import cover_letters as cover_letters_router` and add `app.include_router(cover_letters_router.router, prefix="/api", dependencies=guarded)`.
+In `src/resume_tailor_harness/api/app.py`, import `from resume_tailor_harness.api.routers import cover_letters as cover_letters_router` and add `app.include_router(cover_letters_router.router, prefix="/api", dependencies=guarded)`.
 
 - [ ] **Step 7: Run tests to verify they pass**
 
@@ -1163,7 +1163,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/api/ src/resume_agent/tracking/queries.py tests/api/test_cover_letters_revise.py
+git add src/resume_tailor_harness/api/ src/resume_tailor_harness/tracking/queries.py tests/api/test_cover_letters_revise.py
 git commit -m "feat: cover-letter revise/select/pdf endpoints and JobDetail.cover_letters"
 ```
 
@@ -1596,7 +1596,7 @@ Expected: all PASS, build succeeds.
 
 - [ ] **Step 3: Manual smoke (optional but recommended)**
 
-Start `resume-agent serve`, open the web app, open a tailored job → Versions tab → type "make the summary more concise" → Revise → confirm a new revision row appears with the instruction shown and a fact-check badge; click "Use for application"; check the Cover Letters tab revise flow.
+Start `resume-tailor-harness serve`, open the web app, open a tailored job → Versions tab → type "make the summary more concise" → Revise → confirm a new revision row appears with the instruction shown and a fact-check badge; click "Use for application"; check the Cover Letters tab revise flow.
 
 - [ ] **Step 4: Final commit (if any docs/cleanup)**
 

@@ -1,11 +1,11 @@
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import add_job
-from resume_agent.services.cover_letters import CoverLetterResult
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.services.cover_letters import CoverLetterResult
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import JobStatus
 
 runner = CliRunner()
 

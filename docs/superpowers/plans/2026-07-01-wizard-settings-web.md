@@ -1843,7 +1843,7 @@ git commit -m "feat(web): profile documents manager with upload and rebuild"
 - Produces:
   - Route `/setup` (own top-level route, NOT inside `AppLayout` — single-column, no sidebar) with children `keys`, `documents`, `search`, `sources`, `finish`; index redirects to the first incomplete step.
   - `STEPS` export: `[{ slug: "keys", label: "Keys", done: (s: SetupStatus) => s.secrets.anyLlmKey }, { slug: "documents", label: "Documents", done: (s) => s.profile.hasResume }, { slug: "search", label: "Search", done: (s) => s.search.configured }, { slug: "sources", label: "Sources", done: (s) => s.sources.enabledCount > 0 }]`.
-  - `SetupGate({ children })` — wraps the app shell route: while `setup/status` loads, render children; when loaded, if `!complete` and `localStorage["resume-agent-setup-dismissed"] !== "1"`, `<Navigate to="/setup" replace />`. On fetch error: render children (fail-open, spec §7).
+  - `SetupGate({ children })` — wraps the app shell route: while `setup/status` loads, render children; when loaded, if `!complete` and `localStorage["resume-tailor-harness-setup-dismissed"] !== "1"`, `<Navigate to="/setup" replace />`. On fetch error: render children (fail-open, spec §7).
   - "Exit setup" sets the localStorage flag and navigates to `/`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1916,7 +1916,7 @@ describe("SetupGate", () => {
   });
 
   it("does not redirect when the user dismissed setup", async () => {
-    localStorage.setItem("resume-agent-setup-dismissed", "1");
+    localStorage.setItem("resume-tailor-harness-setup-dismissed", "1");
     renderGate();
     await waitFor(() =>
       expect(screen.getByText("dashboard")).toBeInTheDocument(),
@@ -2057,14 +2057,14 @@ export function SetupWizard() {
     <div className="mx-auto flex min-h-svh w-full max-w-2xl flex-col gap-8 px-5 py-10">
       <header className="flex items-center gap-3">
         <div className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-primary">
-          Resume Agent · First-run setup
+          Résumé Tailor Harness · First-run setup
         </div>
         <Button
           variant="ghost"
           size="sm"
           className="ml-auto"
           onClick={() => {
-            localStorage.setItem("resume-agent-setup-dismissed", "1");
+            localStorage.setItem("resume-tailor-harness-setup-dismissed", "1");
             navigate("/");
           }}
         >
@@ -2133,7 +2133,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
   if (isError) return <>{children}</>; // fail open — never lock a working app
   if (!data) return <>{children}</>; // loading: render normally, no flash-gate
   const dismissed =
-    localStorage.getItem("resume-agent-setup-dismissed") === "1";
+    localStorage.getItem("resume-tailor-harness-setup-dismissed") === "1";
   if (!data.complete && !dismissed) return <Navigate to="/setup" replace />;
   return <>{children}</>;
 }
@@ -2231,7 +2231,7 @@ test("first run gates to the wizard; exit reaches the app; settings nav works", 
 ```
 
 Adjust the empty-backend setup to the project's Playwright configuration (env
-vars for `config_dir`/`env_path`/`data_dir` on the `resume-agent serve`
+vars for `config_dir`/`env_path`/`data_dir` on the `resume-tailor-harness serve`
 process, or a fixture that starts `create_app` with temp paths). If the
 existing e2e infra cannot provide a fresh backend, mark the gate assertion
 `test.skip` with a comment and keep the settings-nav portion.

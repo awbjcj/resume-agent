@@ -3,17 +3,17 @@ from types import SimpleNamespace
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.hiring_contacts.models import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.hiring_contacts.models import (
     HiringContactDraft,
     HiringContactIntelligenceDraft,
 )
-from resume_agent.llm_runner import UnparsedAgentOutput
-from resume_agent.services.hiring_contacts import (
+from resume_tailor_harness.llm_runner import UnparsedAgentOutput
+from resume_tailor_harness.services.hiring_contacts import (
     generate_hiring_contact_intelligence,
     load_hiring_contact_intelligence,
 )
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tracking.tables import Job
 
 
 class _Runner:

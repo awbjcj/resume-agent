@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 @pytest.mark.parametrize(

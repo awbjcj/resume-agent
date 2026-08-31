@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.services.run_completions import record_run_completion
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.services.run_completions import record_run_completion
 
 
 @pytest.fixture()

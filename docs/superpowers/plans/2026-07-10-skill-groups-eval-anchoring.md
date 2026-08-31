@@ -73,11 +73,11 @@ These amendments override any conflicting illustrative snippet below.
 
 | Path                                                                | Role                                                       |
 | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `src/resume_agent/taxonomy/groups.py`                               | New: vocabulary, taxonomy file IO, classifier              |
-| `src/resume_agent/profile/matrix.py`                                | `MatrixRow.group`, `Overrides.group`, `apply_skill_groups` |
-| `src/resume_agent/services/profile_build.py`                        | delta-classify + apply during build                        |
-| `src/resume_agent/api/routers/match_gap.py`                         | apply groups on the refresh rebuild (no LLM)               |
-| `src/resume_agent/api/schemas/profile.py`, `api/routers/profile.py` | `GET /api/profile/matrix`                                  |
+| `src/resume_tailor_harness/taxonomy/groups.py`                               | New: vocabulary, taxonomy file IO, classifier              |
+| `src/resume_tailor_harness/profile/matrix.py`                                | `MatrixRow.group`, `Overrides.group`, `apply_skill_groups` |
+| `src/resume_tailor_harness/services/profile_build.py`                        | delta-classify + apply during build                        |
+| `src/resume_tailor_harness/api/routers/match_gap.py`                         | apply groups on the refresh rebuild (no LLM)               |
+| `src/resume_tailor_harness/api/schemas/profile.py`, `api/routers/profile.py` | `GET /api/profile/matrix`                                  |
 | `web/src/features/settings/use-matrix.ts`, `SkillGroupsPanel.tsx`   | grouped skills panel on Profile settings                   |
 | `evals/RESULTS.md`, `evals/reports/`                                | live baseline artifacts (Task 7)                           |
 
@@ -87,7 +87,7 @@ These amendments override any conflicting illustrative snippet below.
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/groups.py`
+- Create: `src/resume_tailor_harness/taxonomy/groups.py`
 - Test: `tests/test_taxonomy_groups.py` (new)
 
 **Interfaces:**
@@ -102,7 +102,7 @@ Create `tests/test_taxonomy_groups.py`:
 ```python
 import json
 
-from resume_agent.taxonomy.groups import (
+from resume_tailor_harness.taxonomy.groups import (
     SKILL_GROUPS,
     load_group_map,
     save_group_map,
@@ -142,11 +142,11 @@ def test_load_missing_or_invalid_file_is_empty(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_groups.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.taxonomy.groups'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.taxonomy.groups'`
 
 - [ ] **Step 3: Create the module (IO half)**
 
-Create `src/resume_agent/taxonomy/groups.py`:
+Create `src/resume_tailor_harness/taxonomy/groups.py`:
 
 ```python
 """Fixed skill-group vocabulary and the durable token->group taxonomy.
@@ -214,8 +214,8 @@ Expected: PASS
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/taxonomy/groups.py tests/test_taxonomy_groups.py
-git add src/resume_agent/taxonomy/groups.py tests/test_taxonomy_groups.py
+ruff check src/resume_tailor_harness/taxonomy/groups.py tests/test_taxonomy_groups.py
+git add src/resume_tailor_harness/taxonomy/groups.py tests/test_taxonomy_groups.py
 git commit -m "Adds the fixed skill-group vocabulary and durable taxonomy file"
 ```
 
@@ -225,7 +225,7 @@ git commit -m "Adds the fixed skill-group vocabulary and durable taxonomy file"
 
 **Files:**
 
-- Modify: `src/resume_agent/taxonomy/groups.py` (classifier half)
+- Modify: `src/resume_tailor_harness/taxonomy/groups.py` (classifier half)
 - Test: `tests/test_taxonomy_groups.py` (append)
 
 **Interfaces:**
@@ -240,7 +240,7 @@ Append to `tests/test_taxonomy_groups.py`:
 ```python
 from types import SimpleNamespace
 
-from resume_agent.taxonomy.groups import (
+from resume_tailor_harness.taxonomy.groups import (
     SkillGroupAssignment,
     SkillGroupAssignments,
     classify_missing_groups,
@@ -306,12 +306,12 @@ Expected: FAIL — `ImportError: cannot import name 'classify_missing_groups'`
 
 - [ ] **Step 3: Implement the classifier**
 
-Append to `src/resume_agent/taxonomy/groups.py` (extend the imports with
+Append to `src/resume_tailor_harness/taxonomy/groups.py` (extend the imports with
 `from agno.agent import Agent`, `from pydantic import Field`,
-`from resume_agent.config import get_settings`,
-`from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for`,
-`from resume_agent.models.base import ExtensibleModel`,
-`from resume_agent.tracking.match_gap import normalize_skill` — **verify the
+`from resume_tailor_harness.config import get_settings`,
+`from resume_tailor_harness.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for`,
+`from resume_tailor_harness.models.base import ExtensibleModel`,
+`from resume_tailor_harness.tracking.match_gap import normalize_skill` — **verify the
 agno import path against the top of `tracking/canonicalize.py` and copy it
 exactly**):
 
@@ -393,8 +393,8 @@ Expected: PASS
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/taxonomy/groups.py tests/test_taxonomy_groups.py
-git add src/resume_agent/taxonomy/groups.py tests/test_taxonomy_groups.py
+ruff check src/resume_tailor_harness/taxonomy/groups.py tests/test_taxonomy_groups.py
+git add src/resume_tailor_harness/taxonomy/groups.py tests/test_taxonomy_groups.py
 git commit -m "Adds the delta skill-group classifier with hard slug validation"
 ```
 
@@ -404,7 +404,7 @@ git commit -m "Adds the delta skill-group classifier with hard slug validation"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/matrix.py:26-35` (`MatrixRow`), `:55-60` (`Overrides`), new helper after `build_matrix`
+- Modify: `src/resume_tailor_harness/profile/matrix.py:26-35` (`MatrixRow`), `:55-60` (`Overrides`), new helper after `build_matrix`
 - Test: `tests/test_profile_matrix.py` (append; locate with `grep -rl build_matrix tests/*.py` if named differently)
 
 **Interfaces:**
@@ -418,7 +418,7 @@ Append (reuse the file's existing facts/cluster-map fixtures for `build_matrix`;
 the helper tests below need none):
 
 ```python
-from resume_agent.profile.matrix import MatrixRow, SkillMatrix, apply_skill_groups
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatrix, apply_skill_groups
 
 
 def _matrix(*keys: str) -> SkillMatrix:
@@ -450,7 +450,7 @@ Expected: FAIL — `ImportError: cannot import name 'apply_skill_groups'`
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/profile/matrix.py`:
+In `src/resume_tailor_harness/profile/matrix.py`:
 
 1. Add to `MatrixRow` (after `category`):
 
@@ -464,7 +464,7 @@ In `src/resume_agent/profile/matrix.py`:
     group: dict[str, str] = Field(default_factory=dict)
 ```
 
-1. Add the import `from resume_agent.taxonomy.groups import SKILL_GROUPS` and,
+1. Add the import `from resume_tailor_harness.taxonomy.groups import SKILL_GROUPS` and,
    after `build_matrix`, the helper:
 
 ```python
@@ -498,7 +498,7 @@ Expected: PASS — both fields are additive; existing overrides.yaml files load 
 
 ```bash
 ruff check
-git add src/resume_agent/profile/matrix.py tests/test_profile_matrix.py
+git add src/resume_tailor_harness/profile/matrix.py tests/test_profile_matrix.py
 git commit -m "Adds the group axis to matrix rows with override support"
 ```
 
@@ -508,8 +508,8 @@ git commit -m "Adds the group axis to matrix rows with override support"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/profile_build.py` (delta classify + apply, after `build_matrix`)
-- Modify: `src/resume_agent/api/routers/match_gap.py:101-107` (apply from file, no LLM)
+- Modify: `src/resume_tailor_harness/services/profile_build.py` (delta classify + apply, after `build_matrix`)
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py:101-107` (apply from file, no LLM)
 - Test: `tests/test_profile_build.py` or `tests/test_cli_profile.py` (append — pick the file that already fakes the build agents; `grep -rl run_corpus_build tests/*.py`)
 
 **Interfaces:**
@@ -524,7 +524,7 @@ agents; add this alongside, adapting fixture names):
 
 ```python
 def test_corpus_build_assigns_groups_incrementally(tmp_path, monkeypatch):
-    from resume_agent.taxonomy import groups as groups_mod
+    from resume_tailor_harness.taxonomy import groups as groups_mod
 
     calls = []
 
@@ -535,7 +535,7 @@ def test_corpus_build_assigns_groups_incrementally(tmp_path, monkeypatch):
     monkeypatch.setattr(groups_mod, "classify_missing_groups", fake_classify)
     monkeypatch.setattr(groups_mod, "build_group_classifier_agent", lambda: object())
     monkeypatch.setattr(
-        "resume_agent.services.profile_build.DEFAULT_GROUPS_PATH",
+        "resume_tailor_harness.services.profile_build.DEFAULT_GROUPS_PATH",
         str(tmp_path / "skill_groups.json"),
         raising=False,
     )
@@ -556,7 +556,7 @@ def test_corpus_build_assigns_groups_incrementally(tmp_path, monkeypatch):
 (The `...` are this test file's existing profile-build fixtures — reuse them
 verbatim; the assertions are what this step adds. If patching
 `DEFAULT_GROUPS_PATH` on the service module fails because the service imports
-lazily, patch `resume_agent.taxonomy.groups.DEFAULT_GROUPS_PATH` instead.)
+lazily, patch `resume_tailor_harness.taxonomy.groups.DEFAULT_GROUPS_PATH` instead.)
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -568,8 +568,8 @@ In `services/profile_build.py`, inside `run_corpus_build`, right after the
 `matrix = build_matrix(...)` call and before `save_matrix(...)`:
 
 ```python
-    from resume_agent.profile.matrix import apply_skill_groups
-    from resume_agent.taxonomy import groups as skill_groups
+    from resume_tailor_harness.profile.matrix import apply_skill_groups
+    from resume_tailor_harness.taxonomy import groups as skill_groups
 
     group_map = skill_groups.load_group_map(skill_groups.DEFAULT_GROUPS_PATH)
     missing = {row.key for row in matrix.rows} - set(group_map)
@@ -601,8 +601,8 @@ In `api/routers/match_gap.py`, after the `matrix = build_matrix(...)` call
 (line ~101) and before `save_matrix(...)`:
 
 ```python
-        from resume_agent.profile.matrix import apply_skill_groups
-        from resume_agent.taxonomy.groups import load_group_map
+        from resume_tailor_harness.profile.matrix import apply_skill_groups
+        from resume_tailor_harness.taxonomy.groups import load_group_map
 
         apply_skill_groups(matrix, load_group_map(), overrides)
 ```
@@ -616,7 +616,7 @@ Expected: PASS (existing conformance tests unchanged — `groupedRows` is additi
 
 ```bash
 ruff check
-git add src/resume_agent/services/profile_build.py src/resume_agent/api/routers/match_gap.py tests
+git add src/resume_tailor_harness/services/profile_build.py src/resume_tailor_harness/api/routers/match_gap.py tests
 git commit -m "Assigns skill groups incrementally during profile builds"
 ```
 
@@ -626,8 +626,8 @@ git commit -m "Assigns skill groups incrementally during profile builds"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/profile.py` (+ `MatrixRowOut`, `MatrixOut`)
-- Modify: `src/resume_agent/api/routers/profile.py` (+ route)
+- Modify: `src/resume_tailor_harness/api/schemas/profile.py` (+ `MatrixRowOut`, `MatrixOut`)
+- Modify: `src/resume_tailor_harness/api/routers/profile.py` (+ route)
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (regenerated)
 - Test: `tests/api/test_profile_matrix.py` (new — copy the client fixture idiom from an existing `tests/api/test_*.py`)
 
@@ -658,7 +658,7 @@ def test_matrix_route_serves_rows(client, tmp_path, monkeypatch):
         }],
     }), encoding="utf-8")
     monkeypatch.setattr(
-        "resume_agent.api.routers.profile._MATRIX_PATH", matrix_path
+        "resume_tailor_harness.api.routers.profile._MATRIX_PATH", matrix_path
     )
     got = client.get("/api/profile/matrix").json()
     assert got["generatedAt"] == "2026-07-10T00:00:00"
@@ -671,7 +671,7 @@ def test_matrix_route_serves_rows(client, tmp_path, monkeypatch):
 
 def test_matrix_route_empty_when_missing(client, tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.api.routers.profile._MATRIX_PATH", tmp_path / "absent.json"
+        "resume_tailor_harness.api.routers.profile._MATRIX_PATH", tmp_path / "absent.json"
     )
     got = client.get("/api/profile/matrix").json()
     assert got == {"generatedAt": "", "rows": []}
@@ -703,7 +703,7 @@ class MatrixOut(CamelModel):
 ```
 
 In `api/routers/profile.py`, add imports (`from pathlib import Path`,
-`from resume_agent.profile.matrix import SkillMatrix`, plus `MatrixOut` in the
+`from resume_tailor_harness.profile.matrix import SkillMatrix`, plus `MatrixOut` in the
 schemas import block), a module constant, and the route:
 
 ```python
@@ -738,7 +738,7 @@ Expected: PASS including the OpenAPI drift gate.
 
 ```bash
 ruff check
-git add src/resume_agent/api/schemas/profile.py src/resume_agent/api/routers/profile.py \
+git add src/resume_tailor_harness/api/schemas/profile.py src/resume_tailor_harness/api/routers/profile.py \
         contracts tests/api/test_profile_matrix.py
 git commit -m "Serves the skill matrix with groups over the API"
 ```
@@ -955,7 +955,7 @@ git commit -m "Shows the skill matrix grouped by skill group on Profile settings
 - [ ] **Step 1: Update CLAUDE.md**
 
 1. Hot-paths table — add after the `profile/matrix.py` row:
-   `| src/resume_agent/taxonomy/groups.py | Skill-group vocabulary + durable token->group taxonomy + delta classifier |`
+   `| src/resume_tailor_harness/taxonomy/groups.py | Skill-group vocabulary + durable token->group taxonomy + delta classifier |`
 2. "Known design notes" — append:
 
 ```markdown
@@ -1009,7 +1009,7 @@ path. No gate — this is the reference point future prompt changes diff against
 - [ ] **Step 3: Populate groups on the real profile**
 
 ```bash
-resume-agent profile build
+resume-tailor-harness profile build
 ```
 
 Then inspect both failure and vocabulary signals: count rows with no group

@@ -2,7 +2,7 @@ from datetime import date
 from pathlib import Path
 
 from evals.scout_source_eval import load_source_cases
-from resume_agent.discovery.source_resolution.catalog import BOARD_FAMILIES
+from resume_tailor_harness.discovery.source_resolution.catalog import BOARD_FAMILIES
 
 
 CASES_PATH = Path("evals/scout_source_cases.json")

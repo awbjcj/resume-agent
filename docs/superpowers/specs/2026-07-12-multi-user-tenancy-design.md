@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-12
 **Status:** Approved with pre-implementation correctness amendments
-**Scope:** Expand resume-agent from a single-account tool to a small-group
+**Scope:** Expand resume-tailor-harness from a single-account tool to a small-group
 multi-user system: invitation-code registration, admin/user roles, per-user
 LLM budgets and resource quotas, user-specific tokens/links, per-user
 databases and workspaces, and admin management surfaces (HTTP CLI + web UI),
@@ -115,7 +115,7 @@ data/
   system.db                 # NEW: users, invite_codes, api_tokens, usage_events, system_settings
   users/
     <user_id>/              # one full workspace per user (today's data/ shape, relocated)
-      resume_agent.db       # jobs/applications/resumes/cover letters — schema UNCHANGED
+      resume_tailor_harness.db       # jobs/applications/resumes/cover letters — schema UNCHANGED
       profile/              # facts.json, corpus, documents/, overrides.yaml
       config/               # search.yaml, connectors.yaml, review.yaml, prune.yaml
       secrets.env           # per-user non-LLM keys (GitHub, Adzuna) + optional own LLM keys
@@ -277,12 +277,12 @@ over auth):
   data root (`system.db` + all workspaces) so the Railway backup story is
   preserved.
 
-**Admin CLI** — `resume-agent admin <cmd>`, a thin HTTP client exactly like
+**Admin CLI** — `resume-tailor-harness admin <cmd>`, a thin HTTP client exactly like
 vsda's `manage_users.py`: `login`, `logout`, `whoami`, `list-users`,
 `invite`, `set-role`, `set-limits`, `usage [user]`, `disable`, `enable`,
 `delete`. `admin login` posts username/password to the login endpoint, then
 mints a PAT (named `cli`) via the PAT endpoint and caches it at
-`~/.resume-agent/credentials.json`; server selected by `RESUME_AGENT_URL`.
+`~/.resume-tailor-harness/credentials.json`; server selected by `RESUME_TAILOR_HARNESS_URL`.
 
 **Web UI (React SPA):**
 

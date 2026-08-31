@@ -11,7 +11,7 @@ recorded as a roadmap and each gets its own spec → plan cycle later.
 
 ## 1. Background
 
-The tailoring harness (`src/resume_agent/tailor/`) is a linear draft→validate→revise loop:
+The tailoring harness (`src/resume_tailor_harness/tailor/`) is a linear draft→validate→revise loop:
 
 ```
 tailor (premium) ─→ ResumeContent w/ provenance ids
@@ -276,7 +276,7 @@ an explicit reset seam before reuse.
   `insufficient data`. Fact-check is ranked by controlled-probe recall, not unrelated round issues.
 - `make test-py` stays fully offline and green, with new machinery tests included.
 - `CALIBRATION.md` records a judge anchored to <10 MAE with no individual error >20.
-- Zero changes to `src/resume_agent/tailor/` behavior (observation-only phase).
+- Zero changes to `src/resume_tailor_harness/tailor/` behavior (observation-only phase).
 
 ## 7. Implementation constraints resolved by review
 

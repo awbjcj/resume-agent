@@ -2,14 +2,14 @@ from typing import cast
 
 from sqlmodel import Session
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors import companies as companies_module
-from resume_agent.discovery.connectors.adzuna import AdzunaConnector
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.registry import build_source_connectors
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors import companies as companies_module
+from resume_tailor_harness.discovery.connectors.adzuna import AdzunaConnector
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.registry import build_source_connectors
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 REASON = "requires a local browser (browser_enabled=false)"
 
@@ -84,7 +84,7 @@ def test_companies_tesla_isolated_when_browser_disabled(monkeypatch):
 
 
 def test_url_ingest_ands_caller_flag_with_browser_setting(monkeypatch):
-    from resume_agent.services import discovery
+    from resume_tailor_harness.services import discovery
 
     seen = {}
     monkeypatch.setattr(discovery, "build_url_extract_agent", lambda: object())
@@ -110,7 +110,7 @@ def test_url_ingest_ands_caller_flag_with_browser_setting(monkeypatch):
 def test_linkedin_service_returns_explicit_failure_without_building_scraper(
     monkeypatch,
 ):
-    from resume_agent.services import discovery
+    from resume_tailor_harness.services import discovery
 
     monkeypatch.setattr(
         discovery,

@@ -3,8 +3,8 @@ from concurrent.futures import Executor, Future
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import runs as runs_router
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import runs as runs_router
 
 
 class InlineExecutor(Executor):

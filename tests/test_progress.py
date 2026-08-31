@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from resume_agent.progress import (
+from resume_tailor_harness.progress import (
     ProgressReporter,
     atomic_write_text,
     clear_progress,
@@ -12,7 +12,7 @@ from resume_agent.progress import (
     read_all,
     read_progress,
 )
-from resume_agent.security.paths import PathEscapeError
+from resume_tailor_harness.security.paths import PathEscapeError
 
 
 def test_read_progress_missing_returns_none(tmp_path):
@@ -31,8 +31,8 @@ def test_atomic_write_retries_transient_windows_replace_error(monkeypatch, tmp_p
             raise PermissionError(5, "Access is denied")
         return real_replace(src, dst)
 
-    monkeypatch.setattr("resume_agent.progress.os.replace", flaky_replace)
-    monkeypatch.setattr("resume_agent.progress.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("resume_tailor_harness.progress.os.replace", flaky_replace)
+    monkeypatch.setattr("resume_tailor_harness.progress.time.sleep", lambda _seconds: None)
 
     atomic_write_text(target, '{"state": "done"}', root=tmp_path)
 
@@ -89,7 +89,7 @@ def test_read_progress_corrupt_json_returns_none_without_retry(monkeypatch, tmp_
 
     sleeps = {"n": 0}
     monkeypatch.setattr(
-        "resume_agent.progress.time.sleep",
+        "resume_tailor_harness.progress.time.sleep",
         lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1),
     )
 

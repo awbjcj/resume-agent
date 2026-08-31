@@ -1,19 +1,19 @@
 from typing import Any, cast
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.adzuna import AdzunaConnector
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.registry import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.adzuna import AdzunaConnector
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.registry import (
     CONNECTOR_SPECS,
     build_connectors,
     build_source_connectors,
     find_unit,
     spec_for,
 )
-from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
-from resume_agent.discovery.scraper.linkedin import LinkedInScraper
+from resume_tailor_harness.discovery.connectors.remoteok import RemoteOKConnector
+from resume_tailor_harness.discovery.scraper.linkedin import LinkedInScraper
 
 
 def _settings(**kwargs):

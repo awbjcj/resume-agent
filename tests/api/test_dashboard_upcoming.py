@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _iso(delta: timedelta) -> str:

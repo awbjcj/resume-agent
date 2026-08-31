@@ -1,4 +1,4 @@
-from resume_agent.public_sources import (
+from resume_tailor_harness.public_sources import (
     PublicSourceIndex,
     normalize_http_url,
     retain_frozen_citations,

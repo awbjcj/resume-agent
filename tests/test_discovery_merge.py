@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from resume_agent.discovery.merge import (
+from resume_tailor_harness.discovery.merge import (
     IncomingJob,
     Insert,
     Rebase,
@@ -10,7 +10,7 @@ from resume_agent.discovery.merge import (
     UpgradeUrlOnly,
     decide,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _incoming(**over) -> IncomingJob:

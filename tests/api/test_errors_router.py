@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.services.errors import record_error
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.services.errors import record_error
 
 
 def _client(tmp_path):

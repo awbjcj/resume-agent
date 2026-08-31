@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.taxonomy.groups import (
+from resume_tailor_harness.taxonomy.groups import (
     SKILL_GROUPS,
     SkillGroupAssignment,
     SkillGroupAssignments,

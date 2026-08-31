@@ -1,11 +1,11 @@
-from resume_agent.models.evidence_portfolio import (
+from resume_tailor_harness.models.evidence_portfolio import (
     EvidencePortfolio,
     PortfolioOmission,
     PortfolioRequirement,
     PortfolioSelection,
 )
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -13,21 +13,21 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredSkill,
 )
-from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
-from resume_agent.tailor.evidence_portfolio import (
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
+from resume_tailor_harness.tailor.evidence_portfolio import (
     build_evidence_catalog,
     build_fallback_portfolio,
     normalize_evidence_portfolio,
     portfolio_profile,
 )
-from resume_agent.tailor.portfolio_alignment import portfolio_alignment_critique
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.tailor.portfolio_alignment import portfolio_alignment_critique
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def _facts() -> ProfileFacts:

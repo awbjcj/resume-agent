@@ -1,10 +1,10 @@
-# Resume Agent v2 — Connector Framework + Cross-Source Dedup Implementation Plan
+# Résumé Tailor Harness v2 — Connector Framework + Cross-Source Dedup Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the LinkedIn-shaped `JobSource` seam with a one-shot `Connector.fetch(search, limit=None) -> list[RawJob]` interface, add cross-source deduplication via a normalized `(company, title)` key, and refactor the existing LinkedIn scraper onto the new seam — so every later connector (Greenhouse, Adzuna, RemoteOK, …) inherits correct source attribution and dedupe for free.
 
-**Architecture:** This is the **backbone plan** (Plan 1 of 6) for v2 — design spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`. It builds three deep modules behind small interfaces: (1) the `Connector` **seam** with `RawJob` as its single output type; (2) a dedup module whose `compute_dedup_key` + extended `find_existing` concentrate _all_ cross-source identity logic in the tracking layer (so connectors never re-solve dedupe — the **deletion test**: push this into each connector and the complexity reappears N times); (3) `ingest_jobs`, which concentrates "loop → skip-empty → dedupe → attribute source → count" in one place. LinkedIn becomes the first **adapter** on the seam; Plan 2 adds the second, making it a real seam.
+**Architecture:** This is the **backbone plan** (Plan 1 of 6) for v2 — design spec `docs/superpowers/specs/2026-06-11-resume-tailor-harness-v2-connectors-design.md`. It builds three deep modules behind small interfaces: (1) the `Connector` **seam** with `RawJob` as its single output type; (2) a dedup module whose `compute_dedup_key` + extended `find_existing` concentrate _all_ cross-source identity logic in the tracking layer (so connectors never re-solve dedupe — the **deletion test**: push this into each connector and the complexity reappears N times); (3) `ingest_jobs`, which concentrates "loop → skip-empty → dedupe → attribute source → count" in one place. LinkedIn becomes the first **adapter** on the seam; Plan 2 adds the second, making it a real seam.
 
 **Tech Stack:** Python 3.13, uv, SQLModel/SQLAlchemy, Typer, pytest. **No new dependencies** — reuses the existing `httpx`/Playwright/`beautifulsoup4` stack. (API/feed connectors and their deps arrive in Plan 2.)
 
@@ -34,20 +34,20 @@
 ## File Structure
 
 ```
-src/resume_agent/discovery/connectors/
+src/resume_tailor_harness/discovery/connectors/
   __init__.py                 # CREATE — package marker
   base.py                     # CREATE — RawJob dataclass + Connector Protocol
-src/resume_agent/tracking/
+src/resume_tailor_harness/tracking/
   dedup.py                    # CREATE — normalize + compute_dedup_key (pure)
   migrate.py                  # CREATE — ensure_dedup_key_column (SQLite ALTER + backfill)
   tables.py                   # MODIFY — add Job.dedup_key (indexed)
   repository.py               # MODIFY — find_existing checks dedup_key
-src/resume_agent/discovery/
+src/resume_tailor_harness/discovery/
   ingest.py                   # MODIFY — add_job computes dedup_key; add ingest_jobs()
   scraper/linkedin.py         # MODIFY — LinkedInScraper implements Connector.fetch
   scraper/ingest.py           # DELETE — JobSource + ingest_scraped superseded
-src/resume_agent/db.py        # MODIFY — init_db runs ensure_dedup_key_column
-src/resume_agent/cli.py       # MODIFY — scrape uses connector.fetch + ingest_jobs
+src/resume_tailor_harness/db.py        # MODIFY — init_db runs ensure_dedup_key_column
+src/resume_tailor_harness/cli.py       # MODIFY — scrape uses connector.fetch + ingest_jobs
 tests/
   test_connectors_base.py     # CREATE
   test_dedup.py               # CREATE
@@ -65,7 +65,7 @@ tests/
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/__init__.py`, `src/resume_agent/discovery/connectors/base.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/__init__.py`, `src/resume_tailor_harness/discovery/connectors/base.py`
 - Test: `tests/test_connectors_base.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -73,8 +73,8 @@ tests/
 Create `tests/test_connectors_base.py`:
 
 ```python
-from resume_agent.discovery.connectors.base import Connector, RawJob
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import Connector, RawJob
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_rawjob_carries_its_own_source():
@@ -105,23 +105,23 @@ def test_connector_protocol_accepts_a_conforming_object():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connectors_base.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/discovery/connectors/__init__.py`:
+Create `src/resume_tailor_harness/discovery/connectors/__init__.py`:
 
 ```python
 """Job-source connectors: a one-shot fetch() seam shared by scrapers, APIs, and feeds."""
 ```
 
-Create `src/resume_agent/discovery/connectors/base.py`:
+Create `src/resume_tailor_harness/discovery/connectors/base.py`:
 
 ```python
 from dataclasses import dataclass
 from typing import Protocol
 
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 @dataclass
@@ -161,7 +161,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/ tests/test_connectors_base.py
+git add src/resume_tailor_harness/discovery/connectors/ tests/test_connectors_base.py
 git commit -m "feat(connectors): RawJob + Connector seam" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -171,7 +171,7 @@ git commit -m "feat(connectors): RawJob + Connector seam" -m "Co-Authored-By: Cl
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/dedup.py`
+- Create: `src/resume_tailor_harness/tracking/dedup.py`
 - Test: `tests/test_dedup.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -179,7 +179,7 @@ git commit -m "feat(connectors): RawJob + Connector seam" -m "Co-Authored-By: Cl
 Create `tests/test_dedup.py`:
 
 ```python
-from resume_agent.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
 
 
 def test_dedup_key_ignores_case_punctuation_and_seniority():
@@ -205,11 +205,11 @@ def test_dedup_key_none_when_a_side_is_missing():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_dedup.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.dedup'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.dedup'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tracking/dedup.py`:
+Create `src/resume_tailor_harness/tracking/dedup.py`:
 
 ```python
 import re
@@ -249,7 +249,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/dedup.py tests/test_dedup.py
+git add src/resume_tailor_harness/tracking/dedup.py tests/test_dedup.py
 git commit -m "feat(dedup): normalized company+title dedup key" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -259,7 +259,7 @@ git commit -m "feat(dedup): normalized company+title dedup key" -m "Co-Authored-
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py` (Job model), `src/resume_agent/tracking/repository.py` (`find_existing`), `src/resume_agent/discovery/ingest.py` (`add_job`)
+- Modify: `src/resume_tailor_harness/tracking/tables.py` (Job model), `src/resume_tailor_harness/tracking/repository.py` (`find_existing`), `src/resume_tailor_harness/discovery/ingest.py` (`add_job`)
 - Test: `tests/test_discovery_ingest.py` (append)
 
 - [ ] **Step 1: Write the failing test**
@@ -296,7 +296,7 @@ Expected: FAIL on `test_add_job_dedupes_same_company_title_across_sources` — `
 
 - [ ] **Step 3: Add the column to the Job model**
 
-In `src/resume_agent/tracking/tables.py`, inside `class Job`, add `dedup_key` immediately after the `location` field:
+In `src/resume_tailor_harness/tracking/tables.py`, inside `class Job`, add `dedup_key` immediately after the `location` field:
 
 ```python
     location: str | None = None
@@ -306,7 +306,7 @@ In `src/resume_agent/tracking/tables.py`, inside `class Job`, add `dedup_key` im
 
 - [ ] **Step 4: Extend `find_existing` to check the dedup key**
 
-In `src/resume_agent/tracking/repository.py`, replace the whole `find_existing` function with:
+In `src/resume_tailor_harness/tracking/repository.py`, replace the whole `find_existing` function with:
 
 ```python
 def find_existing(
@@ -328,10 +328,10 @@ def find_existing(
 
 - [ ] **Step 5: Compute and store the key in `add_job`**
 
-In `src/resume_agent/discovery/ingest.py`, add the import and update `add_job`:
+In `src/resume_tailor_harness/discovery/ingest.py`, add the import and update `add_job`:
 
 ```python
-from resume_agent.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
 ```
 
 Then, inside `add_job`, replace the body from the `jd_text = jd_text.strip()` line through the `Job(...)` construction with:
@@ -365,7 +365,7 @@ Expected: PASS (all original + 2 new tests).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/repository.py src/resume_agent/discovery/ingest.py tests/test_discovery_ingest.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/repository.py src/resume_tailor_harness/discovery/ingest.py tests/test_discovery_ingest.py
 git commit -m "feat(dedup): cross-source dedupe via Job.dedup_key" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -373,12 +373,12 @@ git commit -m "feat(dedup): cross-source dedupe via Job.dedup_key" -m "Co-Author
 
 ## Task 4: SQLite migration — add + backfill `dedup_key` on existing DBs
 
-> `SQLModel.metadata.create_all` only creates missing _tables_, never missing _columns_. Existing `data/resume_agent.db` files would break on `dedup_key`. This task adds an idempotent column-ensure + backfill and wires it into `init_db` so every run self-heals — without touching the user's tracked applications.
+> `SQLModel.metadata.create_all` only creates missing _tables_, never missing _columns_. Existing `data/resume_tailor_harness.db` files would break on `dedup_key`. This task adds an idempotent column-ensure + backfill and wires it into `init_db` so every run self-heals — without touching the user's tracked applications.
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/migrate.py`
-- Modify: `src/resume_agent/db.py`
+- Create: `src/resume_tailor_harness/tracking/migrate.py`
+- Modify: `src/resume_tailor_harness/db.py`
 - Test: `tests/test_migrate.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -389,8 +389,8 @@ Create `tests/test_migrate.py`:
 from sqlalchemy import text
 from sqlmodel import create_engine
 
-from resume_agent.db import init_db
-from resume_agent.tracking.migrate import ensure_dedup_key_column
+from resume_tailor_harness.db import init_db
+from resume_tailor_harness.tracking.migrate import ensure_dedup_key_column
 
 
 def test_ensure_adds_column_and_backfills_old_jobs_table():
@@ -426,17 +426,17 @@ def test_ensure_is_noop_on_current_schema():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_migrate.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.migrate'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.migrate'`.
 
 - [ ] **Step 3: Implement the migration**
 
-Create `src/resume_agent/tracking/migrate.py`:
+Create `src/resume_tailor_harness/tracking/migrate.py`:
 
 ```python
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from resume_agent.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
 
 
 def ensure_dedup_key_column(engine: Engine) -> None:
@@ -467,10 +467,10 @@ def ensure_dedup_key_column(engine: Engine) -> None:
 
 - [ ] **Step 4: Wire it into `init_db`**
 
-In `src/resume_agent/db.py`, add the import and call after `create_all`:
+In `src/resume_tailor_harness/db.py`, add the import and call after `create_all`:
 
 ```python
-from resume_agent.tracking.migrate import ensure_dedup_key_column
+from resume_tailor_harness.tracking.migrate import ensure_dedup_key_column
 ```
 
 ```python
@@ -487,7 +487,7 @@ Expected: PASS (2 new + existing db tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_migrate.py
+git add src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_migrate.py
 git commit -m "feat(dedup): idempotent dedup_key column migration + backfill" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -497,8 +497,8 @@ git commit -m "feat(dedup): idempotent dedup_key column migration + backfill" -m
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/ingest.py` (add `ingest_jobs`)
-- Delete: `src/resume_agent/discovery/scraper/ingest.py`, `tests/test_scraper_ingest.py`
+- Modify: `src/resume_tailor_harness/discovery/ingest.py` (add `ingest_jobs`)
+- Delete: `src/resume_tailor_harness/discovery/scraper/ingest.py`, `tests/test_scraper_ingest.py`
 - Test: `tests/test_ingest_jobs.py` (new)
 
 - [ ] **Step 1: Write the failing test**
@@ -508,10 +508,10 @@ Create `tests/test_ingest_jobs.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.ingest import ingest_jobs
-from resume_agent.tracking.repository import jobs_by_status
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.ingest import ingest_jobs
+from resume_tailor_harness.tracking.repository import jobs_by_status
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 def _session() -> Session:
@@ -560,17 +560,17 @@ def test_ingest_jobs_dedupes_same_posting_across_sources():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_ingest_jobs.py -v`
-Expected: FAIL — `ImportError: cannot import name 'ingest_jobs' from 'resume_agent.discovery.ingest'`.
+Expected: FAIL — `ImportError: cannot import name 'ingest_jobs' from 'resume_tailor_harness.discovery.ingest'`.
 
 - [ ] **Step 3: Implement `ingest_jobs`**
 
-In `src/resume_agent/discovery/ingest.py`, add at the top:
+In `src/resume_tailor_harness/discovery/ingest.py`, add at the top:
 
 ```python
 from collections import Counter
 from typing import Iterable
 
-from resume_agent.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.base import RawJob
 ```
 
 Add at the end of the file:
@@ -608,7 +608,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Delete the superseded `JobSource`/`ingest_scraped`**
 
 ```bash
-git rm src/resume_agent/discovery/scraper/ingest.py tests/test_scraper_ingest.py
+git rm src/resume_tailor_harness/discovery/scraper/ingest.py tests/test_scraper_ingest.py
 ```
 
 (Task 6 removes the last importer — the LinkedIn driver — and Task 7 removes the CLI import. The `scrape` command still references the old import until then, so do NOT run the full suite yet; the per-file runs above are green.)
@@ -616,7 +616,7 @@ git rm src/resume_agent/discovery/scraper/ingest.py tests/test_scraper_ingest.py
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/ingest.py tests/test_ingest_jobs.py
+git add src/resume_tailor_harness/discovery/ingest.py tests/test_ingest_jobs.py
 git commit -m "feat(connectors): ingest_jobs orchestrator; drop JobSource/ingest_scraped" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -628,7 +628,7 @@ git commit -m "feat(connectors): ingest_jobs orchestrator; drop JobSource/ingest
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/scraper/linkedin.py`
+- Modify: `src/resume_tailor_harness/discovery/scraper/linkedin.py`
 - Test: `tests/test_linkedin_connector.py` (new)
 
 - [ ] **Step 1: Write the failing test**
@@ -638,9 +638,9 @@ Create `tests/test_linkedin_connector.py`:
 ```python
 from pathlib import Path
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.scraper.linkedin import LinkedInScraper
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.scraper.linkedin import LinkedInScraper
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURES = Path(__file__).parent / "fixtures" / "linkedin"
 
@@ -675,7 +675,7 @@ Expected: FAIL — `AttributeError: 'LinkedInScraper' object has no attribute '_
 
 - [ ] **Step 3: Rewrite the driver**
 
-Replace the entire contents of `src/resume_agent/discovery/scraper/linkedin.py` with:
+Replace the entire contents of `src/resume_tailor_harness/discovery/scraper/linkedin.py` with:
 
 ```python
 import time
@@ -683,11 +683,11 @@ import urllib.parse
 
 from playwright.sync_api import sync_playwright
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.scraper.parser import parse_job_detail, parse_search_cards
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.parser import parse_job_detail, parse_search_cards
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _SEARCH_URL = "https://www.linkedin.com/jobs/search/"
 
@@ -786,13 +786,13 @@ Expected: PASS (2 tests).
 
 - [ ] **Step 5: Confirm it imports without launching a browser**
 
-Run: `uv run python -c "from resume_agent.discovery.scraper.linkedin import LinkedInScraper, build_linkedin_scraper; print('import ok')"`
+Run: `uv run python -c "from resume_tailor_harness.discovery.scraper.linkedin import LinkedInScraper, build_linkedin_scraper; print('import ok')"`
 Expected: prints `import ok`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/linkedin.py tests/test_linkedin_connector.py
+git add src/resume_tailor_harness/discovery/scraper/linkedin.py tests/test_linkedin_connector.py
 git commit -m "refactor(scraper): LinkedIn implements Connector.fetch" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -802,7 +802,7 @@ git commit -m "refactor(scraper): LinkedIn implements Connector.fetch" -m "Co-Au
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_scrape.py`
 
 - [ ] **Step 1: Rewrite the test**
@@ -812,8 +812,8 @@ Replace the entire contents of `tests/test_cli_scrape.py` with:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.discovery.connectors.base import RawJob
+from resume_tailor_harness import cli
+from resume_tailor_harness.discovery.connectors.base import RawJob
 
 runner = CliRunner()
 
@@ -839,21 +839,21 @@ def test_scrape_command_ingests_via_connector(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cli_scrape.py -v`
-Expected: FAIL — `ImportError`/`AttributeError` from the still-present `from resume_agent.discovery.scraper.ingest import ingest_scraped` in `cli.py` (the module was deleted in Task 5).
+Expected: FAIL — `ImportError`/`AttributeError` from the still-present `from resume_tailor_harness.discovery.scraper.ingest import ingest_scraped` in `cli.py` (the module was deleted in Task 5).
 
 - [ ] **Step 3: Update the CLI imports**
 
-In `src/resume_agent/cli.py`:
+In `src/resume_tailor_harness/cli.py`:
 
-- Delete the line: `from resume_agent.discovery.scraper.ingest import ingest_scraped`
-- Change `from resume_agent.discovery.ingest import add_job` to:
-  `from resume_agent.discovery.ingest import add_job, ingest_jobs`
+- Delete the line: `from resume_tailor_harness.discovery.scraper.ingest import ingest_scraped`
+- Change `from resume_tailor_harness.discovery.ingest import add_job` to:
+  `from resume_tailor_harness.discovery.ingest import add_job, ingest_jobs`
 
-(`from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper` stays.)
+(`from resume_tailor_harness.discovery.scraper.linkedin import build_linkedin_scraper` stays.)
 
 - [ ] **Step 4: Update the `scrape` command**
 
-In `src/resume_agent/cli.py`, replace the body of `scrape_cmd` with:
+In `src/resume_tailor_harness/cli.py`, replace the body of `scrape_cmd` with:
 
 ```python
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
@@ -876,13 +876,13 @@ Expected: ALL pass — the v2 backbone is green and the v1 pipeline still works 
 Run: `rg -n "ingest_scraped|JobSource" src tests`
 Expected: no output (`rg` exits 1 when there are no matches; that is expected).
 
-Run: `uv run resume-agent scrape --help`
+Run: `uv run resume-tailor-harness scrape --help`
 Expected: help text, exit 0.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_scrape.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_scrape.py
 git commit -m "feat(connectors): scrape runs via Connector.fetch + ingest_jobs" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -920,7 +920,7 @@ Per the spec's build sequence (§10), each is its own plan file, same TDD style.
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-agent-v2-connector-framework.md`. Two execution options:
+Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-tailor-harness-v2-connector-framework.md`. Two execution options:
 
 1. **Subagent-Driven (recommended)** — a fresh subagent per task, two-stage review between tasks, fast iteration.
 2. **Inline Execution** — execute tasks in this session via `executing-plans`, batched with review checkpoints.

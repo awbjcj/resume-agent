@@ -3,8 +3,8 @@ import warnings
 import pytest
 from pydantic import BaseModel
 
-from resume_agent.llm_runner import build_model, resolve_api_key, split_provider
-from resume_agent.models.resume import ResumeContent
+from resume_tailor_harness.llm_runner import build_model, resolve_api_key, split_provider
+from resume_tailor_harness.models.resume import ResumeContent
 
 
 def test_split_provider_bare_id_defaults_anthropic():
@@ -34,7 +34,7 @@ def test_resolve_api_key_reads_provider_specific_setting(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "ok")
     monkeypatch.setenv("GEMINI_API_KEY", "gk")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "dk")
-    from resume_agent.config import env_settings
+    from resume_tailor_harness.config import env_settings
 
     env_settings.cache_clear()
     assert resolve_api_key("claude-opus-4-8") == "ak"
@@ -158,7 +158,7 @@ def test_gemini_uses_json_schema_without_lossy_dictionary_placeholder():
 
 
 def test_claude_falls_back_to_json_mode_only_for_oversized_schema():
-    from resume_agent.llm_runner import use_json_mode_for
+    from resume_tailor_harness.llm_runner import use_json_mode_for
 
     class SmallOutput(BaseModel):
         answer: str
@@ -185,7 +185,7 @@ def test_build_model_deepseek_branch():
 def test_agent_runner_arun_delegates():
     import asyncio
 
-    from resume_agent.llm_runner import AgentRunner
+    from resume_tailor_harness.llm_runner import AgentRunner
 
     class _AsyncAgent:
         async def arun(self, prompt):
@@ -199,7 +199,7 @@ def test_agent_runner_closes_cached_sdk_client_inside_active_loop():
     import asyncio
     from dataclasses import dataclass
 
-    from resume_agent.llm_runner import AgentRunner
+    from resume_tailor_harness.llm_runner import AgentRunner
 
     class _AsyncClient:
         def __init__(self):
@@ -232,7 +232,7 @@ def test_agent_runner_closes_cached_sdk_client_inside_active_loop():
 def test_run_with_cleanup_closes_runner_when_operation_raises():
     import asyncio
 
-    from resume_agent import llm_runner
+    from resume_tailor_harness import llm_runner
 
     class _Runner:
         def __init__(self):
@@ -255,7 +255,7 @@ def test_run_with_cleanup_closes_runner_when_operation_raises():
 def test_run_with_cleanup_preserves_result_and_closes_remaining_runners_after_cleanup_error():
     import asyncio
 
-    from resume_agent import llm_runner
+    from resume_tailor_harness import llm_runner
 
     class _BrokenRunner:
         async def aclose(self):
@@ -281,8 +281,8 @@ def test_run_with_cleanup_preserves_result_and_closes_remaining_runners_after_cl
 def test_acall_respects_semaphore_limit():
     import asyncio
 
-    from resume_agent.concurrency import gather_isolated
-    from resume_agent.llm_runner import acall
+    from resume_tailor_harness.concurrency import gather_isolated
+    from resume_tailor_harness.llm_runner import acall
 
     state = {"now": 0, "max": 0}
 
@@ -315,7 +315,7 @@ def test_acall_respects_semaphore_limit():
 def test_acall_observes_permit_release_after_error():
     import asyncio
 
-    from resume_agent.llm_runner import acall
+    from resume_tailor_harness.llm_runner import acall
 
     events: list[str] = []
 
@@ -345,8 +345,8 @@ def test_retry_kwargs_disables_agno_retry_regardless_of_settings(monkeypatch):
     # always off, independent of llm_retries/llm_retry_delay.
     monkeypatch.setenv("LLM_RETRIES", "5")
     monkeypatch.setenv("LLM_RETRY_DELAY", "3")
-    from resume_agent.config import env_settings
-    from resume_agent.llm_runner import retry_kwargs
+    from resume_tailor_harness.config import env_settings
+    from resume_tailor_harness.llm_runner import retry_kwargs
 
     env_settings.cache_clear()
     try:
@@ -356,7 +356,7 @@ def test_retry_kwargs_disables_agno_retry_regardless_of_settings(monkeypatch):
 
 
 def test_tool_kwargs_bounds_tool_loop():
-    from resume_agent.llm_runner import tool_kwargs
+    from resume_tailor_harness.llm_runner import tool_kwargs
 
     assert tool_kwargs() == {"tool_call_limit": 15}
 
@@ -388,8 +388,8 @@ class _RunOutput:
 
 
 def test_expect_schema_returns_content_when_it_already_matches():
-    from resume_agent.llm_runner import expect_schema
-    from resume_agent.models.profile import Contact
+    from resume_tailor_harness.llm_runner import expect_schema
+    from resume_tailor_harness.models.profile import Contact
 
     content = ResumeContent(contact=Contact(name="Ada"))
     assert expect_schema(_RunOutput(content), ResumeContent, source="tailor") is content
@@ -398,7 +398,7 @@ def test_expect_schema_returns_content_when_it_already_matches():
 def test_unparsed_output_keeps_the_tail_so_truncation_is_visible():
     # A response cut off by an output-token ceiling ends mid-JSON. Only the TAIL
     # shows that, so the preview must never be head-only.
-    from resume_agent.llm_runner import UnparsedAgentOutput, expect_schema
+    from resume_tailor_harness.llm_runner import UnparsedAgentOutput, expect_schema
 
     truncated = '{"contact": {"name": "Ada"}, "experience": [{"company": "Acme' + (
         "x" * 5000
@@ -432,7 +432,7 @@ def test_unparsed_output_keeps_the_tail_so_truncation_is_visible():
 def test_unparsed_output_is_still_a_type_error():
     # Callers and existing tests catch TypeError; widening the diagnostics must
     # not change what propagates through gather_isolated.
-    from resume_agent.llm_runner import UnparsedAgentOutput, expect_schema
+    from resume_tailor_harness.llm_runner import UnparsedAgentOutput, expect_schema
 
     with pytest.raises(TypeError):
         expect_schema(_RunOutput("nope"), ResumeContent, source="tailor")
@@ -442,7 +442,7 @@ def test_unparsed_output_is_still_a_type_error():
 def test_unparsed_output_survives_a_result_without_metadata():
     # RunOutput shape drifts between agno versions; diagnostics must degrade,
     # never mask the failure they are describing.
-    from resume_agent.llm_runner import UnparsedAgentOutput, expect_schema
+    from resume_tailor_harness.llm_runner import UnparsedAgentOutput, expect_schema
 
     class _Bare:
         content = ""
@@ -453,7 +453,7 @@ def test_unparsed_output_survives_a_result_without_metadata():
 
 
 def test_expect_text_returns_content_for_a_completed_run():
-    from resume_agent.llm_runner import expect_text
+    from resume_tailor_harness.llm_runner import expect_text
 
     assert expect_text(_RunOutput("coach notes"), source="coach notes") == "coach notes"
 
@@ -467,7 +467,7 @@ def test_expect_text_rejects_an_errored_run_whose_content_is_the_error_body():
     # reasoning_effort are not supported ...") reached the coach formatter
     # dressed as coach notes and surfaced two layers downstream as the
     # nonsensical "opening turn proposed no topics".
-    from resume_agent.llm_runner import UnparsedAgentOutput, expect_text
+    from resume_tailor_harness.llm_runner import UnparsedAgentOutput, expect_text
 
     errored = _RunOutput(
         "Function tools with reasoning_effort are not supported for "
@@ -487,7 +487,7 @@ def test_expect_text_rejects_an_errored_run_whose_content_is_the_error_body():
 def test_expect_text_rejects_blank_and_non_text_content():
     # Blank notes are as unusable as an error body, and a non-str content means
     # the run did not produce prose at all.
-    from resume_agent.llm_runner import UnparsedAgentOutput, expect_text
+    from resume_tailor_harness.llm_runner import UnparsedAgentOutput, expect_text
 
     with pytest.raises(UnparsedAgentOutput):
         expect_text(_RunOutput("   "), source="coach notes")

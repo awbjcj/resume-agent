@@ -260,12 +260,12 @@ infrastructure.
 
 | Path | Change |
 |------|--------|
-| `src/resume_agent/tracking/match_gap.py` | Add demand-graph report beside the unchanged legacy report. |
-| `src/resume_agent/tracking/canonicalize.py` | Strengthen dedup prompt; add theming agent (`build_skill_themer`). |
-| `src/resume_agent/taxonomy/clusters.py` | New cluster-map persistence (aliases + themeOf + themeLabel), validation, monotonic merge. |
-| `src/resume_agent/api/schemas/match_gap.py` | New camelCase schemas (JobLite/SkillNode/DemandEdge/Theme/MatchGapOut). |
-| `src/resume_agent/api/routers/match_gap.py` | Rich projection GET; new `POST /refresh-clusters` Run endpoint. |
-| `src/resume_agent/api/runs/manager.py` (wiring) | Register the refresh-clusters worker. |
+| `src/resume_tailor_harness/tracking/match_gap.py` | Add demand-graph report beside the unchanged legacy report. |
+| `src/resume_tailor_harness/tracking/canonicalize.py` | Strengthen dedup prompt; add theming agent (`build_skill_themer`). |
+| `src/resume_tailor_harness/taxonomy/clusters.py` | New cluster-map persistence (aliases + themeOf + themeLabel), validation, monotonic merge. |
+| `src/resume_tailor_harness/api/schemas/match_gap.py` | New camelCase schemas (JobLite/SkillNode/DemandEdge/Theme/MatchGapOut). |
+| `src/resume_tailor_harness/api/routers/match_gap.py` | Rich projection GET; new `POST /refresh-clusters` Run endpoint. |
+| `src/resume_tailor_harness/api/runs/manager.py` (wiring) | Register the refresh-clusters worker. |
 | `contracts/openapi.json`, `contracts/ts/api.ts` | Regenerated. |
 | `web/src/features/match-gap/aggregate.ts` | New pure aggregation module. |
 | `web/src/features/match-gap/*.tsx` | Filters, WordCloud, RankedList, SkillDrawer, StatTables, RefreshClustersButton; rewrite container. |

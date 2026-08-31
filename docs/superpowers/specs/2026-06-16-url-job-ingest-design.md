@@ -5,7 +5,7 @@
 
 ## Problem
 
-Manual job-adding (`resume-agent addjob`) requires the user to paste the full
+Manual job-adding (`resume-tailor-harness addjob`) requires the user to paste the full
 job-description text and hand-type company/title/location. The user wants to
 instead paste **just a URL** — from LinkedIn, Greenhouse, or an arbitrary
 company careers page — and have the tool fetch the page and self-extract the
@@ -45,7 +45,7 @@ tagging, and status handling for free.
 
 ### Module layout
 
-New package `src/resume_agent/discovery/url_ingest/`:
+New package `src/resume_tailor_harness/discovery/url_ingest/`:
 
 - **`fetch.py`** — `fetch_page(url, *, allow_browser=True) -> PageContent`
   where `PageContent(html: str, final_url: str, rendered: bool)`. HTTP-first

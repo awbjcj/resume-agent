@@ -1,5 +1,5 @@
-from resume_agent.api.schemas.analytics import AnalyticsOut, CohortOut
-from resume_agent.tracking.analytics import CohortStat
+from resume_tailor_harness.api.schemas.analytics import AnalyticsOut, CohortOut
+from resume_tailor_harness.tracking.analytics import CohortStat
 
 
 def test_cohort_out_projects_rates_from_dto():

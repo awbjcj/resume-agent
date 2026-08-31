@@ -1,7 +1,7 @@
 from datetime import date
 
 from evals.scout_source_eval import ScoutSourceCase, run_source_case
-from resume_agent.discovery.source_resolution.models import CompanySourceResolution
+from resume_tailor_harness.discovery.source_resolution.models import CompanySourceResolution
 
 
 class StubResolver:

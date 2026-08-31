@@ -3,20 +3,20 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.config import Settings
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.evidence_portfolio import EvidencePortfolio
-from resume_agent.models.profile import Contact
-from resume_agent.render.render_config import RenderConfig
-from resume_agent.render.service import render_version
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.evidence_portfolio import EvidencePortfolio
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.render.render_config import RenderConfig
+from resume_tailor_harness.render.service import render_version
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tracking.repository import (
     get_resume_version,
     save_job,
     save_resume_version,
 )
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def _session() -> Session:
@@ -283,7 +283,7 @@ class _FakeConfigStore:
 
 
 def test_clear_custom_render_template_falls_back_to_classic():
-    from resume_agent.services.render_templates import clear_custom_render_template
+    from resume_tailor_harness.services.render_templates import clear_custom_render_template
 
     store = _FakeConfigStore(RenderConfig(template="custom:mine"))
     clear_custom_render_template(store)
@@ -291,7 +291,7 @@ def test_clear_custom_render_template_falls_back_to_classic():
 
 
 def test_clear_custom_render_template_leaves_bundled_and_empty_alone():
-    from resume_agent.services.render_templates import clear_custom_render_template
+    from resume_tailor_harness.services.render_templates import clear_custom_render_template
 
     for template in ("classic", None):
         store = _FakeConfigStore(RenderConfig(template=template))

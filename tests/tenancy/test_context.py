@@ -2,15 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import (
     UserContext,
     current_context,
     new_user_id,
     require_context,
     use_context,
 )
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def make_ctx(**overrides) -> UserContext:

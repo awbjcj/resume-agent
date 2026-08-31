@@ -15,7 +15,7 @@
 - **Lint:** `ruff check` must pass. Web: `npm --prefix web run lint`.
 - **No LLM anywhere in this phase.** Deterministic CRUD, date arithmetic, aggregation only.
 - **No new Python or npm dependencies.**
-- **All datetimes stored UTC.** Use `resume_agent.tracking.tables.utcnow` — never `datetime.now()`.
+- **All datetimes stored UTC.** Use `resume_tailor_harness.tracking.tables.utcnow` — never `datetime.now()`.
 - **API wire format is camelCase.** All request/response models subclass `CamelModel` (`api/schemas/base.py`); Python fields stay snake_case and the alias generator maps them.
 - **Errors use `ApiException(status_code, code, message)`** from `api/errors.py`. Validation failures are `422` / `"VALIDATION_ERROR"`, missing rows `404` / `"NOT_FOUND"`.
 - **SQLite runs without `PRAGMA foreign_keys`.** Declared FKs do not cascade or restrict. Any cleanup must be explicit in code.
@@ -37,16 +37,16 @@
 
 | File | Responsibility |
 | --- | --- |
-| `src/resume_agent/tracking/event_vocab.py` | **Create.** The four enums + the kind→status mapping. Pure data, no I/O, no SQLModel import. Isolated so tests and the web contract can read the vocabulary without touching the DB layer. |
-| `src/resume_agent/tracking/tables.py` | **Modify.** Add the `ApplicationEvent` table. |
-| `src/resume_agent/db.py` | **Modify.** Import `ApplicationEvent` into the metadata block; register the backfill migration. |
-| `src/resume_agent/tracking/migrate.py` | **Modify.** Add `ensure_application_event_sequence_override_column` and `ensure_application_submitted_events`. |
-| `src/resume_agent/tracking/repository.py` | **Modify.** Event CRUD; refine `has_progress` and `progressed_job_ids`. |
-| `src/resume_agent/tracking/status_rules.py` | **Create.** Progression-versus-terminal transition logic. Pure function over strings — no session, no ORM — so the rule is testable in isolation and readable by anyone auditing the invariant. |
-| `src/resume_agent/services/application_events.py` | **Create.** Service layer: validation, sequence assignment, status advancement, transactional create/update/delete. |
-| `src/resume_agent/api/schemas/application_events.py` | **Create.** `ApplicationEventOut`, `ApplicationEventCreate`, `ApplicationEventUpdate`. |
-| `src/resume_agent/api/routers/application_events.py` | **Create.** Four routes nested under `/jobs/{job_id}/events`. |
-| `src/resume_agent/api/app.py` | **Modify.** Register the router. |
+| `src/resume_tailor_harness/tracking/event_vocab.py` | **Create.** The four enums + the kind→status mapping. Pure data, no I/O, no SQLModel import. Isolated so tests and the web contract can read the vocabulary without touching the DB layer. |
+| `src/resume_tailor_harness/tracking/tables.py` | **Modify.** Add the `ApplicationEvent` table. |
+| `src/resume_tailor_harness/db.py` | **Modify.** Import `ApplicationEvent` into the metadata block; register the backfill migration. |
+| `src/resume_tailor_harness/tracking/migrate.py` | **Modify.** Add `ensure_application_event_sequence_override_column` and `ensure_application_submitted_events`. |
+| `src/resume_tailor_harness/tracking/repository.py` | **Modify.** Event CRUD; refine `has_progress` and `progressed_job_ids`. |
+| `src/resume_tailor_harness/tracking/status_rules.py` | **Create.** Progression-versus-terminal transition logic. Pure function over strings — no session, no ORM — so the rule is testable in isolation and readable by anyone auditing the invariant. |
+| `src/resume_tailor_harness/services/application_events.py` | **Create.** Service layer: validation, sequence assignment, status advancement, transactional create/update/delete. |
+| `src/resume_tailor_harness/api/schemas/application_events.py` | **Create.** `ApplicationEventOut`, `ApplicationEventCreate`, `ApplicationEventUpdate`. |
+| `src/resume_tailor_harness/api/routers/application_events.py` | **Create.** Four routes nested under `/jobs/{job_id}/events`. |
+| `src/resume_tailor_harness/api/app.py` | **Modify.** Register the router. |
 | `docs/adr/0012-application-status-progression-and-terminal.md` | **Create.** |
 | `docs/adr/0013-has-progress-requires-real-investment.md` | **Create.** |
 | `web/src/features/job/use-application-events.ts` | **Create.** Query + mutation hooks. |
@@ -62,7 +62,7 @@ Split rationale: `event_vocab.py` and `status_rules.py` are separated from `repo
 ### Task 1: Event vocabulary
 
 **Files:**
-- Create: `src/resume_agent/tracking/event_vocab.py`
+- Create: `src/resume_tailor_harness/tracking/event_vocab.py`
 - Test: `tests/test_event_vocab.py`
 
 **Interfaces:**
@@ -73,7 +73,7 @@ Split rationale: `event_vocab.py` and `status_rules.py` are separated from `repo
 
 ```python
 # tests/test_event_vocab.py
-from resume_agent.tracking.event_vocab import (
+from resume_tailor_harness.tracking.event_vocab import (
     FUNNEL_KINDS,
     KIND_IMPLIES_STATUS,
     REPEATABLE_KINDS,
@@ -82,7 +82,7 @@ from resume_agent.tracking.event_vocab import (
     Modality,
     Platform,
 )
-from resume_agent.tracking.tables import ApplicationStatus
+from resume_tailor_harness.tracking.tables import ApplicationStatus
 
 
 def test_every_kind_except_custom_has_a_status_implication():
@@ -145,12 +145,12 @@ def test_platform_and_result_vocabularies():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_event_vocab.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.event_vocab'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.event_vocab'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/tracking/event_vocab.py
+# src/resume_tailor_harness/tracking/event_vocab.py
 """Closed vocabularies for application timeline events.
 
 Kept free of SQLModel and of any session import: these are the values an
@@ -279,8 +279,8 @@ Expected: PASS (9 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/event_vocab.py tests/test_event_vocab.py
-git add src/resume_agent/tracking/event_vocab.py tests/test_event_vocab.py
+ruff check src/resume_tailor_harness/tracking/event_vocab.py tests/test_event_vocab.py
+git add src/resume_tailor_harness/tracking/event_vocab.py tests/test_event_vocab.py
 git commit -m "feat(tracking): add application event vocabularies"
 ```
 
@@ -289,13 +289,13 @@ git commit -m "feat(tracking): add application event vocabularies"
 ### Task 2: The `ApplicationEvent` table
 
 **Files:**
-- Modify: `src/resume_agent/tracking/tables.py` (append after `Application`, ~line 128)
-- Modify: `src/resume_agent/db.py:10-30` (metadata import block)
+- Modify: `src/resume_tailor_harness/tracking/tables.py` (append after `Application`, ~line 128)
+- Modify: `src/resume_tailor_harness/db.py:10-30` (metadata import block)
 - Test: `tests/test_application_event_table.py`
 
 **Interfaces:**
 - Consumes: Task 1's enums (for default values only).
-- Produces: `resume_agent.tracking.tables.ApplicationEvent` with the exact field names listed in the implementation below. Every later task uses these names.
+- Produces: `resume_tailor_harness.tracking.tables.ApplicationEvent` with the exact field names listed in the implementation below. Every later task uses these names.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -305,8 +305,8 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _engine():
@@ -373,7 +373,7 @@ Expected: FAIL — `ImportError: cannot import name 'ApplicationEvent'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/tracking/tables.py`, directly after the `Application` class:
+Append to `src/resume_tailor_harness/tracking/tables.py`, directly after the `Application` class:
 
 ```python
 class ApplicationEvent(SQLModel, table=True):
@@ -425,7 +425,7 @@ class ApplicationEvent(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow)
 ```
 
-Then in `src/resume_agent/db.py`, add `ApplicationEvent` to the existing table-import block near line 10 so its metadata registers before `create_all`. Find the line importing `Application` from `resume_agent.tracking.tables` and add `ApplicationEvent` to it.
+Then in `src/resume_tailor_harness/db.py`, add `ApplicationEvent` to the existing table-import block near line 10 so its metadata registers before `create_all`. Find the line importing `Application` from `resume_tailor_harness.tracking.tables` and add `ApplicationEvent` to it.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -440,8 +440,8 @@ Expected: PASS — no collection errors, no regressions.
 - [ ] **Step 6: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/tables.py src/resume_agent/db.py
-git add src/resume_agent/tracking/tables.py src/resume_agent/db.py tests/test_application_event_table.py
+ruff check src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/db.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/db.py tests/test_application_event_table.py
 git commit -m "feat(tracking): add ApplicationEvent table"
 ```
 
@@ -450,7 +450,7 @@ git commit -m "feat(tracking): add ApplicationEvent table"
 ### Task 3: Status transition rules (progression versus terminal)
 
 **Files:**
-- Create: `src/resume_agent/tracking/status_rules.py`
+- Create: `src/resume_tailor_harness/tracking/status_rules.py`
 - Create: `docs/adr/0012-application-status-progression-and-terminal.md`
 - Test: `tests/test_status_rules.py`
 
@@ -466,7 +466,7 @@ git commit -m "feat(tracking): add ApplicationEvent table"
 # tests/test_status_rules.py
 import pytest
 
-from resume_agent.tracking.status_rules import (
+from resume_tailor_harness.tracking.status_rules import (
     PROGRESSION,
     TERMINAL,
     advance_application_status,
@@ -520,12 +520,12 @@ def test_unknown_implied_status_is_a_no_op():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_status_rules.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.status_rules'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.status_rules'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/tracking/status_rules.py
+# src/resume_tailor_harness/tracking/status_rules.py
 """How an event moves Application.status. See ADR-0012.
 
 A flat high-water mark cannot express the most common transition in a job
@@ -616,13 +616,13 @@ Manual edits and Gmail proposals continue to write status directly.
 
 - [ ] **Step 6: Amend the tracking CLAUDE.md**
 
-In `src/resume_agent/tracking/CLAUDE.md`, under "Redo — forward-only, never destructive", add a note distinguishing `JobStatus` (high-water mark) from `ApplicationStatus` (progression + terminal, ADR-0012). Do not delete the existing `JobStatus` wording — it remains correct for jobs.
+In `src/resume_tailor_harness/tracking/CLAUDE.md`, under "Redo — forward-only, never destructive", add a note distinguishing `JobStatus` (high-water mark) from `ApplicationStatus` (progression + terminal, ADR-0012). Do not delete the existing `JobStatus` wording — it remains correct for jobs.
 
 - [ ] **Step 7: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/status_rules.py tests/test_status_rules.py
-git add src/resume_agent/tracking/status_rules.py tests/test_status_rules.py docs/adr/0012-application-status-progression-and-terminal.md src/resume_agent/tracking/CLAUDE.md
+ruff check src/resume_tailor_harness/tracking/status_rules.py tests/test_status_rules.py
+git add src/resume_tailor_harness/tracking/status_rules.py tests/test_status_rules.py docs/adr/0012-application-status-progression-and-terminal.md src/resume_tailor_harness/tracking/CLAUDE.md
 git commit -m "feat(tracking): progression-vs-terminal application status (ADR-0012)"
 ```
 
@@ -631,7 +631,7 @@ git commit -m "feat(tracking): progression-vs-terminal application status (ADR-0
 ### Task 4: Refine `has_progress` so an empty application is not investment
 
 **Files:**
-- Modify: `src/resume_agent/tracking/repository.py:470-500` (`has_progress`, `progressed_job_ids`)
+- Modify: `src/resume_tailor_harness/tracking/repository.py:470-500` (`has_progress`, `progressed_job_ids`)
 - Create: `docs/adr/0013-has-progress-requires-real-investment.md`
 - Test: `tests/test_has_progress_investment.py`
 
@@ -647,9 +647,9 @@ git commit -m "feat(tracking): progression-vs-terminal application status (ADR-0
 # tests/test_has_progress_investment.py
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import has_progress, progressed_job_ids
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import has_progress, progressed_job_ids
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _setup(**app_kwargs):
@@ -741,7 +741,7 @@ Expected: FAIL — `test_empty_ready_application_is_not_progress` and `test_blan
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/tracking/repository.py`, add a shared predicate above `has_progress` and use it in both functions:
+In `src/resume_tailor_harness/tracking/repository.py`, add a shared predicate above `has_progress` and use it in both functions:
 
 ```python
 def _application_is_investment(session: Session, application: Application) -> bool:
@@ -856,13 +856,13 @@ the identical predicate; it exists to batch this check and must never diverge.
 
 - [ ] **Step 7: Amend the CLAUDE.md invariants**
 
-Update the "Archive, delete, prune" bullet in the root `CLAUDE.md` and the corresponding section in `src/resume_agent/tracking/CLAUDE.md` to state that an `Application` counts only with real investment, citing ADR-0013.
+Update the "Archive, delete, prune" bullet in the root `CLAUDE.md` and the corresponding section in `src/resume_tailor_harness/tracking/CLAUDE.md` to state that an `Application` counts only with real investment, citing ADR-0013.
 
 - [ ] **Step 8: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/repository.py tests/test_has_progress_investment.py
-git add src/resume_agent/tracking/repository.py tests/test_has_progress_investment.py docs/adr/0013-has-progress-requires-real-investment.md CLAUDE.md src/resume_agent/tracking/CLAUDE.md
+ruff check src/resume_tailor_harness/tracking/repository.py tests/test_has_progress_investment.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_has_progress_investment.py docs/adr/0013-has-progress-requires-real-investment.md CLAUDE.md src/resume_tailor_harness/tracking/CLAUDE.md
 git commit -m "fix(tracking): has_progress requires real investment (ADR-0013)"
 ```
 
@@ -871,7 +871,7 @@ git commit -m "fix(tracking): has_progress requires real investment (ADR-0013)"
 ### Task 5: Event repository CRUD
 
 **Files:**
-- Modify: `src/resume_agent/tracking/repository.py` (append near the other application helpers)
+- Modify: `src/resume_tailor_harness/tracking/repository.py` (append near the other application helpers)
 - Test: `tests/test_application_event_repository.py`
 
 **Interfaces:**
@@ -891,15 +891,15 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import (
     delete_application_event,
     events_for_application,
     get_application_event,
     next_sequence,
     save_application_event,
 )
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _app():
@@ -992,7 +992,7 @@ Expected: FAIL — `ImportError: cannot import name 'events_for_application'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/tracking/repository.py`:
+Append to `src/resume_tailor_harness/tracking/repository.py`:
 
 ```python
 def events_for_application(session: Session, application_id: int) -> list[ApplicationEvent]:
@@ -1052,8 +1052,8 @@ Expected: PASS (6 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/repository.py tests/test_application_event_repository.py
-git add src/resume_agent/tracking/repository.py tests/test_application_event_repository.py
+ruff check src/resume_tailor_harness/tracking/repository.py tests/test_application_event_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_application_event_repository.py
 git commit -m "feat(tracking): application event repository CRUD"
 ```
 
@@ -1062,7 +1062,7 @@ git commit -m "feat(tracking): application event repository CRUD"
 ### Task 6: Event service — validation, sequencing, status advancement
 
 **Files:**
-- Create: `src/resume_agent/services/application_events.py`
+- Create: `src/resume_tailor_harness/services/application_events.py`
 - Test: `tests/test_application_events_service.py`
 
 **Interfaces:**
@@ -1085,16 +1085,16 @@ from datetime import datetime, timezone
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.application_events import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.application_events import (
     EventValidationError,
     create_event,
     delete_event,
     list_events,
     update_event,
 )
-from resume_agent.tracking.queries import application_for_job
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tracking.queries import application_for_job
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _job():
@@ -1244,12 +1244,12 @@ def test_list_events_returns_timeline_order():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_application_events_service.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.application_events'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.application_events'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/application_events.py
+# src/resume_tailor_harness/services/application_events.py
 """Application timeline events: validate, sequence, persist, advance status.
 
 Validation is deliberately thin. The real funnel is not a clean sequence —
@@ -1265,15 +1265,15 @@ from typing import Any
 
 from sqlmodel import Session
 
-from resume_agent.tracking.event_vocab import (
+from resume_tailor_harness.tracking.event_vocab import (
     KIND_IMPLIES_STATUS,
     EventKind,
     EventResult,
     Modality,
     Platform,
 )
-from resume_agent.tracking.queries import application_for_job
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.queries import application_for_job
+from resume_tailor_harness.tracking.repository import (
     delete_application_event,
     events_for_application,
     get_application_event,
@@ -1281,8 +1281,8 @@ from resume_agent.tracking.repository import (
     save_application,
     save_application_event,
 )
-from resume_agent.tracking.status_rules import advance_application_status
-from resume_agent.tracking.tables import Application, ApplicationEvent
+from resume_tailor_harness.tracking.status_rules import advance_application_status
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent
 
 _WRITABLE = {
     "kind", "custom_label", "sequence", "occurred_at", "all_day", "timezone",
@@ -1392,13 +1392,13 @@ def list_events(session: Session, job_id: int) -> list[ApplicationEvent]:
 Run: `.venv/Scripts/python.exe -m pytest tests/test_application_events_service.py -v`
 Expected: PASS (19 tests including parametrized cases)
 
-If `save_application` or `application_for_job` is not importable from the module shown, locate the real one with `grep -rn "def save_application\b\|def application_for_job" src/resume_agent/tracking/` and import from there.
+If `save_application` or `application_for_job` is not importable from the module shown, locate the real one with `grep -rn "def save_application\b\|def application_for_job" src/resume_tailor_harness/tracking/` and import from there.
 
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/services/application_events.py tests/test_application_events_service.py
-git add src/resume_agent/services/application_events.py tests/test_application_events_service.py
+ruff check src/resume_tailor_harness/services/application_events.py tests/test_application_events_service.py
+git add src/resume_tailor_harness/services/application_events.py tests/test_application_events_service.py
 git commit -m "feat(services): application event validation, sequencing, status advancement"
 ```
 
@@ -1407,8 +1407,8 @@ git commit -m "feat(services): application event validation, sequencing, status 
 ### Task 7: Backfill migration for existing `submitted_at`
 
 **Files:**
-- Modify: `src/resume_agent/tracking/migrate.py` (append)
-- Modify: `src/resume_agent/db.py:88-107` (`init_db`, after the existing `ensure_*` calls)
+- Modify: `src/resume_tailor_harness/tracking/migrate.py` (append)
+- Modify: `src/resume_tailor_harness/db.py:88-107` (`init_db`, after the existing `ensure_*` calls)
 - Test: `tests/test_application_event_migration.py`
 
 **Interfaces:**
@@ -1427,9 +1427,9 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.migrate import ensure_application_submitted_events
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.migrate import ensure_application_submitted_events
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _seed(submitted_at):
@@ -1503,7 +1503,7 @@ Expected: FAIL — `ImportError: cannot import name 'ensure_application_submitte
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/tracking/migrate.py`:
+Append to `src/resume_tailor_harness/tracking/migrate.py`:
 
 ```python
 def ensure_application_submitted_events(engine: Engine) -> None:
@@ -1552,7 +1552,7 @@ def ensure_application_submitted_events(engine: Engine) -> None:
             )
 ```
 
-Add `from resume_agent.tracking.tables import utcnow` to `migrate.py`'s imports if absent. Then register the call at the end of `init_db` in `src/resume_agent/db.py`, after `ensure_url_index(engine)`, and add the import to the `migrate` import block.
+Add `from resume_tailor_harness.tracking.tables import utcnow` to `migrate.py`'s imports if absent. Then register the call at the end of `init_db` in `src/resume_tailor_harness/db.py`, after `ensure_url_index(engine)`, and add the import to the `migrate` import block.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1562,8 +1562,8 @@ Expected: PASS (5 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/migrate.py src/resume_agent/db.py
-git add src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_application_event_migration.py
+ruff check src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py
+git add src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_application_event_migration.py
 git commit -m "feat(tracking): backfill application_submitted events from submitted_at"
 ```
 
@@ -1572,9 +1572,9 @@ git commit -m "feat(tracking): backfill application_submitted events from submit
 ### Task 8: API schemas and routes
 
 **Files:**
-- Create: `src/resume_agent/api/schemas/application_events.py`
-- Create: `src/resume_agent/api/routers/application_events.py`
-- Modify: `src/resume_agent/api/app.py` (import + `include_router` beside `jobs_router`, ~line 345)
+- Create: `src/resume_tailor_harness/api/schemas/application_events.py`
+- Create: `src/resume_tailor_harness/api/routers/application_events.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (import + `include_router` beside `jobs_router`, ~line 345)
 - Test: `tests/api/test_application_events.py`
 
 **Interfaces:**
@@ -1587,7 +1587,7 @@ git commit -m "feat(tracking): backfill application_submitted events from submit
 # tests/api/test_application_events.py
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client():
@@ -1738,7 +1738,7 @@ Expected: FAIL — 404 on every route (router not registered).
 - [ ] **Step 3: Write the schemas**
 
 ```python
-# src/resume_agent/api/schemas/application_events.py
+# src/resume_tailor_harness/api/schemas/application_events.py
 """Application timeline event schemas. Total comp is derived, never stored."""
 
 from __future__ import annotations
@@ -1747,7 +1747,7 @@ from datetime import datetime
 
 from pydantic import computed_field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class ApplicationEventOut(CamelModel):
@@ -1846,7 +1846,7 @@ class ApplicationEventUpdate(CamelModel):
 - [ ] **Step 4: Write the router**
 
 ```python
-# src/resume_agent/api/routers/application_events.py
+# src/resume_tailor_harness/api/routers/application_events.py
 """Application timeline event CRUD, nested under the job like /application."""
 
 from __future__ import annotations
@@ -1854,21 +1854,21 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Response
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.application_events import (
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.application_events import (
     ApplicationEventCreate,
     ApplicationEventOut,
     ApplicationEventUpdate,
 )
-from resume_agent.services.application_events import (
+from resume_tailor_harness.services.application_events import (
     EventValidationError,
     create_event,
     delete_event,
     list_events,
     update_event,
 )
-from resume_agent.tracking.repository import get_job
+from resume_tailor_harness.tracking.repository import get_job
 
 router = APIRouter()
 
@@ -1925,7 +1925,7 @@ def remove_event(job_id: int, event_id: int, session: Session = Depends(get_sess
     return Response(status_code=204)
 ```
 
-Register it in `src/resume_agent/api/app.py`: add the import beside the other router imports, then next to line 345's `jobs_router` registration add:
+Register it in `src/resume_tailor_harness/api/app.py`: add the import beside the other router imports, then next to line 345's `jobs_router` registration add:
 
 ```python
     app.include_router(
@@ -1951,7 +1951,7 @@ Expected: `contracts/openapi.json`, `contracts/ts/api.ts`, and `web/src/lib/api/
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/api/ tests/api/test_application_events.py contracts/ web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/api/ tests/api/test_application_events.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(api): application timeline event CRUD routes"
 ```
 
@@ -2586,7 +2586,7 @@ git commit -m "feat(web): restructure ApplicationEditor around the timeline"
 ### Task 13: Phase 1 verification and documentation
 
 **Files:**
-- Modify: `src/resume_agent/tracking/CLAUDE.md`
+- Modify: `src/resume_tailor_harness/tracking/CLAUDE.md`
 - Modify: `CLAUDE.md` (hot-paths table)
 
 - [ ] **Step 1: Run the full verification gate**
@@ -2603,7 +2603,7 @@ Expected: all green. Record the backend and web test counts — the next phase's
 
 - [ ] **Step 2: Document the subsystem**
 
-Add an "Application timeline" section to `src/resume_agent/tracking/CLAUDE.md` covering:
+Add an "Application timeline" section to `src/resume_tailor_harness/tracking/CLAUDE.md` covering:
 - Why an event log rather than wide columns (unbounded rounds; the grid is a pivot, not storage).
 - The progression-versus-terminal status rule, pointing at ADR-0012 and `status_rules.py`.
 - The `has_progress` refinement, pointing at ADR-0013, and the rule that any future `Application` child table must be added to `_application_is_investment` **and** `progressed_job_ids` together.
@@ -2616,14 +2616,14 @@ Add to the table in `CLAUDE.md`:
 
 | Path | Role |
 | --- | --- |
-| `src/resume_agent/tracking/event_vocab.py` | Closed event vocabularies + kind→status mapping + funnel order |
-| `src/resume_agent/tracking/status_rules.py` | Progression-vs-terminal application status (ADR-0012) |
-| `src/resume_agent/services/application_events.py` | Event validation, sequencing, status advancement |
+| `src/resume_tailor_harness/tracking/event_vocab.py` | Closed event vocabularies + kind→status mapping + funnel order |
+| `src/resume_tailor_harness/tracking/status_rules.py` | Progression-vs-terminal application status (ADR-0012) |
+| `src/resume_tailor_harness/services/application_events.py` | Event validation, sequencing, status advancement |
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add CLAUDE.md src/resume_agent/tracking/CLAUDE.md
+git add CLAUDE.md src/resume_tailor_harness/tracking/CLAUDE.md
 git commit -m "docs: application timeline subsystem notes"
 ```
 

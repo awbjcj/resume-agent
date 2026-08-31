@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-import resume_agent.discovery.connectors.google as google
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.google as google
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("google")
 FIXTURE = (Path(__file__).parent / "fixtures" / "google" / "results.html").read_text(

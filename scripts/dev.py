@@ -26,7 +26,7 @@ def commands(
     backend = [
         sys.executable,
         "-m",
-        "resume_agent.cli",
+        "resume_tailor_harness.cli",
         "serve",
         "--host",
         api_host,

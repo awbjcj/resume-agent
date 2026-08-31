@@ -2,12 +2,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from resume_agent.discovery.scraper.learn import (
+from resume_tailor_harness.discovery.scraper.learn import (
     MAX_LEARN_CHARS,
     learn_recipe,
     prune_html,
 )
-from resume_agent.discovery.scraper.recipe import (
+from resume_tailor_harness.discovery.scraper.recipe import (
     Pagination,
     RECIPE_SCHEMA_VERSION,
     ScrapeRecipe,

@@ -2,9 +2,9 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.funnel import _sequences, stage_cycle_times, stage_flows
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.funnel import _sequences, stage_cycle_times, stage_flows
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _require_id(value: int | None) -> int:

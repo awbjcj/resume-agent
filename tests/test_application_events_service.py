@@ -4,17 +4,17 @@ from typing import Protocol, cast
 import pytest
 from sqlmodel import Session, select
 
-import resume_agent.services.application_events as application_events
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.application_events import (
+import resume_tailor_harness.services.application_events as application_events
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.application_events import (
     EventValidationError,
     create_event,
     delete_event,
     list_events,
     update_event,
 )
-from resume_agent.tracking.repository import application_for_job
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.tracking.repository import application_for_job
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 class _PersistedJob(Protocol):

@@ -1,6 +1,6 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     applications_by_status,
     best_resume_version,
@@ -12,7 +12,7 @@ from resume_agent.tracking.repository import (
     save_resume_version,
     update_application_status,
 )
-from resume_agent.tracking.tables import Application, ApplicationStatus, ResumeVersion
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, ResumeVersion
 
 
 def _session() -> Session:

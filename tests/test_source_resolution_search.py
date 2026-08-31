@@ -2,12 +2,12 @@ import json
 
 from ddgs.exceptions import DDGSException, RatelimitException
 
-from resume_agent.discovery.source_resolution.search import (
+from resume_tailor_harness.discovery.source_resolution.search import (
     SearchBudget,
     SearchCoverageSink,
     make_budgeted_web_search_tool,
 )
-from resume_agent.sessions.stream import ToolCompleted, ToolStarted
+from resume_tailor_harness.sessions.stream import ToolCompleted, ToolStarted
 
 
 def test_fallback_search_opens_the_circuit_after_rate_limit():

@@ -2,15 +2,15 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers.jobs import _h1b_sponsorship_response
-from resume_agent.db import get_session
-from resume_agent.h1b.models import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers.jobs import _h1b_sponsorship_response
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.h1b.models import (
     HISTORICAL_ONLY_CAVEAT,
     H1BPeriodStat,
     H1BSponsorshipEvidence,
 )
-from resume_agent.tracking.tables import H1BCompanyEvidence, Job
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence, Job
 
 
 def _h1b_app(tmp_path):

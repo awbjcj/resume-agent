@@ -1,6 +1,6 @@
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.gmail.propose import Proposal, propose_transitions
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.propose import Proposal, propose_transitions
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job
 
 
 def _email(subject, domain="acme.com"):

@@ -2,18 +2,18 @@ import json
 
 import pytest
 
-from resume_agent.discovery import scout
-from resume_agent.discovery.source_resolution.catalog import BOARD_FAMILIES
-from resume_agent.discovery.source_resolution.models import CompanySourceResolution
-from resume_agent.discovery.source_resolution.search import SearchBudget
-from resume_agent.discovery.scout import (
+from resume_tailor_harness.discovery import scout
+from resume_tailor_harness.discovery.source_resolution.catalog import BOARD_FAMILIES
+from resume_tailor_harness.discovery.source_resolution.models import CompanySourceResolution
+from resume_tailor_harness.discovery.source_resolution.search import SearchBudget
+from resume_tailor_harness.discovery.scout import (
     ProposalRejected,
     ScoutProposalDraft,
     ScoutTurnDraft,
     normalize_recap,
     normalize_turn,
 )
-from resume_agent.sessions.turns import TurnRejected
+from resume_tailor_harness.sessions.turns import TurnRejected
 
 
 def test_normalize_retries_integrity_then_drops_all_proposals():

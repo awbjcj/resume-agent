@@ -4,7 +4,7 @@
 
 **Goal:** Expose the existing resume-tailoring workflow (currently driven by a Typer CLI and a Streamlit dashboard) through a FastAPI HTTP server, so a future independent React/shadcn frontend can consume it — without rewriting the domain logic.
 
-**Architecture:** A new `src/resume_agent/api/` package is a _third thin adapter_ over the domain code, sitting alongside the CLI and Streamlit. First (Phase 0) we extract the orchestration logic currently inlined in `cli.py` (agent-building + config/facts loading + the read-model filter/sort/paginate) into a reusable `src/resume_agent/services/` use-case layer; the CLI is refactored to call it, and its existing tests are the safety net proving behavior is preserved. Then the API is built on top. Minutes-long operations (`pull`/`discover`/`tailor`/`cover-letter`/add-job-from-URL) run in a background thread and report progress through a `run_id`-keyed extension of the existing `ProgressReporter` JSON store; clients watch via Server-Sent Events with a polling fallback. The Pydantic schemas are the single source of truth — FastAPI emits OpenAPI, from which a TypeScript client is generated and committed under `contracts/`.
+**Architecture:** A new `src/resume_tailor_harness/api/` package is a _third thin adapter_ over the domain code, sitting alongside the CLI and Streamlit. First (Phase 0) we extract the orchestration logic currently inlined in `cli.py` (agent-building + config/facts loading + the read-model filter/sort/paginate) into a reusable `src/resume_tailor_harness/services/` use-case layer; the CLI is refactored to call it, and its existing tests are the safety net proving behavior is preserved. Then the API is built on top. Minutes-long operations (`pull`/`discover`/`tailor`/`cover-letter`/add-job-from-URL) run in a background thread and report progress through a `run_id`-keyed extension of the existing `ProgressReporter` JSON store; clients watch via Server-Sent Events with a polling fallback. The Pydantic schemas are the single source of truth — FastAPI emits OpenAPI, from which a TypeScript client is generated and committed under `contracts/`.
 
 **Tech Stack:** Python 3.13, FastAPI, Uvicorn, sse-starlette, Pydantic v2 (camelCase alias generator), SQLModel/SQLite (unchanged), pytest. Contract codegen via `openapi-typescript` (Node, used only at codegen time).
 
@@ -25,34 +25,34 @@
 
 **New — application-service layer (Phase 0):**
 
-- `src/resume_agent/services/__init__.py` — package marker.
-- `src/resume_agent/services/agents.py` — central agent-bundle builders (moved out of `cli.py`).
-- `src/resume_agent/services/discovery.py` — `discover_jobs`, `pull_jobs`, `add_job_from_text`, `add_job_from_url`.
-- `src/resume_agent/services/tailoring.py` — `tailor` (loads config/facts, builds agents, calls `tailor/service.tailor_jobs`).
-- `src/resume_agent/services/cover_letters.py` — `write_cover_letters`.
-- `src/resume_agent/services/rendering.py` — `render_resume_version`.
-- `src/resume_agent/services/board.py` — read-models with filter/sort/paginate (`list_shortlist`/`list_pipeline`/`list_triage`) + mutations (`approve`, `set_stage`, `set_archived`, `delete`, `upsert_application`) + `Page` result.
-- `src/resume_agent/services/pagination.py` — pure `paginate(items, page, page_size)` helper.
+- `src/resume_tailor_harness/services/__init__.py` — package marker.
+- `src/resume_tailor_harness/services/agents.py` — central agent-bundle builders (moved out of `cli.py`).
+- `src/resume_tailor_harness/services/discovery.py` — `discover_jobs`, `pull_jobs`, `add_job_from_text`, `add_job_from_url`.
+- `src/resume_tailor_harness/services/tailoring.py` — `tailor` (loads config/facts, builds agents, calls `tailor/service.tailor_jobs`).
+- `src/resume_tailor_harness/services/cover_letters.py` — `write_cover_letters`.
+- `src/resume_tailor_harness/services/rendering.py` — `render_resume_version`.
+- `src/resume_tailor_harness/services/board.py` — read-models with filter/sort/paginate (`list_shortlist`/`list_pipeline`/`list_triage`) + mutations (`approve`, `set_stage`, `set_archived`, `delete`, `upsert_application`) + `Page` result.
+- `src/resume_tailor_harness/services/pagination.py` — pure `paginate(items, page, page_size)` helper.
 
 **New — API layer (Phases 1-4):**
 
-- `src/resume_agent/api/__init__.py`
-- `src/resume_agent/api/app.py` — `create_app(...)` factory: lifespan (`init_db`), CORS, error handlers, router registration, `RunManager` wiring.
-- `src/resume_agent/api/deps.py` — `get_session`, `get_settings_dep`, `require_token`, `get_run_manager`.
-- `src/resume_agent/api/errors.py` — `ApiException`, `ErrorBody`/`ErrorResponse` schemas, exception handlers.
-- `src/resume_agent/api/schemas/base.py` — `CamelModel`, `Pagination`, `Page[T]`.
-- `src/resume_agent/api/schemas/jobs.py` — `ShortlistItem`, `PipelineItem`, `TriageItem`, `JobDetail`, `JobPatch`, `ResumeVersionOut`, `ApplicationOut`, `ApplicationUpsert`, `PruneOverrides`, `PruneReportOut`, `SkillTagOut`.
-- `src/resume_agent/api/schemas/runs.py` — `RunOut`, `PullParams`, `TailorParams`, `CoverLetterParams`, `AddJobUrlParams`, `AddJobTextRequest`.
-- `src/resume_agent/api/mappers.py` — DTO/table → schema converters (mostly `Schema.model_validate(dto)`).
-- `src/resume_agent/api/runs/__init__.py`
-- `src/resume_agent/api/runs/manager.py` — `RunManager` (create/get runs; submit work to an executor; `run_id`-keyed `ProgressReporter`).
-- `src/resume_agent/api/runs/sse.py` — SSE event generator tailing a run record.
-- `src/resume_agent/api/routers/health.py`
-- `src/resume_agent/api/routers/boards.py` — `GET /api/shortlist`, `/api/pipeline`, `/api/triage`.
-- `src/resume_agent/api/routers/jobs.py` — `GET/PATCH/DELETE /api/jobs/{id}`, sub-resources (resume-versions, application), `POST /api/jobs` (sync text add).
-- `src/resume_agent/api/routers/resumes.py` — `GET /api/resume-versions/{id}/pdf`, `POST /api/resume-versions/{id}/render`.
-- `src/resume_agent/api/routers/prune.py` — `POST /api/prune`.
-- `src/resume_agent/api/routers/runs.py` — `POST /api/discover|pull|tailor|cover-letters|jobs/from-url`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events`.
+- `src/resume_tailor_harness/api/__init__.py`
+- `src/resume_tailor_harness/api/app.py` — `create_app(...)` factory: lifespan (`init_db`), CORS, error handlers, router registration, `RunManager` wiring.
+- `src/resume_tailor_harness/api/deps.py` — `get_session`, `get_settings_dep`, `require_token`, `get_run_manager`.
+- `src/resume_tailor_harness/api/errors.py` — `ApiException`, `ErrorBody`/`ErrorResponse` schemas, exception handlers.
+- `src/resume_tailor_harness/api/schemas/base.py` — `CamelModel`, `Pagination`, `Page[T]`.
+- `src/resume_tailor_harness/api/schemas/jobs.py` — `ShortlistItem`, `PipelineItem`, `TriageItem`, `JobDetail`, `JobPatch`, `ResumeVersionOut`, `ApplicationOut`, `ApplicationUpsert`, `PruneOverrides`, `PruneReportOut`, `SkillTagOut`.
+- `src/resume_tailor_harness/api/schemas/runs.py` — `RunOut`, `PullParams`, `TailorParams`, `CoverLetterParams`, `AddJobUrlParams`, `AddJobTextRequest`.
+- `src/resume_tailor_harness/api/mappers.py` — DTO/table → schema converters (mostly `Schema.model_validate(dto)`).
+- `src/resume_tailor_harness/api/runs/__init__.py`
+- `src/resume_tailor_harness/api/runs/manager.py` — `RunManager` (create/get runs; submit work to an executor; `run_id`-keyed `ProgressReporter`).
+- `src/resume_tailor_harness/api/runs/sse.py` — SSE event generator tailing a run record.
+- `src/resume_tailor_harness/api/routers/health.py`
+- `src/resume_tailor_harness/api/routers/boards.py` — `GET /api/shortlist`, `/api/pipeline`, `/api/triage`.
+- `src/resume_tailor_harness/api/routers/jobs.py` — `GET/PATCH/DELETE /api/jobs/{id}`, sub-resources (resume-versions, application), `POST /api/jobs` (sync text add).
+- `src/resume_tailor_harness/api/routers/resumes.py` — `GET /api/resume-versions/{id}/pdf`, `POST /api/resume-versions/{id}/render`.
+- `src/resume_tailor_harness/api/routers/prune.py` — `POST /api/prune`.
+- `src/resume_tailor_harness/api/routers/runs.py` — `POST /api/discover|pull|tailor|cover-letters|jobs/from-url`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events`.
 
 **New — contract tooling (Phase 5):**
 
@@ -62,9 +62,9 @@
 
 **Modified:**
 
-- `src/resume_agent/cli.py` — commands call `services/*`; add `serve` command.
-- `src/resume_agent/config.py` — `Settings` gains `api_token`, `cors_origins`.
-- `src/resume_agent/progress.py` — `ProgressReporter` accepts arbitrary `process` keys + a `RUNS_ROOT`; record gains `kind`/`result` via `**extra` (already supported).
+- `src/resume_tailor_harness/cli.py` — commands call `services/*`; add `serve` command.
+- `src/resume_tailor_harness/config.py` — `Settings` gains `api_token`, `cors_origins`.
+- `src/resume_tailor_harness/progress.py` — `ProgressReporter` accepts arbitrary `process` keys + a `RUNS_ROOT`; record gains `kind`/`result` via `**extra` (already supported).
 - `pyproject.toml` — add `fastapi`, `uvicorn[standard]`, `sse-starlette`.
 
 **New tests:** mirror under `tests/` (e.g. `tests/test_services_board.py`, `tests/api/test_*.py`). All offline — agent/LLM and Playwright calls faked, runs executed via an inline executor.
@@ -79,15 +79,15 @@
 
 **Files:**
 
-- Create: `src/resume_agent/services/__init__.py`
-- Create: `src/resume_agent/services/agents.py`
+- Create: `src/resume_tailor_harness/services/__init__.py`
+- Create: `src/resume_tailor_harness/services/agents.py`
 - Test: `tests/test_services_agents.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_services_agents.py
-from resume_agent.services import agents
+from resume_tailor_harness.services import agents
 
 
 def test_discovery_bundle_has_three_agents(monkeypatch):
@@ -122,16 +122,16 @@ def test_tailor_bundle_builds_one_reviewer_per_spec(monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_agents.py -v`
-Expected: FAIL with `ModuleNotFoundError: resume_agent.services`.
+Expected: FAIL with `ModuleNotFoundError: resume_tailor_harness.services`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/__init__.py
+# src/resume_tailor_harness/services/__init__.py
 ```
 
 ```python
-# src/resume_agent/services/agents.py
+# src/resume_tailor_harness/services/agents.py
 """Central agent-bundle builders.
 
 These were previously inlined in cli.py. Keeping them here lets the CLI, the API,
@@ -142,22 +142,22 @@ concrete `build_*_agent` functions are module-level so tests can monkeypatch the
 from dataclasses import dataclass
 from typing import Mapping
 
-from resume_agent.cover_letter.agents import (
+from resume_tailor_harness.cover_letter.agents import (
     build_cover_letter_agent,
     build_cover_letter_reviser_agent,
 )
-from resume_agent.discovery.extract import build_extract_agent
-from resume_agent.discovery.fit import build_fit_agent
-from resume_agent.discovery.relevance import build_relevance_agent
-from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
-from resume_agent.llm_runner import Runner
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.discovery.extract import build_extract_agent
+from resume_tailor_harness.discovery.fit import build_fit_agent
+from resume_tailor_harness.discovery.relevance import build_relevance_agent
+from resume_tailor_harness.discovery.url_ingest.llm import build_url_extract_agent
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.tailor.agents import (
     build_reviewer_agent,
     build_reviser_agent,
     build_tailor_agent,
     model_for_tier,
 )
-from resume_agent.tracking.canonicalize import build_skill_canonicalizer
+from resume_tailor_harness.tracking.canonicalize import build_skill_canonicalizer
 
 
 @dataclass
@@ -231,7 +231,7 @@ Expected: PASS (2 passed).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/__init__.py src/resume_agent/services/agents.py tests/test_services_agents.py
+git add src/resume_tailor_harness/services/__init__.py src/resume_tailor_harness/services/agents.py tests/test_services_agents.py
 git commit -m "feat(services): central agent-bundle builders"
 ```
 
@@ -241,15 +241,15 @@ git commit -m "feat(services): central agent-bundle builders"
 
 **Files:**
 
-- Create: `src/resume_agent/services/discovery.py`
+- Create: `src/resume_tailor_harness/services/discovery.py`
 - Test: `tests/test_services_discovery.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_services_discovery.py
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services import discovery
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services import discovery
 
 
 def _session():
@@ -296,7 +296,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/discovery.py
+# src/resume_tailor_harness/services/discovery.py
 """Discovery + ingest use-cases: load config/facts, build agents, run, return results.
 
 Wraps the lower-level discovery.pipeline / discovery.connectors so adapters
@@ -310,18 +310,18 @@ import httpx
 from playwright.sync_api import Error as PlaywrightError
 from sqlmodel import Session
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.connectors.config import load_connectors_config
-from resume_agent.discovery.connectors.registry import build_connectors
-from resume_agent.discovery.connectors.runner import PullReport, run_pull
-from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.pipeline import discover
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.discovery.url_ingest.service import job_from_url
-from resume_agent.profile.store import load_facts
-from resume_agent.progress import ProgressReporter
-from resume_agent.services.agents import DiscoveryBundle, build_discovery_bundle, build_url_extract_agent
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.connectors.config import load_connectors_config
+from resume_tailor_harness.discovery.connectors.registry import build_connectors
+from resume_tailor_harness.discovery.connectors.runner import PullReport, run_pull
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.discovery.pipeline import discover
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.discovery.url_ingest.service import job_from_url
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.services.agents import DiscoveryBundle, build_discovery_bundle, build_url_extract_agent
+from resume_tailor_harness.tracking.tables import Job
 
 DEFAULT_SEARCH = "config/search.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -416,7 +416,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/discovery.py tests/test_services_discovery.py
+git add src/resume_tailor_harness/services/discovery.py tests/test_services_discovery.py
 git commit -m "feat(services): discovery + ingest use-cases"
 ```
 
@@ -426,9 +426,9 @@ git commit -m "feat(services): discovery + ingest use-cases"
 
 **Files:**
 
-- Create: `src/resume_agent/services/tailoring.py`
-- Create: `src/resume_agent/services/cover_letters.py`
-- Create: `src/resume_agent/services/rendering.py`
+- Create: `src/resume_tailor_harness/services/tailoring.py`
+- Create: `src/resume_tailor_harness/services/cover_letters.py`
+- Create: `src/resume_tailor_harness/services/rendering.py`
 - Test: `tests/test_services_tailoring.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -437,9 +437,9 @@ git commit -m "feat(services): discovery + ingest use-cases"
 # tests/test_services_tailoring.py
 from pathlib import Path
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services import rendering, tailoring
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services import rendering, tailoring
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def _session():
@@ -492,21 +492,21 @@ Expected: FAIL with `ModuleNotFoundError`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/tailoring.py
+# src/resume_tailor_harness/services/tailoring.py
 """Tailor use-case: resolve targets, load config/facts, build agents, run the loop."""
 
 from __future__ import annotations
 
 from sqlmodel import Session
 
-from resume_agent.profile.store import load_facts
-from resume_agent.progress import ProgressReporter
-from resume_agent.services.agents import TailorBundle, build_tailor_bundle
-from resume_agent.tailor.review_config import load_review_config
-from resume_agent.tailor.service import tailor_jobs
-from resume_agent.tailor.style_guide import load_style_guide
-from resume_agent.tracking.repository import get_job, jobs_by_status
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.services.agents import TailorBundle, build_tailor_bundle
+from resume_tailor_harness.tailor.review_config import load_review_config
+from resume_tailor_harness.tailor.service import tailor_jobs
+from resume_tailor_harness.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tracking.repository import get_job, jobs_by_status
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 DEFAULT_REVIEW = "config/review.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -557,7 +557,7 @@ def tailor(
 ```
 
 ```python
-# src/resume_agent/services/cover_letters.py
+# src/resume_tailor_harness/services/cover_letters.py
 """Cover-letter use-case: resolve targets, build agents, draft + render each."""
 
 from __future__ import annotations
@@ -566,12 +566,12 @@ from dataclasses import dataclass
 
 from sqlmodel import Session
 
-from resume_agent.cover_letter.render import render_cover_letter
-from resume_agent.cover_letter.service import generate_cover_letter
-from resume_agent.profile.store import load_facts
-from resume_agent.progress import ProgressReporter
-from resume_agent.services.agents import build_cover_letter_bundle
-from resume_agent.services.tailoring import resolve_targets
+from resume_tailor_harness.cover_letter.render import render_cover_letter
+from resume_tailor_harness.cover_letter.service import generate_cover_letter
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.services.agents import build_cover_letter_bundle
+from resume_tailor_harness.services.tailoring import resolve_targets
 
 DEFAULT_FACTS = "data/profile/facts.json"
 
@@ -623,7 +623,7 @@ def write_cover_letters(
 ```
 
 ```python
-# src/resume_agent/services/rendering.py
+# src/resume_tailor_harness/services/rendering.py
 """Render use-case: load render config, render one resume version to PDF."""
 
 from __future__ import annotations
@@ -632,8 +632,8 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.render.render_config import RenderConfig, load_render_config
-from resume_agent.render.service import render_version
+from resume_tailor_harness.render.render_config import RenderConfig, load_render_config
+from resume_tailor_harness.render.service import render_version
 
 DEFAULT_RENDER = "config/render.yaml"
 
@@ -657,7 +657,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/tailoring.py src/resume_agent/services/cover_letters.py src/resume_agent/services/rendering.py tests/test_services_tailoring.py
+git add src/resume_tailor_harness/services/tailoring.py src/resume_tailor_harness/services/cover_letters.py src/resume_tailor_harness/services/rendering.py tests/test_services_tailoring.py
 git commit -m "feat(services): tailoring, cover-letter, rendering use-cases"
 ```
 
@@ -667,18 +667,18 @@ git commit -m "feat(services): tailoring, cover-letter, rendering use-cases"
 
 **Files:**
 
-- Create: `src/resume_agent/services/pagination.py`
-- Create: `src/resume_agent/services/board.py`
+- Create: `src/resume_tailor_harness/services/pagination.py`
+- Create: `src/resume_tailor_harness/services/board.py`
 - Test: `tests/test_services_board.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_services_board.py
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services import board
-from resume_agent.services.pagination import paginate
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services import board
+from resume_tailor_harness.services.pagination import paginate
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():
@@ -738,7 +738,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/pagination.py
+# src/resume_tailor_harness/services/pagination.py
 """Pure pagination helper shared by every list use-case."""
 
 from __future__ import annotations
@@ -772,7 +772,7 @@ def paginate(items: list[T], *, page: int = 1, page_size: int = 50) -> Page[T]:
 ```
 
 ```python
-# src/resume_agent/services/board.py
+# src/resume_tailor_harness/services/board.py
 """Board read-models (filter/sort/paginate over the query DTOs) and mutations.
 
 Read side wraps tracking.queries with the core server-side filters the API
@@ -786,9 +786,9 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.profile.store import load_facts
-from resume_agent.services.pagination import Page, paginate
-from resume_agent.tracking.queries import (
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.services.pagination import Page, paginate
+from resume_tailor_harness.tracking.queries import (
     PipelineRow,
     ShortlistRow,
     TriageRow,
@@ -797,7 +797,7 @@ from resume_agent.tracking.queries import (
     shortlist_rows,
     triage_rows,
 )
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     archive_job,
     delete_job,
@@ -807,7 +807,7 @@ from resume_agent.tracking.repository import (
     save_job,
     update_application_status,
 )
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 DEFAULT_FACTS = "data/profile/facts.json"
 
@@ -907,7 +907,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/pagination.py src/resume_agent/services/board.py tests/test_services_board.py
+git add src/resume_tailor_harness/services/pagination.py src/resume_tailor_harness/services/board.py tests/test_services_board.py
 git commit -m "feat(services): board read-models + mutations"
 ```
 
@@ -917,7 +917,7 @@ git commit -m "feat(services): board read-models + mutations"
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (commands: `addjob`, `discover_cmd`, `pull_cmd`, `tailor_cmd`, `cover_letter_cmd`, `render_cmd`; remove the inline `build_reviewer_agents` helper)
+- Modify: `src/resume_tailor_harness/cli.py` (commands: `addjob`, `discover_cmd`, `pull_cmd`, `tailor_cmd`, `cover_letter_cmd`, `render_cmd`; remove the inline `build_reviewer_agents` helper)
 - Test: existing `tests/test_cli_*.py` remain the regression net. Some current tests monkeypatch `cli.py` implementation details that move into `services/*`; update those monkeypatch targets to the service module or service entrypoint while keeping the command invocations and behavioral assertions unchanged.
 
 - [ ] **Step 1: Run the CLI tests to capture the green baseline**
@@ -925,14 +925,14 @@ git commit -m "feat(services): board read-models + mutations"
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_discovery.py tests/test_cli_tailor.py tests/test_cli_cover_letter.py tests/test_cli_render.py tests/test_cli_pull.py tests/test_cli_addjob_url.py -v`
 Expected: PASS (baseline before refactor).
 
-Before editing code, note the tests that patch moved symbols (`load_search_config`, `build_*_agent`, `tailor_jobs`, `job_from_url`, `generate_cover_letter`, etc.). After the refactor, retarget those patches to `resume_agent.services.discovery`, `resume_agent.services.tailoring`, `resume_agent.services.cover_letters`, or `resume_agent.services.rendering` as appropriate; do not weaken the output/status assertions.
+Before editing code, note the tests that patch moved symbols (`load_search_config`, `build_*_agent`, `tailor_jobs`, `job_from_url`, `generate_cover_letter`, etc.). After the refactor, retarget those patches to `resume_tailor_harness.services.discovery`, `resume_tailor_harness.services.tailoring`, `resume_tailor_harness.services.cover_letters`, or `resume_tailor_harness.services.rendering` as appropriate; do not weaken the output/status assertions.
 
 - [ ] **Step 2: Rewrite `discover_cmd`'s funnel branch to call the service**
 
-Replace the funnel branch at the end of `discover_cmd` (`src/resume_agent/cli.py:206-217`) with:
+Replace the funnel branch at the end of `discover_cmd` (`src/resume_tailor_harness/cli.py:206-217`) with:
 
 ```python
-    from resume_agent.services.discovery import discover_jobs
+    from resume_tailor_harness.services.discovery import discover_jobs
 
     engine = _engine(db_url)
     with get_session(engine) as session:
@@ -947,10 +947,10 @@ Replace the funnel branch at the end of `discover_cmd` (`src/resume_agent/cli.py
 
 - [ ] **Step 3: Rewrite `pull_cmd` to call `pull_jobs`**
 
-Replace the body of `pull_cmd` after the config-existence check (`src/resume_agent/cli.py:255-272`) with:
+Replace the body of `pull_cmd` after the config-existence check (`src/resume_tailor_harness/cli.py:255-272`) with:
 
 ```python
-    from resume_agent.services.discovery import pull_jobs
+    from resume_tailor_harness.services.discovery import pull_jobs
 
     engine = _engine(db_url)
     with get_session(engine) as session:
@@ -975,8 +975,8 @@ Replace the body of `pull_cmd` after the config-existence check (`src/resume_age
 In `tailor_cmd`, replace the target-resolution + config-loading + agent-building + `tailor_jobs` block with:
 
 ```python
-    from resume_agent.services.tailoring import tailor as tailor_service
-    from resume_agent.services.tailoring import TargetNotFound
+    from resume_tailor_harness.services.tailoring import tailor as tailor_service
+    from resume_tailor_harness.services.tailoring import TargetNotFound
 
     engine = _engine(db_url)
     with get_session(engine) as session:
@@ -1011,7 +1011,7 @@ Expected: PASS, ruff clean. If a CLI test fails on command output/status/data, t
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py
+git add src/resume_tailor_harness/cli.py
 git commit -m "refactor(cli): route commands through the services layer"
 ```
 
@@ -1023,12 +1023,12 @@ git commit -m "refactor(cli): route commands through the services layer"
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py:16-29` (add fields)
+- Modify: `src/resume_tailor_harness/config.py:16-29` (add fields)
 - Modify: `pyproject.toml:7-30` (add deps)
-- Create: `src/resume_agent/api/__init__.py`
-- Create: `src/resume_agent/api/schemas/__init__.py`
-- Create: `src/resume_agent/api/schemas/base.py`
-- Create: `src/resume_agent/api/errors.py`
+- Create: `src/resume_tailor_harness/api/__init__.py`
+- Create: `src/resume_tailor_harness/api/schemas/__init__.py`
+- Create: `src/resume_tailor_harness/api/schemas/base.py`
+- Create: `src/resume_tailor_harness/api/errors.py`
 - Test: `tests/api/__init__.py`, `tests/api/test_schemas_base.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1039,7 +1039,7 @@ git commit -m "refactor(cli): route commands through the services layer"
 
 ```python
 # tests/api/test_schemas_base.py
-from resume_agent.api.schemas.base import CamelModel, Page, Pagination
+from resume_tailor_harness.api.schemas.base import CamelModel, Page, Pagination
 
 
 class Item(CamelModel):
@@ -1078,7 +1078,7 @@ def test_page_envelope_shape():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_schemas_base.py -v`
-Expected: FAIL with `ModuleNotFoundError: resume_agent.api`.
+Expected: FAIL with `ModuleNotFoundError: resume_tailor_harness.api`.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1092,7 +1092,7 @@ Add to `pyproject.toml` `dependencies` list:
 
 Then install: `uv sync` (or `.venv/Scripts/python.exe -m pip install "fastapi>=0.115.0" "uvicorn[standard]>=0.34.0" "sse-starlette>=2.1.0"`).
 
-Add to `Settings` in `src/resume_agent/config.py` (after `deepseek_api_key`):
+Add to `Settings` in `src/resume_tailor_harness/config.py` (after `deepseek_api_key`):
 
 ```python
     api_token: str = ""  # when non-empty, the API requires Authorization: Bearer <token>
@@ -1100,15 +1100,15 @@ Add to `Settings` in `src/resume_agent/config.py` (after `deepseek_api_key`):
 ```
 
 ```python
-# src/resume_agent/api/__init__.py
+# src/resume_tailor_harness/api/__init__.py
 ```
 
 ```python
-# src/resume_agent/api/schemas/__init__.py
+# src/resume_tailor_harness/api/schemas/__init__.py
 ```
 
 ```python
-# src/resume_agent/api/schemas/base.py
+# src/resume_tailor_harness/api/schemas/base.py
 """Shared API schema base: camelCase wire format + the pagination envelope."""
 
 from __future__ import annotations
@@ -1147,7 +1147,7 @@ class Page(CamelModel, Generic[T]):
 ```
 
 ```python
-# src/resume_agent/api/errors.py
+# src/resume_tailor_harness/api/errors.py
 """Single error envelope + handlers. Every error response is { "error": {...} }."""
 
 from __future__ import annotations
@@ -1159,7 +1159,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class ErrorBody(CamelModel):
@@ -1219,7 +1219,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add pyproject.toml src/resume_agent/config.py src/resume_agent/api/ tests/api/__init__.py tests/api/test_schemas_base.py
+git add pyproject.toml src/resume_tailor_harness/config.py src/resume_tailor_harness/api/ tests/api/__init__.py tests/api/test_schemas_base.py
 git commit -m "feat(api): foundation — deps, settings, CamelModel + error envelope"
 ```
 
@@ -1229,10 +1229,10 @@ git commit -m "feat(api): foundation — deps, settings, CamelModel + error enve
 
 **Files:**
 
-- Create: `src/resume_agent/api/deps.py`
-- Create: `src/resume_agent/api/routers/__init__.py`
-- Create: `src/resume_agent/api/routers/health.py`
-- Create: `src/resume_agent/api/app.py`
+- Create: `src/resume_tailor_harness/api/deps.py`
+- Create: `src/resume_tailor_harness/api/routers/__init__.py`
+- Create: `src/resume_tailor_harness/api/routers/health.py`
+- Create: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_app_health.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1241,7 +1241,7 @@ git commit -m "feat(api): foundation — deps, settings, CamelModel + error enve
 # tests/api/test_app_health.py
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client(**kw):
@@ -1262,8 +1262,8 @@ def test_bearer_required_when_token_set():
     client = _client(api_token="secret")
     assert client.get("/api/health").status_code == 200  # health is unguarded
     # a guarded route (added later) would 401; here we assert the dep itself:
-    from resume_agent.api.deps import require_token
-    from resume_agent.api.errors import ApiException
+    from resume_tailor_harness.api.deps import require_token
+    from resume_tailor_harness.api.errors import ApiException
     import pytest
     with pytest.raises(ApiException) as ei:
         require_token(authorization=None, settings=type("S", (), {"api_token": "secret"})())
@@ -1278,7 +1278,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/deps.py
+# src/resume_tailor_harness/api/deps.py
 """FastAPI dependencies: per-request DB session, settings, optional bearer auth."""
 
 from __future__ import annotations
@@ -1288,8 +1288,8 @@ from collections.abc import Iterator
 from fastapi import Depends, Header, Request
 from sqlmodel import Session
 
-from resume_agent.api.errors import ApiException
-from resume_agent.config import Settings, get_settings
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.config import Settings, get_settings
 
 
 def get_settings_dep() -> Settings:
@@ -1316,11 +1316,11 @@ def require_token(
 ```
 
 ```python
-# src/resume_agent/api/routers/__init__.py
+# src/resume_tailor_harness/api/routers/__init__.py
 ```
 
 ```python
-# src/resume_agent/api/routers/health.py
+# src/resume_tailor_harness/api/routers/health.py
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -1332,7 +1332,7 @@ def health() -> dict[str, str]:
 ```
 
 ```python
-# src/resume_agent/api/app.py
+# src/resume_tailor_harness/api/app.py
 """FastAPI application factory — the third adapter over the domain code."""
 
 from __future__ import annotations
@@ -1344,11 +1344,11 @@ from pathlib import Path
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from resume_agent.api.deps import get_settings_dep, require_token
-from resume_agent.api.errors import install_error_handlers
-from resume_agent.api.routers import health
-from resume_agent.config import get_settings
-from resume_agent.db import init_db, make_engine
+from resume_tailor_harness.api.deps import get_settings_dep, require_token
+from resume_tailor_harness.api.errors import install_error_handlers
+from resume_tailor_harness.api.routers import health
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.db import init_db, make_engine
 
 
 def create_app(
@@ -1372,7 +1372,7 @@ def create_app(
         app.state.engine = engine
         yield
 
-    app = FastAPI(title="Resume Agent API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Résumé Tailor Harness API", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved_settings
     app.state.db_url = resolved_db
     app.dependency_overrides[get_settings_dep] = lambda: resolved_settings
@@ -1403,7 +1403,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/deps.py src/resume_agent/api/routers/ src/resume_agent/api/app.py tests/api/test_app_health.py
+git add src/resume_tailor_harness/api/deps.py src/resume_tailor_harness/api/routers/ src/resume_tailor_harness/api/app.py tests/api/test_app_health.py
 git commit -m "feat(api): app factory, deps, health endpoint"
 ```
 
@@ -1415,10 +1415,10 @@ git commit -m "feat(api): app factory, deps, health endpoint"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/jobs.py` (board item schemas)
-- Create: `src/resume_agent/api/mappers.py`
-- Create: `src/resume_agent/api/routers/boards.py`
-- Modify: `src/resume_agent/api/app.py` (include `boards.router` with `guarded`)
+- Create: `src/resume_tailor_harness/api/schemas/jobs.py` (board item schemas)
+- Create: `src/resume_tailor_harness/api/mappers.py`
+- Create: `src/resume_tailor_harness/api/routers/boards.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (include `boards.router` with `guarded`)
 - Test: `tests/api/test_boards.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1427,9 +1427,9 @@ git commit -m "feat(api): app factory, deps, health endpoint"
 # tests/api/test_boards.py
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _client():
@@ -1487,7 +1487,7 @@ Expected: FAIL (no `/api/pipeline` route).
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/schemas/jobs.py
+# src/resume_tailor_harness/api/schemas/jobs.py
 """Job-side API schemas: board items, detail, patch, sub-resources, prune."""
 
 from __future__ import annotations
@@ -1495,7 +1495,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class SkillTagOut(CamelModel):
@@ -1621,13 +1621,13 @@ class PruneReportOut(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/mappers.py
+# src/resume_tailor_harness/api/mappers.py
 """DTO/table -> schema converters. Most are model_validate (from_attributes)."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import Page, Pagination
-from resume_agent.services.pagination import Page as ServicePage
+from resume_tailor_harness.api.schemas.base import Page, Pagination
+from resume_tailor_harness.services.pagination import Page as ServicePage
 
 
 def to_page(service_page: ServicePage, item_model) -> Page:
@@ -1643,7 +1643,7 @@ def to_page(service_page: ServicePage, item_model) -> Page:
 ```
 
 ```python
-# src/resume_agent/api/routers/boards.py
+# src/resume_tailor_harness/api/routers/boards.py
 """Read-only board lists: shortlist, pipeline, triage. Paginated + core filters."""
 
 from __future__ import annotations
@@ -1651,11 +1651,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.mappers import to_page
-from resume_agent.api.schemas.base import Page
-from resume_agent.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
-from resume_agent.services import board
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.mappers import to_page
+from resume_tailor_harness.api.schemas.base import Page
+from resume_tailor_harness.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
+from resume_tailor_harness.services import board
 
 router = APIRouter()
 
@@ -1705,10 +1705,10 @@ def get_triage(
     return to_page(result, TriageItem)
 ```
 
-In `src/resume_agent/api/app.py`, replace the comment line after the health include with the boards include using the bearer guard:
+In `src/resume_tailor_harness/api/app.py`, replace the comment line after the health include with the boards include using the bearer guard:
 
 ```python
-    from resume_agent.api.routers import boards
+    from resume_tailor_harness.api.routers import boards
 
     app.include_router(health.router, prefix="/api")
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
@@ -1722,7 +1722,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/jobs.py src/resume_agent/api/mappers.py src/resume_agent/api/routers/boards.py src/resume_agent/api/app.py tests/api/test_boards.py
+git add src/resume_tailor_harness/api/schemas/jobs.py src/resume_tailor_harness/api/mappers.py src/resume_tailor_harness/api/routers/boards.py src/resume_tailor_harness/api/app.py tests/api/test_boards.py
 git commit -m "feat(api): shortlist/pipeline/triage list endpoints"
 ```
 
@@ -1732,9 +1732,9 @@ git commit -m "feat(api): shortlist/pipeline/triage list endpoints"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/jobs.py` (detail only this task; mutations added in Task 10)
-- Create: `src/resume_agent/api/routers/resumes.py`
-- Modify: `src/resume_agent/api/app.py` (include both routers, guarded)
+- Create: `src/resume_tailor_harness/api/routers/jobs.py` (detail only this task; mutations added in Task 10)
+- Create: `src/resume_tailor_harness/api/routers/resumes.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (include both routers, guarded)
 - Test: `tests/api/test_job_detail.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1745,9 +1745,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def _client():
@@ -1811,7 +1811,7 @@ Expected: FAIL (routes missing).
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/routers/jobs.py
+# src/resume_tailor_harness/api/routers/jobs.py
 """Single-job endpoints: detail (this task), mutations (Task 10)."""
 
 from __future__ import annotations
@@ -1819,14 +1819,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.jobs import (
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.jobs import (
     ApplicationOut,
     JobDetail,
     ResumeVersionOut,
 )
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     get_job,
     has_progress,
@@ -1869,7 +1869,7 @@ def get_job_detail(job_id: int, session: Session = Depends(get_session)):
 ```
 
 ```python
-# src/resume_agent/api/routers/resumes.py
+# src/resume_tailor_harness/api/routers/resumes.py
 """Resume-version PDF download + on-demand render (render added in Task 11)."""
 
 from __future__ import annotations
@@ -1880,9 +1880,9 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.tracking.repository import get_resume_version
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.tracking.repository import get_resume_version
 
 router = APIRouter()
 
@@ -1902,8 +1902,8 @@ def download_pdf(version_id: int, session: Session = Depends(get_session)) -> Fi
 In `app.py`, add the includes (guarded):
 
 ```python
-    from resume_agent.api.routers import jobs as jobs_router
-    from resume_agent.api.routers import resumes
+    from resume_tailor_harness.api.routers import jobs as jobs_router
+    from resume_tailor_harness.api.routers import resumes
 
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(resumes.router, prefix="/api", dependencies=guarded)
@@ -1917,7 +1917,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/jobs.py src/resume_agent/api/routers/resumes.py src/resume_agent/api/app.py tests/api/test_job_detail.py
+git add src/resume_tailor_harness/api/routers/jobs.py src/resume_tailor_harness/api/routers/resumes.py src/resume_tailor_harness/api/app.py tests/api/test_job_detail.py
 git commit -m "feat(api): job detail + resume PDF download"
 ```
 
@@ -1929,7 +1929,7 @@ git commit -m "feat(api): job detail + resume PDF download"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/jobs.py` (add PATCH, DELETE, PUT application, POST manual add)
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py` (add PATCH, DELETE, PUT application, POST manual add)
 - Test: `tests/api/test_job_mutations.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1938,9 +1938,9 @@ git commit -m "feat(api): job detail + resume PDF download"
 # tests/api/test_job_mutations.py
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _client():
@@ -2015,16 +2015,16 @@ Expected: FAIL.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/api/routers/jobs.py` (add imports at top: `Response` from fastapi; `JobPatch, ApplicationUpsert, ApplicationOut` already partly imported — ensure all present; `board` service; `add_job_from_text`):
+Append to `src/resume_tailor_harness/api/routers/jobs.py` (add imports at top: `Response` from fastapi; `JobPatch, ApplicationUpsert, ApplicationOut` already partly imported — ensure all present; `board` service; `add_job_from_text`):
 
 ```python
 from fastapi import Response
 
-from resume_agent.api.schemas.jobs import ApplicationUpsert, JobPatch
-from resume_agent.api.schemas.runs import AddJobTextRequest  # defined in Task 12
-from resume_agent.services import board
-from resume_agent.services.discovery import add_job_from_text
-from resume_agent.tracking.tables import ApplicationStatus, JobStatus
+from resume_tailor_harness.api.schemas.jobs import ApplicationUpsert, JobPatch
+from resume_tailor_harness.api.schemas.runs import AddJobTextRequest  # defined in Task 12
+from resume_tailor_harness.services import board
+from resume_tailor_harness.services.discovery import add_job_from_text
+from resume_tailor_harness.tracking.tables import ApplicationStatus, JobStatus
 
 
 @router.patch("/jobs/{job_id}", response_model=JobDetail)
@@ -2073,13 +2073,13 @@ def create_manual_job(body: AddJobTextRequest, session: Session = Depends(get_se
     return _job_detail(session, job.id)
 ```
 
-(`AddJobTextRequest` is created in Task 12; if implementing strictly in order, define it inline here and move it in Task 12. To keep tasks independent, add the small schema now in `src/resume_agent/api/schemas/runs.py`:)
+(`AddJobTextRequest` is created in Task 12; if implementing strictly in order, define it inline here and move it in Task 12. To keep tasks independent, add the small schema now in `src/resume_tailor_harness/api/schemas/runs.py`:)
 
 ```python
-# src/resume_agent/api/schemas/runs.py  (partial — completed in Task 12)
+# src/resume_tailor_harness/api/schemas/runs.py  (partial — completed in Task 12)
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class AddJobTextRequest(CamelModel):
@@ -2098,7 +2098,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/jobs.py src/resume_agent/api/schemas/runs.py tests/api/test_job_mutations.py
+git add src/resume_tailor_harness/api/routers/jobs.py src/resume_tailor_harness/api/schemas/runs.py tests/api/test_job_mutations.py
 git commit -m "feat(api): job mutations, application upsert, manual add"
 ```
 
@@ -2108,9 +2108,9 @@ git commit -m "feat(api): job mutations, application upsert, manual add"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/prune.py`
-- Modify: `src/resume_agent/api/routers/resumes.py` (add POST render)
-- Modify: `src/resume_agent/api/app.py` (include prune router, guarded)
+- Create: `src/resume_tailor_harness/api/routers/prune.py`
+- Modify: `src/resume_tailor_harness/api/routers/resumes.py` (add POST render)
+- Modify: `src/resume_tailor_harness/api/app.py` (include prune router, guarded)
 - Test: `tests/api/test_prune_render.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -2119,10 +2119,10 @@ git commit -m "feat(api): job mutations, application upsert, manual add"
 # tests/api/test_prune_render.py
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import resumes
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import resumes
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def _client():
@@ -2144,7 +2144,7 @@ def test_render_endpoint_invokes_service(monkeypatch, tmp_path):
     pdf = tmp_path / "r.pdf"; pdf.write_bytes(b"%PDF-1.4")
 
     def fake_render(session, version_id, *, render_path="config/render.yaml"):
-        v = __import__("resume_agent.tracking.repository", fromlist=["get_resume_version"]).get_resume_version(session, version_id)
+        v = __import__("resume_tailor_harness.tracking.repository", fromlist=["get_resume_version"]).get_resume_version(session, version_id)
         v.pdf_path = str(pdf)
         session.add(v); session.commit()
         return pdf
@@ -2167,7 +2167,7 @@ Expected: FAIL.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/routers/prune.py
+# src/resume_tailor_harness/api/routers/prune.py
 """Prune endpoint: preview (dryRun) or run, with optional config overrides."""
 
 from __future__ import annotations
@@ -2175,10 +2175,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.schemas.jobs import PruneOverrides, PruneReportOut
-from resume_agent.tracking.prune_config import load_prune_config
-from resume_agent.tracking.repository import prune_preview, prune_run
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.schemas.jobs import PruneOverrides, PruneReportOut
+from resume_tailor_harness.tracking.prune_config import load_prune_config
+from resume_tailor_harness.tracking.repository import prune_preview, prune_run
 
 router = APIRouter()
 _PRUNE_CONFIG_PATH = "config/prune.yaml"
@@ -2200,11 +2200,11 @@ def prune(body: PruneOverrides, session: Session = Depends(get_session)):
     return PruneReportOut.model_validate(report)
 ```
 
-Append to `src/resume_agent/api/routers/resumes.py`:
+Append to `src/resume_tailor_harness/api/routers/resumes.py`:
 
 ```python
-from resume_agent.api.schemas.jobs import ResumeVersionOut
-from resume_agent.services.rendering import render_resume_version
+from resume_tailor_harness.api.schemas.jobs import ResumeVersionOut
+from resume_tailor_harness.services.rendering import render_resume_version
 
 
 @router.post("/resume-versions/{version_id}/render", response_model=ResumeVersionOut)
@@ -2221,7 +2221,7 @@ def render_endpoint(version_id: int, session: Session = Depends(get_session)):
 In `app.py` add (guarded):
 
 ```python
-    from resume_agent.api.routers import prune as prune_router
+    from resume_tailor_harness.api.routers import prune as prune_router
 
     app.include_router(prune_router.router, prefix="/api", dependencies=guarded)
 ```
@@ -2234,7 +2234,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/prune.py src/resume_agent/api/routers/resumes.py src/resume_agent/api/app.py tests/api/test_prune_render.py
+git add src/resume_tailor_harness/api/routers/prune.py src/resume_tailor_harness/api/routers/resumes.py src/resume_tailor_harness/api/app.py tests/api/test_prune_render.py
 git commit -m "feat(api): prune + synchronous render endpoints"
 ```
 
@@ -2246,10 +2246,10 @@ git commit -m "feat(api): prune + synchronous render endpoints"
 
 **Files:**
 
-- Create: `src/resume_agent/api/runs/__init__.py`
-- Create: `src/resume_agent/api/runs/manager.py`
-- Modify: `src/resume_agent/api/schemas/runs.py` (add `RunOut` + param schemas)
-- Modify: `src/resume_agent/progress.py:21-24` (add `RUNS_ROOT`)
+- Create: `src/resume_tailor_harness/api/runs/__init__.py`
+- Create: `src/resume_tailor_harness/api/runs/manager.py`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py` (add `RunOut` + param schemas)
+- Modify: `src/resume_tailor_harness/progress.py:21-24` (add `RUNS_ROOT`)
 - Test: `tests/api/test_run_manager.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -2258,8 +2258,8 @@ git commit -m "feat(api): prune + synchronous render endpoints"
 # tests/api/test_run_manager.py
 from concurrent.futures import Executor, Future
 
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.progress import ProgressReporter
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.progress import ProgressReporter
 
 
 class InlineExecutor(Executor):
@@ -2315,18 +2315,18 @@ Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add to `src/resume_agent/progress.py` near `PROGRESS_ROOT`:
+Add to `src/resume_tailor_harness/progress.py` near `PROGRESS_ROOT`:
 
 ```python
 RUNS_ROOT = Path("data/runs")
 ```
 
 ```python
-# src/resume_agent/api/runs/__init__.py
+# src/resume_tailor_harness/api/runs/__init__.py
 ```
 
 ```python
-# src/resume_agent/api/runs/manager.py
+# src/resume_tailor_harness/api/runs/manager.py
 """Background run substrate.
 
 A run is a unit of long work (discover/pull/tailor/cover-letter/add-job-from-url).
@@ -2348,7 +2348,7 @@ from concurrent.futures import Executor, ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from resume_agent.progress import (
+from resume_tailor_harness.progress import (
     RUNS_ROOT,
     ProgressReporter,
     clear_progress,
@@ -2444,7 +2444,7 @@ def _now() -> str:
 
 Note: `RunProgressReporter` injects `kind` into every `begin()`/`done()` write, so a running record never loses its run type after the worker starts. The `create()` seed writes `kind`/`result`/`error` keys directly so the record shape is stable from the first read without touching `ProgressReporter` private fields.
 
-Add to `src/resume_agent/api/schemas/runs.py` (append to the file started in Task 10):
+Add to `src/resume_tailor_harness/api/schemas/runs.py` (append to the file started in Task 10):
 
 ```python
 from typing import Any
@@ -2493,7 +2493,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/ src/resume_agent/api/schemas/runs.py src/resume_agent/progress.py tests/api/test_run_manager.py
+git add src/resume_tailor_harness/api/runs/ src/resume_tailor_harness/api/schemas/runs.py src/resume_tailor_harness/progress.py tests/api/test_run_manager.py
 git commit -m "feat(api): run manager — run_id-keyed background work"
 ```
 
@@ -2503,10 +2503,10 @@ git commit -m "feat(api): run manager — run_id-keyed background work"
 
 **Files:**
 
-- Create: `src/resume_agent/api/runs/sse.py` (record→RunOut mapper used here and by SSE)
-- Create: `src/resume_agent/api/routers/runs.py`
-- Modify: `src/resume_agent/api/app.py` (construct `RunManager`, store on `app.state`, include router guarded, accept `run_executor`)
-- Modify: `src/resume_agent/api/deps.py` (add `get_run_manager`)
+- Create: `src/resume_tailor_harness/api/runs/sse.py` (record→RunOut mapper used here and by SSE)
+- Create: `src/resume_tailor_harness/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (construct `RunManager`, store on `app.state`, include router guarded, accept `run_executor`)
+- Modify: `src/resume_tailor_harness/api/deps.py` (add `get_run_manager`)
 - Test: `tests/api/test_runs_launch.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -2517,8 +2517,8 @@ from concurrent.futures import Executor, Future
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import runs as runs_router
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import runs as runs_router
 
 
 class InlineExecutor(Executor):
@@ -2585,13 +2585,13 @@ Expected: FAIL.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/runs/sse.py
+# src/resume_tailor_harness/api/runs/sse.py
 """Shared record -> RunOut projection (used by GET /runs/{id} and the SSE stream)."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.progress import progress_stats
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.progress import progress_stats
 
 
 def record_to_run(run_id: str, record: dict) -> RunOut:
@@ -2611,7 +2611,7 @@ def record_to_run(run_id: str, record: dict) -> RunOut:
 ```
 
 ```python
-# src/resume_agent/api/routers/runs.py
+# src/resume_tailor_harness/api/routers/runs.py
 """Run launch endpoints + GET run. Each launch returns 202 with the run record.
 
 The work callables open their OWN session inside the worker thread — never the
@@ -2624,21 +2624,21 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
-from resume_agent.api.deps import get_run_manager
-from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.runs import (
+from resume_tailor_harness.api.deps import get_run_manager
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.runs import (
     AddJobUrlParams,
     CoverLetterParams,
     PullParams,
     RunOut,
     TailorParams,
 )
-from resume_agent.db import get_session
-from resume_agent.services.cover_letters import write_cover_letters
-from resume_agent.services.discovery import add_job_from_url, discover_jobs, pull_jobs
-from resume_agent.services.tailoring import tailor
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.services.cover_letters import write_cover_letters
+from resume_tailor_harness.services.discovery import add_job_from_url, discover_jobs, pull_jobs
+from resume_tailor_harness.services.tailoring import tailor
 
 router = APIRouter()
 
@@ -2755,18 +2755,18 @@ def get_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
     return record_to_run(run_id, record)
 ```
 
-Add to `src/resume_agent/api/deps.py`:
+Add to `src/resume_tailor_harness/api/deps.py`:
 
 ```python
 def get_run_manager(request: Request):
     return request.app.state.run_manager
 ```
 
-In `src/resume_agent/api/app.py`: import `RunManager`; in `create_app`, after CORS, construct and store the manager and include the router:
+In `src/resume_tailor_harness/api/app.py`: import `RunManager`; in `create_app`, after CORS, construct and store the manager and include the router:
 
 ```python
-    from resume_agent.api.runs.manager import RunManager
-    from resume_agent.api.routers import runs as runs_router
+    from resume_tailor_harness.api.runs.manager import RunManager
+    from resume_tailor_harness.api.routers import runs as runs_router
 
     app.state.run_manager = (
         RunManager(root=runs_root, executor=run_executor)
@@ -2799,7 +2799,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/sse.py src/resume_agent/api/routers/runs.py src/resume_agent/api/deps.py src/resume_agent/api/app.py tests/api/test_runs_launch.py
+git add src/resume_tailor_harness/api/runs/sse.py src/resume_tailor_harness/api/routers/runs.py src/resume_tailor_harness/api/deps.py src/resume_tailor_harness/api/app.py tests/api/test_runs_launch.py
 git commit -m "feat(api): run launch endpoints + GET run"
 ```
 
@@ -2809,8 +2809,8 @@ git commit -m "feat(api): run launch endpoints + GET run"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/runs/sse.py` (add async event generator)
-- Modify: `src/resume_agent/api/routers/runs.py` (add `GET /runs/{id}/events`)
+- Modify: `src/resume_tailor_harness/api/runs/sse.py` (add async event generator)
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (add `GET /runs/{id}/events`)
 - Test: `tests/api/test_runs_sse.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -2822,8 +2822,8 @@ from concurrent.futures import Executor, Future
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import runs as runs_router
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import runs as runs_router
 
 
 class InlineExecutor(Executor):
@@ -2866,7 +2866,7 @@ Expected: FAIL (no events route).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/api/runs/sse.py`:
+Append to `src/resume_tailor_harness/api/runs/sse.py`:
 
 ```python
 import asyncio
@@ -2898,12 +2898,12 @@ async def run_events(mgr, run_id: str, *, poll_interval: float = 0.5) -> AsyncIt
         await asyncio.sleep(poll_interval)
 ```
 
-Append to `src/resume_agent/api/routers/runs.py` (import `EventSourceResponse`):
+Append to `src/resume_tailor_harness/api/routers/runs.py` (import `EventSourceResponse`):
 
 ```python
 from sse_starlette.sse import EventSourceResponse
 
-from resume_agent.api.runs.sse import run_events
+from resume_tailor_harness.api.runs.sse import run_events
 
 
 @router.get("/runs/{run_id}/events")
@@ -2921,7 +2921,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/sse.py src/resume_agent/api/routers/runs.py tests/api/test_runs_sse.py
+git add src/resume_tailor_harness/api/runs/sse.py src/resume_tailor_harness/api/routers/runs.py tests/api/test_runs_sse.py
 git commit -m "feat(api): SSE progress stream for runs"
 ```
 
@@ -2944,7 +2944,7 @@ git commit -m "feat(api): SSE progress stream for runs"
 import json
 from pathlib import Path
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 CONTRACT = Path("contracts/openapi.json")
 
@@ -2979,7 +2979,7 @@ Expected: FAIL on `test_committed_openapi_is_current` (`contracts/openapi.json` 
 import json
 from pathlib import Path
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def main() -> None:
@@ -3080,11 +3080,11 @@ git commit -m "feat(contracts): generate + commit TypeScript client"
 
 # Phase 6 — Wiring + docs
 
-## Task 17: `resume-agent serve` command + README/CLAUDE.md
+## Task 17: `resume-tailor-harness serve` command + README/CLAUDE.md
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (add `serve` command)
+- Modify: `src/resume_tailor_harness/cli.py` (add `serve` command)
 - Modify: `README.md`, `CLAUDE.md`
 - Test: `tests/test_cli_serve.py`
 
@@ -3094,7 +3094,7 @@ git commit -m "feat(contracts): generate + commit TypeScript client"
 # tests/test_cli_serve.py
 from typer.testing import CliRunner
 
-from resume_agent import cli
+from resume_tailor_harness import cli
 
 
 def test_serve_invokes_uvicorn(monkeypatch):
@@ -3118,7 +3118,7 @@ Expected: FAIL (no `serve` command).
 
 - [ ] **Step 3: Add the command**
 
-Append to `src/resume_agent/cli.py`:
+Append to `src/resume_tailor_harness/cli.py`:
 
 ```python
 @app.command("serve")
@@ -3130,7 +3130,7 @@ def serve_cmd(
     """Run the FastAPI backend (for the React frontend / API clients)."""
     import uvicorn
 
-    from resume_agent.api.app import create_app
+    from resume_tailor_harness.api.app import create_app
 
     uvicorn.run(create_app(db_url=db_url), host=host, port=port)
 ```
@@ -3142,14 +3142,14 @@ Expected: serve test PASS; full suite green; ruff clean.
 
 - [ ] **Step 5: Update docs**
 
-In `README.md`, add an "API server" section: `resume-agent serve` starts the backend at `http://127.0.0.1:8000`; interactive docs at `/docs`; OpenAPI at `/openapi.json`; the committed contract for the frontend lives in `contracts/`; long ops (`POST /api/discover|pull|tailor|cover-letters|jobs/from-url`) return a run you watch via `GET /api/runs/{id}/events` (SSE) or poll at `GET /api/runs/{id}`; set `API_TOKEN` in `.env` to require a bearer token; set `CORS_ORIGINS` for the frontend dev server.
+In `README.md`, add an "API server" section: `resume-tailor-harness serve` starts the backend at `http://127.0.0.1:8000`; interactive docs at `/docs`; OpenAPI at `/openapi.json`; the committed contract for the frontend lives in `contracts/`; long ops (`POST /api/discover|pull|tailor|cover-letters|jobs/from-url`) return a run you watch via `GET /api/runs/{id}/events` (SSE) or poll at `GET /api/runs/{id}`; set `API_TOKEN` in `.env` to require a bearer token; set `CORS_ORIGINS` for the frontend dev server.
 
 In `CLAUDE.md`, add an "API layer (`api/`)" section: the API is the third thin adapter over `services/`; Pydantic schemas are the contract source of truth (camelCase via `to_camel`); runs reuse `ProgressReporter` keyed by `run_id` under `data/runs/`; blocking work runs in a threadpool with its own session; regenerate `contracts/` after schema changes (`scripts/gen_ts_client.sh`); deferred (not yet exposed): Gmail sync, analytics, match-gap, profile build, scrape.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py README.md CLAUDE.md tests/test_cli_serve.py
+git add src/resume_tailor_harness/cli.py README.md CLAUDE.md tests/test_cli_serve.py
 git commit -m "feat(api): serve command + docs"
 ```
 

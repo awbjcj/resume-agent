@@ -5,8 +5,8 @@ from evals.metrics import (
     correlation,
     fact_check_trap_recall,
 )
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 
 
 def _content(bullet_text: str) -> ResumeContent:

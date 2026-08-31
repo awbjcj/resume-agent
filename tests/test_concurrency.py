@@ -1,6 +1,6 @@
 import asyncio
 
-from resume_agent.concurrency import Result, gather_isolated
+from resume_tailor_harness.concurrency import Result, gather_isolated
 
 
 def test_gather_isolated_preserves_order_and_isolates_errors():

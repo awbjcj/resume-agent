@@ -8,13 +8,13 @@ from evals.metrics import (
     trap_avoided,
 )
 from evals.schema import Trap
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.evidence_portfolio import (
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.evidence_portfolio import (
     EvidencePortfolio,
     PortfolioSelection,
 )
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def _facts() -> ProfileFacts:

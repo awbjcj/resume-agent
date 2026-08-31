@@ -8,9 +8,9 @@ join and not the other.
 
 from __future__ import annotations
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
@@ -37,8 +37,8 @@ def _seed(tmp_path):
 
 
 def test_matrix_and_match_gap_agree_on_one_correction(tmp_path):
-    from resume_agent.profile.effective import build_effective_taxonomy
-    from resume_agent.profile.matrix import build_matrix
+    from resume_tailor_harness.profile.effective import build_effective_taxonomy
+    from resume_tailor_harness.profile.matrix import build_matrix
 
     profile_dir, corrections_path, facts = _seed(tmp_path)
     taxonomy = build_effective_taxonomy(profile_dir, corrections_path=corrections_path)
@@ -52,8 +52,8 @@ def test_matrix_and_match_gap_agree_on_one_correction(tmp_path):
 
 
 def test_regroup_timestamp_does_not_invalidate_the_matrix(tmp_path):
-    from resume_agent.profile.effective import build_effective_taxonomy
-    from resume_agent.taxonomy.state import (
+    from resume_tailor_harness.profile.effective import build_effective_taxonomy
+    from resume_tailor_harness.taxonomy.state import (
         GroupingStatus,
         TaxonomyState,
         save_taxonomy_state,

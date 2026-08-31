@@ -80,11 +80,11 @@ These amendments are authoritative when a later code sketch conflicts with them.
 
 | File | Responsibility |
 | --- | --- |
-| `src/resume_agent/profile/interview.py` (create) | Round schemas, history sidecar load/append/record, read-only corpus tools, agent builders |
-| `src/resume_agent/services/profile_interview.py` (create) | Context assembly (incl. market gaps), worker `run_interview_round`, `submit_interview_answers` |
-| `src/resume_agent/api/schemas/profile.py` (modify) | `InterviewAnswersIn`, `InterviewAnswersOut`, `InterviewHistoryOut` |
-| `src/resume_agent/api/routers/profile.py` (modify) | `POST /profile/interview`, `POST /profile/interview/{run_id}/answers`, `GET /profile/interview/history`; extract reusable `_launch_build(request, mgr, conflict)` |
-| `src/resume_agent/cli.py` (modify) | `resume-agent profile interview` (one terminal round) |
+| `src/resume_tailor_harness/profile/interview.py` (create) | Round schemas, history sidecar load/append/record, read-only corpus tools, agent builders |
+| `src/resume_tailor_harness/services/profile_interview.py` (create) | Context assembly (incl. market gaps), worker `run_interview_round`, `submit_interview_answers` |
+| `src/resume_tailor_harness/api/schemas/profile.py` (modify) | `InterviewAnswersIn`, `InterviewAnswersOut`, `InterviewHistoryOut` |
+| `src/resume_tailor_harness/api/routers/profile.py` (modify) | `POST /profile/interview`, `POST /profile/interview/{run_id}/answers`, `GET /profile/interview/history`; extract reusable `_launch_build(request, mgr, conflict)` |
+| `src/resume_tailor_harness/cli.py` (modify) | `resume-tailor-harness profile interview` (one terminal round) |
 | `web/src/features/interview/` (create) | Chat-styled `InterviewPanel` + hooks; mounted on the profile sources page |
 
 ---
@@ -92,11 +92,11 @@ These amendments are authoritative when a later code sketch conflicts with them.
 ### Task 1: Round schemas + history sidecar
 
 **Files:**
-- Create: `src/resume_agent/profile/interview.py`
+- Create: `src/resume_tailor_harness/profile/interview.py`
 - Test: `tests/test_profile_interview.py` (create)
 
 **Interfaces:**
-- Consumes: `ExtensibleModel` from `models/base.py`; `atomic_write_text` from `resume_agent.progress`.
+- Consumes: `ExtensibleModel` from `models/base.py`; `atomic_write_text` from `resume_tailor_harness.progress`.
 - Produces:
   - `InterviewQuestion(ExtensibleModel)`: `id: str = ""`, `gap: str = ""`, `why_it_matters: str = ""`, `question_text: str = ""`, `related_ref: str = ""`
   - `ResearchAction(ExtensibleModel)`: `kind: Literal["harvest_repo","request_url"] = "request_url"`, `target: str = ""`, `why: str = ""`
@@ -109,7 +109,7 @@ These amendments are authoritative when a later code sketch conflicts with them.
 ```python
 import pytest
 
-from resume_agent.profile.interview import (
+from resume_tailor_harness.profile.interview import (
     InterviewQuestion,
     InterviewRound,
     append_round,
@@ -165,7 +165,7 @@ def test_record_answers_once(tmp_path):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_interview.py -v`
 Expected: FAIL — module not found
 
-- [ ] **Step 3: Implement** the first half of `src/resume_agent/profile/interview.py`:
+- [ ] **Step 3: Implement** the first half of `src/resume_tailor_harness/profile/interview.py`:
 
 ```python
 """Profile Interview: round schemas, history sidecar, read-only corpus tools,
@@ -184,8 +184,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.progress import atomic_write_text
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.progress import atomic_write_text
 
 MAX_QUESTIONS = 8
 _DOC_READ_CAP = 20_000
@@ -270,7 +270,7 @@ def asked_questions(profile_dir: Path | str) -> list[str]:
     ]
 ```
 
-(Check `atomic_write_text`'s signature in `src/resume_agent/progress.py` — if it takes `(path, text)` this is correct; adjust if keyword-only.)
+(Check `atomic_write_text`'s signature in `src/resume_tailor_harness/progress.py` — if it takes `(path, text)` this is correct; adjust if keyword-only.)
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -280,7 +280,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/interview.py tests/test_profile_interview.py
+git add src/resume_tailor_harness/profile/interview.py tests/test_profile_interview.py
 git commit -m "feat: interview round schemas and history sidecar"
 ```
 
@@ -289,7 +289,7 @@ git commit -m "feat: interview round schemas and history sidecar"
 ### Task 2: Read-only corpus tools + agent builders
 
 **Files:**
-- Modify: `src/resume_agent/profile/interview.py` (append)
+- Modify: `src/resume_tailor_harness/profile/interview.py` (append)
 - Test: `tests/test_profile_interview.py` (append)
 
 **Interfaces:**
@@ -303,8 +303,8 @@ git commit -m "feat: interview round schemas and history sidecar"
 
 ```python
 def test_corpus_tools_read_only_and_capped(tmp_path):
-    from resume_agent.profile import interview as mod
-    from resume_agent.profile.corpus import add_source
+    from resume_tailor_harness.profile import interview as mod
+    from resume_tailor_harness.profile.corpus import add_source
 
     doc_path = tmp_path / "resume.md"
     doc_path.write_text("# Resume\n" + "x" * 30_000, encoding="utf-8")
@@ -336,8 +336,8 @@ from collections.abc import Callable
 
 from agno.agent import Agent
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
@@ -349,7 +349,7 @@ from resume_agent.llm_runner import (
 
 def make_corpus_tools(profile_dir: Path | str) -> list[Callable[..., str]]:
     """Read-only inspection tools for the interview loop. Strings out, no raises."""
-    from resume_agent.profile.corpus import load_manifest
+    from resume_tailor_harness.profile.corpus import load_manifest
 
     root = Path(profile_dir)
 
@@ -458,7 +458,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/interview.py tests/test_profile_interview.py
+git add src/resume_tailor_harness/profile/interview.py tests/test_profile_interview.py
 git commit -m "feat: read-only corpus tools and interview agent builders"
 ```
 
@@ -467,7 +467,7 @@ git commit -m "feat: read-only corpus tools and interview agent builders"
 ### Task 3: Context assembly with market gaps
 
 **Files:**
-- Create: `src/resume_agent/services/profile_interview.py`
+- Create: `src/resume_tailor_harness/services/profile_interview.py`
 - Test: `tests/test_profile_interview_service.py` (create)
 
 **Interfaces:**
@@ -479,7 +479,7 @@ git commit -m "feat: read-only corpus tools and interview agent builders"
 ```python
 from pathlib import Path
 
-from resume_agent.services.profile_interview import interview_context
+from resume_tailor_harness.services.profile_interview import interview_context
 
 
 def test_context_degrades_gracefully_on_fresh_workspace(tmp_path):
@@ -491,7 +491,7 @@ def test_context_degrades_gracefully_on_fresh_workspace(tmp_path):
 
 
 def test_context_includes_market_gaps(tmp_path, monkeypatch):
-    from resume_agent.services import profile_interview as svc
+    from resume_tailor_harness.services import profile_interview as svc
 
     class Gap:
         skill = "kubernetes"
@@ -510,7 +510,7 @@ def test_context_includes_market_gaps(tmp_path, monkeypatch):
 
 
 def test_context_includes_history(tmp_path):
-    from resume_agent.profile.interview import (
+    from resume_tailor_harness.profile.interview import (
         InterviewQuestion,
         InterviewRound,
         append_round,
@@ -533,7 +533,7 @@ def test_context_includes_history(tmp_path):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_interview_service.py -v`
 Expected: FAIL — module not found
 
-- [ ] **Step 3: Implement** `src/resume_agent/services/profile_interview.py` (first half):
+- [ ] **Step 3: Implement** `src/resume_tailor_harness/services/profile_interview.py` (first half):
 
 ```python
 """Profile Interview use-case: context assembly, round worker, answer intake."""
@@ -544,7 +544,7 @@ import re
 import uuid
 from pathlib import Path
 
-from resume_agent.profile.interview import (
+from resume_tailor_harness.profile.interview import (
     MAX_QUESTIONS,
     InterviewRound,
     append_round,
@@ -553,10 +553,10 @@ from resume_agent.profile.interview import (
     build_interview_inspector_agent,
     make_corpus_tools,
 )
-from resume_agent.llm_runner import Runner
-from resume_agent.profile.corpus import load_manifest
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.store import load_facts
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.profile.corpus import load_manifest
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import load_facts
 
 _METRIC = re.compile(r"\d")
 _TOP_GAPS = 10
@@ -565,9 +565,9 @@ _TOP_SKILLS = 20
 
 def _market_gaps_report(profile_dir: Path, session):
     """The Match/Gap recipe from the CLI, packaged for interview context."""
-    from resume_agent.profile.matrix import effective_cluster_map, load_overrides
-    from resume_agent.taxonomy.clusters import load_cluster_map
-    from resume_agent.tracking.match_gap import match_gap
+    from resume_tailor_harness.profile.matrix import effective_cluster_map, load_overrides
+    from resume_tailor_harness.taxonomy.clusters import load_cluster_map
+    from resume_tailor_harness.tracking.match_gap import match_gap
 
     facts_path = profile_dir / "facts.json"
     if not facts_path.exists():
@@ -649,7 +649,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_interview.py tests/test_profile_interview_service.py
+git add src/resume_tailor_harness/services/profile_interview.py tests/test_profile_interview_service.py
 git commit -m "feat: interview context assembly with market gaps and history"
 ```
 
@@ -658,7 +658,7 @@ git commit -m "feat: interview context assembly with market gaps and history"
 ### Task 4: Round worker + answer intake service
 
 **Files:**
-- Modify: `src/resume_agent/services/profile_interview.py` (append)
+- Modify: `src/resume_tailor_harness/services/profile_interview.py` (append)
 - Test: `tests/test_profile_interview_service.py` (append)
 
 **Interfaces:**
@@ -696,7 +696,7 @@ class FakeAgent:
 
 
 def _fake_round():
-    from resume_agent.profile.interview import InterviewQuestion, InterviewRound
+    from resume_tailor_harness.profile.interview import InterviewQuestion, InterviewRound
 
     return InterviewRound(
         questions=[
@@ -711,8 +711,8 @@ def _fake_round():
 
 
 def test_worker_returns_round_and_appends_history(tmp_path):
-    from resume_agent.profile.interview import load_history
-    from resume_agent.services.profile_interview import run_interview_round
+    from resume_tailor_harness.profile.interview import load_history
+    from resume_tailor_harness.services.profile_interview import run_interview_round
 
     result = run_interview_round(
         FakeReporter(),
@@ -727,8 +727,8 @@ def test_worker_returns_round_and_appends_history(tmp_path):
 def test_submit_answers_creates_notes_and_records(tmp_path):
     import pytest
 
-    from resume_agent.profile.interview import load_history
-    from resume_agent.services.profile_interview import (
+    from resume_tailor_harness.profile.interview import load_history
+    from resume_tailor_harness.services.profile_interview import (
         run_interview_round,
         submit_interview_answers,
     )
@@ -746,7 +746,7 @@ def test_submit_answers_creates_notes_and_records(tmp_path):
     )
     assert len(doc_ids) == 1  # blank answer skipped
 
-    from resume_agent.profile.corpus import load_manifest
+    from resume_tailor_harness.profile.corpus import load_manifest
 
     docs = load_manifest(tmp_path).docs
     assert any(d.id == doc_ids[0] for d in docs)
@@ -766,7 +766,7 @@ def test_submit_answers_creates_notes_and_records(tmp_path):
 def test_submit_answers_rejects_unknown_question(tmp_path):
     import pytest
 
-    from resume_agent.services.profile_interview import (
+    from resume_tailor_harness.services.profile_interview import (
         run_interview_round,
         submit_interview_answers,
     )
@@ -801,7 +801,7 @@ def run_interview_round(
     reporter.begin(1, "Reviewing your profile")
 
     if engine is not None:
-        from resume_agent.tracking.db import get_session
+        from resume_tailor_harness.tracking.db import get_session
 
         with get_session(engine) as session:
             context = interview_context(profile_dir, session=session)
@@ -844,8 +844,8 @@ def run_interview_round(
 def submit_interview_answers(
     profile_dir: Path, round_id: str, answers: list[tuple[str, str]]
 ) -> list[str]:
-    from resume_agent.profile.intake import add_note_source
-    from resume_agent.profile.interview import load_history, record_answers
+    from resume_tailor_harness.profile.intake import add_note_source
+    from resume_tailor_harness.profile.interview import load_history, record_answers
 
     profile_dir = Path(profile_dir)
     rounds = {row["round_id"]: row for row in load_history(profile_dir)["rounds"]}
@@ -872,7 +872,7 @@ def submit_interview_answers(
     return doc_ids
 ```
 
-(`getattr(reporter, "process", ...)` — `ProgressReporter` stores its run id; confirm the attribute name with `rg "self.process|self.run_id" src/resume_agent/progress.py` and use the real one. Check the `get_session` import path against `cli.py`'s import.)
+(`getattr(reporter, "process", ...)` — `ProgressReporter` stores its run id; confirm the attribute name with `rg "self.process|self.run_id" src/resume_tailor_harness/progress.py` and use the real one. Check the `get_session` import path against `cli.py`'s import.)
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -882,7 +882,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_interview.py tests/test_profile_interview_service.py
+git add src/resume_tailor_harness/services/profile_interview.py tests/test_profile_interview_service.py
 git commit -m "feat: interview round worker and answer intake"
 ```
 
@@ -891,8 +891,8 @@ git commit -m "feat: interview round worker and answer intake"
 ### Task 5: API — interview run, answers, history
 
 **Files:**
-- Modify: `src/resume_agent/api/schemas/profile.py` (append)
-- Modify: `src/resume_agent/api/routers/profile.py`
+- Modify: `src/resume_tailor_harness/api/schemas/profile.py` (append)
+- Modify: `src/resume_tailor_harness/api/routers/profile.py`
 - Test: `tests/api/test_profile_interview_router.py` (create)
 
 **Interfaces:**
@@ -910,8 +910,8 @@ import time
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import profile as profile_router
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import profile as profile_router
 
 
 def _client(tmp_path):
@@ -1058,10 +1058,10 @@ existing behavior unchanged (`singleton_conflict="join"` is today's default).
 2. New routes:
 
 ```python
-from resume_agent.api.runs.manager import RunManager, RunSingletonConflict
-from resume_agent.api.schemas.profile import InterviewAnswersIn, InterviewAnswersOut
-from resume_agent.profile.interview import load_history
-from resume_agent.services.profile_interview import (
+from resume_tailor_harness.api.runs.manager import RunManager, RunSingletonConflict
+from resume_tailor_harness.api.schemas.profile import InterviewAnswersIn, InterviewAnswersOut
+from resume_tailor_harness.profile.interview import load_history
+from resume_tailor_harness.services.profile_interview import (
     run_interview_round,
     submit_interview_answers,
 )
@@ -1164,7 +1164,7 @@ def interview_history(request: Request) -> dict:
     }
 ```
 
-(Check `RunSnapshot` exposes `.result` — `rg "result" src/resume_agent/api/runs/models.py`; if the snapshot drops `result`, read it via `mgr._read_record(run_id)` equivalent public path or extend `RunSnapshot` minimally. Adjust `snapshot.state.value` vs `snapshot.state` to the real enum handling used in `api/runs/sse.py::record_to_run`.)
+(Check `RunSnapshot` exposes `.result` — `rg "result" src/resume_tailor_harness/api/runs/models.py`; if the snapshot drops `result`, read it via `mgr._read_record(run_id)` equivalent public path or extend `RunSnapshot` minimally. Adjust `snapshot.state.value` vs `snapshot.state` to the real enum handling used in `api/runs/sse.py::record_to_run`.)
 
 - [ ] **Step 4: Run tests + regenerate contracts**
 
@@ -1174,21 +1174,21 @@ Then: `bash scripts/gen_ts_client.sh` and `.venv/Scripts/python.exe -m pytest te
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api contracts/ tests/api/test_profile_interview_router.py
+git add src/resume_tailor_harness/api contracts/ tests/api/test_profile_interview_router.py
 git commit -m "feat: profile interview run, answers, and history endpoints"
 ```
 
 ---
 
-### Task 6: CLI — `resume-agent profile interview`
+### Task 6: CLI — `resume-tailor-harness profile interview`
 
 **Files:**
-- Modify: `src/resume_agent/cli.py` (append to `profile_app`, after the `build` command at line ~231)
+- Modify: `src/resume_tailor_harness/cli.py` (append to `profile_app`, after the `build` command at line ~231)
 - Test: `tests/test_cli.py` (append)
 
 **Interfaces:**
 - Consumes: `run_interview_round`, `submit_interview_answers`; the CLI's `DEFAULT_FACTS`, `_tenant_cli_path`, `_engine`.
-- Produces: `resume-agent profile interview [--no-build]` — runs one round inline, prompts per question (`typer.prompt(..., default="")`), saves notes, optionally triggers `profile build` by telling the user to run it (CLI build is a separate command; do NOT auto-run it here — print the follow-up command instead).
+- Produces: `resume-tailor-harness profile interview [--no-build]` — runs one round inline, prompts per question (`typer.prompt(..., default="")`), saves notes, optionally triggers `profile build` by telling the user to run it (CLI build is a separate command; do NOT auto-run it here — print the follow-up command instead).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1196,7 +1196,7 @@ git commit -m "feat: profile interview run, answers, and history endpoints"
 def test_profile_interview_command(monkeypatch, tmp_path):
     from typer.testing import CliRunner
 
-    from resume_agent import cli
+    from resume_tailor_harness import cli
 
     round_result = {
         "roundId": "r1",
@@ -1213,7 +1213,7 @@ def test_profile_interview_command(monkeypatch, tmp_path):
     }
     submitted = {}
     monkeypatch.setattr(
-        "resume_agent.services.profile_interview.run_interview_round",
+        "resume_tailor_harness.services.profile_interview.run_interview_round",
         lambda reporter, **kwargs: round_result,
     )
 
@@ -1222,7 +1222,7 @@ def test_profile_interview_command(monkeypatch, tmp_path):
         return ["doc-1"]
 
     monkeypatch.setattr(
-        "resume_agent.services.profile_interview.submit_interview_answers",
+        "resume_tailor_harness.services.profile_interview.submit_interview_answers",
         fake_submit,
     )
 
@@ -1249,7 +1249,7 @@ def profile_interview_cmd(
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run one gap-driven interview round; answers become profile note sources."""
-    from resume_agent.services.profile_interview import (
+    from resume_tailor_harness.services.profile_interview import (
         run_interview_round,
         submit_interview_answers,
     )
@@ -1282,7 +1282,7 @@ def profile_interview_cmd(
     doc_ids = submit_interview_answers(profile_dir, result["roundId"], answers)
     typer.echo(f"\nSaved {len(doc_ids)} note(s).")
     if doc_ids:
-        typer.echo("Run `resume-agent profile build` to fold them into your profile.")
+        typer.echo("Run `resume-tailor-harness profile build` to fold them into your profile.")
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1293,8 +1293,8 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli.py
-git commit -m "feat: resume-agent profile interview command"
+git add src/resume_tailor_harness/cli.py tests/test_cli.py
+git commit -m "feat: resume-tailor-harness profile interview command"
 ```
 
 ---

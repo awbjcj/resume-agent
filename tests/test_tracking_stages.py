@@ -1,5 +1,5 @@
-from resume_agent.tracking.stages import advance, rank
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.stages import advance, rank
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _job(status: str) -> Job:

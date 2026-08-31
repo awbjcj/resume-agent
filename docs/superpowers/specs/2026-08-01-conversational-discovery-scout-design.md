@@ -369,7 +369,7 @@ defines them; a stopped turn is discarded and the transcript is untouched.
 
 ## CLI
 
-`resume-agent scout` opens a session and loops, driving the **same** service
+`resume-tailor-harness scout` opens a session and loops, driving the **same** service
 functions with `ConsoleStreamSink`:
 
 ```

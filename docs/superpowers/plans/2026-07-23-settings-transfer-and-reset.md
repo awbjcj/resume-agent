@@ -14,10 +14,10 @@
 - Backend tests run **offline**: no API key, no network, no live browser. Run with `.venv/Scripts/python.exe -m pytest`.
 - Lint with `ruff check`. It must pass before every commit.
 - Web tests: `cd web && npm test`. Typecheck: `cd web && npm run typecheck`.
-- **Wire format is camelCase.** Every API schema subclasses `CamelModel` from `resume_agent.api.schemas.base`. Python stays snake_case.
+- **Wire format is camelCase.** Every API schema subclasses `CamelModel` from `resume_tailor_harness.api.schemas.base`. Python stays snake_case.
 - After any API schema or route change, regenerate the contract with `bash scripts/gen_ts_client.sh`. `tests/api/test_openapi_contract.py` is a drift gate and will fail otherwise.
-- Errors use the single envelope `{"error": {code, message, details?}}` via `ApiException(status, code, message)` from `resume_agent.api.errors`.
-- **The section table is an allowlist.** Never add a denylist, glob-the-whole-directory shortcut, or "copy everything except" logic anywhere in this feature. `secrets.env`, `gmail_token.json`, `resume_agent.db`, and `config/gmail_credentials.json` live alongside the bundled files.
+- Errors use the single envelope `{"error": {code, message, details?}}` via `ApiException(status, code, message)` from `resume_tailor_harness.api.errors`.
+- **The section table is an allowlist.** Never add a denylist, glob-the-whole-directory shortcut, or "copy everything except" logic anywhere in this feature. `secrets.env`, `gmail_token.json`, `resume_tailor_harness.db`, and `config/gmail_credentials.json` live alongside the bundled files.
 - Never weaken `NON_EDITABLE_KEYS` in `prompts/guidance.py`. `reviewer-fact-check` is an integrity gate.
 - Commit after every task. Branch off `dev`, not `main`.
 
@@ -29,10 +29,10 @@
 
 | Path                                                          | Responsibility                                                              |
 | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `src/resume_agent/settings_sections.py`                       | The twelve-row table, path resolution, `is_customized`, `reset_section`     |
-| `src/resume_agent/services/settings_bundle.py`                | Export, manifest read, strict validation, section-level apply with rollback |
-| `src/resume_agent/api/schemas/settings.py`                    | `CamelModel` DTOs for the five routes                                       |
-| `src/resume_agent/api/routers/settings.py`                    | `router` + `link_router`                                                    |
+| `src/resume_tailor_harness/settings_sections.py`                       | The twelve-row table, path resolution, `is_customized`, `reset_section`     |
+| `src/resume_tailor_harness/services/settings_bundle.py`                | Export, manifest read, strict validation, section-level apply with rollback |
+| `src/resume_tailor_harness/api/schemas/settings.py`                    | `CamelModel` DTOs for the five routes                                       |
+| `src/resume_tailor_harness/api/routers/settings.py`                    | `router` + `link_router`                                                    |
 | `tests/test_settings_sections.py`                             | Registry, customized detection, reset                                       |
 | `tests/test_settings_bundle.py`                               | Round-trip, credential exclusion, strict validation, rollback               |
 | `tests/api/test_settings_api.py`                              | Routes, guards, confirm, 409                                                |
@@ -46,8 +46,8 @@
 
 | Path                                                   | Change                                                                             |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `src/resume_agent/tenancy/workspace.py`                | `provision_workspace` seeds from the registry                                      |
-| `src/resume_agent/api/app.py`                          | Register `settings.router` (guarded) and `settings.link_router` (download-guarded) |
+| `src/resume_tailor_harness/tenancy/workspace.py`                | `provision_workspace` seeds from the registry                                      |
+| `src/resume_tailor_harness/api/app.py`                          | Register `settings.router` (guarded) and `settings.link_router` (download-guarded) |
 | `web/src/features/settings/SettingsLayout.tsx`         | Add `Backup` to the `System` nav group                                             |
 | `web/src/app/router.tsx`                               | Add the `backup` route                                                             |
 | `web/src/features/settings/pages/*.tsx`                | Add `ResetSectionButton` to six pages                                              |
@@ -60,12 +60,12 @@
 
 **Files:**
 
-- Create: `src/resume_agent/settings_sections.py`
+- Create: `src/resume_tailor_harness/settings_sections.py`
 - Test: `tests/test_settings_sections.py`
 
 **Interfaces:**
 
-- Consumes: `resume_agent.tenancy.paths.resolve_tenant_path`
+- Consumes: `resume_tailor_harness.tenancy.paths.resolve_tenant_path`
 - Produces:
   - `SettingsSection` frozen dataclass with `id: str`, `label: str`, `files: tuple[str, ...]`
   - `SETTINGS_SECTIONS: tuple[SettingsSection, ...]` (12 entries)
@@ -84,8 +84,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.settings_sections import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.settings_sections import (
     SECTIONS_BY_ID,
     SETTINGS_SECTIONS,
     arcname_for,
@@ -93,8 +93,8 @@ from resume_agent.settings_sections import (
     live_paths,
     section_for,
 )
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def _context(paths: WorkspacePaths) -> UserContext:
@@ -136,7 +136,7 @@ def test_registry_never_names_a_credential():
     forbidden = {
         "secrets.env",
         "gmail_token.json",
-        "resume_agent.db",
+        "resume_tailor_harness.db",
         "config/gmail_credentials.json",
     }
     named = {entry for section in SETTINGS_SECTIONS for entry in section.files}
@@ -204,13 +204,13 @@ def test_arcname_for_is_posix_and_glob_aware(entry, filename, expected):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_settings_sections.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.settings_sections'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.settings_sections'`
 
 Note: if `use_context` is not the exported context manager in `tenancy/context.py`, open that file and use whatever the existing tests use (grep `tests/tenancy` for how a `UserContext` is entered) — match it exactly rather than inventing a helper.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/settings_sections.py`:
+Create `src/resume_tailor_harness/settings_sections.py`:
 
 ```python
 """The single enumeration of user-customizable settings.
@@ -222,7 +222,7 @@ all three for free.
 
 This table is an ALLOWLIST, and that is load-bearing. It spans the workspace
 root, whose other occupants include secrets.env, gmail_token.json,
-resume_agent.db, and config/gmail_credentials.json (an OAuth client secret). A
+resume_tailor_harness.db, and config/gmail_credentials.json (an OAuth client secret). A
 file not named here can never leave a workspace inside a bundle, nor enter one
 from an imported bundle.
 
@@ -238,9 +238,9 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_tailor_harness.tenancy.paths import resolve_tenant_path
 
-# src/resume_agent/settings_sections.py -> resume_agent -> src -> repository
+# src/resume_tailor_harness/settings_sections.py -> resume_tailor_harness -> src -> repository
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -334,7 +334,7 @@ Expected: PASS, 9 tests
 
 ```bash
 ruff check
-git add src/resume_agent/settings_sections.py tests/test_settings_sections.py
+git add src/resume_tailor_harness/settings_sections.py tests/test_settings_sections.py
 git commit -m "feat: declare the customizable settings surface once"
 ```
 
@@ -344,7 +344,7 @@ git commit -m "feat: declare the customizable settings surface once"
 
 **Files:**
 
-- Modify: `src/resume_agent/settings_sections.py` (append)
+- Modify: `src/resume_tailor_harness/settings_sections.py` (append)
 - Test: `tests/test_settings_sections.py` (append)
 
 **Interfaces:**
@@ -359,7 +359,7 @@ git commit -m "feat: declare the customizable settings surface once"
 Append to `tests/test_settings_sections.py`:
 
 ```python
-from resume_agent.settings_sections import is_customized, reset_section
+from resume_tailor_harness.settings_sections import is_customized, reset_section
 
 
 def _workspace(tmp_path):
@@ -452,7 +452,7 @@ Expected: FAIL — `ImportError: cannot import name 'is_customized'`
 
 - [ ] **Step 3: Write the implementation**
 
-Append to `src/resume_agent/settings_sections.py`:
+Append to `src/resume_tailor_harness/settings_sections.py`:
 
 ```python
 def is_customized(section: SettingsSection) -> bool:
@@ -504,7 +504,7 @@ Expected: PASS, 18 tests
 
 ```bash
 ruff check
-git add src/resume_agent/settings_sections.py tests/test_settings_sections.py
+git add src/resume_tailor_harness/settings_sections.py tests/test_settings_sections.py
 git commit -m "feat: reset one settings section to its shipped default"
 ```
 
@@ -514,7 +514,7 @@ git commit -m "feat: reset one settings section to its shipped default"
 
 **Files:**
 
-- Modify: `src/resume_agent/tenancy/workspace.py:92-115`
+- Modify: `src/resume_tailor_harness/tenancy/workspace.py:92-115`
 - Test: `tests/tenancy/test_workspace.py` (append — the file exists and already defines a `_context(tmp_path)` helper at line 13; reuse it)
 
 **Interfaces:**
@@ -529,8 +529,8 @@ git commit -m "feat: reset one settings section to its shipped default"
 Append to `tests/tenancy/test_workspace.py`:
 
 ```python
-from resume_agent.settings_sections import seedable_entries
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.settings_sections import seedable_entries
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 
 def test_seedable_entries_are_config_files_that_ship_an_example():
@@ -576,7 +576,7 @@ Expected: FAIL — `ImportError: cannot import name 'seedable_entries'`
 
 - [ ] **Step 3: Add `seedable_entries` to the registry**
 
-Append to `src/resume_agent/settings_sections.py`:
+Append to `src/resume_tailor_harness/settings_sections.py`:
 
 ```python
 def seedable_entries() -> tuple[str, ...]:
@@ -595,10 +595,10 @@ def seedable_entries() -> tuple[str, ...]:
 
 - [ ] **Step 4: Rewrite the seeding loop**
 
-In `src/resume_agent/tenancy/workspace.py`, add the import at the top:
+In `src/resume_tailor_harness/tenancy/workspace.py`, add the import at the top:
 
 ```python
-from resume_agent.settings_sections import seedable_entries
+from resume_tailor_harness.settings_sections import seedable_entries
 ```
 
 Replace the seeding block (currently the `templates.glob("*.example")` loop at the end of `provision_workspace`) with:
@@ -630,7 +630,7 @@ Expected: PASS. If anything fails, a caller depended on an `.example` that is no
 
 ```bash
 ruff check
-git add src/resume_agent/settings_sections.py src/resume_agent/tenancy/workspace.py tests/tenancy/test_workspace.py
+git add src/resume_tailor_harness/settings_sections.py src/resume_tailor_harness/tenancy/workspace.py tests/tenancy/test_workspace.py
 git commit -m "refactor: provision workspaces from the settings registry"
 ```
 
@@ -640,7 +640,7 @@ git commit -m "refactor: provision workspaces from the settings registry"
 
 **Files:**
 
-- Create: `src/resume_agent/services/settings_bundle.py`
+- Create: `src/resume_tailor_harness/services/settings_bundle.py`
 - Test: `tests/test_settings_bundle.py`
 
 **Interfaces:**
@@ -663,14 +663,14 @@ import json
 import tarfile
 from pathlib import Path
 
-from resume_agent.config import Settings
-from resume_agent.services.settings_bundle import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.services.settings_bundle import (
     BUNDLE_VERSION,
     MANIFEST_NAME,
     export_settings_bundle,
 )
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def workspace(tmp_path):
@@ -775,11 +775,11 @@ def test_export_names_glob_members_by_their_real_filename(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_settings_bundle.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.settings_bundle'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.settings_bundle'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/services/settings_bundle.py`:
+Create `src/resume_tailor_harness/services/settings_bundle.py`:
 
 ```python
 """Settings-only bundle: export, preview, and section-level import.
@@ -799,7 +799,7 @@ import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.settings_sections import (
+from resume_tailor_harness.settings_sections import (
     SETTINGS_SECTIONS,
     arcname_for,
     live_paths,
@@ -821,7 +821,7 @@ def export_settings_bundle(out_dir: Path) -> Path:
     """Write a tar.gz of every populated section into `out_dir`."""
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc)
-    archive = out_dir / f"resume-agent-settings-{stamp.date().isoformat()}.tar.gz"
+    archive = out_dir / f"resume-tailor-harness-settings-{stamp.date().isoformat()}.tar.gz"
 
     sections: list[str] = []
     members: list[tuple[str, Path]] = []
@@ -863,7 +863,7 @@ Expected: PASS, 5 tests
 
 ```bash
 ruff check
-git add src/resume_agent/services/settings_bundle.py tests/test_settings_bundle.py
+git add src/resume_tailor_harness/services/settings_bundle.py tests/test_settings_bundle.py
 git commit -m "feat: export a settings-only bundle"
 ```
 
@@ -873,12 +873,12 @@ git commit -m "feat: export a settings-only bundle"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/settings_bundle.py` (append)
+- Modify: `src/resume_tailor_harness/services/settings_bundle.py` (append)
 - Test: `tests/test_settings_bundle.py` (append)
 
 **Interfaces:**
 
-- Consumes: `_extract_validated`, `UnsafeArchiveError` from `resume_agent.services.backup`; `SECTIONS_BY_ID`, `live_paths` from Task 1
+- Consumes: `_extract_validated`, `UnsafeArchiveError` from `resume_tailor_harness.services.backup`; `SECTIONS_BY_ID`, `live_paths` from Task 1
 - Produces:
   - `BundleManifest` frozen dataclass: `version: int`, `exported_at: str`, `sections: tuple[str, ...]`, `unknown_sections: tuple[str, ...]`
   - `read_bundle_manifest(archive: Path) -> BundleManifest`
@@ -893,7 +893,7 @@ Append to `tests/test_settings_bundle.py`:
 ```python
 import pytest
 
-from resume_agent.services.settings_bundle import (
+from resume_tailor_harness.services.settings_bundle import (
     InvalidBundleError,
     UnsupportedBundleVersionError,
     read_bundle_manifest,
@@ -1018,7 +1018,7 @@ Expected: FAIL — `ImportError: cannot import name 'read_bundle_manifest'`
 
 - [ ] **Step 3: Write the implementation**
 
-Append to `src/resume_agent/services/settings_bundle.py`. Add these imports at the top of the file:
+Append to `src/resume_tailor_harness/services/settings_bundle.py`. Add these imports at the top of the file:
 
 ```python
 import tempfile
@@ -1027,19 +1027,19 @@ from dataclasses import dataclass
 
 import yaml
 
-from resume_agent.api.schemas.config import ProfileConfigDoc
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.profile.group_corrections import GroupCorrections
-from resume_agent.profile.matrix import load_overrides
-from resume_agent.prompts.guidance import MAX_GUIDANCE_CHARS
-from resume_agent.render.render_config import RenderConfig
-from resume_agent.render.templates import validate_custom_stem
-from resume_agent.services.backup import UnsafeArchiveError, _extract_validated
-from resume_agent.settings_sections import SECTIONS_BY_ID
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.taxonomy.corrections import TaxonomyCorrections
-from resume_agent.tracking.prune_config import PruneConfig
+from resume_tailor_harness.api.schemas.config import ProfileConfigDoc
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.profile.group_corrections import GroupCorrections
+from resume_tailor_harness.profile.matrix import load_overrides
+from resume_tailor_harness.prompts.guidance import MAX_GUIDANCE_CHARS
+from resume_tailor_harness.render.render_config import RenderConfig
+from resume_tailor_harness.render.templates import validate_custom_stem
+from resume_tailor_harness.services.backup import UnsafeArchiveError, _extract_validated
+from resume_tailor_harness.settings_sections import SECTIONS_BY_ID
+from resume_tailor_harness.tailor.review_config import ReviewConfig
+from resume_tailor_harness.taxonomy.corrections import TaxonomyCorrections
+from resume_tailor_harness.tracking.prune_config import PruneConfig
 ```
 
 **Why not the `*ConfigDoc` schemas used by `_store(request).get(domain)`:** those
@@ -1194,7 +1194,7 @@ Expected: PASS, 18 tests
 
 ```bash
 ruff check
-git add src/resume_agent/services/settings_bundle.py tests/test_settings_bundle.py
+git add src/resume_tailor_harness/services/settings_bundle.py tests/test_settings_bundle.py
 git commit -m "feat: read and strictly validate a settings bundle"
 ```
 
@@ -1204,7 +1204,7 @@ git commit -m "feat: read and strictly validate a settings bundle"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/settings_bundle.py` (append)
+- Modify: `src/resume_tailor_harness/services/settings_bundle.py` (append)
 - Test: `tests/test_settings_bundle.py` (append)
 
 **Interfaces:**
@@ -1217,7 +1217,7 @@ git commit -m "feat: read and strictly validate a settings bundle"
 Append to `tests/test_settings_bundle.py`:
 
 ```python
-from resume_agent.services.settings_bundle import import_settings_bundle
+from resume_tailor_harness.services.settings_bundle import import_settings_bundle
 
 
 def test_import_replaces_named_sections_and_leaves_the_rest(tmp_path):
@@ -1359,12 +1359,12 @@ Expected: FAIL — `ImportError: cannot import name 'import_settings_bundle'`
 
 - [ ] **Step 3: Write the implementation**
 
-Append to `src/resume_agent/services/settings_bundle.py`. `live_paths` is already imported by Task 4; add only these two:
+Append to `src/resume_tailor_harness/services/settings_bundle.py`. `live_paths` is already imported by Task 4; add only these two:
 
 ```python
 import shutil
 
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_tailor_harness.tenancy.paths import resolve_tenant_path
 ```
 
 Then append:
@@ -1463,7 +1463,7 @@ Expected: PASS, 25 tests
 
 ```bash
 ruff check
-git add src/resume_agent/services/settings_bundle.py tests/test_settings_bundle.py
+git add src/resume_tailor_harness/services/settings_bundle.py tests/test_settings_bundle.py
 git commit -m "feat: apply a settings bundle section by section with rollback"
 ```
 
@@ -1473,9 +1473,9 @@ git commit -m "feat: apply a settings bundle section by section with rollback"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/settings.py`
-- Create: `src/resume_agent/api/routers/settings.py`
-- Modify: `src/resume_agent/api/app.py`
+- Create: `src/resume_tailor_harness/api/schemas/settings.py`
+- Create: `src/resume_tailor_harness/api/routers/settings.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_settings_api.py`
 
 **Interfaces:**
@@ -1617,14 +1617,14 @@ Expected: FAIL — all 404, routes do not exist
 
 - [ ] **Step 3: Write the schemas**
 
-Create `src/resume_agent/api/schemas/settings.py`:
+Create `src/resume_tailor_harness/api/schemas/settings.py`:
 
 ```python
 """Wire DTOs for the settings bundle and reset controls."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class SettingsSectionOut(CamelModel):
@@ -1650,7 +1650,7 @@ class BundleApplied(CamelModel):
 
 - [ ] **Step 4: Write the router**
 
-Create `src/resume_agent/api/routers/settings.py`:
+Create `src/resume_tailor_harness/api/routers/settings.py`:
 
 ```python
 """Settings transfer and reset. Storage lives behind settings_sections."""
@@ -1666,23 +1666,23 @@ from fastapi import APIRouter, Request, UploadFile
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.settings import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.settings import (
     BundleApplied,
     BundlePreview,
     SettingsSectionList,
     SettingsSectionOut,
 )
-from resume_agent.api.uploads import UploadTooLargeError, copy_upload
-from resume_agent.services.backup import UnsafeArchiveError
-from resume_agent.services.settings_bundle import (
+from resume_tailor_harness.api.uploads import UploadTooLargeError, copy_upload
+from resume_tailor_harness.services.backup import UnsafeArchiveError
+from resume_tailor_harness.services.settings_bundle import (
     InvalidBundleError,
     UnsupportedBundleVersionError,
     export_settings_bundle,
     import_settings_bundle,
     read_bundle_manifest,
 )
-from resume_agent.settings_sections import (
+from resume_tailor_harness.settings_sections import (
     SECTIONS_BY_ID,
     SETTINGS_SECTIONS,
     SettingsSection,
@@ -1690,7 +1690,7 @@ from resume_agent.settings_sections import (
     reset_section,
     section_for,
 )
-from resume_agent.tenancy.context import current_context
+from resume_tailor_harness.tenancy.context import current_context
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 link_router = APIRouter(prefix="/settings", tags=["settings"])
@@ -1737,7 +1737,7 @@ def export_bundle() -> FileResponse:
     return FileResponse(
         archive,
         media_type="application/gzip",
-        filename=f"resume-agent-settings-{date.today().isoformat()}.tar.gz",
+        filename=f"resume-tailor-harness-settings-{date.today().isoformat()}.tar.gz",
         background=BackgroundTask(shutil.rmtree, temporary, ignore_errors=True),
     )
 
@@ -1792,10 +1792,10 @@ def reset(section_id: str) -> SettingsSectionOut:
 
 - [ ] **Step 5: Register the routers**
 
-In `src/resume_agent/api/app.py`, add the import beside the other router imports (around line 30):
+In `src/resume_tailor_harness/api/app.py`, add the import beside the other router imports (around line 30):
 
 ```python
-from resume_agent.api.routers import settings as settings_router
+from resume_tailor_harness.api.routers import settings as settings_router
 ```
 
 Add the link router beside the other `download_guarded` registrations (after line 262):
@@ -1832,7 +1832,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/api tests/api/test_settings_api.py contracts/
+git add src/resume_tailor_harness/api tests/api/test_settings_api.py contracts/
 git commit -m "feat: expose settings bundle and reset over the API"
 ```
 
@@ -2545,7 +2545,7 @@ In `CLAUDE.md`, under **Known design notes**, add:
   unit and the canonical relative paths it owns (`config/connectors.yaml`,
   `data/profile/overrides.yaml`). It is an **allowlist** — it spans the
   workspace root alongside `secrets.env`, `gmail_token.json`,
-  `resume_agent.db`, and `config/gmail_credentials.json`, so a file not named
+  `resume_tailor_harness.db`, and `config/gmail_credentials.json`, so a file not named
   there can neither leave a workspace in a settings bundle nor enter one from
   an imported bundle. `services/settings_bundle.py` exports and imports that
   set as a tar.gz (`GET/POST /api/settings/bundle`), replacing the sections a
@@ -2565,7 +2565,7 @@ In `CLAUDE.md`, under **Known design notes**, add:
 In the **Hot paths** table, add:
 
 ```markdown
-| `src/resume_agent/settings_sections.py` | Single enumeration of customizable settings: bundle scope + reset targets |
+| `src/resume_tailor_harness/settings_sections.py` | Single enumeration of customizable settings: bundle scope + reset targets |
 ```
 
 - [ ] **Step 3: Full verification**

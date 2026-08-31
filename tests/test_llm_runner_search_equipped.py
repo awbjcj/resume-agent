@@ -1,6 +1,6 @@
 from agno.models.google.gemini_interactions import GeminiInteractions
 
-from resume_agent.llm_runner import build_search_equipped
+from resume_tailor_harness.llm_runner import build_search_equipped
 
 
 def test_native_search_forwards_safe_provider_options():
@@ -48,7 +48,7 @@ def test_native_gemini_search_bounds_thinking_when_not_reasoning():
 
 
 def test_native_openai_search_reuses_the_shared_builder():
-    from resume_agent.llm_runner import build_model
+    from resume_tailor_harness.llm_runner import build_model
 
     searched, tools = build_search_equipped(
         "openai:gpt-5.5-pro", mode="native", reasoning=True

@@ -4,8 +4,8 @@ from types import SimpleNamespace
 import pytest
 from pydantic import BaseModel
 
-import resume_agent.llm_runner as llm_runner
-from resume_agent.llm_runner import AgentRunner, is_transient
+import resume_tailor_harness.llm_runner as llm_runner
+from resume_tailor_harness.llm_runner import AgentRunner, is_transient
 
 
 class _TransientError(Exception):

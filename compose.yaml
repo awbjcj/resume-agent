@@ -1,12 +1,12 @@
 services:
-  resume-agent:
+  resume-tailor-harness:
     build:
       context: .
-    image: resume-agent:local
+    image: resume-tailor-harness:local
     init: true
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${RESUME_AGENT_PORT:-8000}:8000"
+      - "127.0.0.1:${RESUME_TAILOR_HARNESS_PORT:-8000}:8000"
     environment:
       APP_MODE: local
       PORT: 8000
@@ -14,7 +14,7 @@ services:
       - path: .env
         required: false
     volumes:
-      - resume-agent-data:/app/data
+      - resume-tailor-harness-data:/app/data
 
 volumes:
-  resume-agent-data:
+  resume-tailor-harness-data:

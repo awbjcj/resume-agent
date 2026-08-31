@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Deploy resume-agent to Railway as a single-tenant instance behind a session-cookie login, with the whole Data root on one volume and browser connectors honestly degraded (spec: `docs/superpowers/specs/2026-07-10-railway-deploy-design.md`, ADR 0002).
+**Goal:** Deploy resume-tailor-harness to Railway as a single-tenant instance behind a session-cookie login, with the whole Data root on one volume and browser connectors honestly degraded (spec: `docs/superpowers/specs/2026-07-10-railway-deploy-design.md`, ADR 0002).
 
 **Architecture:** One Railway service: multi-stage Docker (node builds `web/dist` → python:3.13-slim runs FastAPI, which already serves the SPA). Auth adds a stateless HMAC session cookie beside the existing bearer token, joined inside the single guard `require_token`. Persistence is one volume at `/app/data`; an entrypoint symlinks `output/`, `config/`, `.env` into it. Admin export/import moves the Data root as one tarball (full replace, VACUUM-INTO DB snapshot).
 
@@ -12,8 +12,8 @@
 
 - Python `>=3.13` (pyproject); run tests with `.venv/Scripts/python.exe -m pytest` (offline — no API key, no network, browser faked).
 - Lint gate: `ruff check` must pass before every commit.
-- Wire format is camelCase: every new request/response model extends `CamelModel` (`src/resume_agent/api/schemas/base.py`).
-- Errors use the envelope via `ApiException(status, code, message)` (`src/resume_agent/api/errors.py`).
+- Wire format is camelCase: every new request/response model extends `CamelModel` (`src/resume_tailor_harness/api/schemas/base.py`).
+- Errors use the envelope via `ApiException(status, code, message)` (`src/resume_tailor_harness/api/errors.py`).
 - Any change to routers/schemas changes the OpenAPI contract: run `bash scripts/gen_ts_client.sh`, commit `contracts/openapi.json`, `contracts/ts/api.ts`, and `web/src/lib/api/schema.ts` together — `tests/api/test_openapi_contract.py` is the drift gate.
 - No new Python dependencies anywhere in this plan (auth is stdlib; export/import is `tarfile`/`sqlite3`).
 - Frontend tests: `cd web && npm run test:run`. Frontend lint: `cd web && npm run lint`.
@@ -79,14 +79,14 @@ of a mounted Railway volume.
 
 **Files:**
 
-- Create: `src/resume_agent/api/auth.py`
-- Modify: `src/resume_agent/config.py` (add 4 fields after `api_token`, ~line 34)
-- Modify: `src/resume_agent/cli.py` (add `hash-password` command near `serve_cmd`, ~line 818)
+- Create: `src/resume_tailor_harness/api/auth.py`
+- Modify: `src/resume_tailor_harness/config.py` (add 4 fields after `api_token`, ~line 34)
+- Modify: `src/resume_tailor_harness/cli.py` (add `hash-password` command near `serve_cmd`, ~line 818)
 - Test: `tests/api/test_auth_primitives.py`
 
 **Interfaces:**
 
-- Consumes: `Settings` (`resume_agent.config`).
+- Consumes: `Settings` (`resume_tailor_harness.config`).
 - Produces (used by Tasks 2, 4):
   - `Settings.auth_username: str = ""`, `Settings.auth_password_hash: str = ""`, `Settings.session_secret: str = ""`, `Settings.browser_enabled: bool = True`
   - `auth.SESSION_COOKIE: str = "ra_session"`, `auth.SESSION_LIFETIME_SECONDS: int`
@@ -103,7 +103,7 @@ Create `tests/api/test_auth_primitives.py`:
 ```python
 """Password hashing + stateless session tokens (spec 2026-07-10 §2)."""
 
-from resume_agent.api.auth import (
+from resume_tailor_harness.api.auth import (
     SESSION_LIFETIME_SECONDS,
     hash_password,
     issue_session,
@@ -111,7 +111,7 @@ from resume_agent.api.auth import (
     verify_password,
     verify_session,
 )
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 def _settings(**kw) -> Settings:
@@ -183,23 +183,23 @@ def test_settings_browser_enabled_default_true():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_primitives.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.api.auth'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.api.auth'`
 
 - [ ] **Step 3: Add the Settings fields**
 
-In `src/resume_agent/config.py`, directly after the `api_token` field (~line 34), add:
+In `src/resume_tailor_harness/config.py`, directly after the `api_token` field (~line 34), add:
 
 ```python
     # Single-account session auth (spec 2026-07-10). All three must be set for
     # the session guard to activate; unset = local-dev open mode.
     auth_username: str = ""
-    auth_password_hash: str = ""  # produced by `resume-agent hash-password`
+    auth_password_hash: str = ""  # produced by `resume-tailor-harness hash-password`
     session_secret: str = ""  # HMAC key for the session cookie; rotating it logs out
     # False on Railway: skips connectors that need a visible local browser.
     browser_enabled: bool = True
 ```
 
-- [ ] **Step 4: Write `src/resume_agent/api/auth.py`**
+- [ ] **Step 4: Write `src/resume_tailor_harness/api/auth.py`**
 
 ```python
 """Single-account session auth: PBKDF2 password hashes + stateless HMAC cookies.
@@ -217,7 +217,7 @@ import hmac
 import secrets
 import time
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 SESSION_COOKIE = "ra_session"
 SESSION_LIFETIME_SECONDS = 30 * 24 * 3600
@@ -290,7 +290,7 @@ Expected: all PASS
 
 - [ ] **Step 6: Add the `hash-password` CLI command**
 
-In `src/resume_agent/cli.py`, directly above `serve_cmd` (~line 818), add:
+In `src/resume_tailor_harness/cli.py`, directly above `serve_cmd` (~line 818), add:
 
 ```python
 @app.command("hash-password")
@@ -301,12 +301,12 @@ def hash_password_cmd(
     ),
 ) -> None:
     """Print the PBKDF2 hash to set as AUTH_PASSWORD_HASH (Railway env var)."""
-    from resume_agent.api.auth import hash_password
+    from resume_tailor_harness.api.auth import hash_password
 
     typer.echo(hash_password(password))
 ```
 
-Verify manually: `.venv/Scripts/python.exe -m resume_agent.cli hash-password --password test123`
+Verify manually: `.venv/Scripts/python.exe -m resume_tailor_harness.cli hash-password --password test123`
 Expected: one line starting `pbkdf2:120000:`
 
 - [ ] **Step 7: Full suite + lint, then commit**
@@ -315,7 +315,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: all pass.
 
 ```bash
-git add src/resume_agent/api/auth.py src/resume_agent/config.py src/resume_agent/cli.py tests/api/test_auth_primitives.py
+git add src/resume_tailor_harness/api/auth.py src/resume_tailor_harness/config.py src/resume_tailor_harness/cli.py tests/api/test_auth_primitives.py
 git commit -m "feat: session-auth primitives, settings fields, hash-password CLI"
 ```
 
@@ -325,10 +325,10 @@ git commit -m "feat: session-auth primitives, settings fields, hash-password CLI
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/auth.py`
-- Create: `src/resume_agent/api/routers/auth.py`
-- Modify: `src/resume_agent/api/deps.py` (`require_token` ~line 26, `refresh_app_settings` ~line 54)
-- Modify: `src/resume_agent/api/app.py` (router import block ~line 16, registration ~line 119)
+- Create: `src/resume_tailor_harness/api/schemas/auth.py`
+- Create: `src/resume_tailor_harness/api/routers/auth.py`
+- Modify: `src/resume_tailor_harness/api/deps.py` (`require_token` ~line 26, `refresh_app_settings` ~line 54)
+- Modify: `src/resume_tailor_harness/api/app.py` (router import block ~line 16, registration ~line 119)
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_auth_router.py`
 
@@ -351,10 +351,10 @@ Create `tests/api/test_auth_router.py`:
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
-from resume_agent.api.deps import refresh_app_settings
-from resume_agent.config import Settings
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.api.deps import refresh_app_settings
+from resume_tailor_harness.config import Settings
 
 
 def _auth_env(tmp_path, extra: str = ""):
@@ -376,7 +376,7 @@ def _client(app) -> TestClient:
 
 @pytest.fixture(autouse=True)
 def _no_login_delay(monkeypatch):
-    from resume_agent.api.routers import auth as auth_router
+    from resume_tailor_harness.api.routers import auth as auth_router
 
     monkeypatch.setattr(auth_router, "FAILED_LOGIN_DELAY_SECONDS", 0.0)
 
@@ -477,18 +477,18 @@ def test_refresh_preserves_auth_fields(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_router.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.api.routers.auth'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.api.routers.auth'`
 
 - [ ] **Step 3: Write the schema module**
 
-Create `src/resume_agent/api/schemas/auth.py`:
+Create `src/resume_tailor_harness/api/schemas/auth.py`:
 
 ```python
 """Auth wire models (camelCase via CamelModel)."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class LoginRequest(CamelModel):
@@ -503,7 +503,7 @@ class MeResponse(CamelModel):
 
 - [ ] **Step 4: Write the router**
 
-Create `src/resume_agent/api/routers/auth.py`:
+Create `src/resume_tailor_harness/api/routers/auth.py`:
 
 ```python
 """Login/logout/me for the single-account session (spec 2026-07-10 §2).
@@ -518,11 +518,11 @@ import time
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from resume_agent.api import auth
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.auth import LoginRequest, MeResponse
-from resume_agent.config import Settings
+from resume_tailor_harness.api import auth
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.auth import LoginRequest, MeResponse
+from resume_tailor_harness.config import Settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -578,7 +578,7 @@ def me(
 
 - [ ] **Step 5: Extend the guard and the settings refresh**
 
-In `src/resume_agent/api/deps.py`, replace `require_token` (lines 26-47) with:
+In `src/resume_tailor_harness/api/deps.py`, replace `require_token` (lines 26-47) with:
 
 ```python
 def require_token(
@@ -593,7 +593,7 @@ def require_token(
     header-less clients (EventSource SSE, <a> downloads) — same-origin browser
     sessions don't need it (cookies ride along automatically).
     """
-    from resume_agent.api.auth import (
+    from resume_tailor_harness.api.auth import (
         SESSION_COOKIE,
         session_auth_configured,
         verify_session,
@@ -635,10 +635,10 @@ def refresh_app_settings(app, fresh: Settings) -> None:
 
 - [ ] **Step 6: Register the router**
 
-In `src/resume_agent/api/app.py`: add to the router import block (~line 16):
+In `src/resume_tailor_harness/api/app.py`: add to the router import block (~line 16):
 
 ```python
-from resume_agent.api.routers import auth as auth_router
+from resume_tailor_harness.api.routers import auth as auth_router
 ```
 
 and register it UNGUARDED, directly after the health router (~line 119):
@@ -666,7 +666,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: all pass.
 
 ```bash
-git add src/resume_agent/api/schemas/auth.py src/resume_agent/api/routers/auth.py src/resume_agent/api/deps.py src/resume_agent/api/app.py tests/api/test_auth_router.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/api/schemas/auth.py src/resume_tailor_harness/api/routers/auth.py src/resume_tailor_harness/api/deps.py src/resume_tailor_harness/api/app.py tests/api/test_auth_router.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: session login endpoints + combined cookie-or-bearer guard"
 ```
 
@@ -861,7 +861,7 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-lg font-semibold">Resume Agent</h1>
+        <h1 className="text-lg font-semibold">Résumé Tailor Harness</h1>
         <div className="space-y-2">
           <Label htmlFor="login-username">Username</Label>
           <Input
@@ -1005,9 +1005,9 @@ git commit -m "feat: login page, auth gate, logout, 401 redirect in SPA"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/companies.py` (new exception ~line 31; `_failure_reason` ~line 129; `__init__` ~line 151; `_produce` ~line 181)
-- Modify: `src/resume_agent/discovery/connectors/registry.py` (companies/scrape/adzuna/linkedin specs, lines 60-103)
-- Modify: `src/resume_agent/services/discovery.py` (`add_job_from_url` ~line 103)
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py` (new exception ~line 31; `_failure_reason` ~line 129; `__init__` ~line 151; `_produce` ~line 181)
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py` (companies/scrape/adzuna/linkedin specs, lines 60-103)
+- Modify: `src/resume_tailor_harness/services/discovery.py` (`add_job_from_url` ~line 103)
 - Test: `tests/test_browser_capability.py`
 
 **Interfaces:**
@@ -1026,13 +1026,13 @@ Create `tests/test_browser_capability.py`:
 ```python
 """browser_enabled=False degrades browser connectors honestly (spec §4)."""
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors import companies as companies_mod
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.registry import build_connectors
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors import companies as companies_mod
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.registry import build_connectors
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _SEARCH = SearchConfig()  # no anchors: relevance gate falls through
 
@@ -1118,7 +1118,7 @@ def test_companies_tesla_untouched_when_browser_enabled(monkeypatch):
 
 
 def test_add_job_from_url_gates_browser(monkeypatch):
-    from resume_agent.services import discovery as discovery_mod
+    from resume_tailor_harness.services import discovery as discovery_mod
 
     seen: dict[str, bool] = {}
 
@@ -1147,7 +1147,7 @@ Expected: FAIL — `TypeError: __init__() got an unexpected keyword argument 'br
 
 - [ ] **Step 3: Gate Tesla inside CompaniesConnector**
 
-In `src/resume_agent/discovery/connectors/companies.py`:
+In `src/resume_tailor_harness/discovery/connectors/companies.py`:
 
 Add after `UnsupportedAts` (~line 41):
 
@@ -1182,7 +1182,7 @@ In `_produce`, after the `backend is None` check (~line 193):
 
 - [ ] **Step 4: Wire settings through the registry**
 
-In `src/resume_agent/discovery/connectors/registry.py`:
+In `src/resume_tailor_harness/discovery/connectors/registry.py`:
 
 - companies spec (~line 66): `build=lambda payloads, c, s: CompaniesConnector(payloads, browser_enabled=s.browser_enabled),`
 - scrape spec (~line 74): add `pullable=lambda s: s.browser_enabled,` after `build`.
@@ -1191,7 +1191,7 @@ In `src/resume_agent/discovery/connectors/registry.py`:
 
 - [ ] **Step 5: Gate URL-ingest at the service**
 
-In `src/resume_agent/services/discovery.py`, inside `add_job_from_url` (~line 110), change the `job_from_url(...)` call to AND the caller's flag with settings (add `from resume_agent.config import get_settings` to the imports if absent):
+In `src/resume_tailor_harness/services/discovery.py`, inside `add_job_from_url` (~line 110), change the `job_from_url(...)` call to AND the caller's flag with settings (add `from resume_tailor_harness.config import get_settings` to the imports if absent):
 
 ```python
         raw = job_from_url(
@@ -1212,7 +1212,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: all pass (existing connector tests confirm `browser_enabled=True` default changes nothing).
 
 ```bash
-git add src/resume_agent/discovery/connectors/companies.py src/resume_agent/discovery/connectors/registry.py src/resume_agent/services/discovery.py tests/test_browser_capability.py
+git add src/resume_tailor_harness/discovery/connectors/companies.py src/resume_tailor_harness/discovery/connectors/registry.py src/resume_tailor_harness/services/discovery.py tests/test_browser_capability.py
 git commit -m "feat: browser_enabled flag degrades browser connectors per-unit"
 ```
 
@@ -1222,7 +1222,7 @@ git commit -m "feat: browser_enabled flag degrades browser connectors per-unit"
 
 **Files:**
 
-- Create: `src/resume_agent/deploy.py`
+- Create: `src/resume_tailor_harness/deploy.py`
 - Create: `docker/entrypoint.sh`
 - Test: `tests/test_deploy_prepare.py`
 
@@ -1231,7 +1231,7 @@ git commit -m "feat: browser_enabled flag degrades browser connectors per-unit"
 - Consumes: nothing from other tasks (pure filesystem).
 - Produces (used by Task 8's Dockerfile):
   - `prepare_data_root(app_root: Path, data_root: Path, defaults_dir: Path | None = None) -> None`
-  - `python -m resume_agent.deploy` entrypoint honoring `APP_ROOT` (default `/app`) and `DATA_ROOT` (default `$APP_ROOT/data`), seeding config from `$APP_ROOT/config.defaults`.
+  - `python -m resume_tailor_harness.deploy` entrypoint honoring `APP_ROOT` (default `/app`) and `DATA_ROOT` (default `$APP_ROOT/data`), seeding config from `$APP_ROOT/config.defaults`.
   - `LINKS: dict[str, str]` mapping app-root names to data-root targets (`output`, `config`, `.env`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -1247,7 +1247,7 @@ tests probe and skip rather than fail on locked-down machines.
 
 import pytest
 
-from resume_agent.deploy import prepare_data_root
+from resume_tailor_harness.deploy import prepare_data_root
 
 
 def _require_symlinks(tmp_path):
@@ -1315,9 +1315,9 @@ def test_no_defaults_dir_still_creates_structure(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_deploy_prepare.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.deploy'` (or SKIP everywhere if symlinks are unavailable — in that case enable Windows Developer Mode or accept container-only coverage, and say so in the commit message).
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.deploy'` (or SKIP everywhere if symlinks are unavailable — in that case enable Windows Developer Mode or accept container-only coverage, and say so in the commit message).
 
-- [ ] **Step 3: Implement `src/resume_agent/deploy.py`**
+- [ ] **Step 3: Implement `src/resume_tailor_harness/deploy.py`**
 
 ```python
 """Container boot: bring every mutable path onto the Data root volume.
@@ -1383,8 +1383,8 @@ Create `docker/entrypoint.sh` (LF line endings — add a `.gitattributes` rule i
 ```sh
 #!/bin/sh
 set -e
-python -m resume_agent.deploy
-exec resume-agent serve --host 0.0.0.0 --port "${PORT:-8000}"
+python -m resume_tailor_harness.deploy
+exec resume-tailor-harness serve --host 0.0.0.0 --port "${PORT:-8000}"
 ```
 
 - [ ] **Step 6: Full suite + lint, then commit**
@@ -1393,7 +1393,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: all pass.
 
 ```bash
-git add src/resume_agent/deploy.py docker/entrypoint.sh tests/test_deploy_prepare.py .gitattributes
+git add src/resume_tailor_harness/deploy.py docker/entrypoint.sh tests/test_deploy_prepare.py .gitattributes
 git commit -m "feat: volume prep (seed + symlinks) and container entrypoint"
 ```
 
@@ -1403,15 +1403,15 @@ git commit -m "feat: volume prep (seed + symlinks) and container entrypoint"
 
 **Files:**
 
-- Create: `src/resume_agent/services/backup.py`
-- Create: `src/resume_agent/api/routers/admin.py`
-- Modify: `src/resume_agent/api/app.py` (import block ~line 16, guarded registration ~line 135)
+- Create: `src/resume_tailor_harness/services/backup.py`
+- Create: `src/resume_tailor_harness/api/routers/admin.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (import block ~line 16, guarded registration ~line 135)
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/test_backup_service.py`, `tests/api/test_admin_backup.py`
 
 **Interfaces:**
 
-- Consumes: `app.state.data_dir`, `app.state.db_url`, `app.state.engine`, `app.state.env_path`, `RunManager.list_active()`, `refresh_app_settings` (Task 2 version), `make_engine`/`init_db` (`resume_agent.db`).
+- Consumes: `app.state.data_dir`, `app.state.db_url`, `app.state.engine`, `app.state.env_path`, `RunManager.list_active()`, `refresh_app_settings` (Task 2 version), `make_engine`/`init_db` (`resume_tailor_harness.db`).
 - Produces (used by Task 7):
   - `backup.sqlite_snapshot(db_file: Path, dest: Path) -> None`
   - `backup.export_data_root(data_root: Path, db_url: str, out_dir: Path) -> Path` (returns the archive path)
@@ -1431,7 +1431,7 @@ import tarfile
 
 import pytest
 
-from resume_agent.services.backup import (
+from resume_tailor_harness.services.backup import (
     UnsafeArchiveError,
     export_data_root,
     import_data_root,
@@ -1444,7 +1444,7 @@ def _make_root(tmp_path, name="data"):
     (root / "profile").mkdir(parents=True)
     (root / "profile" / "facts.json").write_text('{"facts": []}', encoding="utf-8")
     (root / ".env").write_text("ANTHROPIC_API_KEY=sk-x\n", encoding="utf-8")
-    db = root / "resume_agent.db"
+    db = root / "resume_tailor_harness.db"
     with sqlite3.connect(db) as conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("CREATE TABLE job (id INTEGER PRIMARY KEY, title TEXT)")
@@ -1464,14 +1464,14 @@ def test_sqlite_snapshot_is_consistent_copy(tmp_path):
 
 def test_export_replaces_live_db_with_snapshot(tmp_path):
     root, db = _make_root(tmp_path)
-    (root / "resume_agent.db-wal").write_bytes(b"")  # simulate a live WAL sidecar
+    (root / "resume_tailor_harness.db-wal").write_bytes(b"")  # simulate a live WAL sidecar
     archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
     with tarfile.open(archive) as tar:
         names = tar.getnames()
     assert "profile/facts.json" in names
     assert ".env" in names
-    assert "resume_agent.db" in names
-    assert "resume_agent.db-wal" not in names  # sidecars never ship
+    assert "resume_tailor_harness.db" in names
+    assert "resume_tailor_harness.db-wal" not in names  # sidecars never ship
 
 
 def test_roundtrip_restores_content(tmp_path):
@@ -1483,7 +1483,7 @@ def test_roundtrip_restores_content(tmp_path):
     import_data_root(archive, root)
     assert (root / "profile" / "facts.json").read_text(encoding="utf-8") == '{"facts": []}'
     assert not (root / "stray.txt").exists()  # full replace, not merge
-    with sqlite3.connect(root / "resume_agent.db") as conn:
+    with sqlite3.connect(root / "resume_tailor_harness.db") as conn:
         assert conn.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
     conn.close()
 
@@ -1511,9 +1511,9 @@ def test_export_db_outside_root_ships_tree_only(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_backup_service.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.backup'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.backup'`
 
-- [ ] **Step 3: Implement `src/resume_agent/services/backup.py`**
+- [ ] **Step 3: Implement `src/resume_tailor_harness/services/backup.py`**
 
 ```python
 """Whole-root export/import (ADR 0002): the Data root moves as one tarball.
@@ -1564,7 +1564,7 @@ def _is_db_artifact(path: Path, db_file: Path) -> bool:
 
 def export_data_root(data_root: Path, db_url: str, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    archive = out_dir / f"resume-agent-data-{date.today().isoformat()}.tar.gz"
+    archive = out_dir / f"resume-tailor-harness-data-{date.today().isoformat()}.tar.gz"
     db_file = _sqlite_file(db_url, data_root)
     with tempfile.TemporaryDirectory() as tmp:
         snapshot: Path | None = None
@@ -1627,8 +1627,8 @@ import io
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from resume_agent.api.app import create_app
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _app(tmp_path):
@@ -1636,7 +1636,7 @@ def _app(tmp_path):
     data_dir.mkdir()
     (data_dir / "profile").mkdir()
     (data_dir / "profile" / "facts.json").write_text("{}", encoding="utf-8")
-    db_url = f"sqlite:///{(data_dir / 'resume_agent.db').as_posix()}"
+    db_url = f"sqlite:///{(data_dir / 'resume_tailor_harness.db').as_posix()}"
     return create_app(db_url=db_url, data_dir=data_dir), data_dir
 
 
@@ -1692,13 +1692,13 @@ def test_endpoints_refuse_while_runs_active(tmp_path, monkeypatch):
 def test_admin_guarded_like_other_routes(tmp_path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    db_url = f"sqlite:///{(data_dir / 'resume_agent.db').as_posix()}"
+    db_url = f"sqlite:///{(data_dir / 'resume_tailor_harness.db').as_posix()}"
     app = create_app(db_url=db_url, data_dir=data_dir, api_token="secret")
     with TestClient(app) as client:
         assert client.get("/api/admin/export").status_code == 401
 ```
 
-Note: check `Job`'s required fields in `src/resume_agent/tracking/tables.py` before running; adjust `_add_job` to satisfy NOT NULL columns the same way existing tests (e.g. `tests/api/test_boards.py`) construct jobs.
+Note: check `Job`'s required fields in `src/resume_tailor_harness/tracking/tables.py` before running; adjust `_add_job` to satisfy NOT NULL columns the same way existing tests (e.g. `tests/api/test_boards.py`) construct jobs.
 
 - [ ] **Step 6: Run router tests to verify they fail**
 
@@ -1707,7 +1707,7 @@ Expected: FAIL — 404s (`No route for /api/admin/export`).
 
 - [ ] **Step 7: Implement the router and register it**
 
-Create `src/resume_agent/api/routers/admin.py`:
+Create `src/resume_tailor_harness/api/routers/admin.py`:
 
 ```python
 """Whole-root export/import endpoints (ADR 0002).
@@ -1728,11 +1728,11 @@ from fastapi import APIRouter, Request, UploadFile
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
-from resume_agent.api.deps import refresh_app_settings
-from resume_agent.api.errors import ApiException
-from resume_agent.config import Settings
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.backup import (
+from resume_tailor_harness.api.deps import refresh_app_settings
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.backup import (
     UnsafeArchiveError,
     export_data_root,
     import_data_root,
@@ -1790,10 +1790,10 @@ def import_root(request: Request, file: UploadFile, confirm: str = "") -> dict[s
     return {"status": "imported"}
 ```
 
-In `src/resume_agent/api/app.py`: add to the import block (~line 16):
+In `src/resume_tailor_harness/api/app.py`: add to the import block (~line 16):
 
 ```python
-from resume_agent.api.routers import admin as admin_router
+from resume_tailor_harness.api.routers import admin as admin_router
 ```
 
 and register it in the guarded list (after the dashboard router, ~line 135):
@@ -1819,7 +1819,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: all pass.
 
 ```bash
-git add src/resume_agent/services/backup.py src/resume_agent/api/routers/admin.py src/resume_agent/api/app.py tests/test_backup_service.py tests/api/test_admin_backup.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/services/backup.py src/resume_tailor_harness/api/routers/admin.py src/resume_tailor_harness/api/app.py tests/test_backup_service.py tests/api/test_admin_backup.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: whole-root export/import service + admin endpoints"
 ```
 
@@ -1829,7 +1829,7 @@ git commit -m "feat: whole-root export/import service + admin endpoints"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/backup.py` (append one function)
+- Modify: `src/resume_tailor_harness/services/backup.py` (append one function)
 - Create: `scripts/pack_data.py`
 - Test: `tests/test_backup_service.py` (append tests)
 
@@ -1844,12 +1844,12 @@ Append to `tests/test_backup_service.py`:
 
 ```python
 def test_pack_local_checkout_builds_volume_layout(tmp_path):
-    from resume_agent.services.backup import pack_local_checkout
+    from resume_tailor_harness.services.backup import pack_local_checkout
 
     repo = tmp_path / "repo"
     (repo / "data" / "profile").mkdir(parents=True)
     (repo / "data" / "profile" / "facts.json").write_text("{}", encoding="utf-8")
-    db = repo / "data" / "resume_agent.db"
+    db = repo / "data" / "resume_tailor_harness.db"
     with sqlite3.connect(db) as conn:
         conn.execute("CREATE TABLE job (id INTEGER PRIMARY KEY)")
     conn.close()
@@ -1863,14 +1863,14 @@ def test_pack_local_checkout_builds_volume_layout(tmp_path):
     with tarfile.open(archive) as tar:
         names = set(tar.getnames())
     assert "profile/facts.json" in names        # data/* lands at archive root
-    assert "resume_agent.db" in names
+    assert "resume_tailor_harness.db" in names
     assert "config/search.yaml" in names
     assert "output/acme/resume.pdf" in names
     assert ".env" in names
 
 
 def test_pack_local_checkout_tolerates_missing_optional_paths(tmp_path):
-    from resume_agent.services.backup import pack_local_checkout
+    from resume_tailor_harness.services.backup import pack_local_checkout
 
     repo = tmp_path / "repo"
     (repo / "data").mkdir(parents=True)  # no config/, output/, .env
@@ -1886,7 +1886,7 @@ Expected: FAIL — `ImportError: cannot import name 'pack_local_checkout'`
 
 - [ ] **Step 3: Implement**
 
-Append to `src/resume_agent/services/backup.py`:
+Append to `src/resume_tailor_harness/services/backup.py`:
 
 ```python
 def pack_local_checkout(repo_root: Path, out: Path) -> Path:
@@ -1934,7 +1934,7 @@ session cookie, or using the API token):
 import argparse
 from pathlib import Path
 
-from resume_agent.services.backup import pack_local_checkout
+from resume_tailor_harness.services.backup import pack_local_checkout
 
 
 def main() -> None:
@@ -1961,7 +1961,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: all pass.
 
 ```bash
-git add src/resume_agent/services/backup.py scripts/pack_data.py tests/test_backup_service.py
+git add src/resume_tailor_harness/services/backup.py scripts/pack_data.py tests/test_backup_service.py
 git commit -m "feat: pack_local_checkout seed tarball + pack_data script"
 ```
 
@@ -1978,7 +1978,7 @@ git commit -m "feat: pack_local_checkout seed tarball + pack_data script"
 
 **Interfaces:**
 
-- Consumes: `docker/entrypoint.sh` + `python -m resume_agent.deploy` (Task 5), `resume-agent serve --host --port` (`cli.py:820`), `spa_dist_dir()` expecting `<repo_root>/web/dist` (`api/app.py:40-45`), `/api/health` (unauthenticated).
+- Consumes: `docker/entrypoint.sh` + `python -m resume_tailor_harness.deploy` (Task 5), `resume-tailor-harness serve --host --port` (`cli.py:820`), `spa_dist_dir()` expecting `<repo_root>/web/dist` (`api/app.py:40-45`), `/api/health` (unauthenticated).
 - Produces: a deployable image + Railway config-as-code + the operator runbook.
 
 - [ ] **Step 1: Write `.dockerignore`**
@@ -2078,13 +2078,13 @@ Single-tenant: one account, one service, one volume.
 2. **Attach the volume**: service → Settings → Volumes → mount path `/app/data`.
    (One volume per service; this pins the service to 1 replica — by design.)
 3. **Set Platform secrets** (service → Variables). Generate the hash locally
-   with `resume-agent hash-password`; generate the session secret with
+   with `resume-tailor-harness hash-password`; generate the session secret with
    `python -c "import secrets; print(secrets.token_hex(32))"`:
 
    | Variable             | Value                                            |
    | -------------------- | ------------------------------------------------ |
    | `AUTH_USERNAME`      | your login name                                  |
-   | `AUTH_PASSWORD_HASH` | output of `resume-agent hash-password`           |
+   | `AUTH_PASSWORD_HASH` | output of `resume-tailor-harness hash-password`           |
    | `SESSION_SECRET`     | 64 hex chars; rotating it logs out every session |
    | `API_TOKEN`          | (optional) bearer for curl/CLI scripts           |
    | `BROWSER_ENABLED`    | `false` (already the image default)              |
@@ -2129,7 +2129,7 @@ you want them:
    `tar -xzf backup-<date>.tar.gz -C data/` … extract `config/`, `output/`,
    `.env` members beside it (they sit at the archive root — see
    `scripts/pack_data.py` for the layout).
-2. Run the local pull: `resume-agent pull` (local default is
+2. Run the local pull: `resume-tailor-harness pull` (local default is
    `BROWSER_ENABLED=true`).
 3. Re-pack and import (seeding commands above).
 4. **Do not mutate the cloud instance between steps 1 and 3** — the import
@@ -2154,12 +2154,12 @@ you want them:
 - [ ] **Step 5: Manual verification (requires Docker; skip gracefully if unavailable)**
 
 ```bash
-docker build -t resume-agent .
+docker build -t resume-tailor-harness .
 docker run --rm -p 8000:8000 -v ra-data:/app/data \
   -e AUTH_USERNAME=owner \
-  -e AUTH_PASSWORD_HASH="$(.venv/Scripts/python.exe -m resume_agent.cli hash-password --password test123)" \
+  -e AUTH_PASSWORD_HASH="$(.venv/Scripts/python.exe -m resume_tailor_harness.cli hash-password --password test123)" \
   -e SESSION_SECRET=devsecret \
-  resume-agent
+  resume-tailor-harness
 ````
 
 Then verify from another shell:
@@ -2177,12 +2177,12 @@ Then verify from another shell:
 - [ ] **Step 5: Manual verification (requires Docker; skip gracefully if unavailable)**
 
 ```bash
-docker build -t resume-agent .
+docker build -t resume-tailor-harness .
 docker run --rm -p 8000:8000 -v ra-data:/app/data \
   -e AUTH_USERNAME=owner \
-  -e AUTH_PASSWORD_HASH="$(.venv/Scripts/python.exe -m resume_agent.cli hash-password --password test123)" \
+  -e AUTH_PASSWORD_HASH="$(.venv/Scripts/python.exe -m resume_tailor_harness.cli hash-password --password test123)" \
   -e SESSION_SECRET=devsecret \
-  resume-agent
+  resume-tailor-harness
 ```
 
 Then verify from another shell:

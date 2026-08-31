@@ -1,5 +1,5 @@
-from resume_agent.api import auth
-from resume_agent.config import Settings
+from resume_tailor_harness.api import auth
+from resume_tailor_harness.config import Settings
 
 
 SETTINGS = Settings.model_validate({"session_secret": "s3cret"})

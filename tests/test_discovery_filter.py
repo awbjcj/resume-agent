@@ -1,6 +1,6 @@
-from resume_agent.discovery.filter import apply_filters
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import JobCriteria, SalaryRange, SponsorshipSignal
+from resume_tailor_harness.discovery.filter import apply_filters
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.job import JobCriteria, SalaryRange, SponsorshipSignal
 
 
 def test_sponsorship_denied_is_rejected():

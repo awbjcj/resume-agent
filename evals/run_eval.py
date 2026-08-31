@@ -9,18 +9,18 @@ from evals.judge import build_judge_agent, judge_prompt_hash
 from evals.report import render_artifact, render_report
 from evals.runner import CaseResult, run_case
 from evals.schema import load_cases, load_profile
-from resume_agent.discovery.extract import build_extract_agent
-from resume_agent.services.agents import TailorBundle, build_tailor_bundle
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.discovery.extract import build_extract_agent
+from resume_tailor_harness.services.agents import TailorBundle, build_tailor_bundle
+from resume_tailor_harness.tailor.agents import (
     build_reviewer_agent,
     build_reviser_agent,
     build_revision_agent,
     build_tailor_agent,
     model_for_tier,
 )
-from resume_agent.tailor.portfolio_planner import build_evidence_portfolio_agent
-from resume_agent.tailor.review_config import ReviewConfig, load_review_config
-from resume_agent.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tailor.portfolio_planner import build_evidence_portfolio_agent
+from resume_tailor_harness.tailor.review_config import ReviewConfig, load_review_config
+from resume_tailor_harness.tailor.style_guide import load_style_guide
 
 
 def build_eval_bundle(

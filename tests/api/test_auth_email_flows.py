@@ -6,10 +6,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import verify_password
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, PendingRegistration, User
-from resume_agent.tenancy.workspace import workspace_paths
+from resume_tailor_harness.api.auth import verify_password
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, PendingRegistration, User
+from resume_tailor_harness.tenancy.workspace import workspace_paths
 
 
 EMAIL = "ada@example.com"
@@ -197,7 +197,7 @@ def test_expired_invite_cannot_be_consumed(mu_app):
 
 
 def test_provisioning_failure_rolls_back_user_invite_and_files(mu_app, monkeypatch):
-    from resume_agent.api.routers import auth_register
+    from resume_tailor_harness.api.routers import auth_register
 
     created = []
 

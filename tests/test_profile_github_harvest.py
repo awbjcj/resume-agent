@@ -1,9 +1,9 @@
 import httpx
 
-from resume_agent.profile.corpus import add_source, load_manifest
-from resume_agent.profile.fragments import fragment_cache_status
-from resume_agent.profile.github import GitHubClient
-from resume_agent.profile.github_harvest import (
+from resume_tailor_harness.profile.corpus import add_source, load_manifest
+from resume_tailor_harness.profile.fragments import fragment_cache_status
+from resume_tailor_harness.profile.github import GitHubClient
+from resume_tailor_harness.profile.github_harvest import (
     GITHUB_DOC_PREFIX,
     _dossier_filename,
     _github_docs_for,

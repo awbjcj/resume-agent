@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from evals.schema import EvalCase, load_case, load_cases, load_profile
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
 
 
 def _case_dict() -> dict:

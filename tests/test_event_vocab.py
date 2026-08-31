@@ -1,4 +1,4 @@
-from resume_agent.tracking.event_vocab import (
+from resume_tailor_harness.tracking.event_vocab import (
     FUNNEL_KINDS,
     KIND_IMPLIES_STATUS,
     REPEATABLE_KINDS,
@@ -7,7 +7,7 @@ from resume_agent.tracking.event_vocab import (
     Modality,
     Platform,
 )
-from resume_agent.tracking.tables import ApplicationStatus
+from resume_tailor_harness.tracking.tables import ApplicationStatus
 
 
 def test_every_kind_except_custom_has_a_status_implication():

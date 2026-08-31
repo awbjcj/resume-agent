@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.config import env_settings
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.config import env_settings
 
 
 def _client(**kw):

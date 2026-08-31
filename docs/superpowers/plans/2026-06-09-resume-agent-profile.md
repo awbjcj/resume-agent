@@ -1,14 +1,14 @@
-# Resume Agent — Profile Implementation Plan
+# Résumé Tailor Harness — Profile Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the `profile` component and a `resume-agent profile build` CLI command that turns your existing resume file + GitHub profile into `data/profile/facts.json` — the human-editable, authoritative fact-lock that all downstream tailoring draws from.
+**Goal:** Build the `profile` component and a `resume-tailor-harness profile build` CLI command that turns your existing resume file + GitHub profile into `data/profile/facts.json` — the human-editable, authoritative fact-lock that all downstream tailoring draws from.
 
 **Architecture:** Deterministic I/O (resume text extraction, GitHub REST fetch, JSON store, merge) is separated from the cheap-model LLM structuring steps: resume text → `ProfileFacts`, and GitHub README text → `Project` summaries. Every unit takes its collaborators as parameters so it can be tested with fakes/fixtures — no network or API key needed in tests.
 
 **Tech Stack:** Python 3.13, uv, Pydantic v2, Agno (`Agent` + `Claude`), Anthropic, httpx, pypdf, python-docx, Typer, pytest.
 
-**Depends on:** the Foundation plan (`resume_agent.models.profile.ProfileFacts` etc., `resume_agent.config`). Foundation is merged to `main` and green (31 tests).
+**Depends on:** the Foundation plan (`resume_tailor_harness.models.profile.ProfileFacts` etc., `resume_tailor_harness.config`). Foundation is merged to `main` and green (31 tests).
 
 > **Commit convention:** every commit ends with the trailer via a second `-m`:
 > `-m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"`
@@ -17,7 +17,7 @@
 
 ## Reference & scoped decisions
 
-Design spec: `docs/superpowers/specs/2026-06-08-resume-agent-design.md` §5.1.
+Design spec: `docs/superpowers/specs/2026-06-08-resume-tailor-harness-design.md` §5.1.
 
 Plan-author decisions (documented; override if undesired):
 
@@ -29,7 +29,7 @@ Plan-author decisions (documented; override if undesired):
 ## File Structure (created/modified by this plan)
 
 ```
-src/resume_agent/
+src/resume_tailor_harness/
   config.py                 # MODIFY: add cheap_model setting
   cli.py                    # CREATE: Typer app + `profile build`
   profile/
@@ -62,8 +62,8 @@ tests/
 
 **Files:**
 
-- Modify: `pyproject.toml`, `src/resume_agent/config.py`, `tests/test_config.py`
-- Create: `src/resume_agent/profile/__init__.py`, `config/profile_sources.yaml.example`
+- Modify: `pyproject.toml`, `src/resume_tailor_harness/config.py`, `tests/test_config.py`
+- Create: `src/resume_tailor_harness/profile/__init__.py`, `config/profile_sources.yaml.example`
 
 - [ ] **Step 1: Add the Profile dependencies**
 
@@ -97,7 +97,7 @@ Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'cheap_mo
 
 - [ ] **Step 4: Add the setting**
 
-In `src/resume_agent/config.py`, add this line to the `Settings` class, right after `db_url`:
+In `src/resume_tailor_harness/config.py`, add this line to the `Settings` class, right after `db_url`:
 
 ```python
     cheap_model: str = "claude-haiku-4-5-20251001"
@@ -105,7 +105,7 @@ In `src/resume_agent/config.py`, add this line to the `Settings` class, right af
 
 - [ ] **Step 5: Create the package + example sources file**
 
-Create `src/resume_agent/profile/__init__.py`:
+Create `src/resume_tailor_harness/profile/__init__.py`:
 
 ```python
 """Profile component: build the fact-lock from resume + GitHub."""
@@ -133,7 +133,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/config.py src/resume_agent/profile/__init__.py config/profile_sources.yaml.example tests/test_config.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/config.py src/resume_tailor_harness/profile/__init__.py config/profile_sources.yaml.example tests/test_config.py
 git commit -m "feat(profile): add deps, cheap_model setting, package scaffold" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -143,7 +143,7 @@ git commit -m "feat(profile): add deps, cheap_model setting, package scaffold" -
 
 **Files:**
 
-- Create: `src/resume_agent/profile/resume_reader.py`
+- Create: `src/resume_tailor_harness/profile/resume_reader.py`
 - Test: `tests/test_profile_resume_reader.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -153,7 +153,7 @@ Create `tests/test_profile_resume_reader.py`:
 ```python
 import pytest
 
-from resume_agent.profile.resume_reader import read_resume_text
+from resume_tailor_harness.profile.resume_reader import read_resume_text
 
 
 def test_reads_txt(tmp_path):
@@ -191,11 +191,11 @@ Run:
 uv run pytest tests/test_profile_resume_reader.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.resume_reader'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.resume_reader'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/resume_reader.py`:
+Create `src/resume_tailor_harness/profile/resume_reader.py`:
 
 ```python
 from pathlib import Path
@@ -241,7 +241,7 @@ Expected: PASS (3 tests). (PDF extraction is exercised manually with a real resu
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/resume_reader.py tests/test_profile_resume_reader.py
+git add src/resume_tailor_harness/profile/resume_reader.py tests/test_profile_resume_reader.py
 git commit -m "feat(profile): resume text reader for pdf/docx/txt" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -251,7 +251,7 @@ git commit -m "feat(profile): resume text reader for pdf/docx/txt" -m "Co-Author
 
 **Files:**
 
-- Create: `src/resume_agent/profile/github.py`
+- Create: `src/resume_tailor_harness/profile/github.py`
 - Test: `tests/test_profile_github.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -261,7 +261,7 @@ Create `tests/test_profile_github.py`:
 ```python
 import httpx
 
-from resume_agent.profile.github import GitHubClient
+from resume_tailor_harness.profile.github import GitHubClient
 
 
 def _client(handler) -> GitHubClient:
@@ -325,16 +325,16 @@ Run:
 uv run pytest tests/test_profile_github.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.github'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.github'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/github.py`:
+Create `src/resume_tailor_harness/profile/github.py`:
 
 ```python
 import httpx
 
-from resume_agent.config import get_settings
+from resume_tailor_harness.config import get_settings
 
 GITHUB_API = "https://api.github.com"
 
@@ -394,7 +394,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/github.py tests/test_profile_github.py
+git add src/resume_tailor_harness/profile/github.py tests/test_profile_github.py
 git commit -m "feat(profile): httpx-based GitHub REST client" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -404,7 +404,7 @@ git commit -m "feat(profile): httpx-based GitHub REST client" -m "Co-Authored-By
 
 **Files:**
 
-- Create: `src/resume_agent/profile/extractor.py`
+- Create: `src/resume_tailor_harness/profile/extractor.py`
 - Test: `tests/test_profile_extractor.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -416,8 +416,8 @@ import pytest
 
 from agno.agent import Agent
 
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.extractor import build_extractor_agent, extract_profile_facts
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.extractor import build_extractor_agent, extract_profile_facts
 
 
 class _FakeResult:
@@ -463,11 +463,11 @@ Run:
 uv run pytest tests/test_profile_extractor.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.extractor'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.extractor'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/extractor.py`:
+Create `src/resume_tailor_harness/profile/extractor.py`:
 
 ```python
 from typing import Any, Protocol
@@ -475,8 +475,8 @@ from typing import Any, Protocol
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
-from resume_agent.config import get_settings
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 class Runner(Protocol):
@@ -526,7 +526,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/extractor.py tests/test_profile_extractor.py
+git add src/resume_tailor_harness/profile/extractor.py tests/test_profile_extractor.py
 git commit -m "feat(profile): Agno agent + resume->ProfileFacts extractor" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -536,7 +536,7 @@ git commit -m "feat(profile): Agno agent + resume->ProfileFacts extractor" -m "C
 
 **Files:**
 
-- Create: `src/resume_agent/profile/github_ingest.py`
+- Create: `src/resume_tailor_harness/profile/github_ingest.py`
 - Test: `tests/test_profile_github_ingest.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -544,8 +544,8 @@ git commit -m "feat(profile): Agno agent + resume->ProfileFacts extractor" -m "C
 Create `tests/test_profile_github_ingest.py`:
 
 ```python
-from resume_agent.models.profile import GitHubProfile, Project
-from resume_agent.profile.github_ingest import build_github_profile, repo_to_project
+from resume_tailor_harness.models.profile import GitHubProfile, Project
+from resume_tailor_harness.profile.github_ingest import build_github_profile, repo_to_project
 
 
 def test_build_github_profile_aggregates_signals():
@@ -605,16 +605,16 @@ Run:
 uv run pytest tests/test_profile_github_ingest.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.github_ingest'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.github_ingest'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/github_ingest.py`:
+Create `src/resume_tailor_harness/profile/github_ingest.py`:
 
 ```python
 from collections import Counter
 
-from resume_agent.models.profile import GitHubProfile, Project
+from resume_tailor_harness.models.profile import GitHubProfile, Project
 
 
 def build_github_profile(profile: dict, repos: list[dict]) -> GitHubProfile:
@@ -667,7 +667,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/github_ingest.py tests/test_profile_github_ingest.py
+git add src/resume_tailor_harness/profile/github_ingest.py tests/test_profile_github_ingest.py
 git commit -m "feat(profile): GitHub profile/repo metadata ingest" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -677,7 +677,7 @@ git commit -m "feat(profile): GitHub profile/repo metadata ingest" -m "Co-Author
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/github_ingest.py`
+- Modify: `src/resume_tailor_harness/profile/github_ingest.py`
 - Test: `tests/test_profile_github_ingest.py`
 
 - [ ] **Step 1: Add failing tests for README summaries**
@@ -687,8 +687,8 @@ Append to `tests/test_profile_github_ingest.py`:
 ```python
 import pytest
 
-from resume_agent.models.profile import Project
-from resume_agent.profile.github_ingest import summarize_repo_project
+from resume_tailor_harness.models.profile import Project
+from resume_tailor_harness.profile.github_ingest import summarize_repo_project
 
 
 class _Result:
@@ -733,7 +733,7 @@ def test_summarize_repo_project_rejects_wrong_agent_type():
 
 - [ ] **Step 2: Implement the summarizer**
 
-Add these imports near the top of `src/resume_agent/profile/github_ingest.py`:
+Add these imports near the top of `src/resume_tailor_harness/profile/github_ingest.py`:
 
 ```python
 from typing import Any, Protocol
@@ -741,7 +741,7 @@ from typing import Any, Protocol
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
-from resume_agent.config import get_settings
+from resume_tailor_harness.config import get_settings
 ```
 
 Then append:
@@ -811,7 +811,7 @@ Expected: PASS.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/profile/github_ingest.py tests/test_profile_github_ingest.py
+git add src/resume_tailor_harness/profile/github_ingest.py tests/test_profile_github_ingest.py
 git commit -m "feat(profile): summarize GitHub READMEs into Project facts" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -821,7 +821,7 @@ git commit -m "feat(profile): summarize GitHub READMEs into Project facts" -m "C
 
 **Files:**
 
-- Create: `src/resume_agent/profile/merge.py`
+- Create: `src/resume_tailor_harness/profile/merge.py`
 - Test: `tests/test_profile_merge.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -829,8 +829,8 @@ git commit -m "feat(profile): summarize GitHub READMEs into Project facts" -m "C
 Create `tests/test_profile_merge.py`:
 
 ```python
-from resume_agent.models.profile import Contact, GitHubProfile, ProfileFacts, Project
-from resume_agent.profile.merge import merge_facts
+from resume_tailor_harness.models.profile import Contact, GitHubProfile, ProfileFacts, Project
+from resume_tailor_harness.profile.merge import merge_facts
 
 
 def test_merge_appends_github_projects_and_sets_profile():
@@ -864,14 +864,14 @@ Run:
 uv run pytest tests/test_profile_merge.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.merge'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.merge'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/merge.py`:
+Create `src/resume_tailor_harness/profile/merge.py`:
 
 ```python
-from resume_agent.models.profile import GitHubProfile, ProfileFacts, Project
+from resume_tailor_harness.models.profile import GitHubProfile, ProfileFacts, Project
 
 
 def merge_facts(
@@ -905,7 +905,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/merge.py tests/test_profile_merge.py
+git add src/resume_tailor_harness/profile/merge.py tests/test_profile_merge.py
 git commit -m "feat(profile): merge resume + GitHub facts" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -915,7 +915,7 @@ git commit -m "feat(profile): merge resume + GitHub facts" -m "Co-Authored-By: C
 
 **Files:**
 
-- Create: `src/resume_agent/profile/store.py`
+- Create: `src/resume_tailor_harness/profile/store.py`
 - Test: `tests/test_profile_store.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -923,8 +923,8 @@ git commit -m "feat(profile): merge resume + GitHub facts" -m "Co-Authored-By: C
 Create `tests/test_profile_store.py`:
 
 ```python
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.store import load_facts, save_facts
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.store import load_facts, save_facts
 
 
 def test_save_creates_parent_dirs_and_round_trips(tmp_path):
@@ -955,16 +955,16 @@ Run:
 uv run pytest tests/test_profile_store.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.store'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.store'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/store.py`:
+Create `src/resume_tailor_harness/profile/store.py`:
 
 ```python
 from pathlib import Path
 
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 def save_facts(facts: ProfileFacts, path: str | Path) -> Path:
@@ -993,7 +993,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/store.py tests/test_profile_store.py
+git add src/resume_tailor_harness/profile/store.py tests/test_profile_store.py
 git commit -m "feat(profile): facts.json save/load" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -1003,7 +1003,7 @@ git commit -m "feat(profile): facts.json save/load" -m "Co-Authored-By: Claude O
 
 **Files:**
 
-- Create: `src/resume_agent/profile/build.py`
+- Create: `src/resume_tailor_harness/profile/build.py`
 - Test: `tests/test_profile_build.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1011,8 +1011,8 @@ git commit -m "feat(profile): facts.json save/load" -m "Co-Authored-By: Claude O
 Create `tests/test_profile_build.py`:
 
 ```python
-from resume_agent.models.profile import Contact, ProfileFacts, Project
-from resume_agent.profile.build import build_profile
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Project
+from resume_tailor_harness.profile.build import build_profile
 
 
 class _FakeResult:
@@ -1081,26 +1081,26 @@ Run:
 uv run pytest tests/test_profile_build.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.build'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.build'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/build.py`:
+Create `src/resume_tailor_harness/profile/build.py`:
 
 ```python
 from pathlib import Path
 
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.extractor import build_extractor_agent, extract_profile_facts
-from resume_agent.profile.github import GitHubClient
-from resume_agent.profile.github_ingest import (
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.profile.extractor import build_extractor_agent, extract_profile_facts
+from resume_tailor_harness.profile.github import GitHubClient
+from resume_tailor_harness.profile.github_ingest import (
     build_github_profile,
     build_repo_summary_agent,
     repo_to_project,
     summarize_repo_project,
 )
-from resume_agent.profile.merge import merge_facts
-from resume_agent.profile.resume_reader import read_resume_text
+from resume_tailor_harness.profile.merge import merge_facts
+from resume_tailor_harness.profile.resume_reader import read_resume_text
 
 
 def build_profile(
@@ -1152,17 +1152,17 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/build.py tests/test_profile_build.py
+git add src/resume_tailor_harness/profile/build.py tests/test_profile_build.py
 git commit -m "feat(profile): build_profile orchestrator" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
 
-## Task 9: CLI — `resume-agent profile build`
+## Task 9: CLI — `resume-tailor-harness profile build`
 
 **Files:**
 
-- Create: `src/resume_agent/cli.py`
+- Create: `src/resume_tailor_harness/cli.py`
 - Modify: `pyproject.toml` (add `[project.scripts]`)
 - Test: `tests/test_cli_profile.py`
 
@@ -1173,8 +1173,8 @@ Create `tests/test_cli_profile.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent.models.profile import Contact, Project, ProfileFacts
-from resume_agent import cli
+from resume_tailor_harness.models.profile import Contact, Project, ProfileFacts
+from resume_tailor_harness import cli
 
 runner = CliRunner()
 
@@ -1237,22 +1237,22 @@ Run:
 uv run pytest tests/test_cli_profile.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cli'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.cli'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/cli.py`:
+Create `src/resume_tailor_harness/cli.py`:
 
 ```python
 from pathlib import Path
 
 import typer
 
-from resume_agent.config import load_yaml
-from resume_agent.profile.build import build_profile
-from resume_agent.profile.store import save_facts
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.profile.build import build_profile
+from resume_tailor_harness.profile.store import save_facts
 
-app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
+app = typer.Typer(help="Résumé Tailor Harness — personal job-hunt automation pipeline.")
 profile_app = typer.Typer(help="Build and manage your fact-lock profile.")
 app.add_typer(profile_app, name="profile")
 
@@ -1304,7 +1304,7 @@ In `pyproject.toml`, add this block (after `[project]`/dependencies, near the ot
 
 ```toml
 [project.scripts]
-resume-agent = "resume_agent.cli:app"
+resume-tailor-harness = "resume_tailor_harness.cli:app"
 ```
 
 - [ ] **Step 6: Verify the CLI is wired**
@@ -1312,7 +1312,7 @@ resume-agent = "resume_agent.cli:app"
 Run:
 
 ```bash
-uv run resume-agent profile build --help
+uv run resume-tailor-harness profile build --help
 ```
 
 Expected: help text for the `profile build` command (exit 0).
@@ -1330,7 +1330,7 @@ Expected: all tests pass (Foundation 31 + Profile additions).
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/cli.py pyproject.toml tests/test_cli_profile.py
+git add src/resume_tailor_harness/cli.py pyproject.toml tests/test_cli_profile.py
 git commit -m "feat(profile): profile build CLI with overwrite protection" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

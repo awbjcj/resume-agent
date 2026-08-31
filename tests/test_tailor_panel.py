@@ -1,26 +1,26 @@
 import pytest
 
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     ProfileFacts,
     Skill,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredSkill,
 )
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.panel import (
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.panel import (
     compose_evidence_review_input,
     compose_lean_review_input,
     review_one,
     run_panel,
 )
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 class _Result:
@@ -120,7 +120,7 @@ def test_lean_review_input_fences_the_jd_but_never_the_coverage_block():
 
 
 def test_evidence_input_carries_only_referenced_facts():
-    from resume_agent.tailor.provenance import resolve_evidence
+    from resume_tailor_harness.tailor.provenance import resolve_evidence
 
     evidence = resolve_evidence(_content(), _facts())
     text = compose_evidence_review_input(_content(), "Backend role", evidence)
@@ -199,7 +199,7 @@ def test_arun_panel_runs_reviewers_concurrently_in_order():
     import asyncio
     import time
 
-    from resume_agent.tailor.panel import arun_panel
+    from resume_tailor_harness.tailor.panel import arun_panel
 
     config = ReviewConfig(
         reviewers=[
@@ -238,7 +238,7 @@ def test_arun_panel_runs_reviewers_concurrently_in_order():
 def test_arun_panel_settles_reviewers_before_raising():
     import asyncio
 
-    from resume_agent.tailor.panel import arun_panel
+    from resume_tailor_harness.tailor.panel import arun_panel
 
     config = ReviewConfig(
         reviewers=[ReviewerSpec(name="boom"), ReviewerSpec(name="slow")]
@@ -277,7 +277,7 @@ def test_arun_panel_settles_reviewers_before_raising():
 def test_arun_panel_rejects_non_merged_reviewer_identity_mismatch():
     import asyncio
 
-    from resume_agent.tailor.panel import arun_panel
+    from resume_tailor_harness.tailor.panel import arun_panel
 
     config = ReviewConfig(reviewers=[ReviewerSpec(name="ats-keyword", weight=1)])
     agents = {
@@ -298,8 +298,8 @@ def test_arun_panel_rejects_non_merged_reviewer_identity_mismatch():
 def test_arun_panel_rejects_merged_gate_identity_mismatch():
     import asyncio
 
-    from resume_agent.models.review import MergedPanelReview, ReviewCritique
-    from resume_agent.tailor.panel import MERGED_ADVISORY, arun_panel
+    from resume_tailor_harness.models.review import MergedPanelReview, ReviewCritique
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY, arun_panel
 
     config = ReviewConfig(
         merged_advisory=True,
@@ -322,8 +322,8 @@ def test_arun_panel_rejects_merged_gate_identity_mismatch():
 
 
 def test_split_merged_critiques_returns_config_order():
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import split_merged_critiques
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import split_merged_critiques
 
     review = MergedPanelReview(
         critiques=[
@@ -346,8 +346,8 @@ def test_split_merged_critiques_returns_config_order():
     ],
 )
 def test_split_merged_critiques_rejects_wrong_coverage(names):
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import split_merged_critiques
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import split_merged_critiques
 
     review = MergedPanelReview(
         critiques=[
@@ -360,7 +360,7 @@ def test_split_merged_critiques_rejects_wrong_coverage(names):
 
 
 def test_merged_advisory_instructions_include_each_rubric():
-    from resume_agent.tailor.agents import _merged_advisory_instructions
+    from resume_tailor_harness.tailor.agents import _merged_advisory_instructions
 
     text = " ".join(_merged_advisory_instructions(["ats-keyword", "concision"]))
     assert "'ats-keyword'" in text
@@ -370,7 +370,7 @@ def test_merged_advisory_instructions_include_each_rubric():
 
 
 def test_merged_advisory_instructions_apply_score_bands_per_reviewer():
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _SCORE_BAND_INSTRUCTION,
         _merged_advisory_instructions,
     )
@@ -400,8 +400,8 @@ def _merged_config() -> ReviewConfig:
 
 
 def test_run_panel_merged_makes_one_lean_advisory_call():
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import MERGED_ADVISORY
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY
 
     merged = _Agent(
         MergedPanelReview(
@@ -435,8 +435,8 @@ def test_run_panel_merged_makes_one_lean_advisory_call():
 def test_arun_panel_merged_matches_sync_order():
     import asyncio
 
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import MERGED_ADVISORY, arun_panel
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY, arun_panel
 
     reviewers = {
         "fact-check": _Agent(

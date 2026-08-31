@@ -1,4 +1,4 @@
-from resume_agent.api.schemas.base import CamelModel, Page, Pagination
+from resume_tailor_harness.api.schemas.base import CamelModel, Page, Pagination
 
 
 class Item(CamelModel):

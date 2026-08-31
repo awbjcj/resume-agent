@@ -25,9 +25,9 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py` (Settings class, after `advisor_model`)
-- Modify: `src/resume_agent/tenancy/workspace.py` (WorkspacePaths)
-- Modify: `src/resume_agent/api/schemas/secrets.py` (SECRET_FIELDS, SecretsUpdate)
+- Modify: `src/resume_tailor_harness/config.py` (Settings class, after `advisor_model`)
+- Modify: `src/resume_tailor_harness/tenancy/workspace.py` (WorkspacePaths)
+- Modify: `src/resume_tailor_harness/api/schemas/secrets.py` (SECRET_FIELDS, SecretsUpdate)
 - Test: `tests/test_gmail_credentials.py` (create)
 
 **Interfaces:**
@@ -41,9 +41,9 @@
 # tests/test_gmail_credentials.py
 from pathlib import Path
 
-from resume_agent.api.schemas.secrets import SECRET_FIELDS
-from resume_agent.config import Settings
-from resume_agent.tenancy.workspace import (
+from resume_tailor_harness.api.schemas.secrets import SECRET_FIELDS
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.workspace import (
     effective_settings,
     workspace_paths,
 )
@@ -88,7 +88,7 @@ Expected: FAIL (AttributeError / KeyError — fields don't exist yet).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/config.py`, add to `Settings` after `advisor_model: str = ""`:
+In `src/resume_tailor_harness/config.py`, add to `Settings` after `advisor_model: str = ""`:
 
 ```python
     # Gmail integration (platform OAuth client; users may override the client
@@ -100,7 +100,7 @@ In `src/resume_agent/config.py`, add to `Settings` after `advisor_model: str = "
     gmail_max_messages: int = Field(default=50, ge=1)
 ```
 
-In `src/resume_agent/tenancy/workspace.py`, add to `WorkspacePaths` after `secrets_env`:
+In `src/resume_tailor_harness/tenancy/workspace.py`, add to `WorkspacePaths` after `secrets_env`:
 
 ```python
     @property
@@ -108,7 +108,7 @@ In `src/resume_agent/tenancy/workspace.py`, add to `WorkspacePaths` after `secre
         return self.root / "gmail_token.json"
 ```
 
-In `src/resume_agent/api/schemas/secrets.py`, add to `SECRET_FIELDS` (after `linkedin_password`):
+In `src/resume_tailor_harness/api/schemas/secrets.py`, add to `SECRET_FIELDS` (after `linkedin_password`):
 
 ```python
     "google_oauth_client_id": "GOOGLE_OAUTH_CLIENT_ID",
@@ -131,7 +131,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -q` 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/config.py src/resume_agent/tenancy/workspace.py src/resume_agent/api/schemas/secrets.py tests/test_gmail_credentials.py contracts/ web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/tenancy/workspace.py src/resume_tailor_harness/api/schemas/secrets.py tests/test_gmail_credentials.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(gmail): settings, workspace token path, and secrets contract for multi-user Gmail"
 ```
 
@@ -141,9 +141,9 @@ git commit -m "feat(gmail): settings, workspace token path, and secrets contract
 
 **Files:**
 
-- Create: `src/resume_agent/gmail/errors.py`
-- Create: `src/resume_agent/gmail/auth.py`
-- Modify: `src/resume_agent/gmail/client.py` (delete `GMAIL_SCOPES`/`CREDENTIALS_PATH`/`TOKEN_PATH`/`build_gmail_service`; re-export the CLI builder)
+- Create: `src/resume_tailor_harness/gmail/errors.py`
+- Create: `src/resume_tailor_harness/gmail/auth.py`
+- Modify: `src/resume_tailor_harness/gmail/client.py` (delete `GMAIL_SCOPES`/`CREDENTIALS_PATH`/`TOKEN_PATH`/`build_gmail_service`; re-export the CLI builder)
 - Test: `tests/test_gmail_auth.py` (create)
 
 **Interfaces:**
@@ -170,11 +170,11 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.gmail import auth
-from resume_agent.gmail.errors import GmailNotConnected
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import workspace_paths
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.gmail import auth
+from resume_tailor_harness.gmail.errors import GmailNotConnected
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import workspace_paths
 
 
 def _context(tmp_path: Path) -> UserContext:
@@ -243,12 +243,12 @@ def test_build_service_raises_when_disconnected(tmp_path: Path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_gmail_auth.py -q`
-Expected: FAIL with `ModuleNotFoundError: resume_agent.gmail.auth`.
+Expected: FAIL with `ModuleNotFoundError: resume_tailor_harness.gmail.auth`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/gmail/errors.py
+# src/resume_tailor_harness/gmail/errors.py
 """Typed Gmail failure family. `.code` feeds run error_code and ApiException."""
 
 
@@ -275,7 +275,7 @@ class GmailApiError(GmailError):
 ```
 
 ```python
-# src/resume_agent/gmail/auth.py
+# src/resume_tailor_harness/gmail/auth.py
 """Tenant-aware Gmail credential storage + service construction.
 
 Tokens are per-user workspace files (never DB rows). The interactive
@@ -289,8 +289,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from resume_agent.gmail.errors import GmailNotConnected
-from resume_agent.tenancy.context import current_context
+from resume_tailor_harness.gmail.errors import GmailNotConnected
+from resume_tailor_harness.tenancy.context import current_context
 
 SCOPE_READONLY = "https://www.googleapis.com/auth/gmail.readonly"
 SCOPE_COMPOSE = "https://www.googleapis.com/auth/gmail.compose"
@@ -381,10 +381,10 @@ def build_gmail_service_interactive(credentials_path: str = CREDENTIALS_PATH) ->
     return build("gmail", "v1", credentials=creds)
 ```
 
-In `src/resume_agent/gmail/client.py`: delete the `GMAIL_SCOPES`, `CREDENTIALS_PATH`, `TOKEN_PATH` constants and the whole `build_gmail_service` function (and the now-unused `Path` import if nothing else uses it), then add near the top:
+In `src/resume_tailor_harness/gmail/client.py`: delete the `GMAIL_SCOPES`, `CREDENTIALS_PATH`, `TOKEN_PATH` constants and the whole `build_gmail_service` function (and the now-unused `Path` import if nothing else uses it), then add near the top:
 
 ```python
-from resume_agent.gmail.auth import build_gmail_service_interactive as build_gmail_service  # noqa: F401  — CLI compat
+from resume_tailor_harness.gmail.auth import build_gmail_service_interactive as build_gmail_service  # noqa: F401  — CLI compat
 ```
 
 - [ ] **Step 4: Run tests**
@@ -395,8 +395,8 @@ Expected: PASS (CLI test mocks `build_gmail_service`, which still resolves).
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/gmail tests/test_gmail_auth.py
-git add src/resume_agent/gmail tests/test_gmail_auth.py
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/gmail tests/test_gmail_auth.py
+git add src/resume_tailor_harness/gmail tests/test_gmail_auth.py
 git commit -m "feat(gmail): tenant-aware auth module + typed error taxonomy"
 ```
 
@@ -406,9 +406,9 @@ git commit -m "feat(gmail): tenant-aware auth module + typed error taxonomy"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/gmail.py`
-- Create: `src/resume_agent/api/routers/gmail.py`
-- Modify: `src/resume_agent/api/app.py` (register routers; init `app.state.gmail_oauth_states = {}` right after `app.state.login_limiter = FailedAttemptLimiter()`)
+- Create: `src/resume_tailor_harness/api/schemas/gmail.py`
+- Create: `src/resume_tailor_harness/api/routers/gmail.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register routers; init `app.state.gmail_oauth_states = {}` right after `app.state.login_limiter = FailedAttemptLimiter()`)
 - Test: `tests/api/test_gmail_router.py` (create)
 
 **Interfaces:**
@@ -428,7 +428,7 @@ git commit -m "feat(gmail): tenant-aware auth module + typed error taxonomy"
 import json
 from types import SimpleNamespace
 
-from resume_agent.gmail import auth as gmail_auth
+from resume_tailor_harness.gmail import auth as gmail_auth
 
 
 class _FakeFlow:
@@ -461,7 +461,7 @@ class _FakeFlow:
 
 
 def _patch_flow(monkeypatch):
-    from resume_agent.api.routers import gmail as gmail_router
+    from resume_tailor_harness.api.routers import gmail as gmail_router
 
     flow = _FakeFlow()
     monkeypatch.setattr(gmail_router, "_build_flow", lambda settings, redirect_uri: flow)
@@ -530,10 +530,10 @@ Expected: FAIL (404s — routes don't exist).
 - [ ] **Step 3: Implement schemas + router**
 
 ```python
-# src/resume_agent/api/schemas/gmail.py
+# src/resume_tailor_harness/api/schemas/gmail.py
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class GmailConnectOut(CamelModel):
@@ -548,7 +548,7 @@ class GmailStatusOut(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/gmail.py
+# src/resume_tailor_harness/api/routers/gmail.py
 """Gmail account connection: OAuth web flow + status + disconnect.
 
 The callback is unguarded — Google's top-level redirect may not carry
@@ -566,13 +566,13 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
-from resume_agent.api import auth as auth_module
-from resume_agent.api.deps import get_data_dir
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.gmail import GmailConnectOut, GmailStatusOut
-from resume_agent.config import Settings, get_settings
-from resume_agent.gmail import auth as gmail_auth
-from resume_agent.tenancy.context import current_context, use_context
+from resume_tailor_harness.api import auth as auth_module
+from resume_tailor_harness.api.deps import get_data_dir
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.gmail import GmailConnectOut, GmailStatusOut
+from resume_tailor_harness.config import Settings, get_settings
+from resume_tailor_harness.gmail import auth as gmail_auth
+from resume_tailor_harness.tenancy.context import current_context, use_context
 
 router = APIRouter()
 callback_router = APIRouter()
@@ -652,7 +652,7 @@ def _resolve_callback_user(request: Request, state: str):
         return None, False
     from sqlalchemy.orm import Session as SystemSession
 
-    from resume_agent.tenancy.system_db import User
+    from resume_tailor_harness.tenancy.system_db import User
 
     with SystemSession(system_engine, expire_on_commit=False) as session:
         user = session.get(User, user_id)
@@ -678,7 +678,7 @@ def gmail_callback(request: Request, code: str = "", state: str = "", error: str
                 flow.credentials.to_json(), request.app.state.data_dir
             )
         else:
-            from resume_agent.tenancy.bootstrap import build_context
+            from resume_tailor_harness.tenancy.bootstrap import build_context
 
             context = build_context(
                 user,
@@ -745,9 +745,9 @@ def gmail_disconnect(request: Request):
     return _status(request)
 ```
 
-In `src/resume_agent/api/app.py`:
+In `src/resume_tailor_harness/api/app.py`:
 
-- add `from resume_agent.api.routers import gmail as gmail_router` to the router imports;
+- add `from resume_tailor_harness.api.routers import gmail as gmail_router` to the router imports;
 - add `app.state.gmail_oauth_states = {}` right after the `app.state.login_limiter = FailedAttemptLimiter()` line;
 - register (next to the notifications router registration):
 
@@ -764,8 +764,8 @@ Run: `bash scripts/gen_ts_client.sh` then `.venv/Scripts/python.exe -m pytest te
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/api tests/api/test_gmail_router.py
-git add src/resume_agent/api tests/api/test_gmail_router.py contracts/ web/src/lib/api/schema.ts
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/api tests/api/test_gmail_router.py
+git add src/resume_tailor_harness/api tests/api/test_gmail_router.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(gmail): OAuth web flow — connect, signed-state callback, status, disconnect"
 ```
 
@@ -775,13 +775,13 @@ git commit -m "feat(gmail): OAuth web flow — connect, signed-state callback, s
 
 **Files:**
 
-- Modify: `src/resume_agent/gmail/client.py` (EmailMessage.body, body extraction)
-- Modify: `src/resume_agent/gmail/classify.py` (body in rules text, `build_classifier_llm`, `hydrating_classifier`)
+- Modify: `src/resume_tailor_harness/gmail/client.py` (EmailMessage.body, body extraction)
+- Modify: `src/resume_tailor_harness/gmail/classify.py` (body in rules text, `build_classifier_llm`, `hydrating_classifier`)
 - Test: `tests/test_gmail_body.py` (create), extend `tests/test_gmail_classify.py`
 
 **Interfaces:**
 
-- Consumes: `html_to_text` from `resume_agent.discovery.connectors.text`, `model_for_tier` from `resume_agent.tailor.agents`, `AgentRunner`, `build_model`, `resolve_api_key`, `retry_kwargs` from `llm_runner`.
+- Consumes: `html_to_text` from `resume_tailor_harness.discovery.connectors.text`, `model_for_tier` from `resume_tailor_harness.tailor.agents`, `AgentRunner`, `build_model`, `resolve_api_key`, `retry_kwargs` from `llm_runner`.
 - Produces:
   - `EmailMessage.body: str | None = None` (new dataclass field, default keeps all callers working)
   - `gmail.client.extract_body(payload: dict) -> str` (text/plain preferred, else html→text, truncated to `BODY_CHAR_LIMIT = 4000`)
@@ -795,8 +795,8 @@ git commit -m "feat(gmail): OAuth web flow — connect, signed-state callback, s
 # tests/test_gmail_body.py
 import base64
 
-from resume_agent.gmail.classify import hydrating_classifier
-from resume_agent.gmail.client import EmailMessage, extract_body, fetch_message_body
+from resume_tailor_harness.gmail.classify import hydrating_classifier
+from resume_tailor_harness.gmail.client import EmailMessage, extract_body, fetch_message_body
 
 
 def _b64(text: str) -> str:
@@ -871,8 +871,8 @@ Also add to `tests/test_gmail_classify.py`:
 
 ```python
 def test_classify_prefers_body_over_snippet():
-    from resume_agent.gmail.client import EmailMessage
-    from resume_agent.gmail.classify import classify_email
+    from resume_tailor_harness.gmail.client import EmailMessage
+    from resume_tailor_harness.gmail.classify import classify_email
 
     email = EmailMessage(
         sender="hr@acme.com",
@@ -891,12 +891,12 @@ Expected: FAIL (no `extract_body`, no `body` field).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/gmail/client.py`, add `body: str | None = None` as the last `EmailMessage` field, and append:
+In `src/resume_tailor_harness/gmail/client.py`, add `body: str | None = None` as the last `EmailMessage` field, and append:
 
 ```python
 import base64
 
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_tailor_harness.discovery.connectors.text import html_to_text
 
 BODY_CHAR_LIMIT = 4000
 
@@ -935,7 +935,7 @@ def fetch_message_body(service, message_id: str) -> str:
 
 (If `html_to_text` in `discovery/connectors/text.py` has a different exact name/signature, check it first and adapt the call — it exists and is the JD HTML→text helper.)
 
-In `src/resume_agent/gmail/classify.py`, change the rules text line in `classify_email` to include the body:
+In `src/resume_tailor_harness/gmail/classify.py`, change the rules text line in `classify_email` to include the body:
 
 ```python
     text = f"{email.subject}\n{email.body or email.snippet}".lower()
@@ -957,8 +957,8 @@ and append:
 ```python
 def build_classifier_llm() -> Runner | None:
     """Cheap-tier fallback agent, or None when that provider has no key."""
-    from resume_agent.llm_runner import AgentRunner, build_model, resolve_api_key, retry_kwargs
-    from resume_agent.tailor.agents import model_for_tier
+    from resume_tailor_harness.llm_runner import AgentRunner, build_model, resolve_api_key, retry_kwargs
+    from resume_tailor_harness.tailor.agents import model_for_tier
 
     model_id = model_for_tier("cheap")
     if not resolve_api_key(model_id):
@@ -974,7 +974,7 @@ def hydrating_classifier(service, llm: Runner | None):
     propose_transitions only calls classify AFTER an email matched an
     application, so the body fetch happens for matches only.
     """
-    from resume_agent.gmail.client import fetch_message_body
+    from resume_tailor_harness.gmail.client import fetch_message_body
 
     def classify(email: EmailMessage) -> str:
         if email.body is None and email.message_id:
@@ -995,8 +995,8 @@ Expected: PASS.
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/gmail tests/test_gmail_body.py tests/test_gmail_classify.py
-git add src/resume_agent/gmail tests/test_gmail_body.py tests/test_gmail_classify.py
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/gmail tests/test_gmail_body.py tests/test_gmail_classify.py
+git add src/resume_tailor_harness/gmail tests/test_gmail_body.py tests/test_gmail_classify.py
 git commit -m "feat(gmail): body-aware classification with wired cheap-tier LLM fallback"
 ```
 
@@ -1006,10 +1006,10 @@ git commit -m "feat(gmail): body-aware classification with wired cheap-tier LLM 
 
 **Files:**
 
-- Create: `src/resume_agent/services/reminders.py`
-- Modify: `src/resume_agent/services/notifications.py` (`accept_notification` branches on kind)
-- Modify: `src/resume_agent/api/schemas/notifications.py` (job projection fields)
-- Modify: `src/resume_agent/api/routers/notifications.py` (join job info)
+- Create: `src/resume_tailor_harness/services/reminders.py`
+- Modify: `src/resume_tailor_harness/services/notifications.py` (`accept_notification` branches on kind)
+- Modify: `src/resume_tailor_harness/api/schemas/notifications.py` (job projection fields)
+- Modify: `src/resume_tailor_harness/api/routers/notifications.py` (join job info)
 - Test: `tests/test_services_reminders.py` (create)
 
 **Interfaces:**
@@ -1029,11 +1029,11 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.notifications import accept_notification, list_pending
-from resume_agent.services.reminders import FOLLOW_UP_KIND, create_follow_up_reminders
-from resume_agent.tracking.repository import get_application, save_application, save_job
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.notifications import accept_notification, list_pending
+from resume_tailor_harness.services.reminders import FOLLOW_UP_KIND, create_follow_up_reminders
+from resume_tailor_harness.tracking.repository import get_application, save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 def _now() -> datetime:
@@ -1098,12 +1098,12 @@ def test_accept_follow_up_does_not_change_status():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_reminders.py -q`
-Expected: FAIL with `ModuleNotFoundError: resume_agent.services.reminders`.
+Expected: FAIL with `ModuleNotFoundError: resume_tailor_harness.services.reminders`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/services/reminders.py
+# src/resume_tailor_harness/services/reminders.py
 """Deterministic stale-application reminders. No LLM, no email parsing.
 
 One reminder per staleness episode: the dedupe key embeds the
@@ -1117,10 +1117,10 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session
 
-from resume_agent.config import get_settings
-from resume_agent.tracking.queries import application_job_pairs
-from resume_agent.tracking.repository import notification_by_key, save_notification
-from resume_agent.tracking.tables import Notification, utcnow
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.tracking.queries import application_job_pairs
+from resume_tailor_harness.tracking.repository import notification_by_key, save_notification
+from resume_tailor_harness.tracking.tables import Notification, utcnow
 
 FOLLOW_UP_KIND = "follow_up"
 _STALE_STATUSES = {"submitted", "interview"}
@@ -1172,7 +1172,7 @@ def create_follow_up_reminders(
     return created
 ```
 
-In `src/resume_agent/services/notifications.py`, replace the body of `accept_notification` with:
+In `src/resume_tailor_harness/services/notifications.py`, replace the body of `accept_notification` with:
 
 ```python
 def accept_notification(session: Session, notification_id: int) -> Notification | None:
@@ -1188,7 +1188,7 @@ def accept_notification(session: Session, notification_id: int) -> Notification 
     return save_notification(session, notification)
 ```
 
-In `src/resume_agent/api/schemas/notifications.py`, add to `NotificationOut`:
+In `src/resume_tailor_harness/api/schemas/notifications.py`, add to `NotificationOut`:
 
 ```python
     job_id: int | None = None
@@ -1196,10 +1196,10 @@ In `src/resume_agent/api/schemas/notifications.py`, add to `NotificationOut`:
     title: str | None = None
 ```
 
-In `src/resume_agent/api/routers/notifications.py`, add a projection helper and use it in all three handlers (replace each `NotificationOut.model_validate(...)` call):
+In `src/resume_tailor_harness/api/routers/notifications.py`, add a projection helper and use it in all three handlers (replace each `NotificationOut.model_validate(...)` call):
 
 ```python
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 def _to_out(session: Session, notification) -> NotificationOut:
@@ -1222,8 +1222,8 @@ Run: `bash scripts/gen_ts_client.sh` then `.venv/Scripts/python.exe -m pytest te
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/services src/resume_agent/api tests/test_services_reminders.py
-git add src/resume_agent/services src/resume_agent/api tests/test_services_reminders.py contracts/ web/src/lib/api/schema.ts
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/services src/resume_tailor_harness/api tests/test_services_reminders.py
+git add src/resume_tailor_harness/services src/resume_tailor_harness/api tests/test_services_reminders.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(gmail): deterministic follow-up reminders riding the notification table"
 ```
 
@@ -1233,8 +1233,8 @@ git commit -m "feat(gmail): deterministic follow-up reminders riding the notific
 
 **Files:**
 
-- Create: `src/resume_agent/services/gmail_sync.py`
-- Modify: `src/resume_agent/api/routers/runs.py` (`launch_gmail_sync`)
+- Create: `src/resume_tailor_harness/services/gmail_sync.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (`launch_gmail_sync`)
 - Test: `tests/test_services_gmail_sync.py` (create)
 
 **Interfaces:**
@@ -1251,12 +1251,12 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.gmail.errors import GmailNotConnected
-from resume_agent.progress import ProgressReporter
-from resume_agent.services.gmail_sync import run_gmail_sync
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.gmail.errors import GmailNotConnected
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.services.gmail_sync import run_gmail_sync
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 class _FakeListing:
@@ -1338,7 +1338,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/services/gmail_sync.py
+# src/resume_tailor_harness/services/gmail_sync.py
 """One sync pass: fetch inbox → propose status changes → follow-up reminders.
 
 Shared by the manual POST /api/gmail/sync run and the scheduler tick, so
@@ -1349,14 +1349,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from resume_agent.config import get_settings
-from resume_agent.db import get_session
-from resume_agent.gmail.auth import build_service
-from resume_agent.gmail.classify import build_classifier_llm, hydrating_classifier
-from resume_agent.gmail.client import fetch_recent_messages
-from resume_agent.llm_runner import Runner
-from resume_agent.services.notifications import sync_notifications
-from resume_agent.services.reminders import create_follow_up_reminders
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.gmail.auth import build_service
+from resume_tailor_harness.gmail.classify import build_classifier_llm, hydrating_classifier
+from resume_tailor_harness.gmail.client import fetch_recent_messages
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.services.notifications import sync_notifications
+from resume_tailor_harness.services.reminders import create_follow_up_reminders
 
 
 def run_gmail_sync(
@@ -1397,12 +1397,12 @@ def run_gmail_sync(engine, reporter, *, service=None, llm: Any = _UNSET) -> dict
 
 Use the sentinel version.
 
-In `src/resume_agent/api/routers/runs.py`, replace the body of `launch_gmail_sync`:
+In `src/resume_tailor_harness/api/routers/runs.py`, replace the body of `launch_gmail_sync`:
 
 ```python
 @router.post("/gmail/sync", response_model=RunOut, status_code=202)
 def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manager)):
-    from resume_agent.gmail.auth import load_credentials
+    from resume_tailor_harness.gmail.auth import load_credentials
 
     engine = _engine(request)
     if load_credentials() is None:
@@ -1411,7 +1411,7 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
         )
 
     def work(reporter):
-        from resume_agent.services.gmail_sync import run_gmail_sync
+        from resume_tailor_harness.services.gmail_sync import run_gmail_sync
 
         return run_gmail_sync(engine, reporter)
 
@@ -1431,8 +1431,8 @@ Expected: PASS (after updating any stale gmailSync launch expectation as noted).
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/services/gmail_sync.py src/resume_agent/api/routers/runs.py tests/test_services_gmail_sync.py
-git add src/resume_agent/services/gmail_sync.py src/resume_agent/api/routers/runs.py tests/test_services_gmail_sync.py tests/api/test_runs_launch.py
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/services/gmail_sync.py src/resume_tailor_harness/api/routers/runs.py tests/test_services_gmail_sync.py
+git add src/resume_tailor_harness/services/gmail_sync.py src/resume_tailor_harness/api/routers/runs.py tests/test_services_gmail_sync.py tests/api/test_runs_launch.py
 git commit -m "feat(gmail): shared sync work unit; manual sync pre-checks connection"
 ```
 
@@ -1442,8 +1442,8 @@ git commit -m "feat(gmail): shared sync work unit; manual sync pre-checks connec
 
 **Files:**
 
-- Create: `src/resume_agent/gmail/scheduler.py`
-- Modify: `src/resume_agent/api/app.py` (lifespan start/stop)
+- Create: `src/resume_tailor_harness/gmail/scheduler.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (lifespan start/stop)
 - Test: `tests/test_gmail_scheduler.py` (create)
 
 **Interfaces:**
@@ -1462,9 +1462,9 @@ from concurrent.futures import Executor, Future
 from pathlib import Path
 from types import SimpleNamespace
 
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.db import init_db, make_engine
-from resume_agent.gmail.scheduler import tick
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.gmail.scheduler import tick
 
 
 class InlineExecutor(Executor):
@@ -1538,7 +1538,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/gmail/scheduler.py
+# src/resume_tailor_harness/gmail/scheduler.py
 """Background Gmail sync: one asyncio task, one serial pass per tick.
 
 Each user's pass is isolated — a revoked token or quota error never
@@ -1555,11 +1555,11 @@ from typing import Any, Callable
 
 from sqlalchemy import select
 
-from resume_agent.api.runs.models import ACTIVE_RUN_STATES
-from resume_agent.gmail.auth import token_path
-from resume_agent.services.gmail_sync import run_gmail_sync
-from resume_agent.tenancy.context import use_context
-from resume_agent.tenancy.workspace import workspace_paths
+from resume_tailor_harness.api.runs.models import ACTIVE_RUN_STATES
+from resume_tailor_harness.gmail.auth import token_path
+from resume_tailor_harness.services.gmail_sync import run_gmail_sync
+from resume_tailor_harness.tenancy.context import use_context
+from resume_tailor_harness.tenancy.workspace import workspace_paths
 
 logger = logging.getLogger(__name__)
 
@@ -1604,8 +1604,8 @@ async def tick(state: Any, *, work: Callable[..., dict] = run_gmail_sync) -> dic
 
     from sqlalchemy.orm import Session as SystemSession
 
-    from resume_agent.tenancy.bootstrap import build_context
-    from resume_agent.tenancy.system_db import User
+    from resume_tailor_harness.tenancy.bootstrap import build_context
+    from resume_tailor_harness.tenancy.system_db import User
 
     with SystemSession(state.system_engine, expire_on_commit=False) as session:
         users = list(
@@ -1649,9 +1649,9 @@ async def scheduler_loop(state: Any) -> None:
             logger.exception("gmail scheduler tick crashed")
 ```
 
-(Verify the `User` primary-key/disabled attributes against `src/resume_agent/tenancy/system_db.py` — `deps.py` uses `session.get(User, user_id)` and `user.disabled_at`, so `User.id` and `User.disabled_at` are the expected names; adjust if the model differs.)
+(Verify the `User` primary-key/disabled attributes against `src/resume_tailor_harness/tenancy/system_db.py` — `deps.py` uses `session.get(User, user_id)` and `user.disabled_at`, so `User.id` and `User.disabled_at` are the expected names; adjust if the model differs.)
 
-In `src/resume_agent/api/app.py` lifespan, after `app.state.run_manager.sweep()` add:
+In `src/resume_tailor_harness/api/app.py` lifespan, after `app.state.run_manager.sweep()` add:
 
 ```python
         app.state.gmail_scheduler_task = None
@@ -1659,7 +1659,7 @@ In `src/resume_agent/api/app.py` lifespan, after `app.state.run_manager.sweep()`
             not _is_memory_db(resolved_db)
             and resolved_settings.gmail_sync_interval_hours > 0
         ):
-            from resume_agent.gmail.scheduler import scheduler_loop
+            from resume_tailor_harness.gmail.scheduler import scheduler_loop
 
             app.state.gmail_scheduler_task = asyncio.create_task(
                 scheduler_loop(app.state)
@@ -1681,8 +1681,8 @@ Expected: PASS.
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/gmail/scheduler.py src/resume_agent/api/app.py tests/test_gmail_scheduler.py
-git add src/resume_agent/gmail/scheduler.py src/resume_agent/api/app.py tests/test_gmail_scheduler.py
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/gmail/scheduler.py src/resume_tailor_harness/api/app.py tests/test_gmail_scheduler.py
+git add src/resume_tailor_harness/gmail/scheduler.py src/resume_tailor_harness/api/app.py tests/test_gmail_scheduler.py
 git commit -m "feat(gmail): in-process scheduler with per-user isolation and runs telemetry"
 ```
 
@@ -1692,8 +1692,8 @@ git commit -m "feat(gmail): in-process scheduler with per-user isolation and run
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py` (new model after `Notification`)
-- Modify: `src/resume_agent/tracking/repository.py` (CRUD + cascade)
+- Modify: `src/resume_tailor_harness/tracking/tables.py` (new model after `Notification`)
+- Modify: `src/resume_tailor_harness/tracking/repository.py` (CRUD + cascade)
 - Test: `tests/test_email_draft_repository.py` (create)
 
 **Interfaces:**
@@ -1710,8 +1710,8 @@ git commit -m "feat(gmail): in-process scheduler with per-user isolation and run
 # tests/test_email_draft_repository.py
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import (
     delete_job_row,
     email_drafts_for_job,
     get_email_draft,
@@ -1719,7 +1719,7 @@ from resume_agent.tracking.repository import (
     save_email_draft,
     save_job,
 )
-from resume_agent.tracking.tables import EmailDraft, Job
+from resume_tailor_harness.tracking.tables import EmailDraft, Job
 
 
 def _draft(job_id: int, subject: str = "Following up") -> EmailDraft:
@@ -1762,7 +1762,7 @@ Expected: FAIL with ImportError (`EmailDraft`).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/tracking/tables.py`, after the `Notification` class:
+In `src/resume_tailor_harness/tracking/tables.py`, after the `Notification` class:
 
 ```python
 class EmailDraft(SQLModel, table=True):
@@ -1780,7 +1780,7 @@ class EmailDraft(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 ```
 
-In `src/resume_agent/tracking/repository.py`: import `EmailDraft` in the tables import block, change the `delete_job_row` cascade tuple to `(CoverLetter, Application, ResumeVersion, EmailDraft)`, and add:
+In `src/resume_tailor_harness/tracking/repository.py`: import `EmailDraft` in the tables import block, change the `delete_job_row` cascade tuple to `(CoverLetter, Application, ResumeVersion, EmailDraft)`, and add:
 
 ```python
 def save_email_draft(session: Session, draft: EmailDraft) -> EmailDraft:
@@ -1813,8 +1813,8 @@ Expected: PASS.
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/tracking tests/test_email_draft_repository.py
-git add src/resume_agent/tracking tests/test_email_draft_repository.py
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/tracking tests/test_email_draft_repository.py
+git add src/resume_tailor_harness/tracking tests/test_email_draft_repository.py
 git commit -m "feat(gmail): EmailDraft table with FK-safe cascade, no progress gating"
 ```
 
@@ -1824,7 +1824,7 @@ git commit -m "feat(gmail): EmailDraft table with FK-safe cascade, no progress g
 
 **Files:**
 
-- Create: `src/resume_agent/services/email_writer.py`
+- Create: `src/resume_tailor_harness/services/email_writer.py`
 - Test: `tests/test_email_writer.py` (create)
 
 **Interfaces:**
@@ -1846,14 +1846,14 @@ from types import SimpleNamespace
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.email_writer import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.email_writer import (
     DRAFT_TYPES,
     EmailDraftContent,
     generate_email_draft,
 )
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 class _FakeAgent:
@@ -1956,7 +1956,7 @@ Expected: FAIL with `ModuleNotFoundError`.
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/services/email_writer.py
+# src/resume_tailor_harness/services/email_writer.py
 """LLM email drafting grounded in profile facts. Human gate, never sends.
 
 The prompt's only permitted source for claims about the user is
@@ -1973,17 +1973,17 @@ from typing import Any
 
 from sqlmodel import Session
 
-from resume_agent.config import get_settings
-from resume_agent.gmail.client import fetch_message_body, fetch_recent_messages
-from resume_agent.gmail.match import match_email_to_application
-from resume_agent.llm_runner import Runner
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.gmail.client import fetch_message_body, fetch_recent_messages
+from resume_tailor_harness.gmail.match import match_email_to_application
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     get_job,
     save_email_draft,
 )
-from resume_agent.tracking.tables import EmailDraft
+from resume_tailor_harness.tracking.tables import EmailDraft
 
 DRAFT_TYPES = ("follow_up", "thank_you", "withdrawal", "cold_outreach")
 
@@ -2014,13 +2014,13 @@ class EmailDraftContent(ExtensibleModel):
 def build_writer_agent() -> Runner:
     from agno.agent import Agent
 
-    from resume_agent.llm_runner import (
+    from resume_tailor_harness.llm_runner import (
         AgentRunner,
         build_model,
         retry_kwargs,
         use_json_mode_for,
     )
-    from resume_agent.tailor.agents import model_for_tier
+    from resume_tailor_harness.tailor.agents import model_for_tier
 
     model = build_model(model_for_tier("mid"))
     return AgentRunner(
@@ -2137,8 +2137,8 @@ Expected: PASS.
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/services/email_writer.py tests/test_email_writer.py
-git add src/resume_agent/services/email_writer.py tests/test_email_writer.py
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/services/email_writer.py tests/test_email_writer.py
+git add src/resume_tailor_harness/services/email_writer.py tests/test_email_writer.py
 git commit -m "feat(gmail): fact-grounded email writer service (drafts, human gate)"
 ```
 
@@ -2148,9 +2148,9 @@ git commit -m "feat(gmail): fact-grounded email writer service (drafts, human ga
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/email_drafts.py`
-- Create: `src/resume_agent/api/routers/email_drafts.py`
-- Modify: `src/resume_agent/api/app.py` (register router with `guarded`)
+- Create: `src/resume_tailor_harness/api/schemas/email_drafts.py`
+- Create: `src/resume_tailor_harness/api/routers/email_drafts.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register router with `guarded`)
 - Test: `tests/api/test_email_drafts.py` (create)
 
 **Interfaces:**
@@ -2175,8 +2175,8 @@ def _seed_job(client) -> int:
     # the app engine is the established approach).
     from sqlmodel import Session
 
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     with Session(client.app.state.engine) as session:
         job = save_job(session, Job(source="manual", company="Acme", title="Eng"))
@@ -2185,12 +2185,12 @@ def _seed_job(client) -> int:
 
 
 def test_generate_run_and_list(client, monkeypatch):
-    from resume_agent.api.routers import email_drafts as router_module
+    from resume_tailor_harness.api.routers import email_drafts as router_module
 
     def fake_generate(session, job_id, draft_type, instructions=None, **kwargs):
-        from resume_agent.services.email_writer import EmailDraftContent  # noqa: F401
-        from resume_agent.tracking.repository import save_email_draft
-        from resume_agent.tracking.tables import EmailDraft
+        from resume_tailor_harness.services.email_writer import EmailDraftContent  # noqa: F401
+        from resume_tailor_harness.tracking.repository import save_email_draft
+        from resume_tailor_harness.tracking.tables import EmailDraft
 
         return save_email_draft(
             session,
@@ -2224,8 +2224,8 @@ def test_generate_rejects_unknown_type(client):
 def test_save_requires_connection(client):
     from sqlmodel import Session
 
-    from resume_agent.tracking.repository import save_email_draft
-    from resume_agent.tracking.tables import EmailDraft
+    from resume_tailor_harness.tracking.repository import save_email_draft
+    from resume_tailor_harness.tracking.tables import EmailDraft
 
     job_id = _seed_job(client)
     with Session(client.app.state.engine) as session:
@@ -2240,11 +2240,11 @@ def test_save_requires_connection(client):
 
 
 def test_save_creates_gmail_draft(client, monkeypatch):
-    from resume_agent.api.routers import email_drafts as router_module
+    from resume_tailor_harness.api.routers import email_drafts as router_module
     from sqlmodel import Session
 
-    from resume_agent.tracking.repository import save_email_draft
-    from resume_agent.tracking.tables import EmailDraft
+    from resume_tailor_harness.tracking.repository import save_email_draft
+    from resume_tailor_harness.tracking.tables import EmailDraft
 
     created = {}
 
@@ -2294,12 +2294,12 @@ Expected: FAIL (404s).
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/api/schemas/email_drafts.py
+# src/resume_tailor_harness/api/schemas/email_drafts.py
 from __future__ import annotations
 
 from datetime import datetime
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class EmailDraftRequest(CamelModel):
@@ -2321,7 +2321,7 @@ class EmailDraftOut(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/email_drafts.py
+# src/resume_tailor_harness/api/routers/email_drafts.py
 """Email writer endpoints: generate (202 run), list, save to Gmail drafts."""
 
 from __future__ import annotations
@@ -2333,17 +2333,17 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_run_manager, get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.email_drafts import EmailDraftOut, EmailDraftRequest
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.db import get_session as open_session
-from resume_agent.gmail import auth as gmail_auth
-from resume_agent.gmail.errors import GmailError, GmailNotConnected, GmailScopeMissing
-from resume_agent.services.email_writer import DRAFT_TYPES, generate_email_draft
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.api.deps import get_run_manager, get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.email_drafts import EmailDraftOut, EmailDraftRequest
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.db import get_session as open_session
+from resume_tailor_harness.gmail import auth as gmail_auth
+from resume_tailor_harness.gmail.errors import GmailError, GmailNotConnected, GmailScopeMissing
+from resume_tailor_harness.services.email_writer import DRAFT_TYPES, generate_email_draft
+from resume_tailor_harness.tracking.repository import (
     email_drafts_for_job,
     get_email_draft,
     get_job,
@@ -2363,7 +2363,7 @@ def _service_or_none() -> Any | None:
 
 def _compose_service(request: Request) -> Any:
     """Draft-capable Gmail service, or a typed 409."""
-    from resume_agent.api.deps import get_data_dir
+    from resume_tailor_harness.api.deps import get_data_dir
 
     data_dir = get_data_dir(request)
     creds = gmail_auth.load_credentials(data_dir)
@@ -2392,7 +2392,7 @@ def launch_email_draft(
         raise ApiException(400, "INVALID_DRAFT_TYPE", f"Unknown type {body.draft_type}")
     if get_job(session, job_id) is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    from resume_agent.api.routers.runs import _engine, _submit, _workspace_args
+    from resume_tailor_harness.api.routers.runs import _engine, _submit, _workspace_args
 
     engine = _engine(request)
     facts_path = _workspace_args()["facts_path"]
@@ -2465,7 +2465,7 @@ def save_to_gmail(
     return EmailDraftOut.model_validate(save_email_draft(session, draft))
 ```
 
-In `src/resume_agent/api/app.py`: import `email_drafts as email_drafts_router` and register next to the notifications router:
+In `src/resume_tailor_harness/api/app.py`: import `email_drafts as email_drafts_router` and register next to the notifications router:
 
 ```python
     app.include_router(email_drafts_router.router, prefix="/api", dependencies=guarded)
@@ -2479,8 +2479,8 @@ Run: `bash scripts/gen_ts_client.sh` then `.venv/Scripts/python.exe -m pytest te
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-.venv/Scripts/python.exe -m ruff check src/resume_agent/api tests/api/test_email_drafts.py
-git add src/resume_agent/api tests/api/test_email_drafts.py contracts/ web/src/lib/api/schema.ts
+.venv/Scripts/python.exe -m ruff check src/resume_tailor_harness/api tests/api/test_email_drafts.py
+git add src/resume_tailor_harness/api tests/api/test_email_drafts.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(gmail): email draft endpoints — generate run, list, save to Gmail"
 ```
 

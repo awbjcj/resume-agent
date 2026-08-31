@@ -1,11 +1,11 @@
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     ProfileFacts,
     Publication,
 )
-from resume_agent.profile.validate import validate_profile
+from resume_tailor_harness.profile.validate import validate_profile
 
 
 def test_clean_profile_has_no_warnings():

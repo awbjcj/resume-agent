@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from resume_agent.profile.matrix import Overrides
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.corrections import TaxonomyCorrections
-from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
-from resume_agent.taxonomy.state import RetiredSkill, TaxonomyState
+from resume_tailor_harness.profile.matrix import Overrides
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.corrections import TaxonomyCorrections
+from resume_tailor_harness.taxonomy.snapshot import EffectiveTaxonomy
+from resume_tailor_harness.taxonomy.state import RetiredSkill, TaxonomyState
 
 
 def test_correction_alias_reaches_the_effective_map():
@@ -75,7 +75,7 @@ def test_alias_cycle_raises_rather_than_picking_a_winner():
 
 def test_semantic_revision_ignores_grouping_timestamps_and_history():
     """Regroup metadata must not invalidate every derived artifact."""
-    from resume_agent.taxonomy.state import GroupingStatus, TaxonomyGeneration
+    from resume_tailor_harness.taxonomy.state import GroupingStatus, TaxonomyGeneration
 
     base = ClusterMap(domain_of={"python": "backend"})
     quiet = EffectiveTaxonomy.from_parts(base, state=TaxonomyState())
@@ -163,7 +163,7 @@ def test_revisions_are_sha256_hex_and_echoed_into_the_manifest():
 
 
 def test_disagreeing_override_and_correction_records_a_conflict():
-    from resume_agent.taxonomy.snapshot import OverrideConflict
+    from resume_tailor_harness.taxonomy.snapshot import OverrideConflict
 
     snap = EffectiveTaxonomy.from_parts(
         ClusterMap(),
@@ -192,7 +192,7 @@ def test_agreeing_override_and_correction_is_not_a_conflict():
 
 
 def test_forbid_alias_defeating_a_correction_is_recorded_as_such():
-    from resume_agent.taxonomy.snapshot import OverrideConflict
+    from resume_tailor_harness.taxonomy.snapshot import OverrideConflict
 
     snap = EffectiveTaxonomy.from_parts(
         ClusterMap(),

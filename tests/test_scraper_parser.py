@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.scraper.parser import (
+from resume_tailor_harness.discovery.scraper.models import ScrapedCard
+from resume_tailor_harness.discovery.scraper.parser import (
     parse_detail_meta,
     parse_job_detail,
     parse_search_cards,

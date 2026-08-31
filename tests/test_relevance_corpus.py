@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import relevance_gate
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.text import relevance_gate
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "relevance" / "labeled.json"
 _ANCHORS = ["engineer", "ai", "ml", "machine learning", "applied scientist", "llm"]

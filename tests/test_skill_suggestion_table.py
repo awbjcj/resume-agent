@@ -2,8 +2,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import SkillSuggestion
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import SkillSuggestion
 
 
 def _payload():

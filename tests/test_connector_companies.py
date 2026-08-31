@@ -1,11 +1,11 @@
 import httpx
 
-import resume_agent.discovery.connectors.companies as companies
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.config import CompanyUrl
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.companies as companies
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.config import CompanyUrl
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _GH = {
     "jobs": [

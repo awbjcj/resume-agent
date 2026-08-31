@@ -49,7 +49,7 @@ draft plan:
 
 **Key facts you'd otherwise have to rediscover:**
 
-1. `resolve_tenant_path` (`src/resume_agent/tenancy/paths.py`) rebases relative paths whose first segment is `data`, `config`, or `output` into the active Workspace (from the `UserContext` contextvar). Absolute paths and unknown prefixes pass through unchanged. With no context set, everything passes through unchanged (legacy single-user mode).
+1. `resolve_tenant_path` (`src/resume_tailor_harness/tenancy/paths.py`) rebases relative paths whose first segment is `data`, `config`, or `output` into the active Workspace (from the `UserContext` contextvar). Absolute paths and unknown prefixes pass through unchanged. With no context set, everything passes through unchanged (legacy single-user mode).
 2. The config loaders already resolve internally: `config.load_yaml` (used by `load_search_config` and `load_connectors_config`) and `profile.store.load_facts` all call `resolve_tenant_path`. Three leaf modules do **not** (that's Task 4): `discovery/connectors/telemetry.py`, `taxonomy/skills.load_aliases`, and `services/sources._save`.
 3. `RunManager.submit` (`api/runs/manager.py:284`) already derives `user_id` and `max_concurrent` from the active context when they are not passed, and `tenancy.limits.active_limit` returns `None` when no context is set — so dropping the explicit `user_id=`/`max_concurrent=` arguments from `api/routers/runs.py::_submit` is behavior-identical.
 4. `ConnectorUnit.payload` (in `registry.py`) is the live pydantic object from the loaded `ConnectorsConfig` — mutating it mutates the config that `_save` will write. Every board-like payload model (`GreenhouseBoard`, `LeverBoard`, `AshbyBoard`, `NativeUrlBoard`, `CompanyUrl`, `ScrapeTarget`) has `enabled: bool` and `limit: int | None`; every section model has `enabled: bool`; the three aggregator sections (`adzuna`, `remoteok`, `linkedin`) also have `limit`.
@@ -66,7 +66,7 @@ Today `CONNECTOR_SPECS` is documented as "the single enumeration of connector ki
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/registry.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py`
 - Test: `tests/test_connectors_registry.py` (append new tests)
 
 **Interfaces:**
@@ -85,8 +85,8 @@ Today `CONNECTOR_SPECS` is documented as "the single enumeration of connector ki
 Append to `tests/test_connectors_registry.py`:
 
 ```python
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.registry import (
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.registry import (
     CONNECTOR_SPECS,
     find_unit,
     spec_for,
@@ -171,12 +171,12 @@ Expected: FAIL with `ImportError: cannot import name 'find_unit'`.
 
 - [x] **Step 3: Implement the registry additions**
 
-In `src/resume_agent/discovery/connectors/registry.py`:
+In `src/resume_tailor_harness/discovery/connectors/registry.py`:
 
 Add imports:
 
 ```python
-from resume_agent.discovery.connectors.config import (
+from resume_tailor_harness.discovery.connectors.config import (
     AshbyBoard,
     CompanyUrl,
     ConnectorsConfig,
@@ -185,7 +185,7 @@ from resume_agent.discovery.connectors.config import (
     NativeUrlBoard,
     ScrapeTarget,
 )
-from resume_agent.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
 ```
 
 (`ConnectorsConfig` is already imported; merge into one import block.)
@@ -328,8 +328,8 @@ Expected: PASS (all, including pre-existing tests).
 - [x] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/discovery/connectors/registry.py tests/test_connectors_registry.py
-git add src/resume_agent/discovery/connectors/registry.py tests/test_connectors_registry.py
+ruff check src/resume_tailor_harness/discovery/connectors/registry.py tests/test_connectors_registry.py
+git add src/resume_tailor_harness/discovery/connectors/registry.py tests/test_connectors_registry.py
 git commit -m "feat(registry): ConnectorSpec owns source-unit addressing (section/unit_items/admits/new_unit + find_unit)"
 ```
 
@@ -339,7 +339,7 @@ git commit -m "feat(registry): ConnectorSpec owns source-unit addressing (sectio
 
 **Files:**
 
-- Modify: `src/resume_agent/services/sources.py:476-616` (the three functions at the bottom of the file)
+- Modify: `src/resume_tailor_harness/services/sources.py:476-616` (the three functions at the bottom of the file)
 - Test: `tests/test_services_sources.py` (append new tests)
 
 **Interfaces:**
@@ -351,11 +351,11 @@ git commit -m "feat(registry): ConnectorSpec owns source-unit addressing (sectio
 
 - [x] **Step 1: Write the failing test**
 
-Append to `tests/test_services_sources.py`. The file already has `import pytest` and `from resume_agent.services import sources as svc` at the top — the `svc.` references below match its existing style; only the two imports shown need adding:
+Append to `tests/test_services_sources.py`. The file already has `import pytest` and `from resume_tailor_harness.services import sources as svc` at the top — the `svc.` references below match its existing style; only the two imports shown need adding:
 
 ```python
-from resume_agent.discovery.connectors.config import ConnectorsConfig, load_connectors_config
-from resume_agent.discovery.connectors.registry import CONNECTOR_SPECS
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig, load_connectors_config
+from resume_tailor_harness.discovery.connectors.registry import CONNECTOR_SPECS
 
 
 def _every_kind_config() -> ConnectorsConfig:
@@ -417,10 +417,10 @@ Expected: PASS. These are characterization tests — they pin today's behavior s
 
 - [x] **Step 3: Replace the three functions**
 
-In `src/resume_agent/services/sources.py`, add to the imports:
+In `src/resume_tailor_harness/services/sources.py`, add to the imports:
 
 ```python
-from resume_agent.discovery.connectors.registry import find_unit
+from resume_tailor_harness.discovery.connectors.registry import find_unit
 ```
 
 Delete the bodies of `_apply_enabled` (lines ~476-525), `_apply_limit` (~528-563), and `_remove` (~566-616) and replace with:
@@ -472,8 +472,8 @@ Expected: PASS.
 - [x] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/services/sources.py tests/test_services_sources.py
-git add src/resume_agent/services/sources.py tests/test_services_sources.py
+ruff check src/resume_tailor_harness/services/sources.py tests/test_services_sources.py
+git add src/resume_tailor_harness/services/sources.py tests/test_services_sources.py
 git commit -m "refactor(sources): enable/limit/remove walk CONNECTOR_SPECS instead of hand-enumerating kinds"
 ```
 
@@ -483,7 +483,7 @@ git commit -m "refactor(sources): enable/limit/remove walk CONNECTOR_SPECS inste
 
 **Files:**
 
-- Modify: `src/resume_agent/services/sources.py:320-420` (`add_source`), plus two new private helpers above it
+- Modify: `src/resume_tailor_harness/services/sources.py:320-420` (`add_source`), plus two new private helpers above it
 - Test: `tests/test_services_sources.py` (existing add-source tests must pass unmodified)
 
 **Interfaces:**
@@ -497,7 +497,7 @@ git commit -m "refactor(sources): enable/limit/remove walk CONNECTOR_SPECS inste
 
 - [x] **Step 1: Add helpers and rewrite `add_source`**
 
-Add above `add_source` (imports: extend the registry import to `from resume_agent.discovery.connectors.registry import find_unit, spec_for`, and make sure `ConnectorSpec` is imported for type hints: `from resume_agent.discovery.connectors.registry import ConnectorSpec, find_unit, spec_for`; `Any` from `typing`):
+Add above `add_source` (imports: extend the registry import to `from resume_tailor_harness.discovery.connectors.registry import find_unit, spec_for`, and make sure `ConnectorSpec` is imported for type hints: `from resume_tailor_harness.discovery.connectors.registry import ConnectorSpec, find_unit, spec_for`; `Any` from `typing`):
 
 ```python
 def _duplicate_message(spec: ConnectorSpec, payload: Any) -> str:
@@ -609,8 +609,8 @@ Expected: PASS.
 - [x] **Step 4: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/services/sources.py
-git add src/resume_agent/services/sources.py
+ruff check src/resume_tailor_harness/services/sources.py
+git add src/resume_tailor_harness/services/sources.py
 git commit -m "refactor(sources): add_source appends units through CONNECTOR_SPECS"
 ```
 
@@ -624,9 +624,9 @@ git commit -m "refactor(sources): add_source appends units through CONNECTOR_SPE
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/telemetry.py`
-- Modify: `src/resume_agent/taxonomy/skills.py:59-76` (`load_aliases`)
-- Modify: `src/resume_agent/services/sources.py:77-88` (`_save`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/telemetry.py`
+- Modify: `src/resume_tailor_harness/taxonomy/skills.py:59-76` (`load_aliases`)
+- Modify: `src/resume_tailor_harness/services/sources.py:77-88` (`_save`)
 - Test: `tests/tenancy/test_workspace.py` (append)
 
 **Interfaces:**
@@ -639,11 +639,11 @@ git commit -m "refactor(sources): add_source appends units through CONNECTOR_SPE
 Append to `tests/tenancy/test_workspace.py`:
 
 ```python
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.telemetry import read_runs, record_run
-from resume_agent.taxonomy.skills import load_aliases
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs, record_run
+from resume_tailor_harness.taxonomy.skills import load_aliases
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def _context(tmp_path):
@@ -688,14 +688,14 @@ Expected: the two new tests FAIL (file written to CWD-relative `data/`, not the 
 
 - [x] **Step 3: Implement**
 
-`src/resume_agent/discovery/connectors/telemetry.py` — full new content:
+`src/resume_tailor_harness/discovery/connectors/telemetry.py` — full new content:
 
 ```python
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_tailor_harness.tenancy.paths import resolve_tenant_path
 
 
 def read_runs(path: str | Path) -> dict[str, dict]:
@@ -719,7 +719,7 @@ def record_run(path: str | Path, name: str, added: int, error: str | None) -> No
     p.write_text(json.dumps(runs, indent=2), encoding="utf-8")
 ```
 
-`src/resume_agent/taxonomy/skills.py` — in `load_aliases`, change only the first body line:
+`src/resume_tailor_harness/taxonomy/skills.py` — in `load_aliases`, change only the first body line:
 
 ```python
     p = resolve_tenant_path(path)
@@ -728,16 +728,16 @@ def record_run(path: str | Path, name: str, added: int, error: str | None) -> No
 with a lazy import at the top of the function (matches the pattern `config.load_yaml` uses):
 
 ```python
-    from resume_agent.tenancy.paths import resolve_tenant_path
+    from resume_tailor_harness.tenancy.paths import resolve_tenant_path
 ```
 
-`src/resume_agent/services/sources.py` — in `_save`, change the first line:
+`src/resume_tailor_harness/services/sources.py` — in `_save`, change the first line:
 
 ```python
     target = resolve_tenant_path(path)
 ```
 
-and add the import `from resume_agent.tenancy.paths import resolve_tenant_path`. Also in `add_source`'s scrape branch (written in Task 3), change `Path(connectors_path).exists()` to `resolve_tenant_path(connectors_path).exists()` so the load/save pair can never split across directories.
+and add the import `from resume_tailor_harness.tenancy.paths import resolve_tenant_path`. Also in `add_source`'s scrape branch (written in Task 3), change `Path(connectors_path).exists()` to `resolve_tenant_path(connectors_path).exists()` so the load/save pair can never split across directories.
 
 - [x] **Step 4: Run tests**
 
@@ -747,7 +747,7 @@ Expected: PASS (full suite — these are leaf functions with many indirect calle
 - [x] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/discovery/connectors/telemetry.py src/resume_agent/taxonomy/skills.py src/resume_agent/services/sources.py tests/tenancy/test_workspace.py
+ruff check src/resume_tailor_harness/discovery/connectors/telemetry.py src/resume_tailor_harness/taxonomy/skills.py src/resume_tailor_harness/services/sources.py tests/tenancy/test_workspace.py
 git add -A
 git commit -m "fix(tenancy): telemetry, skill aliases, and connectors save resolve the active workspace"
 ```
@@ -758,17 +758,17 @@ git commit -m "fix(tenancy): telemetry, skill aliases, and connectors save resol
 
 **Files:**
 
-- Modify: `src/resume_agent/tenancy/paths.py`
-- Modify: `src/resume_agent/services/discovery.py:55-58`, `src/resume_agent/services/tailoring.py:27-29`, `src/resume_agent/services/board.py:48`, `src/resume_agent/services/cover_letters.py:18`, `src/resume_agent/services/cover_letter_revision.py:16`, `src/resume_agent/services/revision.py:20-21`
-- Modify: `src/resume_agent/cli.py:82,455-457`
-- Modify: `src/resume_agent/api/routers/match_gap.py:32`, `src/resume_agent/api/routers/suggestions.py:44`
-- Modify: `src/resume_agent/tracking/queries.py` (the two `aliases_path: str | Path = "data/skill_aliases.json"` defaults — actually three: `shortlist_rows`, `job_facets`, `job_detail_row`)
-- Modify: `src/resume_agent/discovery/pipeline.py:50` (`SKILL_ALIASES_PATH`)
+- Modify: `src/resume_tailor_harness/tenancy/paths.py`
+- Modify: `src/resume_tailor_harness/services/discovery.py:55-58`, `src/resume_tailor_harness/services/tailoring.py:27-29`, `src/resume_tailor_harness/services/board.py:48`, `src/resume_tailor_harness/services/cover_letters.py:18`, `src/resume_tailor_harness/services/cover_letter_revision.py:16`, `src/resume_tailor_harness/services/revision.py:20-21`
+- Modify: `src/resume_tailor_harness/cli.py:82,455-457`
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py:32`, `src/resume_tailor_harness/api/routers/suggestions.py:44`
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (the two `aliases_path: str | Path = "data/skill_aliases.json"` defaults — actually three: `shortlist_rows`, `job_facets`, `job_detail_row`)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py:50` (`SKILL_ALIASES_PATH`)
 - Test: no new tests — this is a constant relocation; the full suite is the check.
 
 **Interfaces:**
 
-- Produces (used by Task 7 and future code): module constants in `resume_agent.tenancy.paths`:
+- Produces (used by Task 7 and future code): module constants in `resume_tailor_harness.tenancy.paths`:
 
 ```python
 FACTS_PATH = "data/profile/facts.json"
@@ -784,7 +784,7 @@ SKILL_ALIASES_PATH = "data/skill_aliases.json"
 
 - [x] **Step 1: Add the constants block**
 
-Append to `src/resume_agent/tenancy/paths.py` (below the imports, above `resolve_tenant_path`):
+Append to `src/resume_tailor_harness/tenancy/paths.py` (below the imports, above `resolve_tenant_path`):
 
 ```python
 # Canonical Workspace layout. Every artifact a service or adapter defaults to
@@ -801,10 +801,10 @@ SKILL_ALIASES_PATH = "data/skill_aliases.json"
 
 - [x] **Step 2: Migrate each declaration site to an aliasing import**
 
-`src/resume_agent/services/discovery.py` — replace lines 55-58:
+`src/resume_tailor_harness/services/discovery.py` — replace lines 55-58:
 
 ```python
-from resume_agent.tenancy.paths import (
+from resume_tailor_harness.tenancy.paths import (
     CONNECTORS_PATH as DEFAULT_CONNECTORS,
     FACTS_PATH as DEFAULT_FACTS,
     SEARCH_PATH as DEFAULT_SEARCH,
@@ -814,10 +814,10 @@ from resume_agent.tenancy.paths import (
 
 (the module already imports `resolve_tenant_path` from the same place — merge into one import statement).
 
-`src/resume_agent/services/tailoring.py` — replace lines 27-29:
+`src/resume_tailor_harness/services/tailoring.py` — replace lines 27-29:
 
 ```python
-from resume_agent.tenancy.paths import (
+from resume_tailor_harness.tenancy.paths import (
     FACTS_PATH as DEFAULT_FACTS,
     REVIEW_DEEP_PATH as DEFAULT_REVIEW_DEEP,
     REVIEW_PATH as DEFAULT_REVIEW,
@@ -825,23 +825,23 @@ from resume_agent.tenancy.paths import (
 )
 ```
 
-(delete the module's existing `from resume_agent.tenancy.paths import resolve_tenant_path` line so there is exactly one import from the module.)
+(delete the module's existing `from resume_tailor_harness.tenancy.paths import resolve_tenant_path` line so there is exactly one import from the module.)
 
-`src/resume_agent/services/board.py:48`, `services/cover_letters.py:18`, `services/cover_letter_revision.py:16` — replace `DEFAULT_FACTS = "data/profile/facts.json"` with `from resume_agent.tenancy.paths import FACTS_PATH as DEFAULT_FACTS` (merged into existing tenancy.paths imports where present).
+`src/resume_tailor_harness/services/board.py:48`, `services/cover_letters.py:18`, `services/cover_letter_revision.py:16` — replace `DEFAULT_FACTS = "data/profile/facts.json"` with `from resume_tailor_harness.tenancy.paths import FACTS_PATH as DEFAULT_FACTS` (merged into existing tenancy.paths imports where present).
 
-`src/resume_agent/services/revision.py:20-21` — replace both constants:
+`src/resume_tailor_harness/services/revision.py:20-21` — replace both constants:
 
 ```python
-from resume_agent.tenancy.paths import (
+from resume_tailor_harness.tenancy.paths import (
     FACTS_PATH as DEFAULT_FACTS,
     REVIEW_PATH as DEFAULT_REVIEW,
 )
 ```
 
-`src/resume_agent/cli.py` — replace line 82 (`DEFAULT_FACTS = ...`) and lines 455-457 (`DEFAULT_SEARCH`/`DEFAULT_CONNECTORS`/`CONNECTOR_RUNS_PATH`) with one import near the top:
+`src/resume_tailor_harness/cli.py` — replace line 82 (`DEFAULT_FACTS = ...`) and lines 455-457 (`DEFAULT_SEARCH`/`DEFAULT_CONNECTORS`/`CONNECTOR_RUNS_PATH`) with one import near the top:
 
 ```python
-from resume_agent.tenancy.paths import (
+from resume_tailor_harness.tenancy.paths import (
     CONNECTORS_PATH as DEFAULT_CONNECTORS,
     FACTS_PATH as DEFAULT_FACTS,
     SEARCH_PATH as DEFAULT_SEARCH,
@@ -849,14 +849,14 @@ from resume_agent.tenancy.paths import (
 )
 ```
 
-`src/resume_agent/api/routers/match_gap.py:32` — replace `_FACTS_PATH = "data/profile/facts.json"` with `from resume_agent.tenancy.paths import FACTS_PATH as _FACTS_PATH` (merge with the existing `from resume_agent.tenancy.paths import resolve_tenant_path`).
+`src/resume_tailor_harness/api/routers/match_gap.py:32` — replace `_FACTS_PATH = "data/profile/facts.json"` with `from resume_tailor_harness.tenancy.paths import FACTS_PATH as _FACTS_PATH` (merge with the existing `from resume_tailor_harness.tenancy.paths import resolve_tenant_path`).
 
-`src/resume_agent/api/routers/suggestions.py:44` — same replacement for its `_FACTS_PATH`.
+`src/resume_tailor_harness/api/routers/suggestions.py:44` — same replacement for its `_FACTS_PATH`.
 
-`src/resume_agent/tracking/queries.py` — change the three defaults `aliases_path: str | Path = "data/skill_aliases.json"` to `aliases_path: str | Path = SKILL_ALIASES_PATH` with `from resume_agent.tenancy.paths import SKILL_ALIASES_PATH` added to the imports.
+`src/resume_tailor_harness/tracking/queries.py` — change the three defaults `aliases_path: str | Path = "data/skill_aliases.json"` to `aliases_path: str | Path = SKILL_ALIASES_PATH` with `from resume_tailor_harness.tenancy.paths import SKILL_ALIASES_PATH` added to the imports.
 
-`src/resume_agent/discovery/pipeline.py` — replace the local declaration with
-`from resume_agent.tenancy.paths import SKILL_ALIASES_PATH`. The constant is a
+`src/resume_tailor_harness/discovery/pipeline.py` — replace the local declaration with
+`from resume_tailor_harness.tenancy.paths import SKILL_ALIASES_PATH`. The constant is a
 string, which remains valid for the existing `Path | str` parameter and is
 resolved by `load_aliases` at the leaf.
 
@@ -865,7 +865,7 @@ resolved by `load_aliases` at the leaf.
 Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
 Expected: PASS / clean. Grep-verify no stray declarations remain:
 
-Run: `grep -rn "data/profile/facts.json\|config/search.yaml\|config/connectors.yaml\|data/connector_runs.json" src/resume_agent --include="*.py" | grep -v tenancy/paths.py | grep -v "\.example\|Copy config"`
+Run: `grep -rn "data/profile/facts.json\|config/search.yaml\|config/connectors.yaml\|data/connector_runs.json" src/resume_tailor_harness --include="*.py" | grep -v tenancy/paths.py | grep -v "\.example\|Copy config"`
 Expected: only `tenancy/paths.py` declares the strings; remaining hits are user-facing help text in `cli.py`/`setup/screens.py` (leave those) and `search_config.py`'s docstring (leave it).
 
 - [x] **Step 4: Commit**
@@ -885,7 +885,7 @@ Seven routers copy the submit → get → assert → `record_to_run` tail; `runs
 
 **Files:**
 
-- Create: `src/resume_agent/api/runs/launch.py`
+- Create: `src/resume_tailor_harness/api/runs/launch.py`
 - Test: `tests/api/test_launch_helper.py` (new)
 
 **Interfaces:**
@@ -916,9 +916,9 @@ Create `tests/api/test_launch_helper.py`:
 ```python
 import pytest
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.launch import launch, session_work
-from resume_agent.api.runs.manager import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.runs.launch import launch, session_work
+from resume_tailor_harness.api.runs.manager import (
     RunQuotaError,
     RunResetConflict,
     RunSingletonConflict,
@@ -1004,7 +1004,7 @@ def test_launch_maps_quota_to_429_and_reset_to_409():
 
 
 def test_session_work_opens_its_own_session(tmp_path):
-    from resume_agent.db import init_db, make_engine
+    from resume_tailor_harness.db import init_db, make_engine
 
     engine = make_engine(f"sqlite:///{(tmp_path / 'db.sqlite').as_posix()}")
     init_db(engine)
@@ -1026,9 +1026,9 @@ Attribute names verified against `api/errors.py:28`: the constructor is `ApiExce
 - [x] **Step 2: Run to verify failure**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_launch_helper.py -q`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.api.runs.launch'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.api.runs.launch'`.
 
-- [x] **Step 3: Implement `src/resume_agent/api/runs/launch.py`**
+- [x] **Step 3: Implement `src/resume_tailor_harness/api/runs/launch.py`**
 
 ```python
 """The run-launch seam shared by every router that starts a background run.
@@ -1046,16 +1046,16 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.manager import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.runs.manager import (
     RunManager,
     RunQuotaError,
     RunResetConflict,
     RunSingletonConflict,
 )
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.db import get_session
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.db import get_session
 
 
 def launch(
@@ -1103,7 +1103,7 @@ def session_work(engine, fn: Callable[[Any, Any], dict]) -> Callable[[Any], dict
     return work
 ```
 
-(Verified: `make_engine`, `init_db`, and `get_session` are all defined in `src/resume_agent/db.py`.)
+(Verified: `make_engine`, `init_db`, and `get_session` are all defined in `src/resume_tailor_harness/db.py`.)
 
 - [x] **Step 4: Run to verify pass**
 
@@ -1113,8 +1113,8 @@ Expected: PASS.
 - [x] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/api/runs/launch.py tests/api/test_launch_helper.py
-git add src/resume_agent/api/runs/launch.py tests/api/test_launch_helper.py
+ruff check src/resume_tailor_harness/api/runs/launch.py tests/api/test_launch_helper.py
+git add src/resume_tailor_harness/api/runs/launch.py tests/api/test_launch_helper.py
 git commit -m "feat(api): shared launch() + session_work() run-launch seam"
 ```
 
@@ -1124,7 +1124,7 @@ git commit -m "feat(api): shared launch() + session_work() run-launch seam"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/runs.py` (whole launch section)
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (whole launch section)
 - Test: existing `tests/api/test_runs_launch.py`, `tests/api/test_runs_list.py`, `tests/api/test_runs_sse.py`, `tests/api/test_run_tenancy_quota.py` — must pass unmodified.
 
 **Interfaces:**
@@ -1136,7 +1136,7 @@ git commit -m "feat(api): shared launch() + session_work() run-launch seam"
 
 - [x] **Step 1: Delete the shallow helpers**
 
-In `src/resume_agent/api/routers/runs.py` delete:
+In `src/resume_tailor_harness/api/routers/runs.py` delete:
 
 - `_WorkspaceArgs` and `_workspace_args()` (lines 63-78)
 - `_submit(...)` (lines 81-111)
@@ -1144,7 +1144,7 @@ In `src/resume_agent/api/routers/runs.py` delete:
 and their now-unused imports (`TypedDict`, `active_limit`, `DEFAULT_MAX_CONCURRENT_RUNS`, `RunQuotaError`, `RunSingletonConflict`). Keep `current_context` (still used by `_owned_record` and `list_runs`). Add:
 
 ```python
-from resume_agent.api.runs.launch import launch, session_work
+from resume_tailor_harness.api.runs.launch import launch, session_work
 ```
 
 - [x] **Step 2: Rewrite each endpoint**
@@ -1360,7 +1360,7 @@ def launch_linkedin_scrape(
             409,
             "LINKEDIN_NOT_CONFIGURED",
             "LinkedIn needs a saved browser profile or configured email and password. "
-            "Run `resume-agent scrape` locally once to create the profile.",
+            "Run `resume-tailor-harness scrape` locally once to create the profile.",
         )
     engine = _engine(request)
 
@@ -1400,13 +1400,13 @@ Leave `list_runs`, `get_run`, `cancel_run`, `stream_run`, `_owned_record`, `_eng
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_runs_launch.py tests/api/test_runs_list.py tests/api/test_runs_sse.py tests/api/test_run_tenancy_quota.py -q`
 Expected: PASS unmodified.
-Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_agent/api/routers/runs.py`
+Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_tailor_harness/api/routers/runs.py`
 Expected: PASS / clean.
 
 - [x] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/runs.py
+git add src/resume_tailor_harness/api/routers/runs.py
 git commit -m "refactor(api): runs router launches through the shared seam; workspace paths resolve at the leaves"
 ```
 
@@ -1416,10 +1416,10 @@ git commit -m "refactor(api): runs router launches through the shared seam; work
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/coach.py:75-97` (its `_submit`)
-- Modify: `src/resume_agent/api/routers/profile.py:149-157, 271-274`
-- Modify: `src/resume_agent/api/routers/sources.py:124-127`
-- Modify: `src/resume_agent/api/routers/match_gap.py:117-120`
+- Modify: `src/resume_tailor_harness/api/routers/coach.py:75-97` (its `_submit`)
+- Modify: `src/resume_tailor_harness/api/routers/profile.py:149-157, 271-274`
+- Modify: `src/resume_tailor_harness/api/routers/sources.py:124-127`
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py:117-120`
 - Test: `tests/api/test_coach_router.py`, `tests/api/test_profile_build_run.py`, `tests/api/test_match_gap_refresh.py`, plus whichever files cover sources discovery — all unmodified.
 
 **Interfaces:**
@@ -1444,11 +1444,11 @@ def _submit(manager: RunManager, kind: str, work) -> RunOut:
     )
 ```
 
-Add `from resume_agent.api.runs.launch import launch`; delete the now-unused imports (`RunSingletonConflict`, `RunResetConflict`, `RunQuotaError`, `record_to_run` — keep any still used elsewhere in the file; trust ruff).
+Add `from resume_tailor_harness.api.runs.launch import launch`; delete the now-unused imports (`RunSingletonConflict`, `RunResetConflict`, `RunQuotaError`, `record_to_run` — keep any still used elsewhere in the file; trust ruff).
 
 - [x] **Step 2: profile.py, sources.py, match_gap.py — replace the tails**
 
-In each, add `from resume_agent.api.runs.launch import launch` and replace the four-line tail pattern:
+In each, add `from resume_tailor_harness.api.runs.launch import launch` and replace the four-line tail pattern:
 
 `profile.py` build endpoint (line ~149):
 
@@ -1494,7 +1494,7 @@ Expected: PASS / clean.
 - [x] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/api/routers
+git add src/resume_tailor_harness/api/routers
 git commit -m "refactor(api): coach/profile/sources/match_gap routers launch through the shared seam"
 ```
 
@@ -1506,7 +1506,7 @@ git commit -m "refactor(api): coach/profile/sources/match_gap routers launch thr
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py:67-105` (the `JobDetailRow` dataclass) and `:247-303` (`job_detail_row`)
+- Modify: `src/resume_tailor_harness/tracking/queries.py:67-105` (the `JobDetailRow` dataclass) and `:247-303` (`job_detail_row`)
 - Test: `tests/test_job_detail_row.py`, `tests/api/test_job_detail.py`, `tests/api/test_openapi_contract.py` — all unmodified.
 
 **Interfaces:**
@@ -1597,11 +1597,11 @@ Expected: PASS unmodified — the schema and OpenAPI output are untouched becaus
 
 - [x] **Step 4: Run the full suite, lint, commit**
 
-Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_agent/tracking/queries.py`
+Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_tailor_harness/tracking/queries.py`
 Expected: PASS / clean.
 
 ```bash
-git add src/resume_agent/tracking/queries.py
+git add src/resume_tailor_harness/tracking/queries.py
 git commit -m "refactor(tracking): JobDetailRow inherits the facet half from ShortlistRow"
 ```
 
@@ -1623,7 +1623,7 @@ git commit -m "refactor(tracking): JobDetailRow inherits the facet half from Sho
 - [x] Contract drift: `git diff --stat contracts/` → empty (no OpenAPI/TS regeneration was needed or performed)
 - [x] Patch hygiene: `git diff --check` → clean
 - [x] Grep gates:
-  - `grep -rn "for board in config.greenhouse.boards" src/resume_agent/services/sources.py` → no hits
-  - `grep -rn "_workspace_args" src/resume_agent` → no hits
-  - `grep -rn "record = mgr.get(run_id)" src/resume_agent/api/routers | grep -v suggestions` → no hits (suggestions.py keeps its service-seam tail by design)
+  - `grep -rn "for board in config.greenhouse.boards" src/resume_tailor_harness/services/sources.py` → no hits
+  - `grep -rn "_workspace_args" src/resume_tailor_harness` → no hits
+  - `grep -rn "record = mgr.get(run_id)" src/resume_tailor_harness/api/routers | grep -v suggestions` → no hits (suggestions.py keeps its service-seam tail by design)
 - [x] Update `CLAUDE.md`: in the Companies-connector section, the sentence "adding an ATS appends one `ConnectorSpec`" now also covers Source Manager CRUD; add one line to the API-layer section naming `api/runs/launch.py` as the launch seam; add one line under Core invariants → Tenancy noting the layout constants in `tenancy/paths.py`. Commit as `docs: record round-3 deepenings in CLAUDE.md`.

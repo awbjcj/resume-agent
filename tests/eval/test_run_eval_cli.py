@@ -6,9 +6,9 @@ from evals.judge import JudgeVerdict
 from evals.metrics import RoundRecord
 from evals.runner import CaseResult
 from evals.usage import UsageTotals
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 def _write_case(case_dir: Path, case_id: str) -> None:

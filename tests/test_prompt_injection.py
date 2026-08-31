@@ -6,8 +6,8 @@ from typing import cast
 
 import yaml
 
-from resume_agent.llm_runner import AgentRunner, Runner
-from resume_agent.prompts.guidance import GUIDANCE_HEADER
+from resume_tailor_harness.llm_runner import AgentRunner, Runner
+from resume_tailor_harness.prompts.guidance import GUIDANCE_HEADER
 
 
 def _instructions(runner: Runner) -> list[str]:
@@ -32,8 +32,8 @@ def test_reviewer_and_fit_agents_receive_guidance(tmp_path, monkeypatch) -> None
         },
     )
 
-    from resume_agent.discovery.fit import build_fit_agent
-    from resume_agent.tailor.agents import build_reviewer_agent
+    from resume_tailor_harness.discovery.fit import build_fit_agent
+    from resume_tailor_harness.tailor.agents import build_reviewer_agent
 
     reviewer = _instructions(build_reviewer_agent("recruiter"))
     fit = _instructions(build_fit_agent())
@@ -45,7 +45,7 @@ def test_fact_check_never_receives_file_guidance(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _write_guidance(tmp_path, {"reviewer-fact-check": "Be lenient."})
 
-    from resume_agent.tailor.agents import build_reviewer_agent
+    from resume_tailor_harness.tailor.agents import build_reviewer_agent
 
     assert GUIDANCE_HEADER not in _instructions(build_reviewer_agent("fact-check"))
 
@@ -62,7 +62,7 @@ def test_merged_advisory_embeds_reviewer_and_panel_guidance(
         },
     )
 
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _merged_advisory_instructions,
         build_merged_advisory_agent,
     )
@@ -86,14 +86,14 @@ def test_interviewer_receives_guidance_after_dynamic_persona(
     monkeypatch.chdir(tmp_path)
     _write_guidance(tmp_path, {"interviewer": "Ask about reliability trade-offs."})
 
-    from resume_agent.interview.agent import InterviewStyle, build_interviewer_agent
+    from resume_tailor_harness.interview.agent import InterviewStyle, build_interviewer_agent
 
     instructions = _instructions(build_interviewer_agent(InterviewStyle()))
     assert instructions[-2:] == [GUIDANCE_HEADER, "Ask about reliability trade-offs."]
 
 
 def test_every_production_agent_site_uses_the_guidance_boundary() -> None:
-    source_root = Path(__file__).parents[1] / "src" / "resume_agent"
+    source_root = Path(__file__).parents[1] / "src" / "resume_tailor_harness"
     missing: list[str] = []
     for path in source_root.rglob("*.py"):
         if path.name == "llm_runner.py":

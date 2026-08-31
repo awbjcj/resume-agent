@@ -130,7 +130,7 @@ error is not converted into a failed run: reconnect or reconcile with
 
 ### Incremental skill-classification module
 
-Create `resume_agent.taxonomy.classification` as the deep module that owns delta
+Create `resume_tailor_harness.taxonomy.classification` as the deep module that owns delta
 planning, batching, model-output projection, reconcile, theme reuse, progress, and
 failure accounting. The match-gap application module supplies demanded tokens and
 persists the returned additions; it does not know batch mechanics.

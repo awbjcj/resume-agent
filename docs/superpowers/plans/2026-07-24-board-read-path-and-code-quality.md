@@ -50,7 +50,7 @@
 ## Baseline — measured, not assumed
 
 All numbers below were taken on the real development workspace at
-`data/users/1398ad91b2b2/resume_agent.db` (19 MB; **2096 jobs**; 11.7 MB of
+`data/users/1398ad91b2b2/resume_tailor_harness.db` (19 MB; **2096 jobs**; 11.7 MB of
 `jd_text`; 822 shortlisted of which 99 unarchived; 1244 triage-status; 0
 applications). Timings are the **minimum of 3 warm in-process runs** — i.e. the
 optimistic case, excluding HTTP, JSON encoding over the wire, and network.
@@ -237,7 +237,7 @@ git commit -m "bench(board): cover the pipeline board, page depth, and payload s
 
 **Files:**
 
-- Read: `src/resume_agent/services/shortlist_filtering.py`, `contracts/shortlist_filter.contract.json`, `tests/test_shortlist_filtering.py`, `tests/test_shortlist_filter_contract.py`, `web/src/lib/filters/`
+- Read: `src/resume_tailor_harness/services/shortlist_filtering.py`, `contracts/shortlist_filter.contract.json`, `tests/test_shortlist_filtering.py`, `tests/test_shortlist_filter_contract.py`, `web/src/lib/filters/`
 
 - [ ] **Step 1: Re-verify the deletion test before deleting anything**
 
@@ -262,7 +262,7 @@ Before deleting, copy out `PRESETS` (`balanced` `(0.50, 0.30, 0.20)`, `pay_first
 
 **Files:**
 
-- Modify: `src/resume_agent/services/board.py`, `src/resume_agent/api/routers/boards.py`
+- Modify: `src/resume_tailor_harness/services/board.py`, `src/resume_tailor_harness/api/routers/boards.py`
 - Create: `tests/api/test_board_composite_rank.py`
 
 **Interfaces:**
@@ -321,8 +321,8 @@ precision — rounding is display-only and must never enter the ordering. Route
 npx --yes openapi-typescript contracts/openapi.json -o contracts/ts/api.ts
 Copy-Item contracts/ts/api.ts web/src/lib/api/schema.ts
 .venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -v
-ruff check src/resume_agent/services/board.py src/resume_agent/api/routers/boards.py tests/api/test_board_composite_rank.py
-git add src/resume_agent/services/board.py src/resume_agent/api/routers/boards.py tests/api/test_board_composite_rank.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+ruff check src/resume_tailor_harness/services/board.py src/resume_tailor_harness/api/routers/boards.py tests/api/test_board_composite_rank.py
+git add src/resume_tailor_harness/services/board.py src/resume_tailor_harness/api/routers/boards.py tests/api/test_board_composite_rank.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "fix(board): composite sort and presets reach the server again"
 ```
 
@@ -334,7 +334,7 @@ and confirm `tests/api/test_openapi_contract.py` passes.
 
 **Files:**
 
-- Delete: `src/resume_agent/services/shortlist_filtering.py`, `contracts/shortlist_filter.contract.json`, `tests/test_shortlist_filtering.py`, `tests/test_shortlist_filter_contract.py`
+- Delete: `src/resume_tailor_harness/services/shortlist_filtering.py`, `contracts/shortlist_filter.contract.json`, `tests/test_shortlist_filtering.py`, `tests/test_shortlist_filter_contract.py`
 - Modify: `contracts/README.md`
 
 - [ ] **Step 1: Delete, then prove nothing moved**
@@ -349,7 +349,7 @@ deletion test passing: complexity vanished rather than relocating.
 ```bash
 .venv/Scripts/python.exe -m pytest tests/api/test_board_composite_rank.py tests/test_services_board.py -q
 ruff check src tests
-git rm src/resume_agent/services/shortlist_filtering.py contracts/shortlist_filter.contract.json tests/test_shortlist_filtering.py tests/test_shortlist_filter_contract.py
+git rm src/resume_tailor_harness/services/shortlist_filtering.py contracts/shortlist_filter.contract.json tests/test_shortlist_filtering.py tests/test_shortlist_filter_contract.py
 git add contracts/README.md
 git commit -m "chore(filters): delete the cross-language filter contract; its TS half is gone"
 ```
@@ -371,8 +371,8 @@ CONTEXT.md here.
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/board_query.py`, `tests/tracking/test_board_query.py`
-- Modify: `src/resume_agent/services/board.py` (compatibility re-exports only)
+- Create: `src/resume_tailor_harness/tracking/board_query.py`, `tests/tracking/test_board_query.py`
+- Modify: `src/resume_tailor_harness/services/board.py` (compatibility re-exports only)
 
 **Interfaces:**
 
@@ -460,8 +460,8 @@ snapped and merged before returning counts.
 
 ```bash
 .venv/Scripts/python.exe -m pytest tests/tracking/test_board_query.py -v
-ruff check src/resume_agent/tracking/board_query.py src/resume_agent/services/board.py tests/tracking/test_board_query.py
-git add src/resume_agent/tracking/board_query.py src/resume_agent/services/board.py tests/tracking/test_board_query.py
+ruff check src/resume_tailor_harness/tracking/board_query.py src/resume_tailor_harness/services/board.py tests/tracking/test_board_query.py
+git add src/resume_tailor_harness/tracking/board_query.py src/resume_tailor_harness/services/board.py tests/tracking/test_board_query.py
 git commit -m "feat(board): one SQL statement builder for board filter, sort, page, and facets"
 ```
 
@@ -469,7 +469,7 @@ git commit -m "feat(board): one SQL statement builder for board filter, sort, pa
 
 **Files:**
 
-- Modify: `src/resume_agent/services/board.py`, `src/resume_agent/services/pagination.py`, `src/resume_agent/tracking/queries.py`
+- Modify: `src/resume_tailor_harness/services/board.py`, `src/resume_tailor_harness/services/pagination.py`, `src/resume_tailor_harness/tracking/queries.py`
 - Modify: `tests/test_services_pagination.py`
 
 - [ ] **Step 1: Rewrite `list_board` on the builder**
@@ -511,7 +511,7 @@ roughly 150 lines of `getattr`-over-`Any` reimplementation of SQL. Keep
 
 ```bash
 .venv/Scripts/python.exe -m pytest tests/tracking/test_board_query.py tests/test_services_board.py tests/test_services_pagination.py -v
-ruff check src/resume_agent/services/board.py src/resume_agent/services/pagination.py src/resume_agent/tracking/queries.py
+ruff check src/resume_tailor_harness/services/board.py src/resume_tailor_harness/services/pagination.py src/resume_tailor_harness/tracking/queries.py
 .venv/Scripts/python.exe scripts/bench_board.py --rows 2000 --repeat 10
 ```
 
@@ -522,7 +522,7 @@ threshold is not met, profile before adding anything further — do not guess.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/board.py src/resume_agent/services/pagination.py src/resume_agent/tracking/queries.py tests/test_services_pagination.py
+git add src/resume_tailor_harness/services/board.py src/resume_tailor_harness/services/pagination.py src/resume_tailor_harness/tracking/queries.py tests/test_services_pagination.py
 git commit -m "perf(board): filter, sort, and page in SQL; project only the returned page"
 ```
 
@@ -534,7 +534,7 @@ git commit -m "perf(board): filter, sort, and page in SQL; project only the retu
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/jobs.py`, `src/resume_agent/tracking/queries.py`, `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/features/pipeline/PipelineCard.tsx`
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py`, `src/resume_tailor_harness/tracking/queries.py`, `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/features/pipeline/PipelineCard.tsx`
 - Create: `tests/api/test_pipeline_payload.py`
 
 **Interfaces:**
@@ -581,9 +581,9 @@ cd web && npm run test:run -- PipelineContainer && cd ..
 
 ```bash
 .venv/Scripts/python.exe -m pytest tests/api/test_pipeline_payload.py tests/api/test_openapi_contract.py -v
-ruff check src/resume_agent/api/schemas/jobs.py src/resume_agent/tracking/queries.py tests/api/test_pipeline_payload.py
+ruff check src/resume_tailor_harness/api/schemas/jobs.py src/resume_tailor_harness/tracking/queries.py tests/api/test_pipeline_payload.py
 .venv/Scripts/python.exe scripts/bench_board.py --rows 2000 --repeat 10 --board pipeline
-git add src/resume_agent/api/schemas/jobs.py src/resume_agent/tracking/queries.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts web/src/features/pipeline/PipelineCard.tsx tests/api/test_pipeline_payload.py
+git add src/resume_tailor_harness/api/schemas/jobs.py src/resume_tailor_harness/tracking/queries.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts web/src/features/pipeline/PipelineCard.tsx tests/api/test_pipeline_payload.py
 git commit -m "perf(pipeline)!: ship a 400-char jdPreview instead of the full description"
 ```
 
@@ -599,7 +599,7 @@ text makes the original 120 KB raw-body target arithmetically impossible.
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/boards.py`, `src/resume_agent/services/board.py`
+- Modify: `src/resume_tailor_harness/api/routers/boards.py`, `src/resume_tailor_harness/services/board.py`
 - Create: `tests/api/test_board_facet_paging.py`
 
 The client reads `pages?.[0]?.facets` (`use-board-query.ts:61`) and discards the
@@ -624,8 +624,8 @@ regenerate all three generated contract artifacts in this commit.
 npx --yes openapi-typescript contracts/openapi.json -o contracts/ts/api.ts
 Copy-Item contracts/ts/api.ts web/src/lib/api/schema.ts
 .venv/Scripts/python.exe -m pytest tests/api/test_board_facet_paging.py tests/api/test_openapi_contract.py -v
-ruff check src/resume_agent/api/routers/boards.py src/resume_agent/services/board.py tests/api/test_board_facet_paging.py
-git add src/resume_agent/api/schemas/base.py src/resume_agent/api/mappers.py src/resume_agent/api/routers/boards.py src/resume_agent/services/board.py tests/api/test_board_facet_paging.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+ruff check src/resume_tailor_harness/api/routers/boards.py src/resume_tailor_harness/services/board.py tests/api/test_board_facet_paging.py
+git add src/resume_tailor_harness/api/schemas/base.py src/resume_tailor_harness/api/mappers.py src/resume_tailor_harness/api/routers/boards.py src/resume_tailor_harness/services/board.py tests/api/test_board_facet_paging.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "perf(board): compute facets on the first page only"
 ```
 
@@ -641,7 +641,7 @@ this phase before Phase 2**, where it would merely paper over the real cost._
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/known_jobs.py`, `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/discovery/known_jobs.py`, `src/resume_tailor_harness/tracking/repository.py`
 - Create: `tests/tracking/test_query_projections.py`
 
 - [ ] **Step 1: Write the failing hydration test**
@@ -665,8 +665,8 @@ those columns.
 
 ```bash
 .venv/Scripts/python.exe -m pytest tests/tracking/test_query_projections.py tests/test_discovery_ingest.py tests/test_prune.py -v
-ruff check src/resume_agent/discovery/known_jobs.py src/resume_agent/tracking/repository.py tests/tracking/test_query_projections.py
-git add src/resume_agent/discovery/known_jobs.py src/resume_agent/tracking/repository.py tests/tracking/test_query_projections.py
+ruff check src/resume_tailor_harness/discovery/known_jobs.py src/resume_tailor_harness/tracking/repository.py tests/tracking/test_query_projections.py
+git add src/resume_tailor_harness/discovery/known_jobs.py src/resume_tailor_harness/tracking/repository.py tests/tracking/test_query_projections.py
 git commit -m "perf(discovery,prune): project columns instead of hydrating full Job rows"
 ```
 

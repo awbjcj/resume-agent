@@ -1,10 +1,10 @@
-from resume_agent.discovery.source_resolution.models import (
+from resume_tailor_harness.discovery.source_resolution.models import (
     CrawlCandidate,
     CrawlReport,
     SourceEvidence,
 )
-from resume_agent.discovery.source_resolution.resolver import CompanySourceResolver
-from resume_agent.services.sources import SourcePreview
+from resume_tailor_harness.discovery.source_resolution.resolver import CompanySourceResolver
+from resume_tailor_harness.services.sources import SourcePreview
 
 
 def strong_report(company: str, url: str) -> CrawlReport:

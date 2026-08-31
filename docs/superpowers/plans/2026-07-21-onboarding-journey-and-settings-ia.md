@@ -67,8 +67,8 @@ for orientation, no CTA).
 
 ### 2. `GettingStartedChecklist` (first-run, dismissible) — `features/journey/GettingStartedChecklist.tsx`
 Shown on the dashboard only while `!complete` and not dismissed
-(`localStorage: resume-agent-getting-started-dismissed`, mirroring the existing
-`resume-agent-setup-dismissed` idiom). Auto-hides once `complete`.
+(`localStorage: resume-tailor-harness-getting-started-dismissed`, mirroring the existing
+`resume-tailor-harness-setup-dismissed` idiom). Auto-hides once `complete`.
 ```
 ┌── Getting started ───────────────── 3 of 5 ── ✕ ──┐
 │  ✓ Build your profile                             │

@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.career_lab.models import CareerLabContextRefs
+from resume_tailor_harness import cli
+from resume_tailor_harness.career_lab.models import CareerLabContextRefs
 
 
 def test_career_lab_command_passes_typed_context_and_skill(monkeypatch, tmp_path):
@@ -29,7 +29,7 @@ def test_career_lab_command_passes_typed_context_and_skill(monkeypatch, tmp_path
     monkeypatch.setattr(cli, "_engine", lambda _db_url: object())
     monkeypatch.setattr(cli, "_tenant_cli_path", lambda _path: tmp_path / "data")
     monkeypatch.setattr(
-        "resume_agent.career_skills.registry.CareerSkillRegistry.from_settings",
+        "resume_tailor_harness.career_skills.registry.CareerSkillRegistry.from_settings",
         lambda _settings: SimpleNamespace(
             require=lambda name, **_kwargs: SimpleNamespace(
                 ref=SimpleNamespace(name=name)
@@ -48,13 +48,13 @@ def test_career_lab_command_passes_typed_context_and_skill(monkeypatch, tmp_path
             "turns": [{"role": "assistant", "text": "draft"}],
         }
 
-    monkeypatch.setattr("resume_agent.services.career_lab.run_start_turn", start)
+    monkeypatch.setattr("resume_tailor_harness.services.career_lab.run_start_turn", start)
     monkeypatch.setattr(
-        "resume_agent.services.career_lab.run_end_turn",
+        "resume_tailor_harness.services.career_lab.run_end_turn",
         lambda reporter, **_kwargs: {"status": "ended"},
     )
     monkeypatch.setattr(
-        "resume_agent.career_lab.store.active_session_for_job",
+        "resume_tailor_harness.career_lab.store.active_session_for_job",
         lambda _root, _job_id: None,
     )
 
@@ -98,10 +98,10 @@ def test_career_lab_command_resumes_the_thread_for_the_given_job(monkeypatch, tm
         return {"session_id": "job-seven-thread"}
 
     monkeypatch.setattr(
-        "resume_agent.career_lab.store.active_session_for_job", active_for_job
+        "resume_tailor_harness.career_lab.store.active_session_for_job", active_for_job
     )
     monkeypatch.setattr(
-        "resume_agent.services.career_lab.session_view",
+        "resume_tailor_harness.services.career_lab.session_view",
         lambda _root, session_id: {
             "sessionId": session_id,
             "status": "active",
@@ -109,7 +109,7 @@ def test_career_lab_command_resumes_the_thread_for_the_given_job(monkeypatch, tm
         },
     )
     monkeypatch.setattr(
-        "resume_agent.services.career_lab.run_end_turn",
+        "resume_tailor_harness.services.career_lab.run_end_turn",
         lambda reporter, **_kwargs: {"status": "ended"},
     )
 
@@ -133,7 +133,7 @@ def test_career_lab_command_keeps_prompting_after_a_clarification(
     monkeypatch.setattr(cli, "_engine", lambda _db_url: object())
     monkeypatch.setattr(cli, "_tenant_cli_path", lambda _path: tmp_path / "data")
     monkeypatch.setattr(
-        "resume_agent.career_lab.store.active_session_for_job",
+        "resume_tailor_harness.career_lab.store.active_session_for_job",
         lambda _root, _job_id: None,
     )
 
@@ -157,10 +157,10 @@ def test_career_lab_command_keeps_prompting_after_a_clarification(
             "turns": [{"role": "assistant", "text": "Here is your draft."}],
         }
 
-    monkeypatch.setattr("resume_agent.services.career_lab.run_start_turn", start)
-    monkeypatch.setattr("resume_agent.services.career_lab.run_message_turn", message)
+    monkeypatch.setattr("resume_tailor_harness.services.career_lab.run_start_turn", start)
+    monkeypatch.setattr("resume_tailor_harness.services.career_lab.run_message_turn", message)
     monkeypatch.setattr(
-        "resume_agent.services.career_lab.run_end_turn",
+        "resume_tailor_harness.services.career_lab.run_end_turn",
         lambda _reporter, **_kwargs: {"status": "ended", "turns": []},
     )
 

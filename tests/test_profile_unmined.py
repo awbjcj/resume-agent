@@ -1,5 +1,5 @@
-from resume_agent.models.base import Source
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.base import Source
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -7,9 +7,9 @@ from resume_agent.models.profile import (
     ProfileFacts,
     Skill,
 )
-from resume_agent.profile.corpus import add_source, doc_path, load_manifest
-from resume_agent.profile.depth import unmined_block, unmined_sources
-from resume_agent.profile.store import save_facts
+from resume_tailor_harness.profile.corpus import add_source, doc_path, load_manifest
+from resume_tailor_harness.profile.depth import unmined_block, unmined_sources
+from resume_tailor_harness.profile.store import save_facts
 
 
 def _workspace(tmp_path):

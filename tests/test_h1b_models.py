@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.h1b.models import (
+from resume_tailor_harness.h1b.models import (
     HISTORICAL_ONLY_CAVEAT,
     H1BCompanyResolution,
     H1BPeriodStat,

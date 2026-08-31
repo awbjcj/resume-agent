@@ -4,14 +4,14 @@ from threading import Barrier, Event, Lock, Thread
 
 import pytest
 
-from resume_agent.api.runs.manager import (
+from resume_tailor_harness.api.runs.manager import (
     RunCancelled,
     RunManager,
     RunProgressReporter,
     RunSingletonConflict,
 )
-from resume_agent.api.runs.models import RunState, parse_run_snapshot
-from resume_agent.progress import ProgressReporter
+from resume_tailor_harness.api.runs.models import RunState, parse_run_snapshot
+from resume_tailor_harness.progress import ProgressReporter
 
 
 class InlineExecutor(Executor):

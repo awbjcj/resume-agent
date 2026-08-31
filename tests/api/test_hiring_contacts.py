@@ -5,14 +5,14 @@ from typing import cast
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.hiring_contacts import agents as contact_agents
-from resume_agent.hiring_contacts.models import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.hiring_contacts import agents as contact_agents
+from resume_tailor_harness.hiring_contacts.models import (
     HiringContactDraft,
     HiringContactIntelligenceDraft,
 )
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tracking.tables import Job
 
 
 class _InlineExecutor(Executor):

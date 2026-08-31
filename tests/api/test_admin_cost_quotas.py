@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.tenancy.system_db import LlmRate, User
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.tenancy.system_db import LlmRate, User
 
 
 def _login(client, username="owner", password="owner-password"):

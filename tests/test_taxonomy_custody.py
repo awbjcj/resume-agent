@@ -6,14 +6,14 @@ import time
 
 import pytest
 
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
-from resume_agent.taxonomy.custody import TaxonomyCustody
-from resume_agent.taxonomy.custody import TaxonomyConflictError
-from resume_agent.taxonomy.state import taxonomy_state_path
+from resume_tailor_harness.taxonomy.custody import TaxonomyCustody
+from resume_tailor_harness.taxonomy.custody import TaxonomyConflictError
+from resume_tailor_harness.taxonomy.state import taxonomy_state_path
 
 
 def _hold_cross_process_mutation(

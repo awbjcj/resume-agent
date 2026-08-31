@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -147,7 +147,7 @@ def test_put_models_rejects_capabilities_the_selected_model_does_not_support(cli
 def test_put_secret_refreshes_app_settings(client):
     client.put("/api/secrets", json={"anthropicApiKey": "sk-ant-new-key-5678"})
     # settings served to routes must see the new value without an app restart
-    from resume_agent.api.deps import get_settings_dep  # noqa: PLC0415
+    from resume_tailor_harness.api.deps import get_settings_dep  # noqa: PLC0415
 
     app = client.app
     assert (

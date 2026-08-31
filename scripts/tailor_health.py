@@ -8,7 +8,7 @@ numbers can be re-read after a change instead of re-derived by hand:
   * which blocking issues each gate is raising
 
 Usage:
-    python scripts/tailor_health.py <path-to-resume_agent.db> [--json]
+    python scripts/tailor_health.py <path-to-resume_tailor_harness.db> [--json]
 
 It opens the database read-only and writes nothing.
 """
@@ -193,7 +193,7 @@ def format_report(report: dict[str, Any]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("db", type=Path, help="path to a workspace resume_agent.db")
+    parser.add_argument("db", type=Path, help="path to a workspace resume_tailor_harness.db")
     parser.add_argument("--json", action="store_true", help="emit raw JSON")
     args = parser.parse_args(argv)
 

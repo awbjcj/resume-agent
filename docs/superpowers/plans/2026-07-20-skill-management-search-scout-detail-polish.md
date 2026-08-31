@@ -13,7 +13,7 @@
 - Tests run offline: `.venv/Scripts/python.exe -m pytest` (no API key / network). Fake all agents via injected `Runner` params; never call live LLMs.
 - Wire format is **camelCase**; Python stays snake_case. Pydantic schemas subclass `CamelModel` (`api/schemas/base.py`).
 - Any new/changed API route requires regenerating contracts: `bash scripts/gen_ts_client.sh` (writes `contracts/openapi.json` + `contracts/ts/api.ts`); drift gate is `tests/api/test_openapi_contract.py`.
-- Skill identity across rebuilds is the **normalized token** (`resume_agent.tracking.match_gap.normalize_skill`), never `Skill.id`.
+- Skill identity across rebuilds is the **normalized token** (`resume_tailor_harness.tracking.match_gap.normalize_skill`), never `Skill.id`.
 - Synthesized facts key `facts.skills` buckets by category name: `"hard"`, `"soft"`, `"domain"` (synthesis.py:527, merge.py:468). Manual skills must join those same buckets.
 - Every skill mutation runs under `manual_skills_lock(profile_dir)` and rebuilds the saved matrix via `rebuild_saved_matrix(profile_dir, facts)`.
 - `reviewer-fact-check` is the only non-editable agent; new agents are editable and MUST be registered in `prompts/registry.py`.
@@ -25,18 +25,18 @@
 
 **Backend (create):**
 - none new for A/B (extend existing files)
-- `src/resume_agent/discovery/search_scout.py` — Search Scout agents + typed models
-- `src/resume_agent/services/search_discovery.py` — context, dedupe, run orchestration
+- `src/resume_tailor_harness/discovery/search_scout.py` — Search Scout agents + typed models
+- `src/resume_tailor_harness/services/search_discovery.py` — context, dedupe, run orchestration
 
 **Backend (modify):**
-- `src/resume_agent/profile/manual_skills.py` — real-category placement, `ManualSuppressEntry`, replay ordering
-- `src/resume_agent/services/profile_skills.py` — `delete_skill`, `restore_skill`, `list_suppressed`, contradiction rules
-- `src/resume_agent/api/routers/profile.py` — delete/restore/list-suppressed routes
-- `src/resume_agent/api/schemas/profile.py` — `SuppressedSkillOut`
-- `src/resume_agent/api/routers/search.py` (or new sub-route) — `POST /api/search/discover`
-- `src/resume_agent/api/schemas/*` — `DiscoverSearchIn`
-- `src/resume_agent/prompts/registry.py` — two new guidance specs
-- `src/resume_agent/cli.py` — `scout-search` command
+- `src/resume_tailor_harness/profile/manual_skills.py` — real-category placement, `ManualSuppressEntry`, replay ordering
+- `src/resume_tailor_harness/services/profile_skills.py` — `delete_skill`, `restore_skill`, `list_suppressed`, contradiction rules
+- `src/resume_tailor_harness/api/routers/profile.py` — delete/restore/list-suppressed routes
+- `src/resume_tailor_harness/api/schemas/profile.py` — `SuppressedSkillOut`
+- `src/resume_tailor_harness/api/routers/search.py` (or new sub-route) — `POST /api/search/discover`
+- `src/resume_tailor_harness/api/schemas/*` — `DiscoverSearchIn`
+- `src/resume_tailor_harness/prompts/registry.py` — two new guidance specs
+- `src/resume_tailor_harness/cli.py` — `scout-search` command
 
 **Web (create):**
 - `web/src/features/search-scout/use-search-discover.ts`
@@ -56,7 +56,7 @@
 Drops the `"Manually added"` bucket; a new manual skill joins the same `hard`/`soft`/`domain` bucket synthesis uses, defaulting `None` → `hard`. A full-lifecycle test proves it survives `run_corpus_build`.
 
 **Files:**
-- Modify: `src/resume_agent/profile/manual_skills.py` (`apply_manual_skill_entry`, `remove_manual_skill_entry`, drop `MANUAL_SKILLS_BUCKET` usage)
+- Modify: `src/resume_tailor_harness/profile/manual_skills.py` (`apply_manual_skill_entry`, `remove_manual_skill_entry`, drop `MANUAL_SKILLS_BUCKET` usage)
 - Test: `tests/test_profile_manual_skills.py`, `tests/test_services_profile_build.py`
 
 **Interfaces:**
@@ -67,8 +67,8 @@ Drops the `"Manually added"` bucket; a new manual skill joins the same `hard`/`s
 
 ```python
 def test_new_skill_lands_in_real_category_bucket_not_manual():
-    from resume_agent.models.profile import ProfileFacts
-    from resume_agent.profile.manual_skills import (
+    from resume_tailor_harness.models.profile import ProfileFacts
+    from resume_tailor_harness.profile.manual_skills import (
         ManualSkillEntry, apply_manual_skill_entry,
     )
     facts = ProfileFacts()
@@ -81,8 +81,8 @@ def test_new_skill_lands_in_real_category_bucket_not_manual():
 
 
 def test_new_skill_without_category_defaults_to_hard():
-    from resume_agent.models.profile import ProfileFacts
-    from resume_agent.profile.manual_skills import (
+    from resume_tailor_harness.models.profile import ProfileFacts
+    from resume_tailor_harness.profile.manual_skills import (
         ManualSkillEntry, apply_manual_skill_entry,
     )
     facts, _ = apply_manual_skill_entry(ProfileFacts(), ManualSkillEntry(name="GraphQL"))
@@ -90,8 +90,8 @@ def test_new_skill_without_category_defaults_to_hard():
 
 
 def test_remove_new_skill_targets_category_bucket():
-    from resume_agent.models.profile import ProfileFacts
-    from resume_agent.profile.manual_skills import (
+    from resume_tailor_harness.models.profile import ProfileFacts
+    from resume_tailor_harness.profile.manual_skills import (
         ManualSkillEntry, apply_manual_skill_entry, remove_manual_skill_entry,
     )
     entry = ManualSkillEntry(name="Rust", category="hard")
@@ -105,7 +105,7 @@ def test_remove_new_skill_targets_category_bucket():
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_manual_skills.py -k "real_category or defaults_to_hard or targets_category" -v`
 Expected: FAIL — skill currently lands in `"Manually added"`.
 
-- [ ] **Step 3: Implement real-category placement** in `src/resume_agent/profile/manual_skills.py`
+- [ ] **Step 3: Implement real-category placement** in `src/resume_tailor_harness/profile/manual_skills.py`
 
 Replace the `MANUAL_SKILLS_BUCKET` block in `apply_manual_skill_entry` (the `isinstance(entry, ManualSkillEntry)` branch):
 
@@ -152,7 +152,7 @@ Expected: PASS (all, including pre-existing).
 def test_manual_skill_survives_rebuild_in_real_category(tmp_path, monkeypatch):
     # Arrange: a built profile_dir with one source and a manual skill ledger entry.
     # (Reuse this module's existing helper that stubs build_corpus_profile agents.)
-    from resume_agent.profile.manual_skills import (
+    from resume_tailor_harness.profile.manual_skills import (
         ManualSkillEntry, ManualSkillsLedger, save_manual_skills,
     )
     profile_dir = _make_built_profile_dir(tmp_path)  # existing helper in this test module
@@ -161,7 +161,7 @@ def test_manual_skill_survives_rebuild_in_real_category(tmp_path, monkeypatch):
         profile_dir / "manual_skills.json",
     )
 
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
     profile_build.run_corpus_build(
         None,
         profile_dir=profile_dir,
@@ -169,7 +169,7 @@ def test_manual_skill_survives_rebuild_in_real_category(tmp_path, monkeypatch):
         facts_out=profile_dir / "facts.json",
     )
 
-    from resume_agent.profile.store import load_facts
+    from resume_tailor_harness.profile.store import load_facts
     facts = load_facts(profile_dir / "facts.json")
     assert "Manually added" not in facts.skills
     assert any(s.name == "Rust" for s in facts.skills.get("hard", []))
@@ -185,7 +185,7 @@ Expected: PASS. If it FAILS on "survives" (skill absent), you found the reported
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/profile/manual_skills.py tests/test_profile_manual_skills.py tests/test_services_profile_build.py
+git add src/resume_tailor_harness/profile/manual_skills.py tests/test_profile_manual_skills.py tests/test_services_profile_build.py
 git commit -m "fix(skills): manual skills fold into real category buckets and survive rebuild"
 ```
 
@@ -196,7 +196,7 @@ git commit -m "fix(skills): manual skills fold into real category buckets and su
 Adds a `suppress` entry to the same ledger; `apply_manual_skills` applies adds/aliases first, then removes suppressed tokens.
 
 **Files:**
-- Modify: `src/resume_agent/profile/manual_skills.py`
+- Modify: `src/resume_tailor_harness/profile/manual_skills.py`
 - Test: `tests/test_profile_manual_skills.py`
 
 **Interfaces:**
@@ -206,8 +206,8 @@ Adds a `suppress` entry to the same ledger; `apply_manual_skills` applies adds/a
 
 ```python
 def test_suppress_removes_matching_skill_after_adds():
-    from resume_agent.models.profile import ProfileFacts, Skill
-    from resume_agent.profile.manual_skills import (
+    from resume_tailor_harness.models.profile import ProfileFacts, Skill
+    from resume_tailor_harness.profile.manual_skills import (
         ManualSuppressEntry, ManualSkillsLedger, apply_manual_skills,
     )
     facts = ProfileFacts(skills={"hard": [Skill(name="Kubernetes", category="hard")]})
@@ -220,8 +220,8 @@ def test_suppress_removes_matching_skill_after_adds():
 
 
 def test_suppress_applies_after_add_of_same_token():
-    from resume_agent.models.profile import ProfileFacts
-    from resume_agent.profile.manual_skills import (
+    from resume_tailor_harness.models.profile import ProfileFacts
+    from resume_tailor_harness.profile.manual_skills import (
         ManualSkillEntry, ManualSuppressEntry, ManualSkillsLedger, apply_manual_skills,
     )
     ledger = ManualSkillsLedger(entries=[
@@ -237,7 +237,7 @@ def test_suppress_applies_after_add_of_same_token():
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_manual_skills.py -k suppress -v`
 Expected: FAIL — `ManualSuppressEntry` undefined.
 
-- [ ] **Step 3: Implement** in `src/resume_agent/profile/manual_skills.py`
+- [ ] **Step 3: Implement** in `src/resume_tailor_harness/profile/manual_skills.py`
 
 Add the model and extend the union:
 
@@ -294,7 +294,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/manual_skills.py tests/test_profile_manual_skills.py
+git add src/resume_tailor_harness/profile/manual_skills.py tests/test_profile_manual_skills.py
 git commit -m "feat(skills): durable suppress entry replayed after additive ledger"
 ```
 
@@ -303,7 +303,7 @@ git commit -m "feat(skills): durable suppress entry replayed after additive ledg
 ## Task 3: delete/restore/list-suppressed services + contradiction rules (B service)
 
 **Files:**
-- Modify: `src/resume_agent/services/profile_skills.py`
+- Modify: `src/resume_tailor_harness/services/profile_skills.py`
 - Test: `tests/test_profile_skills_service.py`
 
 **Interfaces:**
@@ -318,8 +318,8 @@ git commit -m "feat(skills): durable suppress entry replayed after additive ledg
 
 ```python
 def test_delete_skill_suppresses_and_removes(built_profile_dir):
-    from resume_agent.services import profile_skills
-    from resume_agent.profile.store import load_facts
+    from resume_tailor_harness.services import profile_skills
+    from resume_tailor_harness.profile.store import load_facts
     # built_profile_dir has a synthesized skill "Kubernetes" (token "kubernetes")
     profile_skills.delete_skill(built_profile_dir, "kubernetes")
     facts = load_facts(built_profile_dir / "facts.json")
@@ -329,21 +329,21 @@ def test_delete_skill_suppresses_and_removes(built_profile_dir):
 
 def test_delete_unknown_skill_raises(built_profile_dir):
     import pytest
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
     with pytest.raises(profile_skills.SkillNotFoundError):
         profile_skills.delete_skill(built_profile_dir, "nonexistent-token")
 
 
 def test_restore_removes_suppression(built_profile_dir):
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
     profile_skills.delete_skill(built_profile_dir, "kubernetes")
     profile_skills.restore_skill(built_profile_dir, "kubernetes")
     assert profile_skills.list_suppressed(built_profile_dir) == []
 
 
 def test_add_skill_restores_when_suppressed(built_profile_dir):
-    from resume_agent.services import profile_skills
-    from resume_agent.profile.store import load_facts
+    from resume_tailor_harness.services import profile_skills
+    from resume_tailor_harness.profile.store import load_facts
     profile_skills.delete_skill(built_profile_dir, "kubernetes")
     profile_skills.add_skill(built_profile_dir, "Kubernetes", "hard")
     facts = load_facts(built_profile_dir / "facts.json")
@@ -358,12 +358,12 @@ If a `built_profile_dir` fixture with a known skill does not exist, add one to t
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_skills_service.py -k "delete_skill or restore or add_skill_restores" -v`
 Expected: FAIL — `delete_skill`/`restore_skill`/`list_suppressed` undefined.
 
-- [ ] **Step 3: Implement** in `src/resume_agent/services/profile_skills.py`
+- [ ] **Step 3: Implement** in `src/resume_tailor_harness/services/profile_skills.py`
 
 Add imports:
 
 ```python
-from resume_agent.profile.manual_skills import (
+from resume_tailor_harness.profile.manual_skills import (
     ManualSuppressEntry,
     # ...existing imports...
 )
@@ -463,7 +463,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_skills.py tests/test_profile_skills_service.py
+git add src/resume_tailor_harness/services/profile_skills.py tests/test_profile_skills_service.py
 git commit -m "feat(skills): delete_skill/restore_skill services with suppression contradiction rules"
 ```
 
@@ -472,7 +472,7 @@ git commit -m "feat(skills): delete_skill/restore_skill services with suppressio
 ## Task 4: delete/restore/list-suppressed API routes + contract (B API)
 
 **Files:**
-- Modify: `src/resume_agent/api/routers/profile.py`, `src/resume_agent/api/schemas/profile.py`
+- Modify: `src/resume_tailor_harness/api/routers/profile.py`, `src/resume_tailor_harness/api/schemas/profile.py`
 - Test: `tests/api/test_profile_skills_router.py`
 
 **Interfaces:**
@@ -511,7 +511,7 @@ def test_delete_unknown_skill_404(client_with_built_profile):
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_profile_skills_router.py -k "suppressed or restore or delete_unknown" -v`
 Expected: FAIL — routes 404/405.
 
-- [ ] **Step 3: Add the schema** to `src/resume_agent/api/schemas/profile.py`
+- [ ] **Step 3: Add the schema** to `src/resume_tailor_harness/api/schemas/profile.py`
 
 ```python
 class SuppressedSkillOut(CamelModel):
@@ -520,7 +520,7 @@ class SuppressedSkillOut(CamelModel):
     added_at: str
 ```
 
-- [ ] **Step 4: Add the routes** to `src/resume_agent/api/routers/profile.py` (import `SuppressedSkillOut`)
+- [ ] **Step 4: Add the routes** to `src/resume_tailor_harness/api/routers/profile.py` (import `SuppressedSkillOut`)
 
 ```python
 @router.delete("/profile/skills/{key}", status_code=204)
@@ -562,7 +562,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/profile.py src/resume_agent/api/schemas/profile.py tests/api/test_profile_skills_router.py contracts/
+git add src/resume_tailor_harness/api/routers/profile.py src/resume_tailor_harness/api/schemas/profile.py tests/api/test_profile_skills_router.py contracts/
 git commit -m "feat(api): delete/restore/list suppressed skills endpoints"
 ```
 
@@ -571,8 +571,8 @@ git commit -m "feat(api): delete/restore/list suppressed skills endpoints"
 ## Task 5: Search Scout agents + models + registry (E agents)
 
 **Files:**
-- Create: `src/resume_agent/discovery/search_scout.py`
-- Modify: `src/resume_agent/prompts/registry.py`
+- Create: `src/resume_tailor_harness/discovery/search_scout.py`
+- Modify: `src/resume_tailor_harness/prompts/registry.py`
 - Test: `tests/test_search_scout.py`, `tests/test_prompt_registry.py` (only if it enumerates specs)
 
 **Interfaces:**
@@ -587,7 +587,7 @@ git commit -m "feat(api): delete/restore/list suppressed skills endpoints"
 
 ```python
 def test_search_suggestions_model_roundtrips():
-    from resume_agent.discovery.search_scout import SearchSuggestion, SearchSuggestions
+    from resume_tailor_harness.discovery.search_scout import SearchSuggestion, SearchSuggestions
     report = SearchSuggestions(
         suggestions=[SearchSuggestion(value="Rust", kind="keyword", reason="profile uses Rust")]
     )
@@ -595,21 +595,21 @@ def test_search_suggestions_model_roundtrips():
 
 
 def test_builders_return_runners(monkeypatch):
-    from resume_agent.discovery import search_scout
+    from resume_tailor_harness.discovery import search_scout
     # Agents build lazily; just assert construction works with a fake settings key.
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
     monkeypatch.setattr(
-        "resume_agent.discovery.search_scout.get_settings",
+        "resume_tailor_harness.discovery.search_scout.get_settings",
         lambda: Settings.model_construct(
             mid_model="anthropic:claude", cheap_model="anthropic:claude"
         ),
     )
     monkeypatch.setattr(
-        "resume_agent.discovery.search_scout.build_search_equipped",
+        "resume_tailor_harness.discovery.search_scout.build_search_equipped",
         lambda model_id: (object(), []),
     )
     monkeypatch.setattr(
-        "resume_agent.discovery.search_scout.build_model", lambda model_id: object()
+        "resume_tailor_harness.discovery.search_scout.build_model", lambda model_id: object()
     )
     assert search_scout.build_search_scout_research_agent() is not None
     assert search_scout.build_search_scout_formatter_agent() is not None
@@ -620,7 +620,7 @@ def test_builders_return_runners(monkeypatch):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_search_scout.py -v`
 Expected: FAIL — module missing.
 
-- [ ] **Step 3: Implement** `src/resume_agent/discovery/search_scout.py` (mirror `source_scout.py`, no `check_source`)
+- [ ] **Step 3: Implement** `src/resume_tailor_harness/discovery/search_scout.py` (mirror `source_scout.py`, no `check_source`)
 
 ```python
 """Read-only Search Scout agents (recommend search conditions, ADR 0005)."""
@@ -632,8 +632,8 @@ from typing import Literal
 from agno.agent import Agent
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
@@ -642,8 +642,8 @@ from resume_agent.llm_runner import (
     tool_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.prompts.guidance import with_guidance
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.prompts.guidance import with_guidance
 
 MAX_SUGGESTIONS = 24
 
@@ -709,9 +709,9 @@ def build_search_scout_formatter_agent() -> Runner:
     )
 ```
 
-- [ ] **Step 4: Register guidance specs** in `src/resume_agent/prompts/registry.py`
+- [ ] **Step 4: Register guidance specs** in `src/resume_tailor_harness/prompts/registry.py`
 
-Add `search_scout` to the discovery import line (`from resume_agent.discovery import extract, fit, industry, relevance, source_scout, search_scout`) and insert after the `source-scout-format` `_spec(...)`:
+Add `search_scout` to the discovery import line (`from resume_tailor_harness.discovery import extract, fit, industry, relevance, source_scout, search_scout`) and insert after the `source-scout-format` `_spec(...)`:
 
 ```python
     _spec(
@@ -738,7 +738,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/search_scout.py src/resume_agent/prompts/registry.py tests/test_search_scout.py
+git add src/resume_tailor_harness/discovery/search_scout.py src/resume_tailor_harness/prompts/registry.py tests/test_search_scout.py
 git commit -m "feat(search-scout): research + formatter agents and registry specs"
 ```
 
@@ -747,7 +747,7 @@ git commit -m "feat(search-scout): research + formatter agents and registry spec
 ## Task 6: Search discovery service (E service)
 
 **Files:**
-- Create: `src/resume_agent/services/search_discovery.py`
+- Create: `src/resume_tailor_harness/services/search_discovery.py`
 - Test: `tests/test_search_discovery.py`
 
 **Interfaces:**
@@ -772,8 +772,8 @@ class _FakeRunner:
 
 def test_run_search_discovery_dedupes_against_existing(tmp_path):
     import yaml
-    from resume_agent.discovery.search_scout import SearchSuggestion, SearchSuggestions
-    from resume_agent.services.search_discovery import run_search_discovery
+    from resume_tailor_harness.discovery.search_scout import SearchSuggestion, SearchSuggestions
+    from resume_tailor_harness.services.search_discovery import run_search_discovery
 
     search_path = tmp_path / "search.yaml"
     search_path.write_text(yaml.safe_dump({"keywords": ["python"], "titles": []}))
@@ -805,7 +805,7 @@ def test_run_search_discovery_dedupes_against_existing(tmp_path):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_search_discovery.py -v`
 Expected: FAIL — module missing.
 
-- [ ] **Step 3: Implement** `src/resume_agent/services/search_discovery.py`
+- [ ] **Step 3: Implement** `src/resume_tailor_harness/services/search_discovery.py`
 
 ```python
 """Search Scout context, dedupe, and run orchestration."""
@@ -814,16 +814,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.discovery.search_scout import (
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.discovery.search_scout import (
     MAX_SUGGESTIONS,
     SearchSuggestions,
     build_search_scout_formatter_agent,
     build_search_scout_research_agent,
 )
-from resume_agent.llm_runner import Runner
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.store import load_facts
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import load_facts
 
 _TOP_SKILLS = 15
 
@@ -931,7 +931,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/search_discovery.py tests/test_search_discovery.py
+git add src/resume_tailor_harness/services/search_discovery.py tests/test_search_discovery.py
 git commit -m "feat(search-scout): discovery service with per-kind dedupe"
 ```
 
@@ -940,12 +940,12 @@ git commit -m "feat(search-scout): discovery service with per-kind dedupe"
 ## Task 7: Search discover API route + CLI + contract (E API/CLI)
 
 **Files:**
-- Modify: `src/resume_agent/api/routers/search.py` (the router serving `/api/config/search`; if search config lives in a different router, add there), `src/resume_agent/api/schemas/` (add `DiscoverSearchIn`), `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/api/routers/search.py` (the router serving `/api/config/search`; if search config lives in a different router, add there), `src/resume_tailor_harness/api/schemas/` (add `DiscoverSearchIn`), `src/resume_tailor_harness/cli.py`
 - Test: `tests/api/test_search_discover_router.py`, `tests/test_cli_scout.py`
 
 **Interfaces:**
 - Produces: `POST /api/search/discover` → `RunOut` (202); body `DiscoverSearchIn{ prompt: str (3..2000) }`. Same launch-seam + model-key guard as `discover_sources_route`.
-- CLI: `resume-agent scout-search "<prompt>"` prints grouped suggestions.
+- CLI: `resume-tailor-harness scout-search "<prompt>"` prints grouped suggestions.
 
 - [ ] **Step 1: Write the failing router test** (`tests/api/test_search_discover_router.py`, mirror `tests/api/test_sources_router.py::discover` — inject a fake `RunManager`/agents per that file's approach)
 
@@ -1012,7 +1012,7 @@ def discover_search_route(
 
 Add the imports this route needs (`launch`, `RunManager`, `RunOut`, `Settings`, `get_settings_dep`, `get_run_manager`, `get_profile_dir`, `resolve_api_key`, `plan_search`, `run_search_discovery`, `DiscoverSearchIn`). If the search-config router lacks `_config_paths`, use `get_config_store(request).config_dir / "search.yaml"`.
 
-- [ ] **Step 5: Add the CLI command** to `src/resume_agent/cli.py` (mirror `scout_cmd`)
+- [ ] **Step 5: Add the CLI command** to `src/resume_tailor_harness/cli.py` (mirror `scout_cmd`)
 
 ```python
 @app.command("scout-search")
@@ -1021,7 +1021,7 @@ def scout_search_cmd(
     search_path: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
 ) -> None:
     """Recommend search conditions (keywords/titles/anchors/excludes) from a prompt."""
-    from resume_agent.services.search_discovery import run_search_discovery
+    from resume_tailor_harness.services.search_discovery import run_search_discovery
 
     search = str(_tenant_cli_path(search_path))
     result = run_search_discovery(
@@ -1039,9 +1039,9 @@ Use whatever profile-dir constant/helper the existing CLI commands use (match `s
 ```python
 def test_scout_search_cmd_prints_suggestions(monkeypatch, tmp_path):
     from typer.testing import CliRunner
-    from resume_agent.cli import app
+    from resume_tailor_harness.cli import app
     monkeypatch.setattr(
-        "resume_agent.services.search_discovery.run_search_discovery",
+        "resume_tailor_harness.services.search_discovery.run_search_discovery",
         lambda *a, **k: {"prompt": "x", "suggestions": [
             {"value": "Rust", "kind": "keyword", "reason": "fits", "status": "new"}
         ]},
@@ -1061,7 +1061,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/api src/resume_agent/cli.py tests/api/test_search_discover_router.py tests/test_cli_scout.py contracts/
+git add src/resume_tailor_harness/api src/resume_tailor_harness/cli.py tests/api/test_search_discover_router.py tests/test_cli_scout.py contracts/
 git commit -m "feat(search-scout): POST /api/search/discover route + scout-search CLI"
 ```
 

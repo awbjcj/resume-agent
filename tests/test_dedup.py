@@ -1,4 +1,4 @@
-from resume_agent.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
 
 
 def test_dedup_key_ignores_case_punctuation_and_seniority():

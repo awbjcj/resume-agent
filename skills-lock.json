@@ -14,7 +14,7 @@
       "visibility": "public"
     },
     "academic-research-cv": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/academic-research-cv/SKILL.md",
@@ -36,7 +36,7 @@
       "visibility": "public"
     },
     "ats-resume-checker": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/ats-resume-checker/SKILL.md",
@@ -58,7 +58,7 @@
       "visibility": "public"
     },
     "career-pivot-planner": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/career-pivot-planner/SKILL.md",
@@ -80,7 +80,7 @@
       "visibility": "public"
     },
     "compensation-negotiator": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/compensation-negotiator/SKILL.md",
@@ -102,7 +102,7 @@
       "visibility": "public"
     },
     "cover-letter-writer": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/cover-letter-writer/SKILL.md",
@@ -124,7 +124,7 @@
       "visibility": "public"
     },
     "executive-leadership-resume": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/executive-leadership-resume/SKILL.md",
@@ -168,7 +168,7 @@
       "visibility": "public"
     },
     "job-fit-analyzer": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/job-fit-analyzer/SKILL.md",
@@ -179,7 +179,7 @@
       "visibility": "public"
     },
     "linkedin-profile-booster": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/linkedin-profile-booster/SKILL.md",
@@ -201,7 +201,7 @@
       "visibility": "public"
     },
     "mock-interview-coach": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/mock-interview-coach/SKILL.md",
@@ -223,7 +223,7 @@
       "visibility": "public"
     },
     "portfolio-case-study": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/portfolio-case-study/SKILL.md",
@@ -245,7 +245,7 @@
       "visibility": "public"
     },
     "project-dossier": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "e85fdb29570bb23dcd89435a869e91630aa0463a",
       "skillPath": "skills/project-dossier/SKILL.md",
@@ -289,7 +289,7 @@
       "visibility": "public"
     },
     "resume-customizer": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/resume-customizer/SKILL.md",
@@ -366,7 +366,7 @@
       "visibility": "public"
     },
     "software-engineer-resume": {
-      "source": "https://github.com/awbjcj/resume-agent",
+      "source": "https://github.com/awbjcj/resume-tailor-harness",
       "sourceType": "local",
       "reviewedRef": "fb34e2f26f597bcd90306d9f949ac25a96f6469d",
       "skillPath": "skills/software-engineer-resume/SKILL.md",

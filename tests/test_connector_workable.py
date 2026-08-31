@@ -1,13 +1,13 @@
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.workable import (
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.workable import (
     account_url,
     fetch_workable,
     parse_workable,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_workable_maps_public_account_payload():
@@ -42,7 +42,7 @@ def test_workable_fetch_uses_details_endpoint(monkeypatch):
         captured.update(url=url, params=params)
         return Response()
 
-    import resume_agent.discovery.connectors.workable as connector
+    import resume_tailor_harness.discovery.connectors.workable as connector
 
     monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_workable(AtsTarget("workable", "careers"), SearchConfig())

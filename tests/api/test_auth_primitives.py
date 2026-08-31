@@ -1,4 +1,4 @@
-from resume_agent.api.auth import (
+from resume_tailor_harness.api.auth import (
     SESSION_LIFETIME_SECONDS,
     hash_password,
     issue_session,
@@ -6,7 +6,7 @@ from resume_agent.api.auth import (
     verify_password,
     verify_session,
 )
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 def _settings(**updates) -> Settings:

@@ -1,11 +1,11 @@
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import add_job
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.tracking.repository import application_for_job, save_application
-from resume_agent.tracking.tables import Application, ApplicationStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.tracking.repository import application_for_job, save_application
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus
 
 runner = CliRunner()
 
@@ -51,7 +51,7 @@ def test_sync_status_lists_then_applies(tmp_path, monkeypatch):
 
     from sqlmodel import select
 
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.tables import Job
 
     with get_session(make_engine(db_url)) as session:
         acme = session.exec(select(Job).where(Job.company == "Acme")).first()

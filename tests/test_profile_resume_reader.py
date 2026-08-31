@@ -1,6 +1,6 @@
 import pytest
 
-from resume_agent.profile.resume_reader import (
+from resume_tailor_harness.profile.resume_reader import (
     SUPPORTED_SUFFIXES,
     read_document_text,
     read_resume_text,

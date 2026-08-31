@@ -16,7 +16,7 @@
 
 - Test command: `.venv/Scripts/python.exe -m pytest` (offline; no API key, no network).
 - Lint command: `ruff check` — must be clean before every commit.
-- Only `src/resume_agent/llm_runner.py` changes in `src/`. No other module is touched.
+- Only `src/resume_tailor_harness/llm_runner.py` changes in `src/`. No other module is touched.
 - The public signatures of `build_model()` and `build_search_equipped()` do not change. The ~24 modules that call them are not modified.
 - Anthropic, Gemini, and DeepSeek branches are not modified.
 - No new user-facing setting. The migration is unconditional.
@@ -29,7 +29,7 @@
 
 | File | Responsibility | Change |
 |---|---|---|
-| `src/resume_agent/llm_runner.py` | The single provider-construction seam | Modified — OpenAI branch only |
+| `src/resume_tailor_harness/llm_runner.py` | The single provider-construction seam | Modified — OpenAI branch only |
 | `tests/test_llm_runner.py` | Cross-provider construction and schema compatibility | Modified — OpenAI class and Responses schema path assertions rewritten |
 | `tests/test_llm_runner_build_model.py` | `build_model` per-provider construction | Modified — chat-era assertions rewritten and request-shaping regressions added |
 | `tests/test_llm_runner_search_equipped.py` | Search-equipped construction | Modified — 2 existing tests rewritten, 1 added |
@@ -77,7 +77,7 @@ Read once before starting. Line numbers are from the pre-change file.
 Pure functions, no agno involvement. A reviewer can accept or reject the effort policy here without reading any construction code.
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py` (add after `_reasoning_effort_for`, line 811)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (add after `_reasoning_effort_for`, line 811)
 - Test: `tests/test_llm_runner_build_model.py`
 
 **Interfaces:**
@@ -169,11 +169,11 @@ def test_openai_reasoning_fallback_uses_the_nearest_supported_effort(monkeypatch
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_build_model.py -k "openai_effort or openai_reasoning" -v`
 
-Expected: FAIL — `AttributeError: module 'resume_agent.llm_runner' has no attribute '_openai_effort'`
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.llm_runner' has no attribute '_openai_effort'`
 
 - [ ] **Step 3: Write the implementation**
 
-Insert into `src/resume_agent/llm_runner.py` immediately after `_reasoning_effort_for` (which ends at line 811):
+Insert into `src/resume_tailor_harness/llm_runner.py` immediately after `_reasoning_effort_for` (which ends at line 811):
 
 ```python
 # Reasoning efforts in ascending order of spend. OpenAI's Responses API accepts
@@ -228,7 +228,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_build_model.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_build_model.py
 git commit -m "feat: resolve OpenAI reasoning effort from the model catalog
 
 A non-reasoning agent gets the model's lowest declared effort rather than
@@ -243,7 +243,7 @@ uncatalogued custom id stays unset because its vocabulary is unknown."
 Independently reviewable: it is a pure request-param transform, testable by calling `get_request_params` directly with no network and no builder.
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py` (add after `_compatible_openai_chat_class`, line 674)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (add after `_compatible_openai_chat_class`, line 674)
 - Test: `tests/test_llm_runner_build_model.py`
 
 **Interfaces:**
@@ -306,11 +306,11 @@ def test_responses_shim_keeps_a_populated_reasoning_object():
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_build_model.py -k responses_shim -v`
 
-Expected: FAIL — `AttributeError: module 'resume_agent.llm_runner' has no attribute '_compatible_openai_responses_class'`
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.llm_runner' has no attribute '_compatible_openai_responses_class'`
 
 - [ ] **Step 3: Write the implementation**
 
-Insert into `src/resume_agent/llm_runner.py` immediately after `_compatible_openai_chat_class` (which ends at line 674):
+Insert into `src/resume_tailor_harness/llm_runner.py` immediately after `_compatible_openai_chat_class` (which ends at line 674):
 
 ```python
 @lru_cache(maxsize=1)
@@ -363,7 +363,7 @@ Expected: PASS (3 tests)
 
 ```bash
 ruff check
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_build_model.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_build_model.py
 git commit -m "feat: add OpenAI Responses compatibility shim
 
 Strips JSON Schema keywords beside \$ref at text.format.schema, which
@@ -378,7 +378,7 @@ agno emits unconditionally."
 The migration proper. This is where the endpoint changes and the chat-era workarounds are deleted.
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py` (add `_openai_max_output_tokens`; rewrite `build_model` openai branch at 885-894; delete `_openai_disabled_effort` at 832-850 and `_compatible_openai_chat_class` at 648-674)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (add `_openai_max_output_tokens`; rewrite `build_model` openai branch at 885-894; delete `_openai_disabled_effort` at 832-850 and `_compatible_openai_chat_class` at 648-674)
 - Test: `tests/test_llm_runner_build_model.py`
 
 **Interfaces:**
@@ -580,7 +580,7 @@ Expected: PASS. `test_agent_json_mode.py` needs no change — `OpenAIResponses.s
 
 ```bash
 ruff check
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_build_model.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_build_model.py
 git commit -m "feat: build OpenAI agents on /v1/responses
 
 Reasoning effort and function tools can now be used together. Deletes the
@@ -595,7 +595,7 @@ adds an explicit output cap and store=False."
 Without this, the research path keeps its own effort mapper and silently misses the new floor, cap, and `store` policy — the exact drift that produced the current divergence.
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py` (rewrite `build_search_equipped` `native_openai` branch at 963-978; delete `_openai_responses_reasoning_effort_for` at 814-829 and `OpenAIResponsesReasoningEffort` at 301)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (rewrite `build_search_equipped` `native_openai` branch at 963-978; delete `_openai_responses_reasoning_effort_for` at 814-829 and `OpenAIResponsesReasoningEffort` at 301)
 - Test: `tests/test_llm_runner_search_equipped.py`
 
 **Interfaces:**
@@ -639,7 +639,7 @@ def test_native_openai_search_reuses_the_shared_builder():
     # The research path used to construct OpenAIResponses itself with its own
     # effort mapper, so it silently missed rules added to the agent path. Pin
     # that both paths now produce the same construction.
-    from resume_agent.llm_runner import build_model
+    from resume_tailor_harness.llm_runner import build_model
 
     searched, tools = build_search_equipped(
         "openai:gpt-5.5-pro", mode="native", reasoning=True
@@ -687,7 +687,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_search_equipped.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_search_equipped.py
 git commit -m "refactor: build native OpenAI search on the shared seam
 
 The research path had its own OpenAIResponses construction and effort
@@ -729,7 +729,7 @@ plan assumed were private.
 Run:
 
 ```bash
-rg -n "_openai_disabled_effort|_openai_responses_reasoning_effort_for|_compatible_openai_chat_class|OpenAIResponsesReasoningEffort|OpenAIChat" src/resume_agent/llm_runner.py
+rg -n "_openai_disabled_effort|_openai_responses_reasoning_effort_for|_compatible_openai_chat_class|OpenAIResponsesReasoningEffort|OpenAIChat" src/resume_tailor_harness/llm_runner.py
 ```
 
 Expected: no output. Any hit is a leftover.

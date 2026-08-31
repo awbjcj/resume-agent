@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from resume_agent.services.env_config import write_env_updates
+from resume_tailor_harness.services.env_config import write_env_updates
 
 
 def test_write_env_updates_preserves_symlink_and_updates_target(tmp_path):

@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()

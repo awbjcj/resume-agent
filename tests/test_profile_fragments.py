@@ -1,17 +1,17 @@
 import json
 from pathlib import Path
 
-from resume_agent.models.base import Source
-from resume_agent.models.profile import Contact, ProfileFacts, Project, Skill
-from resume_agent.profile.corpus import add_source, load_manifest, remove_source
-from resume_agent.profile.fragments import (
+from resume_tailor_harness.models.base import Source
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Project, Skill
+from resume_tailor_harness.profile.corpus import add_source, load_manifest, remove_source
+from resume_tailor_harness.profile.fragments import (
     extract_fragments,
     extract_project_fragments,
     extract_synthesis_fragments,
     fragment_cache_status,
     load_fragment,
 )
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.profile.synthesis import (
     ClaimVerdict,
     ClaimVerdicts,
     SynthesizedClaim,
@@ -169,7 +169,7 @@ def test_converter_version_bump_invalidates_cache(tmp_path, monkeypatch):
     extract_fragments(profile_dir, manifest, agent)
     assert agent.calls == 1
 
-    monkeypatch.setattr("resume_agent.profile.fragments.CONVERTER_VERSION", 99)
+    monkeypatch.setattr("resume_tailor_harness.profile.fragments.CONVERTER_VERSION", 99)
     again = extract_fragments(profile_dir, load_manifest(profile_dir), agent)
     assert agent.calls == 2
     assert again.status[doc_id] == "extracted"
@@ -266,7 +266,7 @@ def test_synthesis_fragments_cache_and_write_evidence(tmp_path):
 
 
 def test_anchor_change_invalidates_synthesis_cache(tmp_path):
-    from resume_agent.profile.corpus import update_source
+    from resume_tailor_harness.profile.corpus import update_source
 
     profile_dir, doc = _corpus_with_deck(tmp_path)
     synth = _synth_agent()
@@ -353,7 +353,7 @@ def test_synthesis_docs_are_produced_concurrently(tmp_path, monkeypatch):
             return _FakeResult(self._content)
 
     monkeypatch.setattr(
-        "resume_agent.profile.fragments.read_document_text",
+        "resume_tailor_harness.profile.fragments.read_document_text",
         lambda path: "deck bytes " + Path(path).name,
     )
     profile_dir = _setup(tmp_path)
@@ -388,7 +388,7 @@ def test_synthesis_docs_are_produced_concurrently(tmp_path, monkeypatch):
 
 
 def test_project_walk_is_source_aware_cached_and_skipped_by_literal_walk(tmp_path):
-    from resume_agent.profile.project_extractor import ProjectDocFacts
+    from resume_tailor_harness.profile.project_extractor import ProjectDocFacts
 
     profile_dir = _setup(tmp_path)
     repo = tmp_path / "github--repo.md"
@@ -420,7 +420,7 @@ def test_project_walk_is_source_aware_cached_and_skipped_by_literal_walk(tmp_pat
 
 
 def test_project_prompt_version_bump_invalidates_project_cache(tmp_path, monkeypatch):
-    from resume_agent.profile.project_extractor import ProjectDocFacts
+    from resume_tailor_harness.profile.project_extractor import ProjectDocFacts
 
     profile_dir = _setup(tmp_path)
     repo = tmp_path / "github--repo.md"
@@ -431,7 +431,7 @@ def test_project_prompt_version_bump_invalidates_project_cache(tmp_path, monkeyp
     extract_project_fragments(profile_dir, load_manifest(profile_dir), agent)
     assert agent.calls == 1
 
-    monkeypatch.setattr("resume_agent.profile.fragments.PROJECT_PROMPT_VERSION", 99)
+    monkeypatch.setattr("resume_tailor_harness.profile.fragments.PROJECT_PROMPT_VERSION", 99)
     result = extract_project_fragments(profile_dir, load_manifest(profile_dir), agent)
 
     assert agent.calls == 2

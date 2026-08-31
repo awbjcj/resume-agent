@@ -1,11 +1,11 @@
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.pipeline import StageScope, _stage_jobs, run_filter
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import JobCriteria
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.pipeline import StageScope, _stage_jobs, run_filter
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @pytest.fixture

@@ -2,10 +2,10 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.ingest import ingest_jobs, ingest_jobs_with_outcomes
-from resume_agent.tracking.repository import jobs_by_status
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.ingest import ingest_jobs, ingest_jobs_with_outcomes
+from resume_tailor_harness.tracking.repository import jobs_by_status
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 def _session() -> Session:

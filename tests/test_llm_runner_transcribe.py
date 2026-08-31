@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent import llm_runner
-from resume_agent.config import Settings
+from resume_tailor_harness import llm_runner
+from resume_tailor_harness.config import Settings
 
 
 def _settings(**overrides) -> Settings:
@@ -69,10 +69,10 @@ def test_openai_transcription_uses_direct_key_and_base_url(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "resume_agent.tenancy.limits.enforce_agent_budget", lambda _agent: None
+        "resume_tailor_harness.tenancy.limits.enforce_agent_budget", lambda _agent: None
     )
     monkeypatch.setattr(
-        "resume_agent.tenancy.usage.record_direct_usage", lambda _usage: None
+        "resume_tailor_harness.tenancy.usage.record_direct_usage", lambda _usage: None
     )
 
     assert (
@@ -147,7 +147,7 @@ def test_speech_uses_direct_openai_client_and_returns_mp3(monkeypatch):
     )
     monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
     monkeypatch.setattr(
-        "resume_agent.tenancy.limits.enforce_agent_budget", lambda _agent: None
+        "resume_tailor_harness.tenancy.limits.enforce_agent_budget", lambda _agent: None
     )
 
     assert (
@@ -178,8 +178,8 @@ def test_every_model_default_is_a_catalogued_id():
     # flagged the rot -- the tier defaults are all catalog ids. Keeping every
     # default inside the catalog is what makes the next retirement visible,
     # since MODEL_CATALOG is the list a human already maintains.
-    from resume_agent.config import Settings
-    from resume_agent.llm_runner import catalog_entry
+    from resume_tailor_harness.config import Settings
+    from resume_tailor_harness.llm_runner import catalog_entry
 
     for field in ("cheap_model", "mid_model", "premium_model", "transcribe_model"):
         default = Settings.model_fields[field].default

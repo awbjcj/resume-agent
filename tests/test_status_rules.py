@@ -1,6 +1,6 @@
 import pytest
 
-from resume_agent.tracking.status_rules import (
+from resume_tailor_harness.tracking.status_rules import (
     PROGRESSION,
     TERMINAL,
     advance_application_status,

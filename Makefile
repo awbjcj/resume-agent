@@ -18,7 +18,7 @@ H1B_MCP_URL ?= http://$(H1B_HOST):$(H1B_PORT)/mcp
 H1B_MCP_TIMEOUT_SECONDS ?= 30
 H1B_MCP_MAX_RESULT_CHARS ?= 200000
 PYTEST_ARGS ?= tests/api -v
-RAILWAY_URL ?= https://resume-agent.up.railway.app
+RAILWAY_URL ?= https://resume-tailor-harness.up.railway.app
 API_TOKEN ?= $(shell sed -n 's/^API_TOKEN=//p' .env 2>/dev/null)
 BACKUP_DIR ?= backups
 SEED_FILE ?= seed.tar.gz
@@ -33,7 +33,7 @@ export H1B_MCP_TIMEOUT_SECONDS H1B_MCP_MAX_RESULT_CHARS
 endif
 
 # These names are consumed by the local H1B server only. They intentionally do
-# not reuse PORT, which belongs to the resume-agent API.
+# not reuse PORT, which belongs to the resume-tailor-harness API.
 export H1B_HOST H1B_PORT
 
 .PHONY: help setup setup-browser api web h1b dev full-stack docker-up docker-down h1b-health api-health mcp-health stack-health test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port backup-remote seed
@@ -75,7 +75,7 @@ setup-browser:
 	$(UV) run playwright install chromium
 
 api:
-	$(UV) run resume-agent serve --mode $(MODE) --host $(HOST) --port $(PORT)
+	$(UV) run resume-tailor-harness serve --mode $(MODE) --host $(HOST) --port $(PORT)
 
 kill-port:
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill_port.ps1 -Port $(PORT)

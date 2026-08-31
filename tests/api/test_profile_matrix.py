@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.profile.matrix import MatrixRow, SkillMatrix, save_matrix
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatrix, save_matrix
 
 
 @pytest.fixture()

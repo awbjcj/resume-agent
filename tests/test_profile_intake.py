@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from resume_agent.profile.corpus import add_source, doc_path, load_manifest
-from resume_agent.profile.intake import add_note_source, add_url_source
+from resume_tailor_harness.profile.corpus import add_source, doc_path, load_manifest
+from resume_tailor_harness.profile.intake import add_note_source, add_url_source
 
 
 def public_ips(_host: str) -> set[str]:
@@ -194,8 +194,8 @@ def test_add_url_source_stops_streaming_at_the_response_limit(tmp_path):
 
 
 def test_note_source_uses_pinned_synthesis_only_when_an_owner_anchor_is_given(tmp_path):
-    from resume_agent.profile.corpus import add_source
-    from resume_agent.profile.intake import add_note_source
+    from resume_tailor_harness.profile.corpus import add_source
+    from resume_tailor_harness.profile.intake import add_note_source
 
     resume = tmp_path / "resume.txt"
     resume.write_text("Ada", encoding="utf-8")

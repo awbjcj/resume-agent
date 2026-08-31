@@ -9,26 +9,26 @@ from typing import cast
 
 import pytest
 
-import resume_agent.services.match_gap as match_gap_module
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.progress import ProgressReporter
-from resume_agent.services.match_gap import refresh_clusters, slugify_domain
-from resume_agent.taxonomy.classification import (
+import resume_tailor_harness.services.match_gap as match_gap_module
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.services.match_gap import refresh_clusters, slugify_domain
+from resume_tailor_harness.taxonomy.classification import (
     ClassificationMetrics,
     ClassificationOutcome,
 )
-from resume_agent.taxonomy.clusters import (
+from resume_tailor_harness.taxonomy.clusters import (
     ClusterMap,
     load_cluster_map,
     save_cluster_map,
 )
-from resume_agent.taxonomy.state import load_taxonomy_state
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.taxonomy.state import load_taxonomy_state
+from resume_tailor_harness.tracking.canonicalize import (
     IncrementalDomainGroup,
     IncrementalSkillDomains,
     SkillClusters,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _engine_with_target_skills(*skills: str):
@@ -595,7 +595,7 @@ def test_a_token_naming_no_skill_is_retired_and_leaves_the_backlog(tmp_path):
 def test_a_retired_skill_can_be_restored_to_the_backlog(tmp_path):
     """A wrong retirement must be one call from being undone."""
 
-    from resume_agent.services.match_gap import restore_skills
+    from resume_tailor_harness.services.match_gap import restore_skills
 
     engine = _engine_with_target_skills("Kubeflow")
     path = tmp_path / "cluster_map.json"
@@ -681,7 +681,7 @@ def test_the_deferred_backlog_is_reported_separately_from_uncertainty(
     could not tell monotonic progress from a permanent plateau.
     """
 
-    from resume_agent.config import env_settings
+    from resume_tailor_harness.config import env_settings
 
     monkeypatch.setenv("TAXONOMY_ESCALATION_MAX_SKILLS", "1")
     env_settings.cache_clear()
@@ -716,7 +716,7 @@ def test_the_escalation_cap_defers_instead_of_flooring(tmp_path, monkeypatch):
     "unplaceable" would file skills the expensive pass never even saw.
     """
 
-    from resume_agent.config import env_settings
+    from resume_tailor_harness.config import env_settings
 
     monkeypatch.setenv("TAXONOMY_ESCALATION_MAX_SKILLS", "1")
     env_settings.cache_clear()

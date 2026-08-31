@@ -1,0 +1,184 @@
+from __future__ import annotations
+
+import shutil
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_routing import DIRECT_API_BASE_URL_FIELDS, SUB2API_KEY_FIELDS
+from resume_tailor_harness.setup.env_writer import parse_env
+
+_PLATFORM_FIELDS = frozenset(
+    {
+        "api_token",
+        "allowed_hosts",
+        "app_base_url",
+        "auth_password_hash",
+        "auth_username",
+        "cors_origins",
+        "db_url",
+        "session_secret",
+        "h1b_mcp_enabled",
+        "h1b_mcp_transport",
+        "h1b_mcp_command",
+        "h1b_mcp_url",
+        "h1b_mcp_timeout_seconds",
+        "h1b_mcp_max_result_chars",
+        "h1b_cache_ttl_days",
+        # Subscription routing is a deployment decision an admin makes, not a
+        # per-user preference: a member's secrets.env must not be able to
+        # repoint the gateway or swap its credential. Derived from the routing
+        # map so a new provider cannot be added there and silently become
+        # user-overridable here. The *_route_mode fields need no entry --
+        # _OVERLAY_FIELDS only ever admits plain str fields, and they are not.
+        "sub2api_base_url",
+        *SUB2API_KEY_FIELDS.values(),
+        # Direct endpoints are also deployment-owned. Allowing a member to
+        # override one would let their workspace send a shared platform key to
+        # an arbitrary host whenever the direct API route is selected.
+        *DIRECT_API_BASE_URL_FIELDS.values(),
+    }
+)
+_PROVIDER_FIELDS = {
+    "anthropic": "anthropic_api_key",
+    "openai": "openai_api_key",
+    "gemini": "gemini_api_key",
+    "deepseek": "deepseek_api_key",
+}
+_OVERLAY_FIELDS = frozenset(
+    name
+    for name, field in Settings.model_fields.items()
+    if field.annotation in (str, str | None) and name not in _PLATFORM_FIELDS
+)
+
+
+@dataclass(frozen=True)
+class WorkspacePaths:
+    root: Path
+
+    @property
+    def db_file(self) -> Path:
+        return self.root / "resume_tailor_harness.db"
+
+    @property
+    def db_url(self) -> str:
+        return f"sqlite:///{self.db_file.as_posix()}"
+
+    @property
+    def profile_dir(self) -> Path:
+        return self.root / "profile"
+
+    @property
+    def config_dir(self) -> Path:
+        return self.root / "config"
+
+    @property
+    def secrets_env(self) -> Path:
+        return self.root / "secrets.env"
+
+    @property
+    def gmail_token(self) -> Path:
+        return self.root / "gmail_token.json"
+
+    @property
+    def output_dir(self) -> Path:
+        return self.root / "output"
+
+    @property
+    def runs_root(self) -> Path:
+        return self.root / "runs"
+
+    @property
+    def documents_dir(self) -> Path:
+        return self.profile_dir / "documents"
+
+    @property
+    def scraper_recipes_dir(self) -> Path:
+        return self.root / "scraper_recipes"
+
+    @property
+    def workday_facets_dir(self) -> Path:
+        return self.root / "workday_facets"
+
+    @property
+    def career_lab_dir(self) -> Path:
+        return self.root / "career-lab"
+
+
+@dataclass(frozen=True)
+class SettingsOverlay:
+    settings: Settings
+    own_key_providers: frozenset[str]
+    user_provider_keys: dict[str, str]
+
+
+def workspace_paths(data_root: Path | str, user_id: str) -> WorkspacePaths:
+    return WorkspacePaths(Path(data_root) / "users" / user_id)
+
+
+def provision_workspace(
+    data_root: Path | str,
+    user_id: str,
+    *,
+    template_dir: Path | str = Path("config"),
+) -> WorkspacePaths:
+    paths = workspace_paths(data_root, user_id)
+    for directory in (
+        paths.documents_dir,
+        paths.config_dir,
+        paths.output_dir,
+        paths.runs_root,
+        paths.scraper_recipes_dir,
+        paths.workday_facets_dir,
+        paths.career_lab_dir,
+        paths.root / "taxonomy",
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
+    # Local import: settings_sections -> tenancy.paths -> tenancy.context ->
+    # tenancy.workspace would otherwise be a module-load cycle.
+    from resume_tailor_harness.settings_sections import SETTINGS_SECTIONS
+
+    templates = Path(template_dir)
+    if templates.is_dir():
+        # Registry-driven, but seeded from the caller's template_dir -- never
+        # from the repository root -- so provisioning does not silently no-op
+        # when the shipped examples are not colocated with the package.
+        for section in SETTINGS_SECTIONS:
+            for entry in section.files:
+                if "*" in entry or PurePosixPath(entry).parent != PurePosixPath(
+                    "config"
+                ):
+                    continue
+                name = PurePosixPath(entry).name
+                example = templates / f"{name}.example"
+                target = paths.config_dir / name
+                if example.is_file() and not target.exists():
+                    shutil.copyfile(example, target)
+    return paths
+
+
+def effective_settings(base: Settings, paths: WorkspacePaths) -> SettingsOverlay:
+    updates: dict[str, object] = {"db_url": paths.db_url}
+    user_provider_keys: dict[str, str] = {}
+    if paths.secrets_env.is_file():
+        values = parse_env(paths.secrets_env.read_text(encoding="utf-8"))
+        for env_name, value in values.items():
+            field_name = env_name.lower()
+            if field_name in _OVERLAY_FIELDS and value:
+                updates[field_name] = value
+                for provider, provider_field in _PROVIDER_FIELDS.items():
+                    if field_name == provider_field:
+                        user_provider_keys[provider] = value
+                        break
+    settings = base.model_copy(update=updates)
+    own_keys = frozenset(
+        provider
+        for provider, field_name in _PROVIDER_FIELDS.items()
+        if getattr(settings, field_name, "")
+        and getattr(settings, field_name, "") != getattr(base, field_name, "")
+    )
+    return SettingsOverlay(
+        settings=settings,
+        own_key_providers=own_keys,
+        user_provider_keys=user_provider_keys,
+    )

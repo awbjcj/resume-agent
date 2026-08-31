@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 from typing import Any, cast
 
-from resume_agent.discovery.scraper.dashboard import DashboardScraper, MAX_EXTRACT_CHARS
-from resume_agent.discovery.scraper.recipe import Pagination, ScrapeRecipe
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper, MAX_EXTRACT_CHARS
+from resume_tailor_harness.discovery.scraper.recipe import Pagination, ScrapeRecipe
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 class _AgentResponse:
@@ -229,7 +229,7 @@ def test_guarded_relearn_recollects_pages_once_when_recipe_misses_jobs(tmp_path)
 
 class _FakeExtract(_FakeAgent):
     def __init__(self):
-        from resume_agent.discovery.url_ingest.models import ExtractedJob
+        from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob
 
         super().__init__(
             ExtractedJob(

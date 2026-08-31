@@ -1,10 +1,10 @@
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.config import CompanyUrl, GreenhouseBoard
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
-from resume_agent.discovery.connectors.workday import apply_detail, parse_list_rows
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.config import CompanyUrl, GreenhouseBoard
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.greenhouse import GreenhouseConnector
+from resume_tailor_harness.discovery.connectors.workday import apply_detail, parse_list_rows
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _payload():
@@ -69,7 +69,7 @@ def test_workday_detail_preserves_tenant_as_stale_company():
 
 
 def test_company_label_preserves_deepest_fallback(monkeypatch):
-    import resume_agent.discovery.connectors.companies as companies
+    import resume_tailor_harness.discovery.connectors.companies as companies
 
     monkeypatch.setattr(
         companies,

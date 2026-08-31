@@ -7,16 +7,16 @@ from typing import Any
 import pytest
 from sqlmodel import select
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.interview.agent import (
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.interview.agent import (
     DebriefTurn,
     InterviewTurn,
     NewPlanItem,
     OpeningInterview,
     ReviewItem,
 )
-from resume_agent.interview.store import load_session
-from resume_agent.services.mock_interview import (
+from resume_tailor_harness.interview.store import load_session
+from resume_tailor_harness.services.mock_interview import (
     load_context,
     run_answer_turn,
     run_debrief_turn,
@@ -24,8 +24,8 @@ from resume_agent.services.mock_interview import (
     session_view,
     sessions_view,
 )
-from resume_agent.sessions.stream import Completed, Notice, TextDelta, ToolStarted
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.sessions.stream import Completed, Notice, TextDelta, ToolStarted
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationEvent,
     CompanyIntelligenceEvidenceRow,
@@ -214,7 +214,7 @@ def test_audio_preferred_opening_persists_synthesized_audio(tmp_path, engine):
     assert view["style"]["responseMode"] == "audio_preferred"
     assert turn["audioStatus"] == "ready"
     assert turn["audioUrl"].endswith("/turns/0/audio")
-    from resume_agent.interview.store import turn_audio_path
+    from resume_tailor_harness.interview.store import turn_audio_path
 
     assert (
         turn_audio_path(tmp_path, view["sessionId"], 0)
@@ -456,7 +456,7 @@ def test_debrief_without_answers_ends_deterministically_and_skips_llm(tmp_path, 
 def test_debrief_with_empty_candidate_record_still_skips_llm(tmp_path, engine):
     sid = _open(tmp_path, engine)["sessionId"]
 
-    from resume_agent.interview.store import mutate_session
+    from resume_tailor_harness.interview.store import mutate_session
 
     mutate_session(
         tmp_path,

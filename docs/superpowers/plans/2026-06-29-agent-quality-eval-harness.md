@@ -12,7 +12,7 @@
 
 - Offline tests run with **no API key, no network, all agents faked** — `tests/eval/` must obey this.
 - The live tier (`evals/run_eval.py`, real models) must live **outside `tests/`** so `make test-py` (collects `tests/`) never makes a paid call.
-- Phase 0 is **observation-only**: zero behavior change to `src/resume_agent/tailor/`.
+- Phase 0 is **observation-only**: zero behavior change to `src/resume_tailor_harness/tailor/`.
 - Models are `ExtensibleModel` / Pydantic v2; wire format is the model's own JSON via `model_dump_json()` / `model_validate`.
 - Reuse existing seams, do not re-implement: `check_provenance` / `referenced_ids` (`tailor/provenance.py`), `run_tailor_review` + `TailorRound` (`tailor/workflow.py`), `build_tailor_bundle` (`services/agents.py`), `LengthBudget` (`tailor/review_config.py`), `AgentRunner` / `build_model` / `use_json_mode_for` / `retry_kwargs` (`llm_runner.py`), `model_for_tier` (`tailor/agents.py`).
 - Load `config.style_guide_path` exactly as the production tailoring service does; otherwise this is not an eval of the real bundle.
@@ -53,7 +53,7 @@ import pytest
 from pydantic import ValidationError
 
 from evals.schema import EvalCase, Trap, load_case, load_cases, load_profile
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
 
 
 def _case_dict() -> dict:
@@ -146,8 +146,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 TrapKind = Literal[
@@ -219,7 +219,7 @@ git commit -m "Adds eval case schema and loader"
 
 **Interfaces:**
 
-- Consumes: `Trap` (Task 1), `ResumeContent` (`resume_agent.models.resume`)
+- Consumes: `Trap` (Task 1), `ResumeContent` (`resume_tailor_harness.models.resume`)
 - Produces:
   - `resume_text(content: ResumeContent) -> str` — generated claim-bearing text (summary, roles, bullets, projects, skills, publications, certifications, awards, volunteer), space-joined and Unicode-normalized; intentionally excludes verbatim contact/education/language fields
   - `term_present(text: str, term: str) -> bool` — NFKC + Unicode case-folded, escaped token-boundary match (so `java` is not found in `javascript`)
@@ -231,8 +231,8 @@ git commit -m "Adds eval case schema and loader"
 # tests/eval/test_textscan.py
 from evals.schema import Trap
 from evals.textscan import resume_text, term_present, trap_terms_hit
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
@@ -293,7 +293,7 @@ import re
 import unicodedata
 
 from evals.schema import Trap
-from resume_agent.models.resume import ResumeContent
+from resume_tailor_harness.models.resume import ResumeContent
 
 
 def resume_text(content: ResumeContent) -> str:
@@ -373,13 +373,13 @@ git commit -m "Adds resume text scanner and trap-term detection"
 # tests/eval/test_metrics_deterministic.py
 from evals.metrics import budget_ok, must_cite_covered, provenance_ok, total_bullets, trap_avoided
 from evals.schema import Trap
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
 )
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def _facts() -> ProfileFacts:
@@ -449,10 +449,10 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'evals.metrics'`
 # evals/metrics.py
 from evals.schema import Trap
 from evals.textscan import trap_terms_hit
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.provenance import check_provenance, referenced_ids
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.tailor.provenance import check_provenance, referenced_ids
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def trap_avoided(content: ResumeContent, traps: list[Trap]) -> bool:
@@ -520,8 +520,8 @@ git commit -m "Adds deterministic per-case eval checks"
 ```python
 # tests/eval/test_metrics_meta.py
 from evals.metrics import ProbeRecord, RoundRecord, convergence, correlation, fact_check_trap_recall
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 
 
 def _content(bullet_text: str) -> ResumeContent:
@@ -580,7 +580,7 @@ Expected: FAIL — `ImportError: cannot import name 'RoundRecord' from 'evals.me
 # evals/metrics.py  (append below the existing functions)
 from dataclasses import dataclass
 
-from resume_agent.models.review import ReviewCritique
+from resume_tailor_harness.models.review import ReviewCritique
 
 
 @dataclass
@@ -672,8 +672,8 @@ from evals.judge import (
     compose_judge_input,
     validate_judge_verdict,
 )
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 
 
 def _content() -> ResumeContent:
@@ -728,15 +728,15 @@ import json
 from agno.agent import Agent
 from pydantic import BaseModel, Field
 
-from resume_agent.llm_runner import (
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.agents import model_for_tier
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.tailor.agents import model_for_tier
 
 
 class DimensionScore(BaseModel):
@@ -820,7 +820,7 @@ git commit -m "Adds profile-blind quality judge agent"
 - [ ] **Step 4: Re-run the test** and expect PASS.
 - [ ] **Step 5: Commit** `evals/usage.py` and `tests/eval/test_usage.py`.
 
-This decorator is the observation seam: wrap the existing bundle, judge, and optional criteria extractor once per case. Do not modify `src/resume_agent/tailor/` and do not create agents inside the case loop.
+This decorator is the observation seam: wrap the existing bundle, judge, and optional criteria extractor once per case. Do not modify `src/resume_tailor_harness/tailor/` and do not create agents inside the case loop.
 
 ---
 
@@ -846,12 +846,12 @@ This decorator is the observation seam: wrap the existing bundle, judge, and opt
 from evals.judge import DimensionScore, JudgeVerdict
 from evals.runner import CaseResult, run_case
 from evals.schema import EvalCase, Trap
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import ReviewCritique
-from resume_agent.services.agents import TailorBundle
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.services.agents import TailorBundle
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 class _Result:
@@ -956,17 +956,17 @@ from evals.metrics import (
 )
 from evals.schema import EvalCase, Trap
 from evals.usage import MeteredRunner, UsageCollector, UsageTotals
-from resume_agent.discovery.extract import extract_job_criteria
-from resume_agent.llm_runner import Runner
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import Severity
-from resume_agent.services.agents import TailorBundle
-from resume_agent.tailor.panel import compose_evidence_review_input, review_one
-from resume_agent.tailor.provenance import resolve_evidence
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.workflow import run_tailor_review
+from resume_tailor_harness.discovery.extract import extract_job_criteria
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.services.agents import TailorBundle
+from resume_tailor_harness.tailor.panel import compose_evidence_review_input, review_one
+from resume_tailor_harness.tailor.provenance import resolve_evidence
+from resume_tailor_harness.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.workflow import run_tailor_review
 
 
 @dataclass
@@ -1157,11 +1157,11 @@ from evals.report import render_artifact, render_report
 from evals.metrics import ProbeRecord, RoundRecord
 from evals.runner import CaseResult
 from evals.usage import UsageTotals
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 def _result(case_id, quality, ats_score):
@@ -1218,7 +1218,7 @@ from pydantic import TypeAdapter
 
 from evals.metrics import convergence, correlation, fact_check_trap_recall, total_bullets
 from evals.runner import CaseResult
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.review_config import ReviewConfig
 
 
 def _reviewer_score(result: CaseResult, name: str) -> int | None:
@@ -1351,8 +1351,8 @@ from evals.judge import JudgeVerdict
 from evals.metrics import RoundRecord
 from evals.runner import CaseResult
 from evals.usage import UsageTotals
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
 
 
 def test_main_writes_report(tmp_path: Path, monkeypatch):
@@ -1422,17 +1422,17 @@ from evals.judge import build_judge_agent, judge_prompt_hash
 from evals.report import render_report
 from evals.runner import run_case
 from evals.schema import load_cases, load_profile
-from resume_agent.discovery.extract import build_extract_agent
-from resume_agent.services.agents import TailorBundle, build_tailor_bundle
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.discovery.extract import build_extract_agent
+from resume_tailor_harness.services.agents import TailorBundle, build_tailor_bundle
+from resume_tailor_harness.tailor.agents import (
     build_reviewer_agent,
     build_reviser_agent,
     build_revision_agent,
     build_tailor_agent,
     model_for_tier,
 )
-from resume_agent.tailor.review_config import load_review_config
-from resume_agent.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tailor.review_config import load_review_config
+from resume_tailor_harness.tailor.style_guide import load_style_guide
 
 
 def build_eval_bundle(config, style_guide, model_id):
@@ -1601,8 +1601,8 @@ from pathlib import Path
 
 from evals.schema import load_cases, load_profile
 from evals.textscan import term_present
-from resume_agent.models.profile import Bullet
-from resume_agent.tailor.provenance import index_facts
+from resume_tailor_harness.models.profile import Bullet
+from resume_tailor_harness.tailor.provenance import index_facts
 
 CASES = Path("evals/cases")
 PROFILES = Path("evals/profiles")
@@ -1705,7 +1705,7 @@ Create `evals/profiles/backend_eng.json` — a real `ProfileFacts` with stable i
 }
 ```
 
-Note: confirm field names against `src/resume_agent/models/profile.py` while authoring (e.g. `Education` fields). The test in Step 1 fails loudly if a referenced id or required field is wrong.
+Note: confirm field names against `src/resume_tailor_harness/models/profile.py` while authoring (e.g. `Education` fields). The test in Step 1 fails loudly if a referenced id or required field is wrong.
 
 - [ ] **Step 4: Author 8 adversarial cases**
 
@@ -1812,7 +1812,7 @@ git commit -m "Adds 8 adversarial seed cases, profile, and calibration doc"
 - §4.5 calibration — T9 (`CALIBRATION.md`). ✓ §4.6 offline scope — every logic module has a faked unit test. ✓
 - §4.7 CLI/flow — T8 implements model override, live extraction, style-guide parity, timestamped/partial reports, metadata, and failure continuation. ✓
 - §4.8 leanings — realistic embedded criteria by default; Agno metrics captured now; eight seeds. ✓
-- §6 success criteria — report includes every required signal and only ranks reviewers with sufficient data; no task changes `src/resume_agent/tailor/`. ✓
+- §6 success criteria — report includes every required signal and only ranks reviewers with sufficient data; no task changes `src/resume_tailor_harness/tailor/`. ✓
 
 **Placeholder scan:** no TBD/TODO in code steps; `CALIBRATION.md`'s `_TBD_` cells are intended runtime data, not plan placeholders.
 
@@ -1823,6 +1823,6 @@ git commit -m "Adds 8 adversarial seed cases, profile, and calibration doc"
 ## Notes for the implementer
 
 - Run tests with `.venv/Scripts/python.exe -m pytest` (offline; no key needed). The whole of `tests/eval/` must stay runnable without network.
-- Do not touch `src/resume_agent/tailor/`. If a test seems to need a loop change, stop — that belongs to Phase 1, not here.
+- Do not touch `src/resume_tailor_harness/tailor/`. If a test seems to need a loop change, stop — that belongs to Phase 1, not here.
 - When authoring seed data (T9), let `tests/eval/test_seed_cases.py` be your guide: it fails loudly on any wrong id or missing field.
 - Eight stochastic cases are a directional baseline, not statistical proof. Confirm any "weakest reviewer" finding across repeated timestamped runs before changing production behavior.

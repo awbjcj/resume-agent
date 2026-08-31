@@ -17,11 +17,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.llm_runner import AgentRunner
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.spend import SpendDecision
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_runner import AgentRunner
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.spend import SpendDecision
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 CONCURRENCY = 20
 
@@ -92,7 +92,7 @@ class _FlippingGate:
 def test_concurrent_calls_never_lose_their_client_to_a_key_flip(tmp_path, monkeypatch):
     """A key change must land between phases, never under an in-flight sibling."""
     _FlippingGate.calls = 0
-    monkeypatch.setattr("resume_agent.tenancy.spend.SpendGate", _FlippingGate)
+    monkeypatch.setattr("resume_tailor_harness.tenancy.spend.SpendGate", _FlippingGate)
     settings = _settings()
     agent = _ClientWatchingAgent()
     runner = AgentRunner(agent, settings=settings)
@@ -128,7 +128,7 @@ class _SlowGate:
 @pytest.mark.parametrize("batch", [10])
 def test_budget_check_does_not_serialise_the_fan_out(tmp_path, monkeypatch, batch):
     """Blocking I/O on the shared loop stalls every sibling in the batch."""
-    monkeypatch.setattr("resume_agent.tenancy.spend.SpendGate", _SlowGate)
+    monkeypatch.setattr("resume_tailor_harness.tenancy.spend.SpendGate", _SlowGate)
     settings = _settings()
     runner = AgentRunner(_ClientWatchingAgent(), settings=settings)
 
@@ -146,7 +146,7 @@ def test_budget_check_does_not_serialise_the_fan_out(tmp_path, monkeypatch, batc
 
 def test_gate_decision_is_reused_within_its_ttl_and_re_derived_after(tmp_path):
     """The TTL is a ceiling on staleness, not a per-call re-derivation."""
-    from resume_agent.tenancy.spend import SpendGate
+    from resume_tailor_harness.tenancy.spend import SpendGate
 
     settings = _settings(spend_gate_ttl_seconds=30.0)
     context = _context(tmp_path, settings)
@@ -170,7 +170,7 @@ def test_gate_decision_is_reused_within_its_ttl_and_re_derived_after(tmp_path):
 
 def test_settling_a_call_that_exhausts_the_budget_drops_the_decision(tmp_path):
     """Headroom is what makes the cache exact rather than merely time-bounded."""
-    from resume_agent.tenancy.spend import SpendGate, _CachedDecision
+    from resume_tailor_harness.tenancy.spend import SpendGate, _CachedDecision
 
     settings = _settings()
     context = _context(tmp_path, settings)

@@ -3,36 +3,36 @@ from typing import Any
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from resume_agent.discovery.fit import FitLocation, FitScore
-from resume_agent.discovery.industry import (
+from resume_tailor_harness.discovery.fit import FitLocation, FitScore
+from resume_tailor_harness.discovery.industry import (
     IndustryCandidate,
     IndustryClassification,
     IndustryGroup,
 )
-from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.pipeline import (
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.discovery.pipeline import (
     discover,
     reprocess,
     run_extract,
     run_relevance,
     run_score,
 )
-from resume_agent.discovery.relevance import RelevanceVerdict
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import (
+from resume_tailor_harness.discovery.relevance import RelevanceVerdict
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.job import (
     JobCriteriaExtract,
     SponsorshipSignal,
 )
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.matrix import MatrixRow, SkillMatrix
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.industries import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatrix
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.industries import (
     IndustryTaxonomy,
     load_industry_taxonomy,
     save_industry_taxonomy,
 )
-from resume_agent.tracking.repository import jobs_by_status, save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.repository import jobs_by_status, save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session() -> Session:
@@ -336,7 +336,7 @@ def test_run_extract_keeps_failed_industry_candidate_internal_for_retry(tmp_path
 
 
 def test_industry_normalization_skips_untouched_rows(tmp_path):
-    from resume_agent.discovery.pipeline import _normalize_job_industries
+    from resume_tailor_harness.discovery.pipeline import _normalize_job_industries
 
     taxonomy_path = tmp_path / "industries.json"
     save_industry_taxonomy(
@@ -470,7 +470,7 @@ def test_run_extract_runs_concurrently_and_isolates_failures(monkeypatch):
     import time
 
     monkeypatch.setenv("LLM_CONCURRENCY", "8")
-    from resume_agent.config import env_settings
+    from resume_tailor_harness.config import env_settings
 
     env_settings.cache_clear()
 
@@ -535,7 +535,7 @@ def test_discover_extracts_filters_scores_and_shortlists():
 
 
 def test_discover_reports_progress_done(tmp_path):
-    from resume_agent.progress import ProgressReporter, read_progress
+    from resume_tailor_harness.progress import ProgressReporter, read_progress
 
     cfg = SearchConfig(sponsorship_required=True)
     facts = ProfileFacts(contact=Contact(name="Ada"))
@@ -554,7 +554,7 @@ def test_discover_reports_progress_done(tmp_path):
 
 
 def test_run_score_reports_phase_four_after_h1b_stage(tmp_path):
-    from resume_agent.progress import ProgressReporter, read_progress
+    from resume_tailor_harness.progress import ProgressReporter, read_progress
 
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
@@ -1059,7 +1059,7 @@ def test_industry_revisit_query_touches_only_marked_rows(tmp_path):
     which no index can serve: finding zero work cost a full scan that grew with
     the table rather than with the work.
     """
-    from resume_agent.discovery.pipeline import _industry_scope
+    from resume_tailor_harness.discovery.pipeline import _industry_scope
 
     taxonomy_path = tmp_path / "industries.json"
     save_industry_taxonomy(
@@ -1098,7 +1098,7 @@ def test_industry_revisit_query_touches_only_marked_rows(tmp_path):
 
 def test_canonicalizing_a_row_clears_its_revisit_marker(tmp_path):
     """A marker written in one direction only would revisit forever."""
-    from resume_agent.discovery.pipeline import _normalize_job_industries
+    from resume_tailor_harness.discovery.pipeline import _normalize_job_industries
 
     taxonomy_path = tmp_path / "industries.json"
     save_industry_taxonomy(

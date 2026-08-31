@@ -82,7 +82,7 @@ task snippets below.
 ### Task 1: Provider capability seam
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py` (add after `plan_search`, ~line 204)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (add after `plan_search`, ~line 204)
 - Test: `tests/test_llm_runner_capabilities.py` (create)
 
 **Interfaces:**
@@ -96,7 +96,7 @@ task snippets below.
 Create `tests/test_llm_runner_capabilities.py`:
 
 ```python
-from resume_agent.llm_runner import ProviderCapabilities, provider_capabilities
+from resume_tailor_harness.llm_runner import ProviderCapabilities, provider_capabilities
 
 
 def test_anthropic_sonnet_full_reasoning_and_citations():
@@ -162,7 +162,7 @@ Expected: FAIL with `ImportError: cannot import name 'ProviderCapabilities'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/llm_runner.py`, add these imports at the top if missing (`dataclasses.dataclass` is already used for `SearchPlan` — confirm `from dataclasses import dataclass` exists near the top; it does). Add directly after `plan_search` (after line ~204):
+In `src/resume_tailor_harness/llm_runner.py`, add these imports at the top if missing (`dataclasses.dataclass` is already used for `SearchPlan` — confirm `from dataclasses import dataclass` exists near the top; it does). Add directly after `plan_search` (after line ~204):
 
 ```python
 # Anthropic models without extended thinking / effort (Haiku family rejects effort).
@@ -219,7 +219,7 @@ Expected: PASS (8 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_capabilities.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_capabilities.py
 git commit -m "feat(llm): add provider_capabilities seam for reasoning/citations/cache gating"
 ```
 
@@ -228,7 +228,7 @@ git commit -m "feat(llm): add provider_capabilities seam for reasoning/citations
 ### Task 2: Thread reasoning through `build_model`
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py:244-277` (`build_model`)
+- Modify: `src/resume_tailor_harness/llm_runner.py:244-277` (`build_model`)
 - Test: `tests/test_llm_runner_build_model.py` (create)
 
 **Interfaces:**
@@ -240,8 +240,8 @@ git commit -m "feat(llm): add provider_capabilities seam for reasoning/citations
 Create `tests/test_llm_runner_build_model.py`:
 
 ```python
-from resume_agent import llm_runner
-from resume_agent.llm_runner import build_model
+from resume_tailor_harness import llm_runner
+from resume_tailor_harness.llm_runner import build_model
 
 
 def test_anthropic_reasoning_attaches_thinking_and_effort():
@@ -348,7 +348,7 @@ Expected: PASS (6 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_build_model.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_build_model.py
 git commit -m "feat(llm): thread reasoning kwarg through build_model per provider"
 ```
 
@@ -357,7 +357,7 @@ git commit -m "feat(llm): thread reasoning kwarg through build_model per provide
 ### Task 3: Thread reasoning + caching through `build_search_equipped`
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py:280-308` (`build_search_equipped`)
+- Modify: `src/resume_tailor_harness/llm_runner.py:280-308` (`build_search_equipped`)
 - Test: `tests/test_llm_runner_search_equipped.py` (create)
 
 **Interfaces:**
@@ -369,7 +369,7 @@ git commit -m "feat(llm): thread reasoning kwarg through build_model per provide
 Create `tests/test_llm_runner_search_equipped.py`:
 
 ```python
-from resume_agent.llm_runner import build_search_equipped
+from resume_tailor_harness.llm_runner import build_search_equipped
 
 
 def test_anthropic_native_search_forwards_reasoning_and_cache():
@@ -474,7 +474,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_search_equipped.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_search_equipped.py
 git commit -m "feat(llm): thread reasoning/cache through build_search_equipped native branches"
 ```
 
@@ -483,7 +483,7 @@ git commit -m "feat(llm): thread reasoning/cache through build_search_equipped n
 ### Task 4: Source Scout schema + instructions (fit score, avoid, citations)
 
 **Files:**
-- Modify: `src/resume_agent/discovery/source_scout.py`
+- Modify: `src/resume_tailor_harness/discovery/source_scout.py`
 - Test: `tests/test_source_scout_schema.py` (create)
 
 **Interfaces:**
@@ -497,7 +497,7 @@ git commit -m "feat(llm): thread reasoning/cache through build_search_equipped n
 Create `tests/test_source_scout_schema.py`:
 
 ```python
-from resume_agent.discovery.source_scout import Citation, ScoutCandidate
+from resume_tailor_harness.discovery.source_scout import Citation, ScoutCandidate
 
 
 def test_candidate_defaults_are_safe():
@@ -527,7 +527,7 @@ Expected: FAIL — `ImportError: cannot import name 'Citation'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/source_scout.py`, replace the `ScoutCandidate` class (currently lines 31-35) and add `Citation` before it:
+In `src/resume_tailor_harness/discovery/source_scout.py`, replace the `ScoutCandidate` class (currently lines 31-35) and add `Citation` before it:
 
 ```python
 class Citation(ExtensibleModel):
@@ -572,7 +572,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/source_scout.py tests/test_source_scout_schema.py
+git add src/resume_tailor_harness/discovery/source_scout.py tests/test_source_scout_schema.py
 git commit -m "feat(scout): add fit_score, avoid signal, citations to ScoutCandidate"
 ```
 
@@ -581,7 +581,7 @@ git commit -m "feat(scout): add fit_score, avoid signal, citations to ScoutCandi
 ### Task 5: Search Scout schema + instructions (new kinds, fit score, citations)
 
 **Files:**
-- Modify: `src/resume_agent/discovery/search_scout.py`
+- Modify: `src/resume_tailor_harness/discovery/search_scout.py`
 - Test: `tests/test_search_scout_schema.py` (create)
 
 **Interfaces:**
@@ -595,8 +595,8 @@ git commit -m "feat(scout): add fit_score, avoid signal, citations to ScoutCandi
 Create `tests/test_search_scout_schema.py`:
 
 ```python
-from resume_agent.discovery.search_scout import SearchSuggestion
-from resume_agent.discovery.source_scout import Citation
+from resume_tailor_harness.discovery.search_scout import SearchSuggestion
+from resume_tailor_harness.discovery.source_scout import Citation
 
 
 def test_suggestion_defaults_are_safe():
@@ -630,10 +630,10 @@ Expected: FAIL — `ValidationError` for `kind="location"` (not yet in the Liter
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/search_scout.py`, update the import and models. Add to the imports at top:
+In `src/resume_tailor_harness/discovery/search_scout.py`, update the import and models. Add to the imports at top:
 
 ```python
-from resume_agent.discovery.source_scout import Citation
+from resume_tailor_harness.discovery.source_scout import Citation
 ```
 
 Replace the `SuggestionKind` alias and `SearchSuggestion` class (currently lines 32 and 35-38):
@@ -682,7 +682,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/search_scout.py tests/test_search_scout_schema.py
+git add src/resume_tailor_harness/discovery/search_scout.py tests/test_search_scout_schema.py
 git commit -m "feat(scout): add location/seniority/adjacent_role kinds, fit_score, citations"
 ```
 
@@ -691,7 +691,7 @@ git commit -m "feat(scout): add location/seniority/adjacent_role kinds, fit_scor
 ### Task 6: Source discovery service — reasoning wiring, ranking, avoid, citation rows
 
 **Files:**
-- Modify: `src/resume_agent/services/source_discovery.py`
+- Modify: `src/resume_tailor_harness/services/source_discovery.py`
 - Test: `tests/test_source_discovery_enrichment.py` (create)
 
 **Interfaces:**
@@ -705,8 +705,8 @@ Create `tests/test_source_discovery_enrichment.py`. Use fake research/formatter 
 ```python
 from types import SimpleNamespace
 
-from resume_agent.discovery.source_scout import Citation, ScoutCandidate, ScoutReport
-from resume_agent.services import source_discovery
+from resume_tailor_harness.discovery.source_scout import Citation, ScoutCandidate, ScoutReport
+from resume_tailor_harness.services import source_discovery
 
 
 class _FakeRunner:
@@ -786,7 +786,7 @@ Expected: FAIL — `KeyError: 'signal'` (the `_row` dict has no signal/fitScore/
 
 - [ ] **Step 3: Write minimal implementation**
 
-Three edits in `src/resume_agent/services/source_discovery.py`.
+Three edits in `src/resume_tailor_harness/services/source_discovery.py`.
 
 **(a)** Extend `_row` (lines 118-130) to emit the new camelCase keys and a citation serializer:
 
@@ -870,7 +870,7 @@ Expected: PASS (existing + new).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/services/source_discovery.py tests/test_source_discovery_enrichment.py
+git add src/resume_tailor_harness/services/source_discovery.py tests/test_source_discovery_enrichment.py
 git commit -m "feat(scout): rank source candidates, skip validation for avoid rows, emit citations"
 ```
 
@@ -879,7 +879,7 @@ git commit -m "feat(scout): rank source candidates, skip validation for avoid ro
 ### Task 7: Search discovery service — new-kind dedupe, ranking, citation rows
 
 **Files:**
-- Modify: `src/resume_agent/services/search_discovery.py`
+- Modify: `src/resume_tailor_harness/services/search_discovery.py`
 - Test: `tests/test_search_discovery_enrichment.py` (create)
 
 **Interfaces:**
@@ -893,9 +893,9 @@ Create `tests/test_search_discovery_enrichment.py`:
 ```python
 from types import SimpleNamespace
 
-from resume_agent.discovery.search_scout import SearchSuggestion, SearchSuggestions
-from resume_agent.discovery.source_scout import Citation
-from resume_agent.services import search_discovery
+from resume_tailor_harness.discovery.search_scout import SearchSuggestion, SearchSuggestions
+from resume_tailor_harness.discovery.source_scout import Citation
+from resume_tailor_harness.services import search_discovery
 
 
 class _FakeRunner:
@@ -963,7 +963,7 @@ Expected: FAIL — row dict has no `fitScore`/`citations`, and ranking not appli
 
 - [ ] **Step 3: Write minimal implementation**
 
-Edit `src/resume_agent/services/search_discovery.py`. The `_EXISTING_FIELD` map (lines 25-30) already covers keyword/title/role_anchor/exclude_term; `location` and `adjacent_role` need dedupe targets, `seniority` intentionally none. Replace the row-building loop and return (lines 103-121) with:
+Edit `src/resume_tailor_harness/services/search_discovery.py`. The `_EXISTING_FIELD` map (lines 25-30) already covers keyword/title/role_anchor/exclude_term; `location` and `adjacent_role` need dedupe targets, `seniority` intentionally none. Replace the row-building loop and return (lines 103-121) with:
 
 ```python
     existing = _existing_terms(search_path)
@@ -1048,7 +1048,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/services/search_discovery.py tests/test_search_discovery_enrichment.py
+git add src/resume_tailor_harness/services/search_discovery.py tests/test_search_discovery_enrichment.py
 git commit -m "feat(scout): broaden search suggestion kinds, dedupe, rank, and cite"
 ```
 
@@ -1057,8 +1057,8 @@ git commit -m "feat(scout): broaden search suggestion kinds, dedupe, rank, and c
 ### Task 8: Wire capability-gated reasoning + caching into both research agents
 
 **Files:**
-- Modify: `src/resume_agent/discovery/source_scout.py` (`build_scout_research_agent`)
-- Modify: `src/resume_agent/discovery/search_scout.py` (`build_search_scout_research_agent`)
+- Modify: `src/resume_tailor_harness/discovery/source_scout.py` (`build_scout_research_agent`)
+- Modify: `src/resume_tailor_harness/discovery/search_scout.py` (`build_search_scout_research_agent`)
 - Test: `tests/test_scout_research_agent_wiring.py` (create)
 
 **Interfaces:**
@@ -1070,7 +1070,7 @@ git commit -m "feat(scout): broaden search suggestion kinds, dedupe, rank, and c
 Create `tests/test_scout_research_agent_wiring.py`. Assert the builder forwards capability-derived flags by spying on `build_search_equipped`:
 
 ```python
-from resume_agent.discovery import search_scout, source_scout
+from resume_tailor_harness.discovery import search_scout, source_scout
 
 
 def test_source_research_agent_forwards_reasoning_and_cache(monkeypatch):
@@ -1107,7 +1107,7 @@ Expected: FAIL — builders call `build_search_equipped(settings.mid_model)` wit
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/source_scout.py`, add to the `llm_runner` import list `provider_capabilities`, then replace `build_scout_research_agent` (lines 98-110) body's model construction:
+In `src/resume_tailor_harness/discovery/source_scout.py`, add to the `llm_runner` import list `provider_capabilities`, then replace `build_scout_research_agent` (lines 98-110) body's model construction:
 
 ```python
 def build_scout_research_agent(check_source: Callable[[str], str]) -> Runner:
@@ -1130,7 +1130,7 @@ def build_scout_research_agent(check_source: Callable[[str], str]) -> Runner:
     )
 ```
 
-In `src/resume_agent/discovery/search_scout.py`, add `provider_capabilities` to the `llm_runner` import list, then replace `build_search_scout_research_agent` (lines 64-76) model construction:
+In `src/resume_tailor_harness/discovery/search_scout.py`, add `provider_capabilities` to the `llm_runner` import list, then replace `build_search_scout_research_agent` (lines 64-76) model construction:
 
 ```python
 def build_search_scout_research_agent() -> Runner:
@@ -1161,7 +1161,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/source_scout.py src/resume_agent/discovery/search_scout.py tests/test_scout_research_agent_wiring.py
+git add src/resume_tailor_harness/discovery/source_scout.py src/resume_tailor_harness/discovery/search_scout.py tests/test_scout_research_agent_wiring.py
 git commit -m "feat(scout): gate research-agent reasoning/caching via provider_capabilities"
 ```
 
@@ -1185,7 +1185,7 @@ Expected: no errors. Fix any (e.g. unused `_EXISTING_FIELD` import if it lingere
 
 - [ ] **Step 3: Confirm no raw provider-SDK import leaked outside the seam**
 
-Run: `grep -rn "from agno.models" src/resume_agent/ | grep -v llm_runner.py`
+Run: `grep -rn "from agno.models" src/resume_tailor_harness/ | grep -v llm_runner.py`
 Expected: no output (all agno model imports stay in `llm_runner.py`).
 
 - [ ] **Step 4: Commit any lint fixes**

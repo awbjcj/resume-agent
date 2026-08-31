@@ -18,13 +18,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api import app as app_module
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
-from resume_agent.api.password_policy import NullBreachChecker
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.config import Settings
-from resume_agent.mail.mailer import NullMailer
+from resume_tailor_harness.api import app as app_module
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.api.password_policy import NullBreachChecker
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.mail.mailer import NullMailer
 
 
 @pytest.fixture(autouse=True)

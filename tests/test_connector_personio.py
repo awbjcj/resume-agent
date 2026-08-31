@@ -1,12 +1,12 @@
 from pathlib import Path
 
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.personio import (
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.personio import (
     fetch_personio,
     parse_personio,
     search_url,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _fixture() -> str:
@@ -51,7 +51,7 @@ def test_personio_fetch_uses_search_json_with_detected_country(monkeypatch):
         captured["url"] = url
         return Response()
 
-    import resume_agent.discovery.connectors.personio as connector
+    import resume_tailor_harness.discovery.connectors.personio as connector
 
     monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_personio(AtsTarget("personio", "pitch", country="de"), SearchConfig())

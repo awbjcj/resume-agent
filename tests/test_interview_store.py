@@ -2,7 +2,7 @@
 
 import pytest
 
-from resume_agent.interview.store import (
+from resume_tailor_harness.interview.store import (
     InterviewContext,
     InterviewDebrief,
     InterviewStyle,

@@ -7,9 +7,9 @@ from typing import Any, cast
 import pytest
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking import queries
-from resume_agent.tracking.board_query import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking import queries
+from resume_tailor_harness.tracking.board_query import (
     FACET_SPECS,
     NEUTRAL,
     PRESETS,
@@ -20,7 +20,7 @@ from resume_agent.tracking.board_query import (
     board_facet_counts,
     board_page,
 )
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tracking.tables import Job
 
 
 NOW = datetime.now(timezone.utc)

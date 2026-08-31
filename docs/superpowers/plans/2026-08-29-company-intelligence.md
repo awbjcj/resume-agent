@@ -21,12 +21,12 @@
 
 **Files:**
 
-- Create `src/resume_agent/company_intelligence/models.py`
-- Create `src/resume_agent/company_intelligence/agents.py`
-- Create `src/resume_agent/services/company_intelligence.py`
-- Modify `src/resume_agent/tracking/tables.py`
-- Modify `src/resume_agent/config.py`
-- Modify `src/resume_agent/prompts/registry.py`
+- Create `src/resume_tailor_harness/company_intelligence/models.py`
+- Create `src/resume_tailor_harness/company_intelligence/agents.py`
+- Create `src/resume_tailor_harness/services/company_intelligence.py`
+- Modify `src/resume_tailor_harness/tracking/tables.py`
+- Modify `src/resume_tailor_harness/config.py`
+- Modify `src/resume_tailor_harness/prompts/registry.py`
 - Add focused model/service tests
 
 **Contract:**
@@ -41,8 +41,8 @@
 
 **Files:**
 
-- Modify `src/resume_agent/api/schemas/jobs.py`
-- Modify `src/resume_agent/api/routers/jobs.py`
+- Modify `src/resume_tailor_harness/api/schemas/jobs.py`
+- Modify `src/resume_tailor_harness/api/routers/jobs.py`
 - Add API tests
 
 **Contract (refined 2026-08-29):**
@@ -76,9 +76,9 @@
 
 **Files:**
 
-- Modify `src/resume_agent/interview/store.py`
-- Modify `src/resume_agent/services/mock_interview.py`
-- Modify `src/resume_agent/interview/agent.py`
+- Modify `src/resume_tailor_harness/interview/store.py`
+- Modify `src/resume_tailor_harness/services/mock_interview.py`
+- Modify `src/resume_tailor_harness/interview/agent.py`
 - Add interview snapshot/rendering tests
 
 **Contract:**

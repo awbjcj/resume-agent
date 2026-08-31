@@ -1,4 +1,4 @@
-from resume_agent.discovery.source_tier import source_rank
+from resume_tailor_harness.discovery.source_tier import source_rank
 
 
 def test_direct_sources_outrank_aggregators():

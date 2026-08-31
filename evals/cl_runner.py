@@ -8,19 +8,19 @@ from evals.judge import (
 from evals.schema import EvalCase
 from evals.textscan import cover_letter_text, terms_hit
 from evals.usage import MeteredRunner, UsageCollector, UsageTotals
-from resume_agent.cover_letter.drafting import (
+from resume_tailor_harness.cover_letter.drafting import (
     compose_cover_letter_input,
     compose_revise_input,
     draft_cover_letter,
     revise_cover_letter,
 )
-from resume_agent.cover_letter.provenance import (
+from resume_tailor_harness.cover_letter.provenance import (
     collect_fact_ids,
     unsupported_provenance,
 )
-from resume_agent.llm_runner import Runner
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 @dataclass(kw_only=True)

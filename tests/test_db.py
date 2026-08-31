@@ -1,7 +1,7 @@
 from sqlmodel import select
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job
 
 
 def test_make_engine_creates_sqlite_parent_dir(tmp_path):

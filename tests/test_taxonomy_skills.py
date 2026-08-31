@@ -1,6 +1,6 @@
 import json
 
-from resume_agent.taxonomy import skills
+from resume_tailor_harness.taxonomy import skills
 
 
 def test_split_skill_on_comma_and_or():

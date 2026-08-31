@@ -1,0 +1,291 @@
+import re
+from dataclasses import dataclass
+from html import unescape
+from urllib.parse import parse_qs, urlsplit
+
+import httpx
+
+from resume_tailor_harness.security.outbound import fetch_public_text
+
+_TOKEN = r"([A-Za-z0-9_-]+)"
+
+_L1_HOSTS: list[tuple[str, str]] = [
+    ("boards.greenhouse.io", "greenhouse"),
+    ("job-boards.greenhouse.io", "greenhouse"),
+    ("jobs.lever.co", "lever"),
+    ("jobs.ashbyhq.com", "ashby"),
+    ("jobs.smartrecruiters.com", "smartrecruiters"),
+    ("careers.smartrecruiters.com", "smartrecruiters"),
+    ("apply.workable.com", "workable"),
+]
+
+_SUBDOMAIN_HOSTS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.workable\.com$", re.IGNORECASE), "workable"),
+    (
+        re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.IGNORECASE),
+        "recruitee",
+    ),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.breezy\.hr$", re.IGNORECASE), "breezy"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.applytojob\.com$", re.IGNORECASE), "jazzhr"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.bamboohr\.com$", re.IGNORECASE), "bamboohr"),
+]
+
+_PERSONIO_HOST = re.compile(
+    r"^(?P<token>[a-z0-9-]+)\.jobs\.personio\.(?P<country>com|de)$", re.IGNORECASE
+)
+
+_L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
+    (
+        "greenhouse",
+        re.compile(
+            rf"(?:boards|job-boards)\.greenhouse\.io/embed/job_board\?"
+            rf"[^\"'<>\s]*?for={_TOKEN}",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "greenhouse",
+        re.compile(
+            rf"(?:boards|job-boards)\.greenhouse\.io/(?!embed(?:/|$)){_TOKEN}"
+            r"(?=$|[/?#\"'<>\s])",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "lever",
+        re.compile(rf"jobs\.lever\.co/{_TOKEN}(?=$|[/?#\"'<>\s])", re.IGNORECASE),
+    ),
+    (
+        "ashby",
+        re.compile(rf"jobs\.ashbyhq\.com/{_TOKEN}(?=$|[/?#\"'<>\s])", re.IGNORECASE),
+    ),
+    (
+        "ashby",
+        re.compile(
+            rf"__ASHBY[\s\S]{{0,500}}organizationSlug[\"']?\s*[:=]\s*[\"']{_TOKEN}[\"']",
+            re.IGNORECASE,
+        ),
+    ),
+]
+
+_WORKDAY_URL = re.compile(
+    r"(?:(?:https?:)?//)?"
+    r"(?P<host>[a-z0-9-]+\.[a-z0-9-]+\.myworkdayjobs\.com)"
+    r"(?P<path>/[^\"'<>\s]*)?",
+    re.IGNORECASE,
+)
+_LOCALE_SEGMENT = re.compile(r"^[a-z]{2}(?:[-_][a-z]{2})?$", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class AtsTarget:
+    ats: str
+    token: str = ""  # board slug for greenhouse/lever/ashby
+    tenant: str = ""  # workday tenant (e.g. "generalmotors")
+    datacenter: str = ""  # workday data center (e.g. "wd5")
+    site: str = ""  # workday site path segment (e.g. "Careers_GM")
+    country: str = "com"  # Personio careers host suffix
+
+
+@dataclass(frozen=True)
+class AtsInspection:
+    """ATS identity plus whether an unknown-host page was reachable."""
+
+    target: AtsTarget | None
+    reachable: bool
+
+
+def _first_path_segment(path: str) -> str | None:
+    segments = [segment for segment in path.split("/") if segment]
+    return segments[0] if segments else None
+
+
+def _workday_site_segment(path: str) -> str | None:
+    segments = [segment for segment in path.split("/") if segment]
+    while segments and _LOCALE_SEGMENT.fullmatch(segments[0]):
+        segments.pop(0)
+    if (
+        len(segments) >= 4
+        and segments[0].lower() == "wday"
+        and segments[1].lower() == "cxs"
+    ):
+        return segments[3]
+    if segments and segments[0].lower() != "wday":
+        return segments[0]
+    return None
+
+
+def _workday_target(host: str, path: str) -> AtsTarget | None:
+    labels = host.casefold().split(".")
+    if (
+        len(labels) != 4
+        or labels[2:] != ["myworkdayjobs", "com"]
+        or not all(
+            label
+            and all(
+                character.isascii() and (character.isalnum() or character == "-")
+                for character in label
+            )
+            for label in labels[:2]
+        )
+    ):
+        return None
+    site = _workday_site_segment(path)
+    if not site:
+        return None
+    return AtsTarget(
+        "workday",
+        tenant=labels[0],
+        datacenter=labels[1],
+        site=site,
+    )
+
+
+_SINGLETON_HOSTS: list[tuple[str, str]] = [
+    ("www.tesla.com", "tesla"),
+    ("tesla.com", "tesla"),
+    ("careers.google.com", "google"),
+    ("www.google.com", "google"),
+]
+
+
+#: Bespoke portals that are recognized by host but serve their listings from
+#: JavaScript rather than static HTML or a public JSON API. Callers that
+#: otherwise skip the browser for a recognized ATS must still render these.
+SINGLETON_ATS = frozenset(ats for _, ats in _SINGLETON_HOSTS)
+
+
+def _singleton(url: str) -> AtsTarget | None:
+    """Bespoke portals identified by host alone (no token)."""
+    host = (urlsplit(url).hostname or "").lower()
+    path = urlsplit(url).path.lower()
+    for known_host, ats in _SINGLETON_HOSTS:
+        if host == known_host:
+            if ats == "tesla" and not (
+                path == "/careers" or path.startswith("/careers/")
+            ):
+                continue
+            if (
+                ats == "google"
+                and host == "www.google.com"
+                and not path.startswith("/about/careers/")
+            ):
+                continue
+            return AtsTarget(ats)
+    return None
+
+
+def _l1(url: str) -> AtsTarget | None:
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    for known_host, ats in _L1_HOSTS:
+        if host == known_host:
+            token = _first_path_segment(parts.path)
+            if ats == "greenhouse" and token == "embed":
+                # Embed URLs carry the real board slug in ?for=, not the path.
+                for_values = parse_qs(parts.query).get("for")
+                token = for_values[0] if for_values else None
+            if ats == "workable" and token == "j":
+                return None
+            return AtsTarget(ats, token) if token else None
+
+    personio = _PERSONIO_HOST.fullmatch(host)
+    if personio:
+        return AtsTarget(
+            "personio",
+            token=personio.group("token"),
+            country=personio.group("country").lower(),
+        )
+    for pattern, ats in _SUBDOMAIN_HOSTS:
+        if match := pattern.fullmatch(host):
+            return AtsTarget(ats, token=match.group("token"))
+
+    # Workday host with a usable site path -> a fetchable target; non-workday hosts and
+    # workday hosts lacking a site path both yield None, so detect_ats falls to the L2 sniff.
+    return _workday_target(host, parts.path)
+
+
+def _get_html(url: str, *, client: httpx.Client | None = None) -> str | None:
+    """Fetch raw HTML for L2 sniffing. Network errors are treated as no match."""
+    try:
+        return fetch_public_text(
+            url,
+            client=client,
+            timeout=30.0,
+            max_bytes=1_000_000,
+        ).text
+    except (httpx.HTTPError, ValueError):
+        return None
+
+
+def _target_from_html(raw_html: str) -> AtsTarget | None:
+    targets = targets_from_html(raw_html)
+    return targets[0] if targets else None
+
+
+def targets_from_html(raw_html: str) -> list[AtsTarget]:
+    """Extract every supported board target embedded in untrusted page markup."""
+    found: list[AtsTarget] = []
+    for ats, pattern in _L2_MARKERS:
+        match = pattern.search(raw_html)
+        if match:
+            found.append(AtsTarget(ats, match.group(1)))
+
+    html = unescape(raw_html).replace("\\/", "/")
+    for match in _WORKDAY_URL.finditer(html):
+        target = _workday_target(match.group("host").lower(), match.group("path") or "")
+        if target is not None:
+            found.append(target)
+    for raw_url in re.findall(r"https?://[^\"'<>\s]+", html, re.IGNORECASE):
+        target = identify_host(raw_url.rstrip(").,;"))
+        if target is not None:
+            found.append(target)
+    return list(dict.fromkeys(found))
+
+
+def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
+    raw_html = _get_html(url, client=client)
+    return _target_from_html(raw_html) if raw_html is not None else None
+
+
+def workday_external_path(target: AtsTarget, url: str) -> str | None:
+    """The cxs detail suffix (starting with ``/job/...``) for a pasted Workday URL.
+
+    Mirrors ``_workday_site_segment``'s locale-stripping but returns the
+    remainder *after* the site segment -- what ``cxs_detail_url`` needs --
+    instead of the site itself. ``None`` when the URL's site doesn't match
+    ``target.site`` (e.g. a raw ``/wday/cxs/...`` API URL was pasted instead
+    of a browsing URL).
+    """
+    segments = [segment for segment in urlsplit(url).path.split("/") if segment]
+    while segments and _LOCALE_SEGMENT.fullmatch(segments[0]):
+        segments.pop(0)
+    if not segments or segments[0].casefold() != target.site.casefold():
+        return None
+    remainder = segments[1:]
+    return "/" + "/".join(remainder) if remainder else None
+
+
+def identify_host(url: str) -> AtsTarget | None:
+    """Resolve a URL to its ATS by host/path alone — bespoke singleton, then URL pattern.
+
+    Pure: no network. Callers that already hold the page (url_ingest) use this to
+    avoid the L2 sniff re-fetching a page they have — and rendered — already.
+    """
+    return _singleton(url) or _l1(url)
+
+
+def detect_ats(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
+    """Resolve a careers URL: host/path identity, then an HTML sniff for embeds."""
+    return inspect_ats(url, client=client).target
+
+
+def inspect_ats(url: str, *, client: httpx.Client | None = None) -> AtsInspection:
+    """Resolve an ATS while preserving reachability for an unknown host."""
+    target = identify_host(url)
+    if target is not None:
+        return AtsInspection(target=target, reachable=True)
+    raw_html = _get_html(url, client=client)
+    if raw_html is None:
+        return AtsInspection(target=None, reachable=False)
+    return AtsInspection(target=_target_from_html(raw_html), reachable=True)

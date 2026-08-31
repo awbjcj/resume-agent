@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make `resume-agent` safe and feasible to publish as a public GitHub repo — automated CI quality gates, MIT license, security tooling, and community-health files.
+**Goal:** Make `resume-tailor-harness` safe and feasible to publish as a public GitHub repo — automated CI quality gates, MIT license, security tooling, and community-health files.
 
 **Architecture:** Add GitHub-native config and docs only. CI mirrors the existing `Makefile` targets so `make verify` and CI stay in lockstep. Two toolchains (`uv`/Python 3.13, `npm`/Vite) each get their own parallel CI job. No application code changes; no git-history rewrite (history is already secret-free).
 
@@ -298,7 +298,7 @@ git commit -m "Add Dependabot for pip, npm, and github-actions"
 - [ ] **Step 1: Create `.github/CONTRIBUTING.md`**
 
 ```markdown
-# Contributing to Resume Agent
+# Contributing to Résumé Tailor Harness
 
 Thanks for your interest in contributing! This guide covers local setup and the
 checks your change must pass.
@@ -364,7 +364,7 @@ open a PR rather than pushing directly.
 - [ ] **Step 2: Verify**
 
 Run: `head -1 .github/CONTRIBUTING.md`
-Expected: `# Contributing to Resume Agent`
+Expected: `# Contributing to Résumé Tailor Harness`
 
 - [ ] **Step 3: Commit**
 
@@ -398,7 +398,7 @@ This project is developed on `main`. Security fixes are applied to `main` only.
 **Please do not open a public issue for security vulnerabilities.**
 
 Report privately through GitHub's
-[Security Advisories](https://github.com/awbjcj/resume-agent/security/advisories/new)
+[Security Advisories](https://github.com/awbjcj/resume-tailor-harness/security/advisories/new)
 ("Report a vulnerability" button). Include:
 
 - a description of the issue and its impact,
@@ -549,7 +549,7 @@ Anything else — mockups, links, examples.
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/awbjcj/resume-agent/security/advisories/new
+    url: https://github.com/awbjcj/resume-tailor-harness/security/advisories/new
     about: Please report security issues privately, not as public issues.
 ```
 
@@ -603,7 +603,7 @@ git commit -m "Add issue and pull request templates"
 Replace the current top of `README.md`:
 
 ```markdown
-# Resume Agent
+# Résumé Tailor Harness
 
 A personal, command-line job-hunt pipeline. It pulls job posts from multiple
 sources (job-board connectors, LinkedIn, or hand-pasted), scores them against a
@@ -616,9 +616,9 @@ all on your own machine, in one SQLite database.
 with:
 
 ```markdown
-# Resume Agent
+# Résumé Tailor Harness
 
-[![CI](https://github.com/awbjcj/resume-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/awbjcj/resume-agent/actions/workflows/ci.yml)
+[![CI](https://github.com/awbjcj/resume-tailor-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/awbjcj/resume-tailor-harness/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 

@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.system_db import init_system_db, make_system_engine
+from resume_tailor_harness.tenancy.system_db import init_system_db, make_system_engine
 
 NOW = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
 
@@ -57,7 +57,7 @@ def test_migration_adds_the_index_to_an_existing_database(tmp_path):
     with engine.begin() as connection:
         connection.execute(text("DROP INDEX ix_usage_events_own_key_ts"))
 
-    from resume_agent.tenancy.migrate_system import migrate_system_db
+    from resume_tailor_harness.tenancy.migrate_system import migrate_system_db
 
     migrate_system_db(engine)
 

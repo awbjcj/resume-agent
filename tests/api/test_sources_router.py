@@ -3,8 +3,8 @@ from typing import NotRequired, TypedDict
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import sources as sources_router
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import sources as sources_router
 
 
 class _AppKwargs(TypedDict):
@@ -26,7 +26,7 @@ def _client(data_dir: Path | None = None):
 
 
 def test_list_sources_returns_views(monkeypatch):
-    from resume_agent.discovery.connectors.sources import SourceView
+    from resume_tailor_harness.discovery.connectors.sources import SourceView
 
     monkeypatch.setattr(
         sources_router,
@@ -53,7 +53,7 @@ def test_list_sources_returns_views(monkeypatch):
 
 
 def test_preview_endpoint(monkeypatch):
-    from resume_agent.services.sources import SourcePreview
+    from resume_tailor_harness.services.sources import SourcePreview
 
     monkeypatch.setattr(
         sources_router,
@@ -75,7 +75,7 @@ def test_preview_endpoint(monkeypatch):
 
 
 def test_preview_endpoint_forwards_native_provider_recipe(monkeypatch):
-    from resume_agent.services.sources import SourcePreview
+    from resume_tailor_harness.services.sources import SourcePreview
 
     calls = []
 
@@ -105,7 +105,7 @@ def test_preview_endpoint_forwards_native_provider_recipe(monkeypatch):
 
 
 def test_native_provider_requires_its_connection_parameters(monkeypatch):
-    from resume_agent.services.sources import SourcePreview
+    from resume_tailor_harness.services.sources import SourcePreview
 
     monkeypatch.setattr(
         sources_router,
@@ -125,7 +125,7 @@ def test_native_provider_requires_its_connection_parameters(monkeypatch):
 
 
 def test_add_source_error_maps_to_400(monkeypatch):
-    from resume_agent.services.sources import SourceError
+    from resume_tailor_harness.services.sources import SourceError
 
     def boom(url, label=None, **kwargs):
         raise SourceError("nope")
@@ -141,7 +141,7 @@ def test_add_source_error_maps_to_400(monkeypatch):
 
 
 def test_patch_source_forwards_present_fields_atomically(monkeypatch):
-    from resume_agent.discovery.connectors.sources import SourceView
+    from resume_tailor_harness.discovery.connectors.sources import SourceView
 
     calls = []
 

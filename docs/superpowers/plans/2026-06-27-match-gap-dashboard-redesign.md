@@ -70,16 +70,16 @@ multi-target generation.
 
 ### Backend and contract
 
-- Modify `src/resume_agent/tracking/match_gap.py`
-- Modify `src/resume_agent/services/suggestions.py`
-- Create `src/resume_agent/services/suggestion_runs.py`
-- Modify `src/resume_agent/api/runs/manager.py`
-- Modify `src/resume_agent/api/schemas/match_gap.py`
-- Modify `src/resume_agent/api/schemas/suggestions.py`
-- Modify `src/resume_agent/api/routers/match_gap.py`
-- Modify `src/resume_agent/api/routers/suggestions.py`
-- Modify `src/resume_agent/api/app.py`
-- Modify `src/resume_agent/config.py`
+- Modify `src/resume_tailor_harness/tracking/match_gap.py`
+- Modify `src/resume_tailor_harness/services/suggestions.py`
+- Create `src/resume_tailor_harness/services/suggestion_runs.py`
+- Modify `src/resume_tailor_harness/api/runs/manager.py`
+- Modify `src/resume_tailor_harness/api/schemas/match_gap.py`
+- Modify `src/resume_tailor_harness/api/schemas/suggestions.py`
+- Modify `src/resume_tailor_harness/api/routers/match_gap.py`
+- Modify `src/resume_tailor_harness/api/routers/suggestions.py`
+- Modify `src/resume_tailor_harness/api/app.py`
+- Modify `src/resume_tailor_harness/config.py`
 - Regenerate `contracts/openapi.json`, `contracts/ts/api.ts`
 - Modify tests under `tests/` and `tests/api/`
 
@@ -106,7 +106,7 @@ multi-target generation.
 
 **Files:**
 
-- Modify `src/resume_agent/tracking/match_gap.py`
+- Modify `src/resume_tailor_harness/tracking/match_gap.py`
 - Modify `tests/test_tracking_match_gap.py`
 - Modify `tests/test_demand_graph.py` only if its public-interface fixtures need
   the additive fields
@@ -155,7 +155,7 @@ deleting one would spread a rule across callers. The public test surface is
 
 ```powershell
 .venv/Scripts/python.exe -m pytest tests/test_tracking_match_gap.py tests/test_demand_graph.py -v
-.venv/Scripts/ruff.exe check src/resume_agent/tracking/match_gap.py tests/test_tracking_match_gap.py tests/test_demand_graph.py
+.venv/Scripts/ruff.exe check src/resume_tailor_harness/tracking/match_gap.py tests/test_tracking_match_gap.py tests/test_demand_graph.py
 ```
 
 Commit: `feat(match-gap): add stable skill identity and graph aggregates`
@@ -166,9 +166,9 @@ Commit: `feat(match-gap): add stable skill identity and graph aggregates`
 
 **Files:**
 
-- Modify `src/resume_agent/api/schemas/match_gap.py`
-- Modify `src/resume_agent/services/suggestions.py`
-- Modify `src/resume_agent/api/routers/match_gap.py`
+- Modify `src/resume_tailor_harness/api/schemas/match_gap.py`
+- Modify `src/resume_tailor_harness/services/suggestions.py`
+- Modify `src/resume_tailor_harness/api/routers/match_gap.py`
 - Modify `tests/api/test_schemas_match_gap.py`
 - Modify `tests/api/test_match_gap.py`
 - Modify `tests/test_services_suggestions.py`
@@ -218,7 +218,7 @@ not issue N calls through the single-suggestion HTTP interface.
 
 ```powershell
 .venv/Scripts/python.exe -m pytest tests/test_services_suggestions.py tests/api/test_schemas_match_gap.py tests/api/test_match_gap.py -v
-.venv/Scripts/ruff.exe check src/resume_agent/services/suggestions.py src/resume_agent/api/schemas/match_gap.py src/resume_agent/api/routers/match_gap.py
+.venv/Scripts/ruff.exe check src/resume_tailor_harness/services/suggestions.py src/resume_tailor_harness/api/schemas/match_gap.py src/resume_tailor_harness/api/routers/match_gap.py
 ```
 
 Commit: `feat(api): include suggestion status in match-gap snapshot`
@@ -229,9 +229,9 @@ Commit: `feat(api): include suggestion status in match-gap snapshot`
 
 **Files:**
 
-- Modify `src/resume_agent/api/runs/manager.py`
-- Modify `src/resume_agent/api/app.py`
-- Modify `src/resume_agent/config.py`
+- Modify `src/resume_tailor_harness/api/runs/manager.py`
+- Modify `src/resume_tailor_harness/api/app.py`
+- Modify `src/resume_tailor_harness/config.py`
 - Modify `tests/api/test_run_manager.py`
 - Modify `tests/api/test_app_health.py` if lifecycle assertions belong there
 - Modify `tests/test_config.py`
@@ -264,7 +264,7 @@ where it provides locality and cannot starve unrelated run kinds.
 
 ```powershell
 .venv/Scripts/python.exe -m pytest tests/api/test_run_manager.py tests/api/test_app_health.py tests/test_config.py -v
-.venv/Scripts/ruff.exe check src/resume_agent/api/runs/manager.py src/resume_agent/api/app.py src/resume_agent/config.py
+.venv/Scripts/ruff.exe check src/resume_tailor_harness/api/runs/manager.py src/resume_tailor_harness/api/app.py src/resume_tailor_harness/config.py
 ```
 
 Commit: `feat(runs): isolate suggestion work in a managed executor lane`
@@ -275,9 +275,9 @@ Commit: `feat(runs): isolate suggestion work in a managed executor lane`
 
 **Files:**
 
-- Create `src/resume_agent/services/suggestion_runs.py`
-- Modify `src/resume_agent/api/schemas/suggestions.py`
-- Modify `src/resume_agent/api/routers/suggestions.py`
+- Create `src/resume_tailor_harness/services/suggestion_runs.py`
+- Modify `src/resume_tailor_harness/api/schemas/suggestions.py`
+- Modify `src/resume_tailor_harness/api/routers/suggestions.py`
 - Modify `tests/test_services_suggestions.py` or create
   `tests/test_services_suggestion_runs.py`
 - Modify `tests/api/test_schemas_suggestions.py`
@@ -317,7 +317,7 @@ Keep `POST /api/suggestions/generate` unchanged externally. Add
 
 ```powershell
 .venv/Scripts/python.exe -m pytest tests/test_services_suggestion_runs.py tests/api/test_schemas_suggestions.py tests/api/test_suggestions.py -v
-.venv/Scripts/ruff.exe check src/resume_agent/services/suggestion_runs.py src/resume_agent/api/schemas/suggestions.py src/resume_agent/api/routers/suggestions.py
+.venv/Scripts/ruff.exe check src/resume_tailor_harness/services/suggestion_runs.py src/resume_tailor_harness/api/schemas/suggestions.py src/resume_tailor_harness/api/routers/suggestions.py
 ```
 
 Commit: `feat(suggestions): add ordered multi-target run submission`

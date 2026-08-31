@@ -3,11 +3,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.manual_skills import load_manual_skills
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.store import load_facts, save_facts
-from resume_agent.services.profile_skills import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.manual_skills import load_manual_skills
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import load_facts, save_facts
+from resume_tailor_harness.services.profile_skills import (
     ProfileNotBuiltError,
     SkillAlreadyExistsError,
     SkillNotFoundError,
@@ -43,7 +43,7 @@ def test_add_skill_raises_when_profile_not_built(tmp_path):
 
 
 def test_delete_skill_suppresses_and_removes(built_profile_dir):
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
 
     profile_skills.delete_skill(built_profile_dir, "kubernetes")
     facts = load_facts(built_profile_dir / "facts.json")
@@ -56,14 +56,14 @@ def test_delete_skill_suppresses_and_removes(built_profile_dir):
 
 
 def test_delete_unknown_skill_raises(built_profile_dir):
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
 
     with pytest.raises(profile_skills.SkillNotFoundError):
         profile_skills.delete_skill(built_profile_dir, "nonexistent-token")
 
 
 def test_restore_removes_suppression(built_profile_dir):
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
 
     profile_skills.delete_skill(built_profile_dir, "kubernetes")
     profile_skills.restore_skill(built_profile_dir, "kubernetes")
@@ -71,14 +71,14 @@ def test_restore_removes_suppression(built_profile_dir):
 
 
 def test_restore_unknown_raises(built_profile_dir):
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
 
     with pytest.raises(profile_skills.SuppressedSkillNotFoundError):
         profile_skills.restore_skill(built_profile_dir, "kubernetes")
 
 
 def test_add_skill_restores_when_suppressed(built_profile_dir):
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
 
     profile_skills.delete_skill(built_profile_dir, "kubernetes")
     profile_skills.add_skill(built_profile_dir, "Kubernetes", "hard")
@@ -89,7 +89,7 @@ def test_add_skill_restores_when_suppressed(built_profile_dir):
 
 def test_restore_brings_back_a_deleted_manual_skill(built_profile_dir):
     """A manually-added skill must return immediately on restore, not vanish."""
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.services import profile_skills
 
     profile_skills.add_skill(built_profile_dir, "Rust", "hard")
     profile_skills.delete_skill(built_profile_dir, "rust")
@@ -104,9 +104,9 @@ def test_restore_brings_back_a_deleted_manual_skill(built_profile_dir):
 
 def test_delete_by_alias_removes_the_skill(tmp_path):
     """Deleting via an alias token must actually remove the skill, not just log."""
-    from resume_agent.models.profile import Contact, ProfileFacts, Skill
-    from resume_agent.profile.store import save_facts
-    from resume_agent.services import profile_skills
+    from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+    from resume_tailor_harness.profile.store import save_facts
+    from resume_tailor_harness.services import profile_skills
 
     facts = ProfileFacts(
         contact=Contact(name="Ada"),
@@ -149,7 +149,7 @@ def test_add_skill_rejects_a_duplicate(profile_dir):
 
 
 def test_concurrent_skill_additions_preserve_both_entries(profile_dir, monkeypatch):
-    from resume_agent.services import profile_skills as service
+    from resume_tailor_harness.services import profile_skills as service
 
     original_load = service.load_manual_skills
     first_loaded = threading.Event()

@@ -1,7 +1,7 @@
 import httpx
 
-from resume_agent.discovery.source_resolution.crawler import FirstPartyCrawler
-from resume_agent.security.outbound import PublicTextResponse
+from resume_tailor_harness.discovery.source_resolution.crawler import FirstPartyCrawler
+from resume_tailor_harness.security.outbound import PublicTextResponse
 
 
 def response(url: str, html: str) -> PublicTextResponse:

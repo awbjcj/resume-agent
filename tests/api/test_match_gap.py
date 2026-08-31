@@ -1,22 +1,22 @@
 from fastapi.testclient import TestClient
 
-import resume_agent.api.routers.match_gap as router_mod
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.store import save_facts
-from resume_agent.services.suggestions import (
+import resume_tailor_harness.api.routers.match_gap as router_mod
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness.services.suggestions import (
     resolve_suggestion_context,
     suggestion_fingerprint,
 )
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
-from resume_agent.tracking.match_gap import build_demand_graph
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus, SkillSuggestion
+from resume_tailor_harness.tracking.match_gap import build_demand_graph
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus, SkillSuggestion
 
 
 def _client():
@@ -154,7 +154,7 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
 
 
 def test_match_gap_reports_override_conflicts(monkeypatch, tmp_path):
-    from resume_agent.profile import effective as effective_module
+    from resume_tailor_harness.profile import effective as effective_module
 
     profile_dir = tmp_path / "profile"
     facts_path = profile_dir / "facts.json"

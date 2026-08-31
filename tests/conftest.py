@@ -15,7 +15,7 @@ explicitly, which never consults this seam.
 
 import pytest
 
-import resume_agent.taxonomy.embeddings as embeddings
+import resume_tailor_harness.taxonomy.embeddings as embeddings
 
 
 @pytest.fixture(autouse=True)

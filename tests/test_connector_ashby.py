@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
+from resume_tailor_harness.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
 
 FIXTURE = json.loads(
     (Path(__file__).parent / "fixtures" / "ashby" / "job_board.json").read_text(
@@ -80,7 +80,7 @@ def test_parse_ashby_no_sidebar_when_no_metadata_present():
 
 
 def test_fetch_ashby_board_hits_posting_api(monkeypatch):
-    import resume_agent.discovery.connectors.ashby as ashby
+    import resume_tailor_harness.discovery.connectors.ashby as ashby
 
     captured = {}
 

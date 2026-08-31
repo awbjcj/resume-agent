@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from resume_agent.career_skills.agno import run_meta_payload, skill_kwargs
-from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
-from resume_agent.career_skills.registry import CareerSkillRegistry
-from resume_agent.h1b.mcp import H1B_INCLUDE_TOOLS
+from resume_tailor_harness.career_skills.agno import run_meta_payload, skill_kwargs
+from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta
+from resume_tailor_harness.career_skills.registry import CareerSkillRegistry
+from resume_tailor_harness.h1b.mcp import H1B_INCLUDE_TOOLS
 
 
 class _Runner:
@@ -64,11 +64,11 @@ def test_run_metadata_is_redacted_to_identity_only():
 
 def test_mcp_boundary_does_not_leak_into_other_agent_families():
     roots = [
-        Path("src/resume_agent/career_lab"),
-        Path("src/resume_agent/discovery"),
-        Path("src/resume_agent/tailor"),
-        Path("src/resume_agent/cover_letter"),
-        Path("src/resume_agent/interview"),
+        Path("src/resume_tailor_harness/career_lab"),
+        Path("src/resume_tailor_harness/discovery"),
+        Path("src/resume_tailor_harness/tailor"),
+        Path("src/resume_tailor_harness/cover_letter"),
+        Path("src/resume_tailor_harness/interview"),
     ]
     offenders = [
         str(path)
@@ -80,7 +80,7 @@ def test_mcp_boundary_does_not_leak_into_other_agent_families():
 
 
 def test_career_lab_prompt_labels_user_controlled_data():
-    source = Path("src/resume_agent/services/career_lab.py").read_text(encoding="utf-8")
+    source = Path("src/resume_tailor_harness/services/career_lab.py").read_text(encoding="utf-8")
     assert "MESSAGE (UNTRUSTED)" in source
     assert "TYPED CONTEXT PROJECTION (UNTRUSTED)" in source
     assert "Do not claim external actions" in source

@@ -6,7 +6,8 @@ import { loadAutoTranslations, resources } from "./resources";
 export const supportedLanguages = ["en", "zh-CN"] as const;
 export type SupportedLanguage = (typeof supportedLanguages)[number];
 
-export const LANGUAGE_STORAGE_KEY = "resume-agent-language";
+export const LANGUAGE_STORAGE_KEY = "resume-tailor-harness-language";
+const LEGACY_LANGUAGE_STORAGE_KEY = "resume-agent-language";
 export const DEFAULT_LANGUAGE: SupportedLanguage = "en";
 
 export function normalizeLanguage(language: string | null | undefined): SupportedLanguage | null {
@@ -34,7 +35,12 @@ function getInitialLanguage(): SupportedLanguage {
   if (typeof window === "undefined") return DEFAULT_LANGUAGE;
   let storedLanguage: string | null = null;
   try {
-    storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
+      ?? window.localStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY);
+    if (storedLanguage && !window.localStorage.getItem(LANGUAGE_STORAGE_KEY)) {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, storedLanguage);
+      window.localStorage.removeItem(LEGACY_LANGUAGE_STORAGE_KEY);
+    }
   } catch {
     // Storage can be unavailable in privacy-restricted browser contexts.
   }

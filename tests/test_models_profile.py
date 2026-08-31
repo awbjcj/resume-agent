@@ -1,4 +1,4 @@
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -7,7 +7,7 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
-from resume_agent.models.base import Source
+from resume_tailor_harness.models.base import Source
 import pytest
 from pydantic import ValidationError
 

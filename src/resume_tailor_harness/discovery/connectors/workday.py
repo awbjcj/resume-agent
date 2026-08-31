@@ -1,0 +1,422 @@
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+import httpx
+
+from resume_tailor_harness.discovery.connectors import http as board
+
+from resume_tailor_harness.discovery.connectors.base import RawJob, SkipSeen
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.harvest import harvest_detailed
+from resume_tailor_harness.discovery.connectors.text import (
+    html_to_markdown,
+    join_locations,
+    primary_search_term,
+    with_meta_lines,
+)
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.tenancy.context import current_context
+
+_PAGE = 20  # cxs page size
+_MAX_OFFSET = (
+    1000  # safety ceiling: <=51 pages (~1020 rows) even if a tenant ignores searchText
+)
+_FACETS_DIR = Path("data/workday_facets")
+
+# Workday boards throttle aggressively, so a big pull must survive an
+# intermittent 429 or transient 5xx. That retry is no longer Workday's own: it
+# is the default policy of every board endpoint, and lives in
+# ``connectors/http.py`` together with the pool. These names remain as the
+# canonical description of the policy Workday needs.
+_RETRY_STATUSES = board.RETRY_STATUSES
+_RETRY_ATTEMPTS = board.RETRY_ATTEMPTS
+_RETRY_BACKOFF_S = board.RETRY_BACKOFF_S
+_MAX_RETRY_SLEEP_S = board.MAX_RETRY_SLEEP_S
+
+
+def _checked(response: httpx.Response) -> httpx.Response:
+    """Raise on a status the pool already retried to exhaustion.
+
+    The session returns the last transient response rather than raising, so a
+    persistently throttled board surfaces here as an ``HTTPStatusError`` and is
+    isolated per URL by the companies connector — never aborting siblings.
+    """
+    response.raise_for_status()
+    return response
+
+
+def default_facets_dir() -> Path:
+    """Per-tenant facet cache when a workspace is active, else the flat default.
+
+    ``fetch_workday`` runs inside a pull run, where ``RunManager.submit`` has
+    copied the caller's ``UserContext`` into the worker, so each workspace's
+    resolved location facets live under its own root (which provisioning creates
+    and reset targets) instead of a shared cwd path.
+    """
+    context = current_context()
+    return context.paths.workday_facets_dir if context is not None else _FACETS_DIR
+
+
+@dataclass
+class WorkdayRow(RawJob):
+    """A list-page RawJob that remembers its detail path for the N+1 fetch."""
+
+    external_path: str = ""
+
+
+def _base(target: AtsTarget) -> str:
+    return f"https://{target.tenant}.{target.datacenter}.myworkdayjobs.com"
+
+
+def cxs_jobs_url(target: AtsTarget) -> str:
+    return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}/jobs"
+
+
+def list_request_body(
+    search: SearchConfig,
+    offset: int,
+    applied_facets: dict[str, list[str]] | None = None,
+) -> dict:
+    return {
+        "appliedFacets": applied_facets or {},
+        "limit": _PAGE,
+        "offset": offset,
+        "searchText": primary_search_term(search),
+    }
+
+
+def _facet_values(node: object):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _facet_values(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _facet_values(value)
+
+
+def resolve_location_facets(page: dict, locations: list[str]) -> dict[str, list[str]]:
+    """Resolve every requested location under location-only facet parameters."""
+    wanted = [location.strip().casefold() for location in locations if location.strip()]
+    facets = page.get("facets")
+    if not wanted or not isinstance(facets, list):
+        return {}
+
+    matched: set[int] = set()
+    applied: dict[str, list[str]] = {}
+    for facet in facets:
+        if not isinstance(facet, dict):
+            continue
+        parameter = facet.get("facetParameter")
+        if not isinstance(parameter, str) or "location" not in parameter.casefold():
+            continue
+        for value in _facet_values(facet.get("values")):
+            descriptor = value.get("descriptor")
+            facet_id = value.get("id")
+            if not isinstance(descriptor, str) or not isinstance(facet_id, str):
+                continue
+            haystack = descriptor.casefold()
+            matching = {
+                index
+                for index, location in enumerate(wanted)
+                if location == haystack
+                or (
+                    len(location) >= 3
+                    and len(haystack) >= 3
+                    and (location in haystack or haystack in location)
+                )
+            }
+            if not matching:
+                continue
+            matched.update(matching)
+            ids = applied.setdefault(parameter, [])
+            if facet_id not in ids:
+                ids.append(facet_id)
+    return applied if len(matched) == len(wanted) else {}
+
+
+def _facet_cache_path(target: AtsTarget, base_dir: str | Path) -> Path:
+    return Path(base_dir) / f"{target.tenant}-{target.site}.json"
+
+
+def _normalized_locations(locations: list[str]) -> list[str]:
+    return sorted(location.strip() for location in locations if location.strip())
+
+
+def load_cached_facets(
+    target: AtsTarget,
+    locations: list[str],
+    base_dir: str | Path = _FACETS_DIR,
+) -> dict[str, list[str]] | None:
+    """Load a matching, well-shaped cache; ``{}`` is a remembered miss."""
+    try:
+        payload = json.loads(
+            _facet_cache_path(target, base_dir).read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict) or payload.get(
+        "locations"
+    ) != _normalized_locations(locations):
+        return None
+    applied = payload.get("appliedFacets")
+    if not isinstance(applied, dict):
+        return None
+    if not all(
+        isinstance(parameter, str)
+        and isinstance(ids, list)
+        and all(isinstance(facet_id, str) for facet_id in ids)
+        for parameter, ids in applied.items()
+    ):
+        return None
+    return applied
+
+
+def save_cached_facets(
+    target: AtsTarget,
+    locations: list[str],
+    applied: dict[str, list[str]],
+    base_dir: str | Path = _FACETS_DIR,
+) -> None:
+    path = _facet_cache_path(target, base_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "locations": _normalized_locations(locations),
+        "appliedFacets": applied,
+    }
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def parse_list_rows(target: AtsTarget, page: dict) -> list[WorkdayRow]:
+    rows: list[WorkdayRow] = []
+    for item in page.get("jobPostings", []):
+        path = item.get("externalPath") or ""
+        rows.append(
+            WorkdayRow(
+                source="workday",
+                url=f"{_base(target)}{path}" if path else None,
+                company=target.tenant,
+                title=item.get("title"),
+                location=item.get("locationsText"),
+                jd_text="",
+                external_path=path,
+                company_provenance="token",
+            )
+        )
+    return rows
+
+
+def cxs_detail_url(target: AtsTarget, external_path: str) -> str:
+    # external_path already begins with "/job/..."; the cxs detail endpoint is the
+    # site path with that suffix appended verbatim (no special-casing of the prefix).
+    return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}{external_path}"
+
+
+def fetch_job_detail(target: AtsTarget, external_path: str) -> dict:
+    """GET one Workday posting's cxs detail payload, with the throttle retry.
+
+    Workday boards throttle aggressively, so every call -- including a one-off
+    lookup for a pasted URL -- rides the pooled session's retry rather than a
+    bare ``httpx.get`` that a single 429 would defeat.
+    """
+    return _checked(board.get(cxs_detail_url(target, external_path))).json()
+
+
+def detail_company_name(detail: dict) -> str | None:
+    """The employer name a cxs detail payload actually carries.
+
+    ``jobPostingInfo.companyName`` is the documented field and is still
+    preferred, but Workday now serves it as ``null``: measured live on four
+    unrelated tenants (generalmotors, phinia, toyota, nvidia) it was null on
+    every one, while the real name sat at the payload's **top level** under
+    ``hiringOrganization.name`` ("General Motors LLC", "2100 NVIDIA USA").
+
+    Reading only the old key had two consequences. Every row kept the URL slug
+    as its company with ``company_provenance == "token"`` — the exact
+    slug-as-company case ``dedup_key`` cannot reconcile against the same
+    requisition seen elsewhere — and, because Scout's board verification proves
+    ownership from provider-attributed company names
+    (``services/sources.py::preview_source``), **no Workday board could ever
+    verify**: `observed_companies` was always empty, so even
+    ``generalmotors.wd5.myworkdayjobs.com`` resolved as
+    ``OWNERSHIP_NOT_PROVEN``.
+
+    The names are legal entities rather than trade names, which is why the
+    caller matches them through ``identity.company_names_match`` (its
+    legal-suffix stripping and subset rule are what make "PHINIA" match
+    "PHINIA Delphi India Private Limited - (India)").
+    """
+    for value in (
+        (detail.get("jobPostingInfo") or {}).get("companyName"),
+        (detail.get("hiringOrganization") or {}).get("name"),
+    ):
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def detail_location(info: dict) -> str | None:
+    """Join Workday's primary and additional posting locations."""
+    primary = info.get("location") or info.get("jobRequisitionLocation")
+    if isinstance(primary, dict):
+        primary = primary.get("descriptor")
+    additional = [
+        item.get("descriptor") if isinstance(item, dict) else item
+        for item in info.get("additionalLocations") or []
+    ]
+    return join_locations([primary, *additional])
+
+
+def workday_meta_lines(info: dict) -> list[str]:
+    """The facts Workday renders above a posting's description.
+
+    Kept shared with URL ingestion so a board pull and a pasted Workday URL
+    preserve the same header fields.
+    """
+    lines: list[str] = []
+    location = info.get("location") or info.get("jobRequisitionLocation")
+    if isinstance(location, dict):
+        location = location.get("descriptor")
+    if location:
+        lines.append(f"Location: {location}")
+    if additional := info.get("additionalLocations"):
+        names = [
+            item.get("descriptor") if isinstance(item, dict) else item
+            for item in additional
+        ]
+        if joined := ", ".join(str(name) for name in names if name):
+            lines.append(f"Additional Locations: {joined}")
+    if remote := info.get("remoteType"):
+        lines.append(f"Workplace Type: {remote}")
+    if time_type := info.get("timeType"):
+        lines.append(f"Employment Type: {time_type}")
+    if job_family := info.get("jobFamily"):
+        lines.append(f"Department: {job_family}")
+    if req_id := info.get("jobReqId"):
+        lines.append(f"Requisition ID: {req_id}")
+    if posted := info.get("postedOn"):
+        lines.append(f"Posted: {posted}")
+    return lines
+
+
+def apply_detail(row: WorkdayRow, detail: dict) -> None:
+    info = detail.get("jobPostingInfo") or {}
+    row.jd_text = with_meta_lines(
+        workday_meta_lines(info), html_to_markdown(info.get("jobDescription", ""))
+    )
+    if info.get("externalUrl"):
+        row.url = info["externalUrl"]
+    if location := detail_location(info):
+        row.location = location
+    if company := detail_company_name(detail):
+        if row.company and company.casefold() != row.company.casefold():
+            row.stale_company = row.stale_company or row.company
+        row.company = company
+        row.company_provenance = "provider"
+    row.posted_at = parse_iso_datetime(info.get("startDate"))
+
+
+def _list_page(
+    target: AtsTarget,
+    search: SearchConfig,
+    offset: int,
+    applied_facets: dict[str, list[str]],
+) -> dict:
+    return _checked(
+        board.post(
+            cxs_jobs_url(target),
+            json=list_request_body(search, offset, applied_facets),
+        )
+    ).json()
+
+
+def _remember_facets(
+    target: AtsTarget,
+    locations: list[str],
+    applied: dict[str, list[str]],
+    facets_dir: str | Path,
+) -> bool:
+    try:
+        save_cached_facets(target, locations, applied, facets_dir)
+    except OSError:
+        return False
+    return True
+
+
+def _list_pages(
+    target: AtsTarget,
+    search: SearchConfig,
+    facets_dir: str | Path = _FACETS_DIR,
+):
+    locations = [location.strip() for location in search.locations if location.strip()]
+    cached = load_cached_facets(target, locations, facets_dir) if locations else {}
+    applied = cached or {}
+    offset = 0
+    page = None
+
+    if locations and cached is None:
+        plain_page = _list_page(target, search, 0, {})
+        resolved = resolve_location_facets(plain_page, locations)
+        if not _remember_facets(target, locations, resolved, facets_dir):
+            resolved = {}
+        if resolved:
+            faceted_page = _list_page(target, search, 0, resolved)
+            if faceted_page.get("jobPostings"):
+                applied = resolved
+                page = faceted_page
+            else:
+                applied = {}
+                _remember_facets(target, locations, {}, facets_dir)
+                page = plain_page
+        else:
+            page = plain_page
+
+    while offset <= _MAX_OFFSET:
+        if page is None:
+            page = _list_page(target, search, offset, applied)
+        postings = page.get("jobPostings") or []
+        if not postings:
+            if offset == 0 and applied:
+                applied = {}
+                _remember_facets(target, locations, {}, facets_dir)
+                page = None
+                continue
+            return
+        yield from parse_list_rows(target, page)
+        total = page.get("total")
+        offset += _PAGE
+        if isinstance(total, int) and offset >= total:
+            return
+        page = None
+
+
+def _fetch_detail(target: AtsTarget, row: WorkdayRow) -> dict | None:
+    # No detail path -> cannot fetch a description; skip rather than GET a bad URL.
+    if not row.external_path:
+        return None
+    return fetch_job_detail(target, row.external_path)
+
+
+def fetch_workday(
+    target: AtsTarget,
+    search: SearchConfig,
+    limit: int | None = None,
+    skip_seen: SkipSeen | None = None,
+    facets_dir: str | Path | None = None,
+) -> list[RawJob]:
+    """List with safe location facets, then gate and detail-fetch survivors."""
+    if facets_dir is None:
+        facets_dir = default_facets_dir()
+    return harvest_detailed(
+        _list_pages(target, search, facets_dir),
+        lambda row: _fetch_detail(target, row),
+        apply_detail,
+        search=search,
+        limit=limit,
+        skip_seen=skip_seen,
+    )

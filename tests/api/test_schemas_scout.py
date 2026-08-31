@@ -1,7 +1,7 @@
 import pytest
 from pydantic import AnyHttpUrl, TypeAdapter, ValidationError
 
-from resume_agent.api.schemas.scout import (
+from resume_tailor_harness.api.schemas.scout import (
     ScoutApproveIn,
     ScoutEvidenceOut,
     ScoutManualConfirmationOut,

@@ -1,4 +1,4 @@
-# Contributing to Resume Agent
+# Contributing to Résumé Tailor Harness
 
 Thanks for your interest in contributing! This guide covers local setup and the
 checks your change must pass.

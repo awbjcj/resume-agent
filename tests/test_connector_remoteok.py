@@ -2,8 +2,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.connectors.remoteok import RemoteOKConnector, parse_remoteok
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.remoteok import RemoteOKConnector, parse_remoteok
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURE = json.loads(
     (Path(__file__).parent / "fixtures" / "remoteok" / "api.json").read_text()

@@ -1,14 +1,14 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.bootstrap import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.bootstrap import (
     BootstrapError,
     build_context,
     ensure_bootstrapped,
 )
-from resume_agent.tenancy.engines import EngineRegistry
-from resume_agent.tenancy.system_db import User, init_system_db, make_system_engine
+from resume_tailor_harness.tenancy.engines import EngineRegistry
+from resume_tailor_harness.tenancy.system_db import User, init_system_db, make_system_engine
 
 
 def _settings(**updates):

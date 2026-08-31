@@ -1,15 +1,15 @@
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.services.notifications import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.services.notifications import (
     accept_notification,
     dismiss_notification,
     list_pending,
     sync_notifications,
 )
-from resume_agent.tracking.repository import get_application, save_application, save_job
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.tracking.repository import get_application, save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 def _seed(session: Session):

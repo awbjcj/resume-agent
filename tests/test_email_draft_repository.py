@@ -1,7 +1,7 @@
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import (
     delete_job_row,
     email_drafts_for_job,
     get_email_draft,
@@ -9,7 +9,7 @@ from resume_agent.tracking.repository import (
     save_email_draft,
     save_job,
 )
-from resume_agent.tracking.tables import EmailDraft, Job
+from resume_tailor_harness.tracking.tables import EmailDraft, Job
 
 
 def _draft(job_id: int, subject: str = "Following up") -> EmailDraft:

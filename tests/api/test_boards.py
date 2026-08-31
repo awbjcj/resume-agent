@@ -4,10 +4,10 @@ from typing import cast
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence, Job, JobStatus
 
 
 def _client():

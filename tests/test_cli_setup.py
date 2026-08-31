@@ -1,6 +1,6 @@
 from typer.testing import CliRunner
 
-from resume_agent.cli import app
+from resume_tailor_harness.cli import app
 
 runner = CliRunner()
 
@@ -15,7 +15,7 @@ def test_setup_command_launches_app(monkeypatch):
         def run(self):
             launched["ran"] = True
 
-    monkeypatch.setattr("resume_agent.setup.app.SetupApp", FakeApp)
+    monkeypatch.setattr("resume_tailor_harness.setup.app.SetupApp", FakeApp)
     result = runner.invoke(app, ["setup"])
     assert result.exit_code == 0
     assert launched["ran"] is True

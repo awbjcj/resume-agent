@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Used by `make kill-port` to clear an orphaned dev server (typically a
-  `resume-agent serve` grandchild left behind when `make dev` is interrupted
+  `resume-tailor-harness serve` grandchild left behind when `make dev` is interrupted
   on Windows, where Ctrl-C does not always propagate through `make -j2`).
 #>
 param(

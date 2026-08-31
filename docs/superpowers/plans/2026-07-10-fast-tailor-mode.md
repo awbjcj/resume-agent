@@ -14,7 +14,7 @@
 
 - All Python tests run offline: `.venv/Scripts/python.exe -m pytest` (agents are faked; never construct a real model in tests).
 - Lint: `ruff check` must stay clean.
-- Web tests: `npx vitest run <file>` from `D:\Fun\resume-agent\web`.
+- Web tests: `npx vitest run <file>` from `D:\Fun\resume-tailor-harness\web`.
 - Wire format is camelCase (`CamelModel`); Python stays snake_case.
 - Fact-lock invariant untouched: fact-check stays a blocking gate at `model_tier: premium` in BOTH modes; the deterministic provenance gate still short-circuits the panel.
 - Back-compat: existing flat `review.yaml` files (no new keys) must load and behave exactly as before. All new `ReviewConfig` fields have defaults preserving current behavior.
@@ -31,7 +31,7 @@ checking the plan against the 2026-07-10 design and the current repository.
    strings. Add a regression test that an unknown tier is rejected rather than
    silently falling through `model_for_tier()` to the mid model.
 2. **Test the real setup interface.** The current tuple is private
-   `resume_agent.setup.preflight._EXAMPLES`; Task 2 must assert against that
+   `resume_tailor_harness.setup.preflight._EXAMPLES`; Task 2 must assert against that
    name (and update `atomic_write_all`'s "five config files" docstring to six).
 3. **Keep one source of truth for config paths.** CLI and API code import
    `DEFAULT_REVIEW` / `DEFAULT_REVIEW_DEEP` from
@@ -58,7 +58,7 @@ checking the plan against the 2026-07-10 design and the current repository.
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/review_config.py`
+- Modify: `src/resume_tailor_harness/tailor/review_config.py`
 - Test: `tests/test_tailor_review_config.py`
 
 **Interfaces:**
@@ -92,7 +92,7 @@ def test_new_fields_load_from_yaml(tmp_path):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_review_config.py -v`
 Expected: FAIL — `AttributeError` / assertion on missing fields.
 
-- [ ] **Step 3: Implement** — in `src/resume_agent/tailor/review_config.py`, add to `ReviewConfig` (after `match_plan_enabled`):
+- [ ] **Step 3: Implement** — in `src/resume_tailor_harness/tailor/review_config.py`, add to `ReviewConfig` (after `match_plan_enabled`):
 
 ```python
     merged_advisory: bool = False
@@ -108,7 +108,7 @@ Expected: PASS (all, including pre-existing tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/review_config.py tests/test_tailor_review_config.py
+git add src/resume_tailor_harness/tailor/review_config.py tests/test_tailor_review_config.py
 git commit -m "feat(tailor): add merged_advisory and writer tier knobs to ReviewConfig"
 ```
 
@@ -120,7 +120,7 @@ git commit -m "feat(tailor): add merged_advisory and writer tier knobs to Review
 
 - Modify: `config/review.yaml`, `config/review.yaml.example`
 - Create: `config/review_deep.yaml`, `config/review_deep.yaml.example`
-- Modify: `src/resume_agent/setup/preflight.py:5-13` (EXAMPLES tuple), `src/resume_agent/setup/writer.py:48-53` (targets map), `src/resume_agent/setup/screens.py:534-540` (file listing)
+- Modify: `src/resume_tailor_harness/setup/preflight.py:5-13` (EXAMPLES tuple), `src/resume_tailor_harness/setup/writer.py:48-53` (targets map), `src/resume_tailor_harness/setup/screens.py:534-540` (file listing)
 - Test: `tests/test_shipped_review_configs.py` (new)
 
 **Interfaces:**
@@ -130,7 +130,7 @@ git commit -m "feat(tailor): add merged_advisory and writer tier knobs to Review
 - [ ] **Step 1: Write the failing test** — create `tests/test_shipped_review_configs.py`:
 
 ```python
-from resume_agent.tailor.review_config import load_review_config
+from resume_tailor_harness.tailor.review_config import load_review_config
 
 
 def test_shipped_fast_config_shape():
@@ -158,7 +158,7 @@ def test_shipped_deep_config_matches_legacy_roster():
 
 
 def test_deep_example_registered_with_setup():
-    from resume_agent.setup.preflight import EXAMPLES
+    from resume_tailor_harness.setup.preflight import EXAMPLES
 
     assert "review_deep.yaml.example" in EXAMPLES
 ```
@@ -227,7 +227,7 @@ Expected: PASS. If a setup test asserts the exact example-file list, update it t
 - [ ] **Step 6: Commit**
 
 ```bash
-git add config/review.yaml config/review.yaml.example config/review_deep.yaml config/review_deep.yaml.example src/resume_agent/setup tests/test_shipped_review_configs.py
+git add config/review.yaml config/review.yaml.example config/review_deep.yaml config/review_deep.yaml.example src/resume_tailor_harness/setup tests/test_shipped_review_configs.py
 git commit -m "feat(config): fast review roster by default, deep roster split out"
 ```
 
@@ -237,7 +237,7 @@ git commit -m "feat(config): fast review roster by default, deep roster split ou
 
 **Files:**
 
-- Modify: `src/resume_agent/services/agents.py:69-88`
+- Modify: `src/resume_tailor_harness/services/agents.py:69-88`
 - Modify: `tests/test_services_agents.py` (existing lambdas must accept the new kwarg)
 
 **Interfaces:**
@@ -310,7 +310,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/services/agents.py tests/test_services_agents.py
+git add src/resume_tailor_harness/services/agents.py tests/test_services_agents.py
 git commit -m "feat(tailor): route configured writer tiers into tailor/reviser agents"
 ```
 
@@ -320,9 +320,9 @@ git commit -m "feat(tailor): route configured writer tiers into tailor/reviser a
 
 **Files:**
 
-- Modify: `src/resume_agent/models/review.py`
-- Modify: `src/resume_agent/tailor/agents.py`
-- Modify: `src/resume_agent/tailor/panel.py`
+- Modify: `src/resume_tailor_harness/models/review.py`
+- Modify: `src/resume_tailor_harness/tailor/agents.py`
+- Modify: `src/resume_tailor_harness/tailor/panel.py`
 - Test: `tests/test_tailor_panel.py`
 
 **Interfaces:**
@@ -337,8 +337,8 @@ git commit -m "feat(tailor): route configured writer tiers into tailor/reviser a
 
 ```python
 def test_split_merged_critiques_returns_expected_order():
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import split_merged_critiques
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import split_merged_critiques
 
     review = MergedPanelReview(
         critiques=[
@@ -359,8 +359,8 @@ def test_split_merged_critiques_returns_expected_order():
     ],
 )
 def test_split_merged_critiques_rejects_wrong_coverage(names):
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import split_merged_critiques
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import split_merged_critiques
 
     review = MergedPanelReview(
         critiques=[ReviewCritique(reviewer=n, score=80, passed=True) for n in names]
@@ -370,7 +370,7 @@ def test_split_merged_critiques_rejects_wrong_coverage(names):
 
 
 def test_merged_advisory_instructions_cover_each_rubric():
-    from resume_agent.tailor.agents import _merged_advisory_instructions
+    from resume_tailor_harness.tailor.agents import _merged_advisory_instructions
 
     text = " ".join(_merged_advisory_instructions(["ats-keyword", "concision"]))
     assert "'ats-keyword'" in text
@@ -386,7 +386,7 @@ Expected: FAIL — ImportError.
 
 - [ ] **Step 3: Implement.**
 
-`src/resume_agent/models/review.py` — append:
+`src/resume_tailor_harness/models/review.py` — append:
 
 ```python
 class MergedPanelReview(ExtensibleModel):
@@ -395,7 +395,7 @@ class MergedPanelReview(ExtensibleModel):
     critiques: list[ReviewCritique] = Field(default_factory=list)
 ```
 
-`src/resume_agent/tailor/agents.py` — append (import `MergedPanelReview` from `resume_agent.models.review`):
+`src/resume_tailor_harness/tailor/agents.py` — append (import `MergedPanelReview` from `resume_tailor_harness.models.review`):
 
 ```python
 def _merged_advisory_instructions(
@@ -445,7 +445,7 @@ def build_merged_advisory_agent(
     )
 ```
 
-`src/resume_agent/tailor/panel.py` — add near the top (import `MergedPanelReview`):
+`src/resume_tailor_harness/tailor/panel.py` — add near the top (import `MergedPanelReview`):
 
 ```python
 MERGED_ADVISORY = "advisory-panel"
@@ -472,7 +472,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/review.py src/resume_agent/tailor/agents.py src/resume_agent/tailor/panel.py tests/test_tailor_panel.py
+git add src/resume_tailor_harness/models/review.py src/resume_tailor_harness/tailor/agents.py src/resume_tailor_harness/tailor/panel.py tests/test_tailor_panel.py
 git commit -m "feat(tailor): merged advisory reviewer schema, agent builder, splitter"
 ```
 
@@ -482,8 +482,8 @@ git commit -m "feat(tailor): merged advisory reviewer schema, agent builder, spl
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/panel.py:49-118`
-- Modify: `src/resume_agent/services/agents.py:69-77`
+- Modify: `src/resume_tailor_harness/tailor/panel.py:49-118`
+- Modify: `src/resume_tailor_harness/services/agents.py:69-77`
 - Test: `tests/test_tailor_panel.py`, `tests/test_services_agents.py`
 
 **Interfaces:**
@@ -506,8 +506,8 @@ def _merged_config() -> ReviewConfig:
 
 
 def test_run_panel_merged_makes_one_advisory_call():
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import MERGED_ADVISORY
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY
 
     merged_agent = _Agent(
         MergedPanelReview(
@@ -530,8 +530,8 @@ def test_run_panel_merged_makes_one_advisory_call():
 
 
 def test_run_panel_merged_raises_on_bad_coverage():
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import MERGED_ADVISORY
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY
 
     agents = {
         "fact-check": _Agent(ReviewCritique(reviewer="fact-check", score=100, passed=True)),
@@ -548,8 +548,8 @@ def test_run_panel_merged_raises_on_bad_coverage():
 def test_arun_panel_merged_matches_sync():
     import asyncio
 
-    from resume_agent.models.review import MergedPanelReview
-    from resume_agent.tailor.panel import MERGED_ADVISORY, arun_panel
+    from resume_tailor_harness.models.review import MergedPanelReview
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY, arun_panel
 
     agents = {
         "fact-check": _Agent(ReviewCritique(reviewer="fact-check", score=100, passed=True)),
@@ -659,7 +659,7 @@ async def arun_panel(content, profile_facts, jd_text, config, reviewer_agents, *
 - [ ] **Step 4: Wire the bundle.** In `services/agents.py` `build_tailor_bundle`, replace the reviewers loop:
 
 ```python
-    from resume_agent.tailor.panel import MERGED_ADVISORY  # top-of-file import
+    from resume_tailor_harness.tailor.panel import MERGED_ADVISORY  # top-of-file import
 
     reviewers = {}
     merged = bool(getattr(config, "merged_advisory", False))
@@ -693,7 +693,7 @@ Expected: PASS (workflow tests confirm the loop is untouched).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/panel.py src/resume_agent/services/agents.py tests/test_tailor_panel.py tests/test_services_agents.py
+git add src/resume_tailor_harness/tailor/panel.py src/resume_tailor_harness/services/agents.py tests/test_tailor_panel.py tests/test_services_agents.py
 git commit -m "feat(tailor): one merged advisory call replaces per-reviewer fan-out in fast mode"
 ```
 
@@ -703,7 +703,7 @@ git commit -m "feat(tailor): one merged advisory call replaces per-reviewer fan-
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/workflow.py`
+- Modify: `src/resume_tailor_harness/tailor/workflow.py`
 - Test: `tests/test_tailor_workflow.py`
 
 **Interfaces:**
@@ -767,7 +767,7 @@ In BOTH `run_tailor_review` and `arun_tailor_review`, wrap each stage with `time
 - construct the round with `stage_seconds={**pending, "panel": panel_s}` when the panel ran (else just `pending`), then reset `pending = {}`
 - around the revise call at the loop bottom: `pending["revise"] = elapsed` (lands on the next round)
 
-- [ ] **Step 4: Log per-job totals** so live runs are measurable without a DB migration. In `src/resume_agent/tailor/service.py`, add `import logging` + `logger = logging.getLogger(__name__)` at module level, and inside `_persist_rounds` (which both `tailor_job` and `tailor_jobs` share), after the loop over rounds:
+- [ ] **Step 4: Log per-job totals** so live runs are measurable without a DB migration. In `src/resume_tailor_harness/tailor/service.py`, add `import logging` + `logger = logging.getLogger(__name__)` at module level, and inside `_persist_rounds` (which both `tailor_job` and `tailor_jobs` share), after the loop over rounds:
 
 ```python
     total = sum(sum(r.stage_seconds.values()) for r in rounds)
@@ -788,7 +788,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/workflow.py src/resume_agent/tailor/service.py tests/test_tailor_workflow.py
+git add src/resume_tailor_harness/tailor/workflow.py src/resume_tailor_harness/tailor/service.py tests/test_tailor_workflow.py
 git commit -m "feat(tailor): record per-stage wall-clock on each review round"
 ```
 
@@ -798,7 +798,7 @@ git commit -m "feat(tailor): record per-stage wall-clock on each review round"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/tailoring.py:22` (add constant), `src/resume_agent/cli.py:599-651`
+- Modify: `src/resume_tailor_harness/services/tailoring.py:22` (add constant), `src/resume_tailor_harness/cli.py:599-651`
 - Test: `tests/test_cli_tailor_deep.py` (new)
 
 **Interfaces:**
@@ -811,11 +811,11 @@ git commit -m "feat(tailor): record per-stage wall-clock on each review round"
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import add_job
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import JobStatus
 
 runner = CliRunner()
 
@@ -897,7 +897,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/tailoring.py src/resume_agent/cli.py tests/test_cli_tailor_deep.py
+git add src/resume_tailor_harness/services/tailoring.py src/resume_tailor_harness/cli.py tests/test_cli_tailor_deep.py
 git commit -m "feat(cli): tailor --deep swaps in the deep review roster"
 ```
 
@@ -907,7 +907,7 @@ git commit -m "feat(cli): tailor --deep swaps in the deep review roster"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/runs.py:53-56`, `src/resume_agent/api/routers/runs.py:148-177`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py:53-56`, `src/resume_tailor_harness/api/routers/runs.py:148-177`
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` (whichever `gen_ts_client.sh` writes)
 - Test: `tests/api/test_runs_launch.py`
 
@@ -956,7 +956,7 @@ class TailorParams(CamelModel):
 `routers/runs.py` — import the constants and pass the path:
 
 ```python
-from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP
+from resume_tailor_harness.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP
 
 # inside launch_tailor's work():
             results = tailor(
@@ -984,7 +984,7 @@ Expected: PASS, including `test_openapi_contract.py`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api contracts web/src/lib/api
+git add src/resume_tailor_harness/api tests/api contracts web/src/lib/api
 git commit -m "feat(api): deep flag on tailor launch selects the deep review roster"
 ```
 
@@ -1369,8 +1369,8 @@ Expected: all green.
 - [ ] **Step 3: Live acceptance (requires API key; run with the user).** Pick 2-3 approved jobs, then:
 
 ```bash
-.venv/Scripts/python.exe -m resume_agent.cli tailor --job-id <ID>          # fast
-.venv/Scripts/python.exe -m resume_agent.cli tailor --job-id <ID2> --deep  # deep
+.venv/Scripts/python.exe -m resume_tailor_harness.cli tailor --job-id <ID>          # fast
+.venv/Scripts/python.exe -m resume_tailor_harness.cli tailor --job-id <ID2> --deep  # deep
 ```
 
 Read the `tailor job=… total_llm_seconds=…` log lines emitted by `tailor/service.py` (Task 6). **Pass criteria (from spec):** fast median ≤ 90 s per passing job AND ≤ ~50 % of the deep wall-clock; manually eyeball both resumes for quality parity. Record the numbers in the PR/commit message.
@@ -1390,8 +1390,8 @@ Expected: all green.
 - [ ] **Step 3: Live acceptance (requires API key; run with the user).** Pick 2-3 approved jobs, then:
 
 ```bash
-.venv/Scripts/python.exe -m resume_agent.cli tailor --job-id <ID>          # fast
-.venv/Scripts/python.exe -m resume_agent.cli tailor --job-id <ID2> --deep  # deep
+.venv/Scripts/python.exe -m resume_tailor_harness.cli tailor --job-id <ID>          # fast
+.venv/Scripts/python.exe -m resume_tailor_harness.cli tailor --job-id <ID2> --deep  # deep
 ```
 
 Read the `tailor job=… total_llm_seconds=…` log lines emitted by `tailor/service.py` (Task 6). **Pass criteria (from spec):** fast median ≤ 90 s per passing job AND ≤ ~50 % of the deep wall-clock; manually eyeball both resumes for quality parity. Record the numbers in the PR/commit message.

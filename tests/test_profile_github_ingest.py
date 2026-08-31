@@ -1,5 +1,5 @@
-from resume_agent.models.profile import GitHubProfile, Project
-from resume_agent.profile.github_ingest import (
+from resume_tailor_harness.models.profile import GitHubProfile, Project
+from resume_tailor_harness.profile.github_ingest import (
     build_github_profile,
     normalize_repo_url,
     repo_to_project,

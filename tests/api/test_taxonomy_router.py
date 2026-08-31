@@ -1,14 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 
-import resume_agent.api.routers.match_gap as match_gap_router
-import resume_agent.api.routers.taxonomy as taxonomy_router
-import resume_agent.profile.effective as effective_module
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+import resume_tailor_harness.api.routers.match_gap as match_gap_router
+import resume_tailor_harness.api.routers.taxonomy as taxonomy_router
+import resume_tailor_harness.profile.effective as effective_module
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @pytest.fixture()

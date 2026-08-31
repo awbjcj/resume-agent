@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
 
 
 def test_blocking_issue_severity():

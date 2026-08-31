@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-import resume_agent.tracking.canonicalize as canonicalize_module
+import resume_tailor_harness.tracking.canonicalize as canonicalize_module
 
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.tracking.canonicalize import (
     build_classification_agents,
     IncrementalDomainGroup,
     IncrementalSkillDomains,

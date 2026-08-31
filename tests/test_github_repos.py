@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from resume_agent.github.repos import RepoMeta, parse_github_url, verify_repo
+from resume_tailor_harness.github.repos import RepoMeta, parse_github_url, verify_repo
 
 
 @pytest.mark.parametrize(

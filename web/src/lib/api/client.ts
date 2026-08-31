@@ -2,16 +2,23 @@ import createClient from "openapi-fetch";
 
 import type { paths } from "./schema";
 
-const TOKEN_KEY = "resume-agent-token";
+const TOKEN_KEY = "resume-tailor-harness-token";
+const LEGACY_TOKEN_KEY = "resume-agent-token";
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY) ?? localStorage.getItem(LEGACY_TOKEN_KEY);
+  if (token && !localStorage.getItem(TOKEN_KEY)) {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
+  return token;
 }
 export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
 }
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 export function withTokenParam(path: string): string {
   const token = getToken();

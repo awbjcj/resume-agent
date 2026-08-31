@@ -2,7 +2,7 @@ import pytest
 from typing import Any, cast
 from pathlib import Path
 
-from resume_agent.config import Settings, load_yaml
+from resume_tailor_harness.config import Settings, load_yaml
 
 
 def _settings(*, env_file: str | None) -> Settings:

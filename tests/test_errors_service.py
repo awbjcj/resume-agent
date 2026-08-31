@@ -4,8 +4,8 @@ from datetime import timedelta
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.errors import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.errors import (
     count_open,
     dismiss_all,
     list_error_records,
@@ -13,7 +13,7 @@ from resume_agent.services.errors import (
     record_source_failures,
     set_error_status,
 )
-from resume_agent.tracking.tables import utcnow
+from resume_tailor_harness.tracking.tables import utcnow
 
 
 @pytest.fixture
@@ -108,9 +108,9 @@ def test_record_source_failures_preserves_run_id(session):
 
 
 def test_record_job_failure_stores_formatted_details(session):
-    from resume_agent.services.errors import StageFailure, record_job_failure
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.errors import StageFailure, record_job_failure
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(
         session, Job(source="manual", jd_text="jd", company="Acme", title="Staff")
@@ -143,9 +143,9 @@ def test_record_job_failure_stores_formatted_details(session):
 
 
 def test_repeated_job_failure_dedupes_and_counts(session):
-    from resume_agent.services.errors import StageFailure, record_job_failure
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.errors import StageFailure, record_job_failure
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
@@ -158,9 +158,9 @@ def test_repeated_job_failure_dedupes_and_counts(session):
 
 
 def test_different_stages_are_separate_records(session):
-    from resume_agent.services.errors import StageFailure, record_job_failure
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.errors import StageFailure, record_job_failure
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
@@ -172,13 +172,13 @@ def test_different_stages_are_separate_records(session):
 
 
 def test_success_resolves_open_job_failure(session):
-    from resume_agent.services.errors import (
+    from resume_tailor_harness.services.errors import (
         StageFailure,
         record_job_failure,
         resolve_job_failures,
     )
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     assert job.id is not None
@@ -193,13 +193,13 @@ def test_success_resolves_open_job_failure(session):
 
 
 def test_resolve_leaves_other_stages_open(session):
-    from resume_agent.services.errors import (
+    from resume_tailor_harness.services.errors import (
         StageFailure,
         record_job_failure,
         resolve_job_failures,
     )
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     assert job.id is not None
@@ -214,7 +214,7 @@ def test_resolve_leaves_other_stages_open(session):
 
 
 def test_stage_failure_truncates_message_and_traceback():
-    from resume_agent.services.errors import (
+    from resume_tailor_harness.services.errors import (
         MAX_MESSAGE_CHARS,
         MAX_TRACEBACK_CHARS,
         StageFailure,

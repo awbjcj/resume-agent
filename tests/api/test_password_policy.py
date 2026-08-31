@@ -1,6 +1,6 @@
 import httpx
 
-from resume_agent.api.password_policy import HibpBreachChecker
+from resume_tailor_harness.api.password_policy import HibpBreachChecker
 
 
 def test_hibp_checker_uses_only_the_sha1_range_prefix(monkeypatch):
@@ -17,7 +17,7 @@ def test_hibp_checker_uses_only_the_sha1_range_prefix(monkeypatch):
             text=f"{digest[5:]}:3\n",
         )
 
-    monkeypatch.setattr("resume_agent.api.password_policy.httpx.get", fake_get)
+    monkeypatch.setattr("resume_tailor_harness.api.password_policy.httpx.get", fake_get)
 
     assert HibpBreachChecker().is_breached(password) is True
     assert seen["url"] == f"https://api.pwnedpasswords.com/range/{digest[:5]}"

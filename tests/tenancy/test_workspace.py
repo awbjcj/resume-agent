@@ -1,9 +1,9 @@
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.telemetry import read_runs, record_run
-from resume_agent.settings_sections import seedable_entries
-from resume_agent.taxonomy.skills import load_aliases
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.telemetry import read_runs, record_run
+from resume_tailor_harness.settings_sections import seedable_entries
+from resume_tailor_harness.taxonomy.skills import load_aliases
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import (
     WorkspacePaths,
     effective_settings,
     provision_workspace,

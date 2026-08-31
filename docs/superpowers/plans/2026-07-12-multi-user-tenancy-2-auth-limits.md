@@ -70,8 +70,8 @@ These corrections are normative and override later reference snippets:
 
 **Files:**
 
-- Modify: `src/resume_agent/tenancy/system_db.py` (append models)
-- Create: `src/resume_agent/tenancy/secrets.py`
+- Modify: `src/resume_tailor_harness/tenancy/system_db.py` (append models)
+- Create: `src/resume_tailor_harness/tenancy/secrets.py`
 - Test: `tests/tenancy/test_system_tables.py`
 
 **Interfaces:**
@@ -92,8 +92,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.secrets import hash_secret, mint_secret
-from resume_agent.tenancy.system_db import (
+from resume_tailor_harness.tenancy.secrets import hash_secret, mint_secret
+from resume_tailor_harness.tenancy.system_db import (
     ApiToken,
     InviteCode,
     SystemSetting,
@@ -147,7 +147,7 @@ Expected: FAIL — imports missing
 
 - [ ] **Step 3: Implement**
 
-Append to `src/resume_agent/tenancy/system_db.py` (below `User`, reusing `utc_now`; add `Boolean, Float, Index` to the sqlalchemy import):
+Append to `src/resume_tailor_harness/tenancy/system_db.py` (below `User`, reusing `utc_now`; add `Boolean, Float, Index` to the sqlalchemy import):
 
 ```python
 class InviteCode(SystemBase):
@@ -217,7 +217,7 @@ class SystemSetting(SystemBase):
 ```
 
 ```python
-# src/resume_agent/tenancy/secrets.py
+# src/resume_tailor_harness/tenancy/secrets.py
 """Mint-and-hash helpers shared by invite codes and PATs.
 
 The raw secret is shown exactly once at mint time; only sha256(raw) is
@@ -246,7 +246,7 @@ Expected: all pass
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/system_db.py src/resume_agent/tenancy/secrets.py tests/tenancy/test_system_tables.py
+git add src/resume_tailor_harness/tenancy/system_db.py src/resume_tailor_harness/tenancy/secrets.py tests/tenancy/test_system_tables.py
 git commit -m "Adds invite/token/usage/setting system tables and secret helpers"
 ```
 
@@ -256,7 +256,7 @@ git commit -m "Adds invite/token/usage/setting system tables and secret helpers"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/auth.py` (add user-scoped functions; keep the legacy single-account functions — legacy apps still use them until Task 5 rewires, and `hash_password`/`verify_password` are reused everywhere)
+- Modify: `src/resume_tailor_harness/api/auth.py` (add user-scoped functions; keep the legacy single-account functions — legacy apps still use them until Task 5 rewires, and `hash_password`/`verify_password` are reused everywhere)
 - Test: `tests/api/test_user_sessions.py`
 
 **Interfaces:**
@@ -271,7 +271,7 @@ git commit -m "Adds invite/token/usage/setting system tables and secret helpers"
 
 ```python
 # tests/api/test_user_sessions.py
-from resume_agent.api.auth import (
+from resume_tailor_harness.api.auth import (
     LINK_TOKEN_TTL_SECONDS,
     SESSION_LIFETIME_SECONDS,
     issue_link_token,
@@ -280,7 +280,7 @@ from resume_agent.api.auth import (
     verify_link_token,
     verify_user_session,
 )
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 SETTINGS = Settings(_env_file=None, session_secret="s3cret")
 HASH = "pbkdf2:120000:aa:bbccddeeff00112233"
@@ -335,7 +335,7 @@ Expected: FAIL — imports missing
 
 - [ ] **Step 3: Implement**
 
-Append to `src/resume_agent/api/auth.py`:
+Append to `src/resume_tailor_harness/api/auth.py`:
 
 ```python
 LINK_TOKEN_TTL_SECONDS = 600
@@ -425,7 +425,7 @@ Expected: 7 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/auth.py tests/api/test_user_sessions.py
+git add src/resume_tailor_harness/api/auth.py tests/api/test_user_sessions.py
 git commit -m "Adds user-scoped stateless sessions and signed link tokens"
 ```
 
@@ -435,7 +435,7 @@ git commit -m "Adds user-scoped stateless sessions and signed link tokens"
 
 **Files:**
 
-- Create: `src/resume_agent/api/rate_limit.py`
+- Create: `src/resume_tailor_harness/api/rate_limit.py`
 - Test: `tests/api/test_rate_limit.py`
 
 **Interfaces:**
@@ -446,7 +446,7 @@ git commit -m "Adds user-scoped stateless sessions and signed link tokens"
 
 ```python
 # tests/api/test_rate_limit.py
-from resume_agent.api.rate_limit import FailedAttemptLimiter
+from resume_tailor_harness.api.rate_limit import FailedAttemptLimiter
 
 
 def test_blocks_after_max_failures():
@@ -486,7 +486,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/api/rate_limit.py
+# src/resume_tailor_harness/api/rate_limit.py
 """In-process fixed-window throttle for failed login/register attempts.
 
 Single-process server, so no external store; resets on restart, which
@@ -540,7 +540,7 @@ Expected: 4 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/rate_limit.py tests/api/test_rate_limit.py
+git add src/resume_tailor_harness/api/rate_limit.py tests/api/test_rate_limit.py
 git commit -m "Adds failed-attempt rate limiter for login and register"
 ```
 
@@ -550,9 +550,9 @@ git commit -m "Adds failed-attempt rate limiter for login and register"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/auth.py`
-- Modify: `src/resume_agent/api/schemas/auth.py` (add `RegisterRequest`, extend `MeResponse` with `role: str | None = None`)
-- Modify: `src/resume_agent/api/app.py` (instantiate `app.state.login_limiter = FailedAttemptLimiter()`)
+- Modify: `src/resume_tailor_harness/api/routers/auth.py`
+- Modify: `src/resume_tailor_harness/api/schemas/auth.py` (add `RegisterRequest`, extend `MeResponse` with `role: str | None = None`)
+- Modify: `src/resume_tailor_harness/api/app.py` (instantiate `app.state.login_limiter = FailedAttemptLimiter()`)
 - Create: `tests/api/mu_conftest_helpers.py` — no; instead extend `tests/api/conftest.py` with the multi-user fixture below
 - Test: `tests/api/test_auth_multiuser.py`
 
@@ -572,8 +572,8 @@ git commit -m "Adds failed-attempt rate limiter for login and register"
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
 
 
 @pytest.fixture
@@ -616,8 +616,8 @@ def login(client: TestClient, username: str = "owner", password: str = "pw"):
 # tests/api/test_auth_multiuser.py
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.secrets import hash_secret, mint_secret
-from resume_agent.tenancy.system_db import InviteCode, User
+from resume_tailor_harness.tenancy.secrets import hash_secret, mint_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, User
 
 from tests.api.conftest import login
 
@@ -719,7 +719,7 @@ Expected: FAIL — no register route; login ignores system.db
 
 - [ ] **Step 4: Implement**
 
-Schemas (`src/resume_agent/api/schemas/auth.py`) — add:
+Schemas (`src/resume_tailor_harness/api/schemas/auth.py`) — add:
 
 ```python
 class RegisterRequest(CamelModel):
@@ -730,9 +730,9 @@ class RegisterRequest(CamelModel):
 
 and add `role: str | None = None` to `MeResponse`.
 
-`app.py`: add `from resume_agent.api.rate_limit import FailedAttemptLimiter` and, next to the other `app.state` assignments, `app.state.login_limiter = FailedAttemptLimiter()`.
+`app.py`: add `from resume_tailor_harness.api.rate_limit import FailedAttemptLimiter` and, next to the other `app.state` assignments, `app.state.login_limiter = FailedAttemptLimiter()`.
 
-Rewrite `src/resume_agent/api/routers/auth.py`:
+Rewrite `src/resume_tailor_harness/api/routers/auth.py`:
 
 ```python
 """Login/logout/me/register. Multi-user apps authenticate against system.db;
@@ -748,15 +748,15 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from resume_agent.api import auth
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.auth import LoginRequest, MeResponse, RegisterRequest
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import new_user_id
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.api import auth
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.auth import LoginRequest, MeResponse, RegisterRequest
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import new_user_id
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 FAILED_LOGIN_DELAY_SECONDS = 1.0
@@ -915,7 +915,7 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → green (legacy log
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/auth.py src/resume_agent/api/schemas/auth.py src/resume_agent/api/app.py tests/api/conftest.py tests/api/test_auth_multiuser.py
+git add src/resume_tailor_harness/api/routers/auth.py src/resume_tailor_harness/api/schemas/auth.py src/resume_tailor_harness/api/app.py tests/api/conftest.py tests/api/test_auth_multiuser.py
 git commit -m "Adds invite-code registration and system.db-backed login"
 ```
 
@@ -925,10 +925,10 @@ git commit -m "Adds invite-code registration and system.db-backed login"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/account.py` (PAT endpoints; Plan 3 adds password-change/export here)
-- Create: `src/resume_agent/api/schemas/account.py`
-- Modify: `src/resume_agent/api/deps.py` (`get_user_context` becomes the real resolver)
-- Modify: `src/resume_agent/api/app.py` (include `account` router in guarded list)
+- Create: `src/resume_tailor_harness/api/routers/account.py` (PAT endpoints; Plan 3 adds password-change/export here)
+- Create: `src/resume_tailor_harness/api/schemas/account.py`
+- Modify: `src/resume_tailor_harness/api/deps.py` (`get_user_context` becomes the real resolver)
+- Modify: `src/resume_tailor_harness/api/app.py` (include `account` router in guarded list)
 - Test: `tests/api/test_pats.py`, `tests/api/test_tenancy_isolation.py`
 
 **Interfaces:**
@@ -987,9 +987,9 @@ def test_unauthenticated_guarded_route_is_401(mu_client):
 from sqlalchemy.orm import Session
 from sqlmodel import Session as SMSession
 
-from resume_agent.tracking.tables import Job
-from resume_agent.tenancy.secrets import hash_secret, mint_secret
-from resume_agent.tenancy.system_db import InviteCode
+from resume_tailor_harness.tracking.tables import Job
+from resume_tailor_harness.tenancy.secrets import hash_secret, mint_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode
 
 from tests.api.conftest import login
 
@@ -1017,10 +1017,10 @@ def test_users_see_only_their_own_jobs(mu_app, mu_client):
     # seed a job directly into alice's workspace engine
     ctx_registry = mu_app.state.engine_registry
     from sqlalchemy.orm import Session as SA
-    from resume_agent.tenancy.system_db import User
+    from resume_tailor_harness.tenancy.system_db import User
     with SA(mu_app.state.system_engine) as s:
         alice = s.query(User).filter_by(username="alice").one()
-    from resume_agent.tenancy.workspace import workspace_paths
+    from resume_tailor_harness.tenancy.workspace import workspace_paths
     engine = ctx_registry.get(alice.id, workspace_paths(mu_app.state.data_dir, alice.id).db_url)
     with SMSession(engine) as session:
         session.add(Job(source="manual", jd_text="alice job", company="A", title="Eng"))
@@ -1042,10 +1042,10 @@ Expected: FAIL — no account router; guarded routes still serve the default (ad
 - [ ] **Step 3: Implement the account router**
 
 ```python
-# src/resume_agent/api/schemas/account.py
+# src/resume_tailor_harness/api/schemas/account.py
 from datetime import datetime
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class TokenCreateRequest(CamelModel):
@@ -1070,7 +1070,7 @@ class TokenList(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/account.py
+# src/resume_tailor_harness/api/routers/account.py
 """Self-service account surface: personal access tokens (Plan 3 adds
 password change and workspace export)."""
 
@@ -1083,16 +1083,16 @@ from fastapi import APIRouter, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.account import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.account import (
     TokenCreated,
     TokenCreateRequest,
     TokenInfo,
     TokenList,
 )
-from resume_agent.tenancy.context import require_context
-from resume_agent.tenancy.secrets import hash_secret, mint_secret
-from resume_agent.tenancy.system_db import ApiToken
+from resume_tailor_harness.tenancy.context import require_context
+from resume_tailor_harness.tenancy.secrets import hash_secret, mint_secret
+from resume_tailor_harness.tenancy.system_db import ApiToken
 
 router = APIRouter(prefix="/account", tags=["account"])
 
@@ -1137,11 +1137,11 @@ def revoke_token(token_id: str, request: Request) -> dict[str, str]:
     return {"status": "revoked"}
 ```
 
-Register in `app.py`: `from resume_agent.api.routers import account as account_router` and `app.include_router(account_router.router, prefix="/api", dependencies=guarded)`.
+Register in `app.py`: `from resume_tailor_harness.api.routers import account as account_router` and `app.include_router(account_router.router, prefix="/api", dependencies=guarded)`.
 
 - [ ] **Step 4: Implement the real `get_user_context`**
 
-Replace Plan 1's transitional body in `src/resume_agent/api/deps.py`:
+Replace Plan 1's transitional body in `src/resume_tailor_harness/api/deps.py`:
 
 ```python
 from datetime import datetime, timezone
@@ -1149,11 +1149,11 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session as SASession
 
-from resume_agent.api import auth as auth_mod
-from resume_agent.tenancy.bootstrap import build_context
-from resume_agent.tenancy.context import UserContext, current_context, use_context
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import ApiToken, User
+from resume_tailor_harness.api import auth as auth_mod
+from resume_tailor_harness.tenancy.bootstrap import build_context
+from resume_tailor_harness.tenancy.context import UserContext, current_context, use_context
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import ApiToken, User
 
 
 def _resolve_user(request: Request, settings: Settings):
@@ -1244,7 +1244,7 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → green. Plan 1's `
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/account.py src/resume_agent/api/schemas/account.py src/resume_agent/api/deps.py src/resume_agent/api/app.py tests/api/test_pats.py tests/api/test_tenancy_isolation.py tests/api/test_multi_user_boot.py
+git add src/resume_tailor_harness/api/routers/account.py src/resume_tailor_harness/api/schemas/account.py src/resume_tailor_harness/api/deps.py src/resume_tailor_harness/api/app.py tests/api/test_pats.py tests/api/test_tenancy_isolation.py tests/api/test_multi_user_boot.py
 git commit -m "Adds PATs and per-user request auth resolution"
 ```
 
@@ -1254,8 +1254,8 @@ git commit -m "Adds PATs and per-user request auth resolution"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/auth.py` (add `/auth/link-token`)
-- Modify: `src/resume_agent/api/schemas/auth.py` (add `LinkTokenResponse`)
+- Modify: `src/resume_tailor_harness/api/routers/auth.py` (add `/auth/link-token`)
+- Modify: `src/resume_tailor_harness/api/schemas/auth.py` (add `LinkTokenResponse`)
 - Modify: `web/src/lib/api` (add `fetchLinkToken`) and the SSE/download call sites
 - Test: `tests/api/test_link_tokens.py`
 
@@ -1311,9 +1311,9 @@ class LinkTokenResponse(CamelModel):
 Router — this route must be **guarded** (it authenticates via the normal chain), so register it as a separate router in `auth.py` and include it with `dependencies=guarded` in `app.py`:
 
 ```python
-# append to src/resume_agent/api/routers/auth.py
-from resume_agent.api.schemas.auth import LinkTokenRequest, LinkTokenResponse
-from resume_agent.tenancy.context import require_context
+# append to src/resume_tailor_harness/api/routers/auth.py
+from resume_tailor_harness.api.schemas.auth import LinkTokenRequest, LinkTokenResponse
+from resume_tailor_harness.tenancy.context import require_context
 
 link_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -1376,7 +1376,7 @@ Run: `cd web && npx vitest run` → green
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/auth.py src/resume_agent/api/schemas/auth.py src/resume_agent/api/app.py web/src tests/api/test_link_tokens.py
+git add src/resume_tailor_harness/api/routers/auth.py src/resume_tailor_harness/api/schemas/auth.py src/resume_tailor_harness/api/app.py web/src tests/api/test_link_tokens.py
 git commit -m "Adds short-lived link tokens for SSE and downloads"
 ```
 
@@ -1386,9 +1386,9 @@ git commit -m "Adds short-lived link tokens for SSE and downloads"
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/usage.py`
-- Modify: `src/resume_agent/llm_runner.py:300-314` (`acall`)
-- Modify: `src/resume_agent/api/app.py` + `src/resume_agent/tenancy/local.py` (configure the recorder)
+- Create: `src/resume_tailor_harness/tenancy/usage.py`
+- Modify: `src/resume_tailor_harness/llm_runner.py:300-314` (`acall`)
+- Modify: `src/resume_tailor_harness/api/app.py` + `src/resume_tailor_harness/tenancy/local.py` (configure the recorder)
 - Test: `tests/tenancy/test_usage.py`
 
 **Interfaces:**
@@ -1409,10 +1409,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.config import Settings
-from resume_agent.tenancy import usage
-from resume_agent.tenancy.context import use_context
-from resume_agent.tenancy.system_db import UsageEvent, init_system_db, make_system_engine
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy import usage
+from resume_tailor_harness.tenancy.context import use_context
+from resume_tailor_harness.tenancy.system_db import UsageEvent, init_system_db, make_system_engine
 
 from tests.tenancy.test_context import make_ctx
 
@@ -1488,7 +1488,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/usage.py
+# src/resume_tailor_harness/tenancy/usage.py
 """Best-effort per-call usage recording (the acall leaf's side channel).
 
 Recording never breaks the call: any failure logs a warning and the LLM
@@ -1503,9 +1503,9 @@ import logging
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from resume_agent.config import Settings, env_settings
-from resume_agent.tenancy.context import current_context
-from resume_agent.tenancy.system_db import UsageEvent
+from resume_tailor_harness.config import Settings, env_settings
+from resume_tailor_harness.tenancy.context import current_context
+from resume_tailor_harness.tenancy.system_db import UsageEvent
 
 logger = logging.getLogger(__name__)
 
@@ -1549,7 +1549,7 @@ def _model_id(agent: object) -> str:
 
 
 def _is_own_key(model_id: str, ctx_settings: Settings) -> bool:
-    from resume_agent.llm_runner import split_provider
+    from resume_tailor_harness.llm_runner import split_provider
 
     provider = split_provider(model_id)[0]
     field = _PROVIDER_KEY_FIELDS.get(provider, "anthropic_api_key")
@@ -1571,7 +1571,7 @@ def record_call(agent: object, response: object) -> None:
         cache_read = _int_metric(metrics, "cache_read_tokens")
         cache_creation = _int_metric(metrics, "cache_creation_tokens")
         model_id = _model_id(agent)
-        from resume_agent.llm_runner import split_provider
+        from resume_tailor_harness.llm_runner import split_provider
 
         provider = split_provider(model_id)[0] if model_id else None
         event = UsageEvent(
@@ -1606,7 +1606,7 @@ Integrate in `llm_runner.acall` (line ~309):
         _observe(on_acquire)
         try:
             response = await agent.arun(prompt)
-            from resume_agent.tenancy import usage
+            from resume_tailor_harness.tenancy import usage
 
             usage.record_call(agent, response)
             return response
@@ -1616,7 +1616,7 @@ Integrate in `llm_runner.acall` (line ~309):
 
 Configure at both server and CLI set-points:
 
-- `app.py` lifespan multi-user branch: `from resume_agent.tenancy import usage` → `usage.configure(system_engine)`; legacy branch: `usage.configure(None)`.
+- `app.py` lifespan multi-user branch: `from resume_tailor_harness.tenancy import usage` → `usage.configure(system_engine)`; legacy branch: `usage.configure(None)`.
 - `tenancy/local.py` `activate_local_context`: after resolving a multi-user context, `usage.configure(make_system_engine(root))` — construct one engine and keep it (module-lifetime is fine for a CLI process).
 
 - [ ] **Step 4: Run tests + full suite**
@@ -1627,7 +1627,7 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → green (fakes in t
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/usage.py src/resume_agent/llm_runner.py src/resume_agent/api/app.py src/resume_agent/tenancy/local.py tests/tenancy/test_usage.py
+git add src/resume_tailor_harness/tenancy/usage.py src/resume_tailor_harness/llm_runner.py src/resume_tailor_harness/api/app.py src/resume_tailor_harness/tenancy/local.py tests/tenancy/test_usage.py
 git commit -m "Records per-user LLM usage at the acall leaf"
 ```
 
@@ -1637,8 +1637,8 @@ git commit -m "Records per-user LLM usage at the acall leaf"
 
 **Files:**
 
-- Create: `src/resume_agent/tenancy/limits.py`
-- Modify: the LLM-phase service entrypoints (locate with `grep -n "^def " src/resume_agent/services/discovery.py src/resume_agent/services/tailoring.py src/resume_agent/services/cover_letters.py src/resume_agent/services/profile_build.py` — add the two-line guard to each public function that fans out LLM calls: discovery extract/score, `tailor`, `write_cover_letters`, `run_corpus_build`)
+- Create: `src/resume_tailor_harness/tenancy/limits.py`
+- Modify: the LLM-phase service entrypoints (locate with `grep -n "^def " src/resume_tailor_harness/services/discovery.py src/resume_tailor_harness/services/tailoring.py src/resume_tailor_harness/services/cover_letters.py src/resume_tailor_harness/services/profile_build.py` — add the two-line guard to each public function that fans out LLM calls: discovery extract/score, `tailor`, `write_cover_letters`, `run_corpus_build`)
 - Test: `tests/tenancy/test_limits.py`
 
 **Interfaces:**
@@ -1661,9 +1661,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy import usage
-from resume_agent.tenancy.context import use_context
-from resume_agent.tenancy.limits import (
+from resume_tailor_harness.tenancy import usage
+from resume_tailor_harness.tenancy.context import use_context
+from resume_tailor_harness.tenancy.limits import (
     DEFAULT_WEEKLY_TOKEN_BUDGET,
     BudgetExceededError,
     enforce_active_budget,
@@ -1671,7 +1671,7 @@ from resume_agent.tenancy.limits import (
     resolve_limit,
     weekly_usage,
 )
-from resume_agent.tenancy.system_db import UsageEvent, init_system_db, make_system_engine
+from resume_tailor_harness.tenancy.system_db import UsageEvent, init_system_db, make_system_engine
 
 from tests.tenancy.test_context import make_ctx
 
@@ -1742,7 +1742,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/tenancy/limits.py
+# src/resume_tailor_harness/tenancy/limits.py
 """Budget and quota resolution/enforcement.
 
 Budgets are checked once per phase (never inside the semaphore-guarded
@@ -1759,9 +1759,9 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy import usage as usage_module
-from resume_agent.tenancy.context import current_context
-from resume_agent.tenancy.system_db import SystemSetting, UsageEvent, User
+from resume_tailor_harness.tenancy import usage as usage_module
+from resume_tailor_harness.tenancy.context import current_context
+from resume_tailor_harness.tenancy.system_db import SystemSetting, UsageEvent, User
 
 DEFAULT_WEEKLY_TOKEN_BUDGET = 10_000_000
 DEFAULT_MAX_ACTIVE_JOBS = 2_000
@@ -1843,7 +1843,7 @@ def enforce_active_budget(*, now: datetime | None = None) -> None:
 Wire the guard into each LLM-phase service entrypoint found by the grep (top of the function body, after argument validation):
 
 ```python
-    from resume_agent.tenancy.limits import enforce_active_budget
+    from resume_tailor_harness.tenancy.limits import enforce_active_budget
 
     enforce_active_budget()
 ```
@@ -1858,7 +1858,7 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → green (no context
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tenancy/limits.py src/resume_agent/services tests/tenancy/test_limits.py
+git add src/resume_tailor_harness/tenancy/limits.py src/resume_tailor_harness/services tests/tenancy/test_limits.py
 git commit -m "Enforces weekly token budgets at LLM phase entrypoints"
 ```
 
@@ -1868,9 +1868,9 @@ git commit -m "Enforces weekly token budgets at LLM phase entrypoints"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/runs/manager.py` (`create`/`submit` gain `user_id` + cap), `src/resume_agent/api/runs/models.py` (snapshot carries `user_id`)
-- Modify: `src/resume_agent/api/routers/runs.py` (pass `user_id`/cap from context; 429 mapping; per-user filtering of list/get)
-- Modify: `src/resume_agent/discovery/ingest.py` (job-cap gate in the `IngestCounts` loop)
+- Modify: `src/resume_tailor_harness/api/runs/manager.py` (`create`/`submit` gain `user_id` + cap), `src/resume_tailor_harness/api/runs/models.py` (snapshot carries `user_id`)
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (pass `user_id`/cap from context; 429 mapping; per-user filtering of list/get)
+- Modify: `src/resume_tailor_harness/discovery/ingest.py` (job-cap gate in the `IngestCounts` loop)
 - Modify: `CLAUDE.md` (limits section)
 - Test: `tests/api/test_run_quota.py`, `tests/test_ingest_job_cap.py`
 
@@ -1890,7 +1890,7 @@ import threading
 
 import pytest
 
-from resume_agent.api.runs.manager import RunManager, RunQuotaError
+from resume_tailor_harness.api.runs.manager import RunManager, RunQuotaError
 
 
 def test_submit_rejects_beyond_user_cap(tmp_path):
@@ -1931,14 +1931,14 @@ def test_list_active_filters_by_user(tmp_path):
 # tests/test_ingest_job_cap.py
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job
 
 # Import the batch-ingest loop; check its actual name in discovery/ingest.py
 # (the function that returns IngestCounts) and the RawJob constructor shape
 # used by existing tests in tests/test_discovery_ingest.py — mirror them.
-from resume_agent.discovery.ingest import ingest_raw_jobs  # adjust if named differently
-from resume_agent.discovery.connectors.base import RawJob  # adjust import to match repo
+from resume_tailor_harness.discovery.ingest import ingest_raw_jobs  # adjust if named differently
+from resume_tailor_harness.discovery.connectors.base import RawJob  # adjust import to match repo
 
 
 def _raw(n):
@@ -1993,8 +1993,8 @@ class RunQuotaError(RuntimeError):
 In `api/routers/runs.py`, every `run_manager.submit(...)` call site passes `user_id` and cap resolved from the active context (no-op `None`s in legacy mode):
 
 ```python
-from resume_agent.tenancy.context import current_context
-from resume_agent.tenancy.limits import (
+from resume_tailor_harness.tenancy.context import current_context
+from resume_tailor_harness.tenancy.limits import (
     DEFAULT_MAX_CONCURRENT_RUNS,
     resolve_limit,
     system_default,
@@ -2006,7 +2006,7 @@ def _quota_args(request) -> dict:
     if ctx is None or request.app.state.system_engine is None:
         return {}
     from sqlalchemy.orm import Session
-    from resume_agent.tenancy.system_db import User
+    from resume_tailor_harness.tenancy.system_db import User
 
     with Session(request.app.state.system_engine) as session:
         user = session.get(User, ctx.user_id)
@@ -2074,7 +2074,7 @@ Expected: green
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/runs src/resume_agent/api/routers/runs.py src/resume_agent/discovery/ingest.py contracts CLAUDE.md tests/api/test_run_quota.py tests/test_ingest_job_cap.py
+git add src/resume_tailor_harness/api/runs src/resume_tailor_harness/api/routers/runs.py src/resume_tailor_harness/discovery/ingest.py contracts CLAUDE.md tests/api/test_run_quota.py tests/test_ingest_job_cap.py
 git commit -m "Adds per-user run and job quotas with 429 surfacing"
 ```markdown
 Budgets and quotas: usage is recorded in `llm_runner.acall` (best-effort,
@@ -2093,6 +2093,6 @@ Expected: green
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/runs src/resume_agent/api/routers/runs.py src/resume_agent/discovery/ingest.py contracts CLAUDE.md tests/api/test_run_quota.py tests/test_ingest_job_cap.py
+git add src/resume_tailor_harness/api/runs src/resume_tailor_harness/api/routers/runs.py src/resume_tailor_harness/discovery/ingest.py contracts CLAUDE.md tests/api/test_run_quota.py tests/test_ingest_job_cap.py
 git commit -m "Adds per-user run and job quotas with 429 surfacing"
 ```

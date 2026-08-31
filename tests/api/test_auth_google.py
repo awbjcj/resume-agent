@@ -5,9 +5,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api import auth
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, LoginAttempt, OAuthFlow, User
+from resume_tailor_harness.api import auth
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, LoginAttempt, OAuthFlow, User
 
 
 CLIENT = {"google_oauth_client_id": "cid", "google_oauth_client_secret": "secret"}
@@ -39,7 +39,7 @@ def _configure(app):
 
 
 def _fake_google(monkeypatch, claims):
-    from resume_agent.api.routers import auth_google
+    from resume_tailor_harness.api.routers import auth_google
 
     flow = _FakeFlow()
 
@@ -54,7 +54,7 @@ def _fake_google(monkeypatch, claims):
 
 
 def _callback(client, app, *, mode="login", invite_hash=""):
-    from resume_agent.api.routers import auth_google
+    from resume_tailor_harness.api.routers import auth_google
 
     state = auth.issue_oauth_state(
         app.state.settings, mode=mode, invite_hash=invite_hash
@@ -151,7 +151,7 @@ def test_google_callback_consumes_oauth_cookies(mu_app, monkeypatch):
 
 
 def test_google_callback_consumes_oauth_flow_once(mu_app, monkeypatch):
-    from resume_agent.api.routers import auth_google
+    from resume_tailor_harness.api.routers import auth_google
 
     _configure(mu_app)
     flow = _fake_google(
@@ -192,7 +192,7 @@ def test_google_callback_consumes_oauth_flow_once(mu_app, monkeypatch):
 
 
 def test_google_callback_uses_configured_origin_not_forwarded_host(mu_app, monkeypatch):
-    from resume_agent.api.routers import auth_google
+    from resume_tailor_harness.api.routers import auth_google
 
     _configure(mu_app)
     mu_app.state.settings = mu_app.state.settings.model_copy(

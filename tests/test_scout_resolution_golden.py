@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.discovery.source_resolution.crawler import FirstPartyCrawler
-from resume_agent.discovery.source_resolution.resolver import CompanySourceResolver
-from resume_agent.services.sources import SourcePreview
+from resume_tailor_harness.discovery.source_resolution.crawler import FirstPartyCrawler
+from resume_tailor_harness.discovery.source_resolution.resolver import CompanySourceResolver
+from resume_tailor_harness.services.sources import SourcePreview
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "scout_resolution"
@@ -50,6 +50,6 @@ def test_golden_company_resolves_the_expected_board(
 
 
 def _response(url: str, html: str):
-    from resume_agent.security.outbound import PublicTextResponse
+    from resume_tailor_harness.security.outbound import PublicTextResponse
 
     return PublicTextResponse(final_url=url, text=html, content_type="text/html")

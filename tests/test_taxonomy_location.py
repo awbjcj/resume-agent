@@ -1,4 +1,4 @@
-from resume_agent.taxonomy import location
+from resume_tailor_harness.taxonomy import location
 
 
 def test_normalize_country_variants_to_iso2():

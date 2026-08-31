@@ -1,7 +1,7 @@
 from pypdf import PdfReader
 
-from resume_agent.models.profile import Contact, Education, Language
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact, Education, Language
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredAward,
     TailoredBullet,
@@ -10,7 +10,7 @@ from resume_agent.models.resume import (
     TailoredPublication,
     TailoredVolunteer,
 )
-from resume_agent.render.renderer import render_pdf
+from resume_tailor_harness.render.renderer import render_pdf
 
 
 def _rich_content() -> ResumeContent:

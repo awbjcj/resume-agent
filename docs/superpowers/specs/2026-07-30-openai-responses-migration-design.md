@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-30
 **Status:** Approved, pending implementation plan
-**Scope:** `src/resume_agent/llm_runner.py` (OpenAI provider branch only)
+**Scope:** `src/resume_tailor_harness/llm_runner.py` (OpenAI provider branch only)
 
 ---
 

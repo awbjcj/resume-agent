@@ -1,6 +1,6 @@
 import json
 
-from resume_agent.discovery.industry import (
+from resume_tailor_harness.discovery.industry import (
     IndustryCandidate,
     IndustryClassification,
     IndustryGroup,

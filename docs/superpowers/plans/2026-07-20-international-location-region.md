@@ -4,7 +4,7 @@
 
 **Goal:** Give non-US job locations a real `region` value (e.g. Taiwan's `"New Taipei City"`) instead of `region` always being `null` outside the US, while leaving all US behavior byte-for-byte unchanged.
 
-**Architecture:** Two layers, matching the existing US-only implementation. Layer 2 (`src/resume_agent/taxonomy/location.py`) is the deterministic taxonomy: it gains a country table expansion, a new `_clean_region()` pass-through helper, and a small restructure of `build_location()`'s final region assignment so a resolved non-US country gets a cleaned pass-through region instead of `None`. Layer 1 (`src/resume_agent/discovery/fit.py`) is the LLM extraction prompt: one instruction sentence is reworded from "US state" to a country-agnostic "state, province, or administrative region" so the model actually extracts a region for non-US postings. No schema, API, or frontend changes — `services/board.py`, `services/shortlist_filtering.py`, `tracking/queries.py`, and `JobMeta.tsx` already treat `location_region` generically.
+**Architecture:** Two layers, matching the existing US-only implementation. Layer 2 (`src/resume_tailor_harness/taxonomy/location.py`) is the deterministic taxonomy: it gains a country table expansion, a new `_clean_region()` pass-through helper, and a small restructure of `build_location()`'s final region assignment so a resolved non-US country gets a cleaned pass-through region instead of `None`. Layer 1 (`src/resume_tailor_harness/discovery/fit.py`) is the LLM extraction prompt: one instruction sentence is reworded from "US state" to a country-agnostic "state, province, or administrative region" so the model actually extracts a region for non-US postings. No schema, API, or frontend changes — `services/board.py`, `services/shortlist_filtering.py`, `tracking/queries.py`, and `JobMeta.tsx` already treat `location_region` generically.
 
 **Tech Stack:** Python (pytest), no new dependencies.
 
@@ -21,7 +21,7 @@
 ### Task 1: Expand the country table
 
 **Files:**
-- Modify: `src/resume_agent/taxonomy/location.py:14-21` (`_COUNTRY_TO_ISO2`)
+- Modify: `src/resume_tailor_harness/taxonomy/location.py:14-21` (`_COUNTRY_TO_ISO2`)
 - Test: `tests/test_taxonomy_location.py:4-11` (`test_normalize_country_variants_to_iso2`)
 
 **Interfaces:**
@@ -57,7 +57,7 @@ Expected: FAIL — `assert None == "TW"` (Taiwan not yet in the table).
 
 - [ ] **Step 3: Expand `_COUNTRY_TO_ISO2`**
 
-In `src/resume_agent/taxonomy/location.py`, replace:
+In `src/resume_tailor_harness/taxonomy/location.py`, replace:
 
 ```python
 _COUNTRY_TO_ISO2 = {
@@ -105,7 +105,7 @@ Expected: PASS (all tests, since this task only adds table entries)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/location.py tests/test_taxonomy_location.py
+git add src/resume_tailor_harness/taxonomy/location.py tests/test_taxonomy_location.py
 git commit -m "feat(taxonomy): add Taiwan and other countries to location country table"
 ```
 
@@ -114,7 +114,7 @@ git commit -m "feat(taxonomy): add Taiwan and other countries to location countr
 ### Task 2: Add `_clean_region()` and generalize `normalize_region()`
 
 **Files:**
-- Modify: `src/resume_agent/taxonomy/location.py` (add `_clean_region`, rewrite `normalize_region`)
+- Modify: `src/resume_tailor_harness/taxonomy/location.py` (add `_clean_region`, rewrite `normalize_region`)
 - Test: `tests/test_taxonomy_location.py:14-18` (`test_normalize_region_us_only`), plus new `_clean_region` tests
 
 **Interfaces:**
@@ -156,11 +156,11 @@ def test_clean_region_collapses_whitespace_and_strips_zip():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_location.py::test_normalize_region_us_and_pass_through tests/test_taxonomy_location.py::test_clean_region_collapses_whitespace_and_strips_zip -v`
-Expected: FAIL — `test_normalize_region_us_and_pass_through` fails on `assert None == "Ontario"`; `test_clean_region_collapses_whitespace_and_strips_zip` fails with `AttributeError: module 'resume_agent.taxonomy.location' has no attribute '_clean_region'`.
+Expected: FAIL — `test_normalize_region_us_and_pass_through` fails on `assert None == "Ontario"`; `test_clean_region_collapses_whitespace_and_strips_zip` fails with `AttributeError: module 'resume_tailor_harness.taxonomy.location' has no attribute '_clean_region'`.
 
 - [ ] **Step 3: Add `_clean_region()` and rewrite `normalize_region()`**
 
-In `src/resume_agent/taxonomy/location.py`, add this function immediately after `_key()` (which ends just before `def normalize_country`):
+In `src/resume_tailor_harness/taxonomy/location.py`, add this function immediately after `_key()` (which ends just before `def normalize_country`):
 
 ```python
 def _clean_region(raw: str | None) -> str | None:
@@ -212,7 +212,7 @@ Expected: PASS (the `build_location`-level foreign-region tests still expect the
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/location.py tests/test_taxonomy_location.py
+git add src/resume_tailor_harness/taxonomy/location.py tests/test_taxonomy_location.py
 git commit -m "feat(taxonomy): pass through non-US region text instead of discarding it"
 ```
 
@@ -221,7 +221,7 @@ git commit -m "feat(taxonomy): pass through non-US region text instead of discar
 ### Task 3: Restructure `build_location()` to use the pass-through region
 
 **Files:**
-- Modify: `src/resume_agent/taxonomy/location.py:143-178` (`build_location`)
+- Modify: `src/resume_tailor_harness/taxonomy/location.py:143-178` (`build_location`)
 - Test: `tests/test_taxonomy_location.py` (`test_build_location_foreign_has_no_region`, `test_foreign_country_keeps_region_null_even_with_state_like_field`, plus two new tests)
 
 **Interfaces:**
@@ -299,7 +299,7 @@ Expected: FAIL — `test_build_location_foreign_region_pass_through` fails on `a
 
 - [ ] **Step 3: Restructure `build_location()`**
 
-In `src/resume_agent/taxonomy/location.py`, replace:
+In `src/resume_tailor_harness/taxonomy/location.py`, replace:
 
 ```python
     us = is_us(iso2)
@@ -344,13 +344,13 @@ Expected: PASS — all tests, including `test_build_location_us`, `test_infers_u
 
 - [ ] **Step 6: Lint**
 
-Run: `ruff check src/resume_agent/taxonomy/location.py tests/test_taxonomy_location.py`
+Run: `ruff check src/resume_tailor_harness/taxonomy/location.py tests/test_taxonomy_location.py`
 Expected: no errors
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/location.py tests/test_taxonomy_location.py
+git add src/resume_tailor_harness/taxonomy/location.py tests/test_taxonomy_location.py
 git commit -m "feat(taxonomy): build_location passes through region for resolved non-US countries"
 ```
 
@@ -359,7 +359,7 @@ git commit -m "feat(taxonomy): build_location passes through region for resolved
 ### Task 4: Generalize the fit-score LLM prompt's region instruction
 
 **Files:**
-- Modify: `src/resume_agent/discovery/fit.py:51-53` (`_INSTRUCTIONS`)
+- Modify: `src/resume_tailor_harness/discovery/fit.py:51-53` (`_INSTRUCTIONS`)
 - Test: `tests/test_agent_prompt_contracts.py:96-100` (`test_fit_prompt_guides_us_location_segmentation`)
 
 **Interfaces:**
@@ -396,7 +396,7 @@ Expected: FAIL — `assert 'administrative region' in rendered` fails (phrase no
 
 - [ ] **Step 3: Reword the region-splitting instruction**
 
-In `src/resume_agent/discovery/fit.py`, replace:
+In `src/resume_tailor_harness/discovery/fit.py`, replace:
 
 ```python
     "Split a combined location into its parts: put the city in city, the US state (full name or "
@@ -424,13 +424,13 @@ Expected: PASS (all tests — `test_fit_prompt_does_not_duplicate_industry_class
 
 - [ ] **Step 6: Lint**
 
-Run: `ruff check src/resume_agent/discovery/fit.py tests/test_agent_prompt_contracts.py`
+Run: `ruff check src/resume_tailor_harness/discovery/fit.py tests/test_agent_prompt_contracts.py`
 Expected: no errors
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/discovery/fit.py tests/test_agent_prompt_contracts.py
+git add src/resume_tailor_harness/discovery/fit.py tests/test_agent_prompt_contracts.py
 git commit -m "feat(fit): generalize location-splitting prompt instruction beyond US states"
 ```
 

@@ -1,8 +1,8 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.analytics import fit_band_stats, source_stats
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job
+from resume_tailor_harness.tracking.analytics import fit_band_stats, source_stats
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job
 
 
 def _session():
@@ -50,7 +50,7 @@ def test_fit_band_stats_groups_by_band():
 
 
 def test_analytics_excludes_archived_jobs():
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as session:
         _seed(session, "greenhouse", 85, ApplicationStatus.submitted.value)

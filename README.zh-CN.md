@@ -1,16 +1,71 @@
-# Resume Agent
+# Résumé Tailor Harness
 
-[![CI](https://github.com/awbjcj/resume-agent/actions/workflows/ci-main.yml/badge.svg)](https://github.com/awbjcj/resume-agent/actions/workflows/ci-main.yml)
+[![CI](https://github.com/awbjcj/resume-tailor-harness/actions/workflows/ci-main.yml/badge.svg)](https://github.com/awbjcj/resume-tailor-harness/actions/workflows/ci-main.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 
 [English](README.md) | 简体中文
 
-Resume Agent 是一个本地优先、同时支持命令行和网页界面的求职工作流，也可以部署为多用户服务。它可以从招聘网站连接器、LinkedIn 或手动输入中获取职位，根据候选人的真实经历进行匹配评分，通过多智能体评审流程定制简历和求职信，将材料渲染为 PDF，并在工作区级 SQLite 数据库中跟踪完整的申请进度。
+Résumé Tailor Harness 是一套面向完整求职流程的**智能体框架（agent harness）**，其核心规则只有一条：模型可以起草、改写和评审，但永远不是"什么内容能进入最终文档"的最终决定者。它可以从招聘网站连接器、LinkedIn 或手动输入中获取职位，根据候选人的真实经历进行匹配评分，通过多智能体评审流程定制简历和求职信，将材料渲染为 PDF，并在工作区级 SQLite 数据库中跟踪完整的申请进度——可作为命令行工具、本地网页应用，或多用户托管服务运行。
 
-项目最重要的原则是 **事实锁定（fact-lock）**：定制简历中的每一条陈述都必须能够追溯到用户提供的真实事实。智能体可以重写和重新组织表达，但不能虚构经历。
+项目最重要的原则是 **事实锁定（fact-lock）**：定制简历中的每一条陈述都必须能够追溯到用户提供的真实事实。智能体可以重写和重新组织表达，但不能虚构经历。这并不是写在提示词里的一句要求，而是控制流中的一道**闸门（gate）**——具体实现见下方[框架设计](#框架设计)。
 
 > 本文档中的命令、配置键、API 路径和状态值保持英文，以便与程序界面和源码一致。
+
+---
+
+## 框架设计
+
+本仓库的绝大部分代码并不是"调用模型然后打印结果"，而是让结果**可信、可复现、成本可控**的那套机制。它由六个部分组成。
+
+### 1. 事实锁定是闸门，不是提示
+
+用户的简历和代码仓库会被抽取为**封闭 schema** 的证据档案（`data/profile/facts.json`）：每条事实都带有 id，抽取 schema 会拒绝未定义的字段，因此项目类来源无法悄悄产出任职经历或教育背景。
+
+随后每一轮定制都要经过**三道确定性闸门**，全部在进程内判定，不涉及任何模型：
+
+| 闸门               | 在以下情况拦截该轮结果       |
+| ------------------ | ---------------------------- |
+| `provenance`       | 引用的事实 id 无法对应到真实事实 |
+| `skill-naming`     | 声称了档案中并未确立的技能   |
+| `numeric-evidence` | 给出了证据无法支撑的数字     |
+
+这三个名称是**保留名**：把评审员配置成其中任意一个会直接导致启动报错，因此修改评审名单永远无法架空闸门。闸门与模型评审意见最终汇入**唯一的**判定构造函数（`tailor/verdict.py::aggregate`），使"这一轮算不算通过"只有一个定义——任何一道闸门未通过，无论评分多高都会拦截该轮。
+
+求职信同样由这道确定性 provenance 闸门把关，而不是评审团。
+
+### 2. 技能集中式定制（skill-concentrated tailoring）
+
+这里的任务智能体不是一段随意的提示词，而是一个稳定的**智能体族（agent family）**——职位分析、简历撰写、简历评审、求职信、面试、Career Lab、内部档案、担保研究——外加**恰好一个**已核准的执行程序。
+
+这些程序是本地 `SKILL.md` 文件，由根目录受限、**SHA-256 校验**的注册表（`career_skills/registry.py`）依据 `skills-lock.json` 中的锁定清单解析。模型永远不选择路径：它只报出一个能力名称，注册表返回唯一且不可变的 `SkillRef`（名称、版本、摘要、族）。若文件被修改、被替换为符号链接，或指向技能根目录之外，该能力会被**停用**，而不是悄悄加载被篡改的文本。解析出的 `SkillRef` 会随它影响过的每一件产物和每一轮对话一并持久化，因此任何输出都能回溯到产生它的那份程序的确切字节。
+
+### 3. 受限的只读工具循环
+
+在智能体使用工具的场景中——Source Scout、Profile Coach、担保研究、Career Lab——循环内的每个工具都是**只读**的（检索、探测、查看）。写入发生在循环**之外**，经由确定性服务，并且需要用户批准；工具"验证过"的任何结论，都会在循环外重新验证后才呈现为已验证。Scout 只*提议*来源；Coach 只*起草*笔记，由用户编辑后保存；Career Lab 的输出在设计上就只能是草稿——它无法投递、上传、发送或更新用户档案。
+
+### 4. 最小权限提示（least-privilege prompting）
+
+评审员拿到的上下文按权限划分，而不是图省事一股脑塞进去：
+
+- **闸门评审员**只看到草稿、职位描述，以及*该草稿实际引用到的那些档案事实*。
+- **建议类评审员**（文风、影响力、排版）完全看不到原始档案。
+- 每一份第三方职位描述都会被包进明确的"不可信内容"分隔标记，因此 JD 中夹带的"忽略你的指令"只是数据，不是策略。
+- 声称了错误评审员身份的评审结果会被拒绝；合并式建议评审团必须**不多不少**覆盖其配置名单——不允许遗漏或重复。
+
+### 5. 用控制流表达成本控制
+
+评审团是最昂贵的环节，因此框架把钱花在刀刃上：
+
+- 可机械证明的闸门在付费评审团**之前**计算，因此引用错误会在它产生的那一轮就送到修订者手里，而不必花费一轮昂贵的 fact-check 才被重新发现。
+- **仅**因 provenance 失败的一轮可获得一次**免费重试**，不占用 `max_rounds` 的质量轮次——廉价的笔误不按质量问题计费。
+- 每次修订都以**评分最高且闸门全过的那一轮**为基础，而不是简单地接着最后一轮改，因此一次糟糕的修订不会成为下一轮的基线。
+- 评分出现回退时提前结束循环，而不是再买一轮。
+- 三个模型档位（`CHEAP_MODEL`、`MID_MODEL`、`PREMIUM_MODEL`）各自带**提供商前缀**，因此廉价抽取可以跑在 Gemini 上而撰写者仍留在 Claude——且未使用的提供商 SDK 根本不会被导入。
+
+### 6. 持久化的运行与数据保管
+
+耗时操作以后台**运行（run）**的形式执行，并带有持久事件日志：SSE 流可恢复、取消是协作式的、终态结果会写入幂等的历史记录，因此浏览器断连不会抹掉结果。在托管模式下，每个用户拥有独立工作区——各自的数据库、语料、密钥与渲染产物；所有受用户影响的对外请求都经过一个抗 DNS 重绑定的出网网关，它校验每一次重定向并锁定已校验的地址。
 
 ---
 
@@ -46,6 +101,20 @@ Resume Agent 是一个本地优先、同时支持命令行和网页界面的求�
 
 ## 主要功能
 
+把一份简历改好并不难，难的是投五十家。由于下列每个界面都建立在同一套框架之上——同一份事实锁定档案、同一个校验过的技能注册表、同样的只读工具循环、同一套持久运行机制——那些通常会把求职拖垮的琐碎工作变得可以承受：
+
+| 界面                 | 它替你消除的负担                                                     |
+| -------------------- | -------------------------------------------------------------------- |
+| **Profile Coach**    | 从未被记录下来的经历证据。每次只问一个问题，且只根据你的回答起草。   |
+| **Mock interviews**  | 盲目练习。针对*具体某个*已定制职位演练，并给出带评分的复盘。         |
+| **Career Lab**       | 谈薪准备、转行、作品集撰写——35 个已核准程序，输出始终是草稿。        |
+| **Match-gap**        | 不知道下一步该学什么。按目标职位的需求程度排出你档案里缺失的技能。   |
+| **担保证据**         | 盲投不支持签证的雇主。以历史备案作为参考信号——绝不当作承诺。         |
+| **公司研究**         | 面试准备不足。生成带引用的雇主简报，且只在你主动触发时刷新。         |
+| **申请时间线**       | 进度失控。所有轮次、结果和截止日期汇入一份数据集，可导出 CSV 或日历。 |
+| **Gmail 同步**       | 手动追踪状态。读取收件箱并*提议*状态变更，由你确认。                 |
+| **Analytics**        | 重复无效的做法。显示哪些来源和匹配分档真正能转化。                   |
+
 ### 职位看板
 
 - **Triage** (`/triage`)：处理尚未筛选或已拒绝的职位。
@@ -67,7 +136,7 @@ Resume Agent 是一个本地优先、同时支持命令行和网页界面的求�
 - **Career Lab** (`/career-lab`)：一次调用一个经过校验的本地职业技能；输出始终是草稿，不能替用户申请、上传或发送内容。
 
 ```bash
-uv run resume-agent career-lab "准备薪酬谈判要点" \
+uv run resume-tailor-harness career-lab "准备薪酬谈判要点" \
   --skill salary-negotiation-prep --offer-application-id 7
 ```
 
@@ -127,12 +196,12 @@ docker compose up --build
 也可以直接构建并运行镜像：
 
 ```bash
-docker build -t resume-agent .
-docker run --name resume-agent --init --restart unless-stopped \
+docker build -t resume-tailor-harness .
+docker run --name resume-tailor-harness --init --restart unless-stopped \
   -e APP_MODE=local \
   -p 127.0.0.1:8000:8000 \
-  -v resume-agent-data:/app/data \
-  resume-agent
+  -v resume-tailor-harness-data:/app/data \
+  resume-tailor-harness
 ```
 
 如需在启动时注入模型密钥，请在创建 `.env` 后添加 `--env-file .env`。
@@ -143,11 +212,11 @@ docker run --name resume-agent --init --restart unless-stopped \
 
 ```bash
 uv run --no-project scripts/bootstrap.py
-uv run resume-agent setup
+uv run resume-tailor-harness setup
 uv run python scripts/dev.py
 ```
 
-第一条命令会以幂等方式安装锁定的 Python 和前端依赖；只有需要浏览器型职位来源时才传入 `--browser`。`resume-agent setup` 会引导配置密钥、搜索条件和职位连接器，并写入 `.env` 与 `config/*.yaml`。也可以从仓库中的 `.example` 文件手动创建配置。
+第一条命令会以幂等方式安装锁定的 Python 和前端依赖；只有需要浏览器型职位来源时才传入 `--browser`。`resume-tailor-harness setup` 会引导配置密钥、搜索条件和职位连接器，并写入 `.env` 与 `config/*.yaml`。也可以从仓库中的 `.example` 文件手动创建配置。
 
 启动 API 和网页前端：
 
@@ -159,53 +228,53 @@ uv run python scripts/dev.py
 
 ```bash
 # 1. 根据简历和可选 GitHub 来源构建事实锁定资料
-uv run resume-agent profile build
+uv run resume-tailor-harness profile build
 
 # 2. 导入职位（三选一）
-uv run resume-agent pull --limit 10
-uv run resume-agent scrape --limit 10
-uv run resume-agent addjob --company "Acme" --title "Backend Engineer" --jd-file jd.txt
+uv run resume-tailor-harness pull --limit 10
+uv run resume-tailor-harness scrape --limit 10
+uv run resume-tailor-harness addjob --company "Acme" --title "Backend Engineer" --jd-file jd.txt
 
 # 3. 提取要求、筛选并评分
-uv run resume-agent discover
-uv run resume-agent match-gap
+uv run resume-tailor-harness discover
+uv run resume-tailor-harness match-gap
 
 # 4. 在网页 Shortlist 页面中批准职位
 make dev
 
 # 5. 定制所有已批准的职位并生成求职信
-uv run resume-agent tailor --approved
-uv run resume-agent cover-letter --approved
+uv run resume-tailor-harness tailor --approved
+uv run resume-tailor-harness cover-letter --approved
 
 # 6. 将指定简历版本渲染为 PDF
-uv run resume-agent render 12
+uv run resume-tailor-harness render 12
 
 # 7. 在网页 Tracking 页签中记录申请事件
 
 # 8. 可选：读取 Gmail 并提出状态变更建议
-uv run resume-agent sync-status
-uv run resume-agent sync-status --apply
+uv run resume-tailor-harness sync-status
+uv run resume-tailor-harness sync-status --apply
 ```
 
 ## 常用命令
 
 | 命令 | 说明 |
 | --- | --- |
-| `resume-agent setup` | 交互式创建本地配置。 |
-| `resume-agent profile build` | 从配置的来源构建事实锁定资料。 |
-| `resume-agent addjob` | 手动添加一个职位。 |
-| `resume-agent pull` | 运行所有已启用的职位连接器。 |
-| `resume-agent scrape` | 使用本地浏览器获取 LinkedIn 职位。 |
-| `resume-agent sources` | 查看职位来源和连接器运行历史。 |
-| `resume-agent discover` | 提取职位要求、应用筛选条件并评分。 |
-| `resume-agent match-gap` | 查看目标职位需要但资料中缺乏证据的技能。 |
-| `resume-agent approve JOB_ID` | 从命令行批准职位。 |
-| `resume-agent tailor` | 生成并评审事实锁定简历。 |
-| `resume-agent cover-letter` | 生成经过来源校验的求职信。 |
-| `resume-agent render VERSION_ID` | 将简历版本渲染为 PDF。 |
-| `resume-agent sync-status` | 从 Gmail 生成申请状态建议。 |
-| `resume-agent career-lab` | 使用一个已校验的职业技能创建草稿。 |
-| `resume-agent serve` | 启动 API 和已构建的网页应用。 |
+| `resume-tailor-harness setup` | 交互式创建本地配置。 |
+| `resume-tailor-harness profile build` | 从配置的来源构建事实锁定资料。 |
+| `resume-tailor-harness addjob` | 手动添加一个职位。 |
+| `resume-tailor-harness pull` | 运行所有已启用的职位连接器。 |
+| `resume-tailor-harness scrape` | 使用本地浏览器获取 LinkedIn 职位。 |
+| `resume-tailor-harness sources` | 查看职位来源和连接器运行历史。 |
+| `resume-tailor-harness discover` | 提取职位要求、应用筛选条件并评分。 |
+| `resume-tailor-harness match-gap` | 查看目标职位需要但资料中缺乏证据的技能。 |
+| `resume-tailor-harness approve JOB_ID` | 从命令行批准职位。 |
+| `resume-tailor-harness tailor` | 生成并评审事实锁定简历。 |
+| `resume-tailor-harness cover-letter` | 生成经过来源校验的求职信。 |
+| `resume-tailor-harness render VERSION_ID` | 将简历版本渲染为 PDF。 |
+| `resume-tailor-harness sync-status` | 从 Gmail 生成申请状态建议。 |
+| `resume-tailor-harness career-lab` | 使用一个已校验的职业技能创建草稿。 |
+| `resume-tailor-harness serve` | 启动 API 和已构建的网页应用。 |
 
 完整参数与示例见 [英文命令参考](README.md#command-reference)。
 
@@ -213,15 +282,15 @@ uv run resume-agent sync-status --apply
 
 ## 多用户托管模式
 
-`resume-agent serve` 默认是无需登录的本地应用，只绑定回环地址。要公开服务或启用多用户模式，请设置管理员凭据并显式启动 hosted 模式：
+`resume-tailor-harness serve` 默认是无需登录的本地应用，只绑定回环地址。要公开服务或启用多用户模式，请设置管理员凭据并显式启动 hosted 模式：
 
 ```bash
-uv run resume-agent serve --mode hosted --host 0.0.0.0 --port 8080
+uv run resume-tailor-harness serve --mode hosted --host 0.0.0.0 --port 8080
 ```
 
 ```env
 AUTH_USERNAME=owner
-AUTH_PASSWORD_HASH=<uv run resume-agent hash-password 的输出>
+AUTH_PASSWORD_HASH=<uv run resume-tailor-harness hash-password 的输出>
 SESSION_SECRET=<足够长的随机值>
 APP_BASE_URL=https://your-domain.example
 ```
@@ -249,8 +318,8 @@ Gmail 集成只会读取邮件和创建草稿，不会发送邮件。
 ## API
 
 ```bash
-uv run resume-agent serve
-uv run resume-agent serve --mode hosted --host 0.0.0.0 --port 8080
+uv run resume-tailor-harness serve
+uv run resume-tailor-harness serve --mode hosted --host 0.0.0.0 --port 8080
 ```
 
 - 本地交互式文档：`/docs`
@@ -296,7 +365,7 @@ PREMIUM_MODEL=claude-opus-5
 
 | 路径 | 内容 |
 | --- | --- |
-| `data/resume_agent.db` | 本地模式下的职位、简历版本、求职信和申请记录。 |
+| `data/resume_tailor_harness.db` | 本地模式下的职位、简历版本、求职信和申请记录。 |
 | `data/profile/facts.json` | 事实锁定资料。 |
 | `data/connector_runs.json` | 连接器运行历史。 |
 | `data/gmail_token.json` | 本地 CLI 使用的 Gmail OAuth token。 |
@@ -335,7 +404,7 @@ npm run build
 
 仓库还包含以下安全文档：
 
-- [威胁模型](docs/resume-agent-threat-model.md)
+- [威胁模型](docs/resume-tailor-harness-threat-model.md)
 - [安全最佳实践报告](docs/security_best_practices_report.md)
 - [ADR-0008：出口网关、租户存储和规范来源](docs/adr/0008-egress-gateway-tenant-storage-canonical-origin.md)
 

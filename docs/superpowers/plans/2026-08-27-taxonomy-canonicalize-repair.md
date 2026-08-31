@@ -4,7 +4,7 @@
 
 **Goal:** Stop Regroup from plateauing by repairing canonicalize-phase omissions in-run, filing whatever survives as its own canonical, and reporting the deferred backlog the escalation cap was already computing but never returning.
 
-**Architecture:** All behavioural change lands inside `classify_incrementally`'s canonicalize section in `src/resume_agent/taxonomy/classification.py`. Omitted tokens are re-asked in geometrically shrinking rounds (`batch_size` → `batch_size // 4` → `1`); whatever still survives gets an identity alias and a failure recorded as `retryable=False`. That flag alone lets the existing `_apply_placement_floor` file the token, so `refresh_clusters` needs **no structural change** — only new telemetry keys. `refresh_clusters` is the sole caller of `classify_incrementally` (it calls it twice: pass one and escalation), so the blast radius is contained.
+**Architecture:** All behavioural change lands inside `classify_incrementally`'s canonicalize section in `src/resume_tailor_harness/taxonomy/classification.py`. Omitted tokens are re-asked in geometrically shrinking rounds (`batch_size` → `batch_size // 4` → `1`); whatever still survives gets an identity alias and a failure recorded as `retryable=False`. That flag alone lets the existing `_apply_placement_floor` file the token, so `refresh_clusters` needs **no structural change** — only new telemetry keys. `refresh_clusters` is the sole caller of `classify_incrementally` (it calls it twice: pass one and escalation), so the blast radius is contained.
 
 **Tech Stack:** Python 3.12, pydantic v2, pytest, agno `Agent` + `AgentRunner`, React + TypeScript + vitest for the toast.
 
@@ -26,8 +26,8 @@
 ### Task 1: Canonicalize repair rounds
 
 **Files:**
-- Modify: `src/resume_agent/config.py` (add one setting near `taxonomy_escalation_max_skills`, line ~131)
-- Modify: `src/resume_agent/taxonomy/classification.py:47-54` (`ClassificationMetrics`), `:355-370` (signature), `:436-475` (canonicalize block), `:700-712` (metrics construction)
+- Modify: `src/resume_tailor_harness/config.py` (add one setting near `taxonomy_escalation_max_skills`, line ~131)
+- Modify: `src/resume_tailor_harness/taxonomy/classification.py:47-54` (`ClassificationMetrics`), `:355-370` (signature), `:436-475` (canonicalize block), `:700-712` (metrics construction)
 - Test: `tests/test_taxonomy_classification.py`
 
 **Interfaces:**
@@ -105,7 +105,7 @@ Expected: FAIL with `AttributeError: 'ClassificationMetrics' object has no attri
 
 - [ ] **Step 3: Add the setting**
 
-In `src/resume_agent/config.py`, immediately after the `taxonomy_escalation_max_skills` field (line ~131):
+In `src/resume_tailor_harness/config.py`, immediately after the `taxonomy_escalation_max_skills` field (line ~131):
 
 ```python
     # Bounds the terminal singleton repair round.  In the normal case it is
@@ -121,7 +121,7 @@ In `src/resume_agent/config.py`, immediately after the `taxonomy_escalation_max_
 
 - [ ] **Step 4: Extend the metrics dataclass**
 
-In `src/resume_agent/taxonomy/classification.py`, replace the `ClassificationMetrics` body (lines 47-54) with:
+In `src/resume_tailor_harness/taxonomy/classification.py`, replace the `ClassificationMetrics` body (lines 47-54) with:
 
 ```python
 @dataclass(frozen=True)
@@ -152,7 +152,7 @@ In `classify_incrementally`'s signature, after `enforce_candidates: bool = True`
 
 - [ ] **Step 6: Replace the canonicalize block**
 
-Replace `src/resume_agent/taxonomy/classification.py` lines 436-475 (from `aliases: dict[str, str] = {}` through the end of the `for batch, result in zip(alias_batches, ...)` loop, stopping before `new_heads = ...`) with:
+Replace `src/resume_tailor_harness/taxonomy/classification.py` lines 436-475 (from `aliases: dict[str, str] = {}` through the end of the `for batch, result in zip(alias_batches, ...)` loop, stopping before `new_heads = ...`) with:
 
 ```python
     aliases: dict[str, str] = {}
@@ -253,7 +253,7 @@ Expected: all PASS, ruff clean. Note: `residue` currently leaks tokens that no r
 - [ ] **Step 10: Commit**
 
 ```bash
-git add src/resume_agent/config.py src/resume_agent/taxonomy/classification.py tests/test_taxonomy_classification.py
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/taxonomy/classification.py tests/test_taxonomy_classification.py
 git commit -m "fix(taxonomy): repair canonicalize omissions with shrinking rounds"
 ```
 
@@ -262,7 +262,7 @@ git commit -m "fix(taxonomy): repair canonicalize omissions with shrinking round
 ### Task 2: Identity-canonical backstop
 
 **Files:**
-- Modify: `src/resume_agent/taxonomy/classification.py` (end of the canonicalize block added in Task 1)
+- Modify: `src/resume_tailor_harness/taxonomy/classification.py` (end of the canonicalize block added in Task 1)
 - Test: `tests/test_taxonomy_classification.py`, `tests/test_services_match_gap.py`
 
 **Interfaces:**
@@ -358,7 +358,7 @@ Expected: FAIL — `KeyError: 'quantum widgetry'` on the first test.
 
 - [ ] **Step 3: Add the backstop**
 
-In `src/resume_agent/taxonomy/classification.py`, immediately after the `canonical_repaired = ...` line added in Task 1 Step 6, append (still inside `if alias_batches:`):
+In `src/resume_tailor_harness/taxonomy/classification.py`, immediately after the `canonical_repaired = ...` line added in Task 1 Step 6, append (still inside `if alias_batches:`):
 
 ```python
         if residue:
@@ -445,7 +445,7 @@ Expected: all PASS, ruff clean. If `test_the_escalation_cap_defers_instead_of_fl
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/classification.py tests/test_taxonomy_classification.py tests/test_services_match_gap.py
+git add src/resume_tailor_harness/taxonomy/classification.py tests/test_taxonomy_classification.py tests/test_services_match_gap.py
 git commit -m "fix(taxonomy): file unclusterable tokens as their own canonical"
 ```
 
@@ -454,7 +454,7 @@ git commit -m "fix(taxonomy): file unclusterable tokens as their own canonical"
 ### Task 3: Canonicalizer model tier
 
 **Files:**
-- Modify: `src/resume_agent/tracking/canonicalize.py:279-296` (`build_incremental_canonicalizer_agent`)
+- Modify: `src/resume_tailor_harness/tracking/canonicalize.py:279-296` (`build_incremental_canonicalizer_agent`)
 - Test: `tests/test_tracking_canonicalize.py:168-197`
 
 **Interfaces:**
@@ -489,7 +489,7 @@ Expected: FAIL with `assert ['premium', 'mid'] == ['mid', 'mid']`
 
 - [ ] **Step 3: Change the tier**
 
-In `src/resume_agent/tracking/canonicalize.py`, in `build_incremental_canonicalizer_agent`, replace:
+In `src/resume_tailor_harness/tracking/canonicalize.py`, in `build_incremental_canonicalizer_agent`, replace:
 
 ```python
     model = build_model(
@@ -516,7 +516,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/canonicalize.py tests/test_tracking_canonicalize.py
+git add src/resume_tailor_harness/tracking/canonicalize.py tests/test_tracking_canonicalize.py
 git commit -m "perf(taxonomy): run the canonicalizer on the mid tier"
 ```
 
@@ -525,7 +525,7 @@ git commit -m "perf(taxonomy): run the canonicalizer on the mid tier"
 ### Task 4: Regroup telemetry legibility
 
 **Files:**
-- Modify: `src/resume_agent/services/match_gap.py:383-395` (pass one call), `:417-431` (escalation call), `:563-630` (result dict)
+- Modify: `src/resume_tailor_harness/services/match_gap.py:383-395` (pass one call), `:417-431` (escalation call), `:563-630` (result dict)
 - Test: `tests/test_services_match_gap.py`
 
 **Interfaces:**
@@ -551,7 +551,7 @@ def test_the_deferred_backlog_is_reported_separately_from_uncertainty(
     could not tell monotonic progress from a permanent plateau.
     """
 
-    from resume_agent.config import env_settings
+    from resume_tailor_harness.config import env_settings
 
     monkeypatch.setenv("TAXONOMY_ESCALATION_MAX_SKILLS", "1")
     env_settings.cache_clear()
@@ -587,7 +587,7 @@ Expected: FAIL with `KeyError: 'deferredSkills'`
 
 - [ ] **Step 3: Pass the singleton bound through both call sites**
 
-In `src/resume_agent/services/match_gap.py`, add this keyword argument to **both** `classify_incrementally(...)` calls (the `first = await ...` at line ~383 and the `second = await ...` at line ~417), after `enforce_candidates` / `category_hints` respectively:
+In `src/resume_tailor_harness/services/match_gap.py`, add this keyword argument to **both** `classify_incrementally(...)` calls (the `first = await ...` at line ~383 and the `second = await ...` at line ~417), after `enforce_candidates` / `category_hints` respectively:
 
 ```python
                 repair_max_singletons=settings.taxonomy_canonical_repair_max_singletons,
@@ -654,7 +654,7 @@ Run: `git status --short` after the suite. If `web/src/lib/api/schema.ts` or any
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/services/match_gap.py tests/test_services_match_gap.py
+git add src/resume_tailor_harness/services/match_gap.py tests/test_services_match_gap.py
 git commit -m "feat(taxonomy): report the deferred backlog separately from uncertainty"
 ```
 
@@ -768,7 +768,7 @@ git commit -m "feat(web): distinguish deferred from uncertain in the regroup toa
 ### Task 6: Record the decisions in the taxonomy reference
 
 **Files:**
-- Modify: `src/resume_agent/taxonomy/CLAUDE.md`
+- Modify: `src/resume_tailor_harness/taxonomy/CLAUDE.md`
 
 **Interfaces:**
 - Consumes: everything above.
@@ -776,7 +776,7 @@ git commit -m "feat(web): distinguish deferred from uncertain in the regroup toa
 
 - [ ] **Step 1: Correct the now-stale claim**
 
-`src/resume_agent/taxonomy/CLAUDE.md` currently contains the bullet beginning **"A regroup is two passes, and the second one differs."** That bullet states canonicalize failures are sent back through pass one, which is still true but is no longer the *end* of the story. Append to that bullet:
+`src/resume_tailor_harness/taxonomy/CLAUDE.md` currently contains the bullet beginning **"A regroup is two passes, and the second one differs."** That bullet states canonicalize failures are sent back through pass one, which is still true but is no longer the *end* of the story. Append to that bullet:
 
 ```markdown
   A canonicalize-phase failure is no longer permanent backlog. The pass now
@@ -837,14 +837,14 @@ Add a further bullet:
 
 - [ ] **Step 4: Verify nothing else in the file now contradicts the code**
 
-Run: `grep -n "premium\|canonicalize" src/resume_agent/taxonomy/CLAUDE.md`
+Run: `grep -n "premium\|canonicalize" src/resume_tailor_harness/taxonomy/CLAUDE.md`
 
 Read each hit. Fix any remaining statement that the code no longer supports.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/CLAUDE.md
+git add src/resume_tailor_harness/taxonomy/CLAUDE.md
 git commit -m "docs(taxonomy): record canonicalize repair, tier change, batch rejection"
 ```
 

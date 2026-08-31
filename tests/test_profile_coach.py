@@ -1,6 +1,6 @@
 import pytest
 
-from resume_agent.profile.coach import (
+from resume_tailor_harness.profile.coach import (
     AGENDA_CAP,
     CoachTurn,
     DraftNote,
@@ -17,8 +17,8 @@ from resume_agent.profile.coach import (
     render_agenda,
     render_transcript,
 )
-from resume_agent.profile.coach_store import CoachTopic
-from resume_agent.sessions.turns import DraftRejected
+from resume_tailor_harness.profile.coach_store import CoachTopic
+from resume_tailor_harness.sessions.turns import DraftRejected
 
 
 def test_opening_formatter_instructions_require_agenda_topics():
@@ -32,7 +32,7 @@ def test_opening_formatter_instructions_require_agenda_topics():
 
 
 def test_persona_instructions_define_visible_prose_metadata_boundary():
-    from resume_agent.profile.coach import _COACH_INSTRUCTIONS
+    from resume_tailor_harness.profile.coach import _COACH_INSTRUCTIONS
 
     instructions = " ".join(_COACH_INSTRUCTIONS)
     assert "---METADATA---" in instructions
@@ -304,9 +304,9 @@ def test_profile_overview_degrades_on_fresh_workspace(tmp_path):
 
 
 def test_profile_overview_includes_unmined_documents_as_question_material(tmp_path):
-    from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-    from resume_agent.profile.corpus import add_source
-    from resume_agent.profile.store import save_facts
+    from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+    from resume_tailor_harness.profile.corpus import add_source
+    from resume_tailor_harness.profile.store import save_facts
 
     resume = tmp_path / "resume.md"
     goals = tmp_path / "goals.md"
@@ -335,8 +335,8 @@ def test_profile_overview_includes_unmined_documents_as_question_material(tmp_pa
 
 
 def test_profile_overview_names_the_supply_target_and_missing_aspects(tmp_path):
-    from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-    from resume_agent.profile.store import save_facts
+    from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+    from resume_tailor_harness.profile.store import save_facts
 
     save_facts(
         ProfileFacts(
@@ -388,7 +388,7 @@ def test_opening_format_instruction_states_the_positional_id_convention():
     # The formatter is the only thing that fills topic_id, so if the prompt does
     # not name the t1/t2 convention the model has to guess -- and a guess can
     # never match a positionally generated id.
-    from resume_agent.profile.coach import _formatter_instructions
+    from resume_tailor_harness.profile.coach import _formatter_instructions
 
     text = " ".join(_formatter_instructions(OpeningTurn))
     assert "t1" in text

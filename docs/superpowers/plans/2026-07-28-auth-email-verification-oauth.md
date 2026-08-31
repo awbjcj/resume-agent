@@ -20,7 +20,7 @@
 - **Enumeration:** `register` and `password/forgot` return byte-identical status and body for known and unknown addresses.
 - **Platform SMTP settings are process-environment only** — never part of the per-workspace `secrets.env` overlay.
 - **`gmail.send` remains permanently out of scope.** Platform mail is a separate actor and never touches a user's Gmail token or the Google OAuth client.
-- New system tables subclass `SystemBase` from `resume_agent.tenancy.system_db` and use `String(12)` hex ids via `uuid.uuid4().hex[:12]`.
+- New system tables subclass `SystemBase` from `resume_tailor_harness.tenancy.system_db` and use `String(12)` hex ids via `uuid.uuid4().hex[:12]`.
 - Pydantic request/response schemas subclass `CamelModel` (`api/schemas/base.py`) — snake_case in Python, camelCase on the wire.
 - Errors raise `ApiException(status, CODE, message)` from `api/errors.py`.
 
@@ -98,18 +98,18 @@ must be applied wherever a later snippet disagrees:
 
 | Path                                             | Responsibility                                                                     |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `src/resume_agent/mail/__init__.py`              | Package marker                                                                     |
-| `src/resume_agent/mail/mailer.py`                | `Mailer` protocol, `SmtpMailer`, `NullMailer`, `MailDeliveryError`, `build_mailer` |
-| `src/resume_agent/mail/messages.py`              | Plain-text message bodies                                                          |
-| `src/resume_agent/tenancy/migrate_system.py`     | Additive `system.db` column/index migration                                        |
-| `src/resume_agent/api/password_policy.py`        | `validate_password`, `BreachChecker`, `HibpBreachChecker`, `NullBreachChecker`     |
-| `src/resume_agent/api/data/common_passwords.txt` | Offline common-password floor                                                      |
-| `src/resume_agent/api/attempts.py`               | Durable rate-limit budgets + account lockout tiers                                 |
-| `src/resume_agent/api/auth_codes.py`             | Code generation, hashing, and attempt-counting verification                        |
-| `src/resume_agent/api/routers/auth_register.py`  | `register`, `verify-email`, `resend-code`                                          |
-| `src/resume_agent/api/routers/auth_password.py`  | `password/forgot`, `password/reset`                                                |
-| `src/resume_agent/api/routers/auth_google.py`    | `google/start`, `google/callback`                                                  |
-| `src/resume_agent/api/schemas/auth_email.py`     | Schemas for the above routers                                                      |
+| `src/resume_tailor_harness/mail/__init__.py`              | Package marker                                                                     |
+| `src/resume_tailor_harness/mail/mailer.py`                | `Mailer` protocol, `SmtpMailer`, `NullMailer`, `MailDeliveryError`, `build_mailer` |
+| `src/resume_tailor_harness/mail/messages.py`              | Plain-text message bodies                                                          |
+| `src/resume_tailor_harness/tenancy/migrate_system.py`     | Additive `system.db` column/index migration                                        |
+| `src/resume_tailor_harness/api/password_policy.py`        | `validate_password`, `BreachChecker`, `HibpBreachChecker`, `NullBreachChecker`     |
+| `src/resume_tailor_harness/api/data/common_passwords.txt` | Offline common-password floor                                                      |
+| `src/resume_tailor_harness/api/attempts.py`               | Durable rate-limit budgets + account lockout tiers                                 |
+| `src/resume_tailor_harness/api/auth_codes.py`             | Code generation, hashing, and attempt-counting verification                        |
+| `src/resume_tailor_harness/api/routers/auth_register.py`  | `register`, `verify-email`, `resend-code`                                          |
+| `src/resume_tailor_harness/api/routers/auth_password.py`  | `password/forgot`, `password/reset`                                                |
+| `src/resume_tailor_harness/api/routers/auth_google.py`    | `google/start`, `google/callback`                                                  |
+| `src/resume_tailor_harness/api/schemas/auth_email.py`     | Schemas for the above routers                                                      |
 
 **Modified — backend**
 
@@ -142,13 +142,13 @@ must be applied wherever a later snippet disagrees:
 
 **Files:**
 
-- Create: `src/resume_agent/mail/__init__.py`, `src/resume_agent/mail/mailer.py`, `src/resume_agent/mail/messages.py`
-- Modify: `src/resume_agent/config.py` (after the Gmail block, around line 62)
+- Create: `src/resume_tailor_harness/mail/__init__.py`, `src/resume_tailor_harness/mail/mailer.py`, `src/resume_tailor_harness/mail/messages.py`
+- Modify: `src/resume_tailor_harness/config.py` (after the Gmail block, around line 62)
 - Test: `tests/test_mailer.py`
 
 **Interfaces:**
 
-- Consumes: `resume_agent.config.Settings`
+- Consumes: `resume_tailor_harness.config.Settings`
 - Produces:
   - `Mailer` protocol with `send(*, to: str, subject: str, body: str) -> None` and `notify(...) -> None`
   - `MailDeliveryError(RuntimeError)`
@@ -172,9 +172,9 @@ import logging
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.mail import messages
-from resume_agent.mail.mailer import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.mail import messages
+from resume_tailor_harness.mail.mailer import (
     MailDeliveryError,
     NullMailer,
     SmtpMailer,
@@ -238,11 +238,11 @@ def test_notice_omits_links_when_base_url_blank():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_mailer.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.mail'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.mail'`
 
 - [ ] **Step 3: Add the Settings fields**
 
-In `src/resume_agent/config.py`, immediately after the `gmail_max_messages` line (the end of the Gmail block, ~line 62), add:
+In `src/resume_tailor_harness/config.py`, immediately after the `gmail_max_messages` line (the end of the Gmail block, ~line 62), add:
 
 ```python
     # Platform outbound mail (verification codes, password reset, security
@@ -261,13 +261,13 @@ In `src/resume_agent/config.py`, immediately after the `gmail_max_messages` line
 
 - [ ] **Step 4: Write `mail/__init__.py` and `mail/messages.py`**
 
-`src/resume_agent/mail/__init__.py`:
+`src/resume_tailor_harness/mail/__init__.py`:
 
 ```python
 """Platform outbound mail. Not the user's Gmail — see CLAUDE.md."""
 ```
 
-`src/resume_agent/mail/messages.py`:
+`src/resume_tailor_harness/mail/messages.py`:
 
 ```python
 """Plain-text bodies for platform mail. No HTML, no tracking, no attachments."""
@@ -291,7 +291,7 @@ def _link_line(base_url: str, path: str, label: str) -> str:
 
 def verification_code(code: str) -> Message:
     return Message(
-        subject="Your Resume Agent verification code",
+        subject="Your Résumé Tailor Harness verification code",
         body=(
             f"Your verification code is {code}\n\n"
             f"It expires in {CODE_TTL_MINUTES} minutes and can be used once.\n"
@@ -302,7 +302,7 @@ def verification_code(code: str) -> Message:
 
 def reset_code(code: str) -> Message:
     return Message(
-        subject="Your Resume Agent password reset code",
+        subject="Your Résumé Tailor Harness password reset code",
         body=(
             f"Your password reset code is {code}\n\n"
             f"It expires in {CODE_TTL_MINUTES} minutes and can be used once.\n"
@@ -314,9 +314,9 @@ def reset_code(code: str) -> Message:
 
 def password_changed(base_url: str) -> Message:
     return Message(
-        subject="Your Resume Agent password was changed",
+        subject="Your Résumé Tailor Harness password was changed",
         body=(
-            "The password on your Resume Agent account was just changed, and\n"
+            "The password on your Résumé Tailor Harness account was just changed, and\n"
             "every signed-in device was signed out.\n\n"
             "If this was not you, reset your password immediately."
             + _link_line(base_url, "/forgot-password", "Reset your password")
@@ -326,9 +326,9 @@ def password_changed(base_url: str) -> Message:
 
 def google_linked(base_url: str) -> Message:
     return Message(
-        subject="A Google account was linked to your Resume Agent account",
+        subject="A Google account was linked to your Résumé Tailor Harness account",
         body=(
-            "A Google account can now be used to sign in to your Resume Agent\n"
+            "A Google account can now be used to sign in to your Résumé Tailor Harness\n"
             "account.\n\nIf this was not you, reset your password immediately."
             + _link_line(base_url, "/forgot-password", "Reset your password")
         ),
@@ -339,7 +339,7 @@ def signup_on_existing(base_url: str) -> Message:
     return Message(
         subject="Someone tried to sign up with your email",
         body=(
-            "Someone attempted to create a Resume Agent account with this email\n"
+            "Someone attempted to create a Résumé Tailor Harness account with this email\n"
             "address, but an account already exists. No new account was created\n"
             "and nothing changed.\n\n"
             "If that was you, sign in instead — or reset your password if you\n"
@@ -368,7 +368,7 @@ import smtplib
 from email.message import EmailMessage
 from typing import Protocol
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 logger = logging.getLogger(__name__)
 _TIMEOUT_SECONDS = 10.0
@@ -451,13 +451,13 @@ def build_mailer(settings: Settings) -> Mailer:
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_mailer.py -v && ruff check src/resume_agent/mail src/resume_agent/config.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_mailer.py -v && ruff check src/resume_tailor_harness/mail src/resume_tailor_harness/config.py`
 Expected: 7 passed, ruff clean.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/mail src/resume_agent/config.py tests/test_mailer.py
+git add src/resume_tailor_harness/mail src/resume_tailor_harness/config.py tests/test_mailer.py
 git commit -m "Adds the platform outbound-mail seam with raising send and swallowing notify"
 ```
 
@@ -467,8 +467,8 @@ git commit -m "Adds the platform outbound-mail seam with raising send and swallo
 
 **Files:**
 
-- Modify: `src/resume_agent/tenancy/system_db.py`
-- Create: `src/resume_agent/tenancy/migrate_system.py`
+- Modify: `src/resume_tailor_harness/tenancy/system_db.py`
+- Create: `src/resume_tailor_harness/tenancy/migrate_system.py`
 - Test: `tests/tenancy/test_migrate_system.py`
 
 **Interfaces:**
@@ -490,8 +490,8 @@ from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.migrate_system import migrate_system_db
-from resume_agent.tenancy.system_db import (
+from resume_tailor_harness.tenancy.migrate_system import migrate_system_db
+from resume_tailor_harness.tenancy.system_db import (
     LoginAttempt,
     PasswordResetCode,
     PendingRegistration,
@@ -768,15 +768,15 @@ def migrate_system_db(engine: Engine) -> None:
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/tenancy/test_migrate_system.py -v && ruff check src/resume_agent/tenancy`
+Run: `.venv/Scripts/python.exe -m pytest tests/tenancy/test_migrate_system.py -v && ruff check src/resume_tailor_harness/tenancy`
 Expected: 7 passed, ruff clean.
 
 - [ ] **Step 6: Wire the migration into app startup**
 
-In `src/resume_agent/api/app.py`, find the lifespan block where `make_system_engine` is called (~line 113) and add the migration immediately after `init_system_db(system_engine)`:
+In `src/resume_tailor_harness/api/app.py`, find the lifespan block where `make_system_engine` is called (~line 113) and add the migration immediately after `init_system_db(system_engine)`:
 
 ```python
-            from resume_agent.tenancy.migrate_system import migrate_system_db
+            from resume_tailor_harness.tenancy.migrate_system import migrate_system_db
 
             migrate_system_db(system_engine)
 ```
@@ -789,7 +789,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/tenancy tests/api -q`
 Expected: all pass — this task changes no behavior.
 
 ```bash
-git add src/resume_agent/tenancy tests/tenancy/test_migrate_system.py src/resume_agent/api/app.py
+git add src/resume_tailor_harness/tenancy tests/tenancy/test_migrate_system.py src/resume_tailor_harness/api/app.py
 git commit -m "Adds email identity columns, code tables, and an additive system.db migration"
 ```
 
@@ -799,9 +799,9 @@ git commit -m "Adds email identity columns, code tables, and an additive system.
 
 **Files:**
 
-- Modify: `src/resume_agent/api/auth.py:90-141`
-- Modify: `src/resume_agent/api/deps.py:_authenticated_user` (~line 110)
-- Modify: `src/resume_agent/api/routers/auth.py:104` (the `issue_user_session` call)
+- Modify: `src/resume_tailor_harness/api/auth.py:90-141`
+- Modify: `src/resume_tailor_harness/api/deps.py:_authenticated_user` (~line 110)
+- Modify: `src/resume_tailor_harness/api/routers/auth.py:104` (the `issue_user_session` call)
 - Test: `tests/api/test_session_epoch.py`
 
 **Interfaces:**
@@ -817,8 +817,8 @@ git commit -m "Adds email identity columns, code tables, and an additive system.
 Create `tests/api/test_session_epoch.py`:
 
 ```python
-from resume_agent.api import auth
-from resume_agent.config import Settings
+from resume_tailor_harness.api import auth
+from resume_tailor_harness.config import Settings
 
 SETTINGS = Settings(_env_file=None, session_secret="s3cret")
 
@@ -987,13 +987,13 @@ Also update the `me` handler's `verify_user_session` call (line 216) to pass `ep
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_agent/api`
+Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_tailor_harness/api`
 Expected: all pass. Any existing test that constructs a session token directly must be updated to pass `epoch=0`; that is the expected fallout, not a regression.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_session_epoch.py
+git add src/resume_tailor_harness/api tests/api/test_session_epoch.py
 git commit -m "Mixes session_epoch into the session HMAC so revocation stays table-free"
 ```
 
@@ -1009,8 +1009,8 @@ git commit -m "Mixes session_epoch into the session HMAC so revocation stays tab
 
 **Files:**
 
-- Create: `src/resume_agent/api/password_policy.py`
-- Create: `src/resume_agent/api/data/common_passwords.txt`
+- Create: `src/resume_tailor_harness/api/password_policy.py`
+- Create: `src/resume_tailor_harness/api/data/common_passwords.txt`
 - Test: `tests/api/test_password_policy.py`
 
 **Interfaces:**
@@ -1033,8 +1033,8 @@ import hashlib
 import httpx
 import pytest
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.password_policy import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.password_policy import (
     HibpBreachChecker,
     NullBreachChecker,
     validate_password,
@@ -1120,11 +1120,11 @@ def test_null_checker_never_reports_breached():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_password_policy.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.api.password_policy'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.api.password_policy'`
 
 - [ ] **Step 3: Create the common-password list**
 
-Create `src/resume_agent/api/data/common_passwords.txt` — one lowercase entry per line, no header. Seed it from the SecLists "10-million-password-list-top-1000" (public domain). It must include at least these, which the tests depend on:
+Create `src/resume_tailor_harness/api/data/common_passwords.txt` — one lowercase entry per line, no header. Seed it from the SecLists "10-million-password-list-top-1000" (public domain). It must include at least these, which the tests depend on:
 
 ```
 123456
@@ -1170,7 +1170,7 @@ from typing import Protocol
 
 import httpx
 
-from resume_agent.api.errors import ApiException
+from resume_tailor_harness.api.errors import ApiException
 
 logger = logging.getLogger(__name__)
 
@@ -1264,20 +1264,20 @@ def validate_password(
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_password_policy.py -v && ruff check src/resume_agent/api/password_policy.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_password_policy.py -v && ruff check src/resume_tailor_harness/api/password_policy.py`
 Expected: 11 passed, ruff clean.
 
 - [ ] **Step 6: Make sure the data file ships in the wheel**
 
-Inspect `pyproject.toml` for the build backend's package-data configuration and add the `data/*.txt` glob for the `resume_agent.api` package (setuptools: `[tool.setuptools.package-data]`; hatchling: `[tool.hatch.build.targets.wheel] include`). Then verify the file loads through the package path rather than the repo path:
+Inspect `pyproject.toml` for the build backend's package-data configuration and add the `data/*.txt` glob for the `resume_tailor_harness.api` package (setuptools: `[tool.setuptools.package-data]`; hatchling: `[tool.hatch.build.targets.wheel] include`). Then verify the file loads through the package path rather than the repo path:
 
-Run: `.venv/Scripts/python.exe -c "from resume_agent.api.password_policy import _common_passwords; print(len(_common_passwords()))"`
+Run: `.venv/Scripts/python.exe -c "from resume_tailor_harness.api.password_policy import _common_passwords; print(len(_common_passwords()))"`
 Expected: a number ≥ 1000.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/password_policy.py src/resume_agent/api/data tests/api/test_password_policy.py pyproject.toml
+git add src/resume_tailor_harness/api/password_policy.py src/resume_tailor_harness/api/data tests/api/test_password_policy.py pyproject.toml
 git commit -m "Adds the password policy with an offline floor and HIBP k-anonymity breach check"
 ```
 
@@ -1287,8 +1287,8 @@ git commit -m "Adds the password policy with an offline floor and HIBP k-anonymi
 
 **Files:**
 
-- Modify: `src/resume_agent/api/app.py` (app state, ~line 172)
-- Modify: `src/resume_agent/api/routers/account.py` (the `change_password` handler)
+- Modify: `src/resume_tailor_harness/api/app.py` (app state, ~line 172)
+- Modify: `src/resume_tailor_harness/api/routers/account.py` (the `change_password` handler)
 - Modify: `tests/api/conftest.py` (the `mu_app` fixture)
 - Test: `tests/api/test_account_password.py`
 
@@ -1305,8 +1305,8 @@ Create `tests/api/test_account_password.py`:
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import verify_password
-from resume_agent.tenancy.system_db import User
+from resume_tailor_harness.api.auth import verify_password
+from resume_tailor_harness.tenancy.system_db import User
 
 NEW_PASSWORD = "quartz-lantern-42-drift"
 
@@ -1379,7 +1379,7 @@ Expected: FAIL — the weak password is accepted and `session_epoch` stays `0`.
 
 - [ ] **Step 3: Build the mailer and checker onto app state**
 
-In `src/resume_agent/api/app.py`, beside the other `app.state` assignments (~line 172), add:
+In `src/resume_tailor_harness/api/app.py`, beside the other `app.state` assignments (~line 172), add:
 
 ```python
     app.state.mailer = build_mailer(resolved_settings)
@@ -1389,8 +1389,8 @@ In `src/resume_agent/api/app.py`, beside the other `app.state` assignments (~lin
 with imports at the top:
 
 ```python
-from resume_agent.api.password_policy import HibpBreachChecker
-from resume_agent.mail.mailer import build_mailer
+from resume_tailor_harness.api.password_policy import HibpBreachChecker
+from resume_tailor_harness.mail.mailer import build_mailer
 ```
 
 - [ ] **Step 4: Make the test fixture offline**
@@ -1420,11 +1420,11 @@ def mu_app(tmp_path):
     return application
 ```
 
-with `from resume_agent.mail.mailer import NullMailer` and `from resume_agent.api.password_policy import NullBreachChecker` at the top of the conftest.
+with `from resume_tailor_harness.mail.mailer import NullMailer` and `from resume_tailor_harness.api.password_policy import NullBreachChecker` at the top of the conftest.
 
 - [ ] **Step 5: Update the `change_password` handler**
 
-In `src/resume_agent/api/routers/account.py`, replace the `change_password` handler with:
+In `src/resume_tailor_harness/api/routers/account.py`, replace the `change_password` handler with:
 
 ```python
 @router.post("/password")
@@ -1476,21 +1476,21 @@ def change_password(
 Add these imports to `account.py`:
 
 ```python
-from resume_agent.api.password_policy import validate_password
-from resume_agent.mail import messages
+from resume_tailor_harness.api.password_policy import validate_password
+from resume_tailor_harness.mail import messages
 ```
 
 `notify` (not `send`) is correct: the hash rotation has already committed, so a dead SMTP host must not fail the request.
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_agent/api`
+Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_tailor_harness/api`
 Expected: all pass.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api
+git add src/resume_tailor_harness/api tests/api
 git commit -m "Applies the password policy, epoch bump, and change notice to change-password"
 ```
 
@@ -1502,7 +1502,7 @@ git commit -m "Applies the password policy, epoch bump, and change notice to cha
 
 **Files:**
 
-- Create: `src/resume_agent/api/attempts.py`
+- Create: `src/resume_tailor_harness/api/attempts.py`
 - Test: `tests/api/test_attempts.py`
 
 **Interfaces:**
@@ -1528,8 +1528,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from resume_agent.api import attempts
-from resume_agent.tenancy.system_db import LoginAttempt, User, init_system_db
+from resume_tailor_harness.api import attempts
+from resume_tailor_harness.tenancy.system_db import LoginAttempt, User, init_system_db
 
 NOW = datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
 
@@ -1671,7 +1671,7 @@ Note: `User()` constructed outside a session leaves `failed_login_count` as `Non
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_attempts.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.api.attempts'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.api.attempts'`
 
 - [ ] **Step 3: Write `api/attempts.py`**
 
@@ -1693,7 +1693,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.system_db import LoginAttempt, User
+from resume_tailor_harness.tenancy.system_db import LoginAttempt, User
 
 
 @dataclass(frozen=True)
@@ -1815,13 +1815,13 @@ def is_locked(user: User, now: datetime) -> bool:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_attempts.py -v && ruff check src/resume_agent/api/attempts.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_attempts.py -v && ruff check src/resume_tailor_harness/api/attempts.py`
 Expected: 12 passed, ruff clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/attempts.py tests/api/test_attempts.py
+git add src/resume_tailor_harness/api/attempts.py tests/api/test_attempts.py
 git commit -m "Adds durable three-scope rate limiting and progressive account lockout"
 ```
 
@@ -1831,9 +1831,9 @@ git commit -m "Adds durable three-scope rate limiting and progressive account lo
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/auth.py` (lines 31–47 and the `login` handler)
-- Modify: `src/resume_agent/api/app.py` (drop `app.state.login_limiter`)
-- Delete: `src/resume_agent/api/rate_limit.py`
+- Modify: `src/resume_tailor_harness/api/routers/auth.py` (lines 31–47 and the `login` handler)
+- Modify: `src/resume_tailor_harness/api/app.py` (drop `app.state.login_limiter`)
+- Delete: `src/resume_tailor_harness/api/rate_limit.py`
 - Test: `tests/api/test_login_lockout.py`
 
 **Interfaces:**
@@ -1844,7 +1844,7 @@ git commit -m "Adds durable three-scope rate limiting and progressive account lo
   - `_record_failure(request: Request, identifier: str) -> None`
   - `_clear_failures(request: Request, identifier: str) -> None`
 
-  These three are reused verbatim by the Phase 4 and Phase 5 routers, so keep them module-level and non-underscore-private to the package (import as `from resume_agent.api.routers.auth import _rate_gate` is acceptable within `api/routers/`).
+  These three are reused verbatim by the Phase 4 and Phase 5 routers, so keep them module-level and non-underscore-private to the package (import as `from resume_tailor_harness.api.routers.auth import _rate_gate` is acceptable within `api/routers/`).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1854,7 +1854,7 @@ Create `tests/api/test_login_lockout.py`:
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.system_db import User
+from resume_tailor_harness.tenancy.system_db import User
 
 
 def _bad_login(client, times=1):
@@ -1961,7 +1961,7 @@ def _clear_failures(request: Request, identifier: str) -> None:
         attempts.reset(engine, email=identifier, ip=_client_ip(request))
 ```
 
-Add `from resume_agent.api import attempts` to the imports.
+Add `from resume_tailor_harness.api import attempts` to the imports.
 
 - [ ] **Step 4: Apply the lockout inside the `login` handler**
 
@@ -1996,20 +1996,20 @@ Replace the `request.app.state.login_limiter.reset(...)` line after the block wi
 
 - [ ] **Step 5: Remove the old limiter**
 
-Delete `src/resume_agent/api/rate_limit.py` and any `tests/api/test_rate_limit.py`. In `api/app.py`, delete the `app.state.login_limiter = FailedAttemptLimiter()` line and its import. Confirm nothing references it:
+Delete `src/resume_tailor_harness/api/rate_limit.py` and any `tests/api/test_rate_limit.py`. In `api/app.py`, delete the `app.state.login_limiter = FailedAttemptLimiter()` line and its import. Confirm nothing references it:
 
 Run: `grep -rn "login_limiter\|FailedAttemptLimiter" src tests`
 Expected: no output.
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_agent/api`
+Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_tailor_harness/api`
 Expected: all pass. The `register` handler still calls `_rate_gate(request, body.username)` — the new signature is compatible.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add -A src/resume_agent/api tests/api
+git add -A src/resume_tailor_harness/api tests/api
 git commit -m "Replaces the in-memory login limiter with durable budgets and account lockout"
 ```
 
@@ -2025,7 +2025,7 @@ git commit -m "Replaces the in-memory login limiter with durable budgets and acc
 
 **Files:**
 
-- Create: `src/resume_agent/api/auth_codes.py`
+- Create: `src/resume_tailor_harness/api/auth_codes.py`
 - Test: `tests/api/test_auth_codes.py`
 
 **Interfaces:**
@@ -2048,8 +2048,8 @@ Create `tests/api/test_auth_codes.py`:
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.api import auth_codes
-from resume_agent.config import Settings
+from resume_tailor_harness.api import auth_codes
+from resume_tailor_harness.config import Settings
 
 SETTINGS = Settings(_env_file=None, session_secret="s3cret")
 NOW = datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
@@ -2137,7 +2137,7 @@ def test_naive_expiry_from_sqlite_is_treated_as_utc():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_codes.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.api.auth_codes'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.api.auth_codes'`
 
 - [ ] **Step 3: Write `api/auth_codes.py`**
 
@@ -2158,7 +2158,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Protocol
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 CODE_TTL = timedelta(minutes=15)
 MAX_ATTEMPTS = 5
@@ -2215,13 +2215,13 @@ def check_code(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_codes.py -v && ruff check src/resume_agent/api/auth_codes.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_codes.py -v && ruff check src/resume_tailor_harness/api/auth_codes.py`
 Expected: 9 passed, ruff clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/auth_codes.py tests/api/test_auth_codes.py
+git add src/resume_tailor_harness/api/auth_codes.py tests/api/test_auth_codes.py
 git commit -m "Adds peppered six-digit codes with TTL and attempt exhaustion"
 ```
 
@@ -2231,9 +2231,9 @@ git commit -m "Adds peppered six-digit codes with TTL and attempt exhaustion"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/auth_email.py`
-- Create: `src/resume_agent/api/routers/auth_register.py`
-- Modify: `src/resume_agent/api/app.py` (mount the router, unguarded, next to `auth_router.router`)
+- Create: `src/resume_tailor_harness/api/schemas/auth_email.py`
+- Create: `src/resume_tailor_harness/api/routers/auth_register.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (mount the router, unguarded, next to `auth_router.router`)
 - Test: `tests/api/test_auth_register.py`
 
 **Interfaces:**
@@ -2255,8 +2255,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, PendingRegistration, User
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, PendingRegistration, User
 
 PASSWORD = "quartz-lantern-42-drift"
 SENT = {"status": "sent"}
@@ -2374,7 +2374,7 @@ def test_email_is_stored_casefolded(mu_app):
 
 
 def test_register_fails_loudly_when_mail_cannot_be_delivered(mu_app):
-    from resume_agent.mail.mailer import MailDeliveryError
+    from resume_tailor_harness.mail.mailer import MailDeliveryError
 
     class DeadMailer:
         def send(self, **kwargs):
@@ -2406,7 +2406,7 @@ from typing import Literal
 
 from pydantic import EmailStr, Field, field_validator
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class _EmailBody(CamelModel):
@@ -2469,24 +2469,24 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
-from resume_agent.api import attempts, auth, auth_codes
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.api.errors import ApiException
-from resume_agent.api.password_policy import validate_password
-from resume_agent.api.schemas.auth import MeResponse
-from resume_agent.api.schemas.auth_email import (
+from resume_tailor_harness.api import attempts, auth, auth_codes
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.password_policy import validate_password
+from resume_tailor_harness.api.schemas.auth import MeResponse
+from resume_tailor_harness.api.schemas.auth_email import (
     CodeSentResponse,
     RegisterRequest,
     ResendCodeRequest,
     VerifyEmailRequest,
 )
-from resume_agent.config import Settings
-from resume_agent.mail import messages
-from resume_agent.mail.mailer import MailDeliveryError
-from resume_agent.tenancy.context import new_user_id
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, PendingRegistration, User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.mail import messages
+from resume_tailor_harness.mail.mailer import MailDeliveryError
+from resume_tailor_harness.tenancy.context import new_user_id
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, PendingRegistration, User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -2610,17 +2610,17 @@ In `api/app.py`, beside the existing unguarded auth router (~line 254):
     app.include_router(auth_register_router.router, prefix="/api")
 ```
 
-with `from resume_agent.api.routers import auth_register as auth_register_router` at the top.
+with `from resume_tailor_harness.api.routers import auth_register as auth_register_router` at the top.
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_register.py -v && ruff check src/resume_agent/api`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_register.py -v && ruff check src/resume_tailor_harness/api`
 Expected: 9 passed, ruff clean.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_auth_register.py
+git add src/resume_tailor_harness/api tests/api/test_auth_register.py
 git commit -m "Adds registration that emails a code without creating the account"
 ```
 
@@ -2630,7 +2630,7 @@ git commit -m "Adds registration that emails a code without creating the account
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/auth_register.py` (append two handlers)
+- Modify: `src/resume_tailor_harness/api/routers/auth_register.py` (append two handlers)
 - Test: `tests/api/test_auth_verify_email.py`
 
 **Interfaces:**
@@ -2649,8 +2649,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, PendingRegistration, User
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, PendingRegistration, User
 
 PASSWORD = "quartz-lantern-42-drift"
 EMAIL = "ada@example.com"
@@ -2964,7 +2964,7 @@ Expected: 9 passed.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_auth_verify_email.py
+git add src/resume_tailor_harness/api tests/api/test_auth_verify_email.py
 git commit -m "Creates the account only on verified code, consuming the invite atomically"
 ```
 
@@ -2974,9 +2974,9 @@ git commit -m "Creates the account only on verified code, consuming the invite a
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/auth.py`
-- Modify: `src/resume_agent/api/routers/auth.py` (`login`, `me`)
-- Modify: `src/resume_agent/tenancy/bootstrap.py` (seed `AUTH_EMAIL`)
+- Modify: `src/resume_tailor_harness/api/schemas/auth.py`
+- Modify: `src/resume_tailor_harness/api/routers/auth.py` (`login`, `me`)
+- Modify: `src/resume_tailor_harness/tenancy/bootstrap.py` (seed `AUTH_EMAIL`)
 - Test: `tests/api/test_login_email.py`
 
 **Interfaces:**
@@ -2995,8 +2995,8 @@ Create `tests/api/test_login_email.py`:
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.tenancy.system_db import User
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.tenancy.system_db import User
 
 PASSWORD = "quartz-lantern-42-drift"
 
@@ -3165,7 +3165,7 @@ At minimum this covers `tests/api/test_account_password.py` (Task 5),
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api src/resume_agent/tenancy/bootstrap.py tests/api
+git add src/resume_tailor_harness/api src/resume_tailor_harness/tenancy/bootstrap.py tests/api
 git commit -m "Makes email the login identifier with a username fallback for pre-email accounts"
 ```
 
@@ -3175,8 +3175,8 @@ git commit -m "Makes email the login identifier with a username fallback for pre
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/auth_password.py`
-- Modify: `src/resume_agent/api/app.py` (mount, unguarded)
+- Create: `src/resume_tailor_harness/api/routers/auth_password.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (mount, unguarded)
 - Test: `tests/api/test_auth_password_reset.py`
 
 **Interfaces:**
@@ -3195,8 +3195,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password, verify_password
-from resume_agent.tenancy.system_db import PasswordResetCode, User
+from resume_tailor_harness.api.auth import hash_password, verify_password
+from resume_tailor_harness.tenancy.system_db import PasswordResetCode, User
 
 OLD = "old-quartz-lantern-42"
 NEW = "new-cobalt-meridian-77"
@@ -3369,25 +3369,25 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from resume_agent.api import attempts, auth, auth_codes
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.api.errors import ApiException
-from resume_agent.api.password_policy import validate_password
-from resume_agent.api.routers.auth_register import (
+from resume_tailor_harness.api import attempts, auth, auth_codes
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.password_policy import validate_password
+from resume_tailor_harness.api.routers.auth_register import (
     _client_ip,
     _record_failure,
     _require_multi_user,
     _send_or_fail,
 )
-from resume_agent.api.schemas.auth import MeResponse
-from resume_agent.api.schemas.auth_email import (
+from resume_tailor_harness.api.schemas.auth import MeResponse
+from resume_tailor_harness.api.schemas.auth_email import (
     CodeSentResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
 )
-from resume_agent.config import Settings
-from resume_agent.mail import messages
-from resume_agent.tenancy.system_db import PasswordResetCode, User
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.mail import messages
+from resume_tailor_harness.tenancy.system_db import PasswordResetCode, User
 
 router = APIRouter(prefix="/auth/password", tags=["auth"])
 
@@ -3532,13 +3532,13 @@ In `api/app.py`, beside the other unguarded auth routers:
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_password_reset.py -v && ruff check src/resume_agent/api`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_password_reset.py -v && ruff check src/resume_tailor_harness/api`
 Expected: 11 passed, ruff clean.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_auth_password_reset.py
+git add src/resume_tailor_harness/api tests/api/test_auth_password_reset.py
 git commit -m "Adds password recovery by emailed single-use code with full session revocation"
 ```
 
@@ -3548,10 +3548,10 @@ git commit -m "Adds password recovery by emailed single-use code with full sessi
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/account.py`
-- Modify: `src/resume_agent/api/schemas/account.py`
-- Modify: `src/resume_agent/api/routers/health.py`
-- Create: `src/resume_agent/api/schemas/health.py`
+- Modify: `src/resume_tailor_harness/api/routers/account.py`
+- Modify: `src/resume_tailor_harness/api/schemas/account.py`
+- Modify: `src/resume_tailor_harness/api/routers/health.py`
+- Create: `src/resume_tailor_harness/api/schemas/health.py`
 - Test: `tests/api/test_account_email.py`, `tests/api/test_health.py`
 
 **Interfaces:**
@@ -3583,7 +3583,7 @@ import re
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.system_db import User
+from resume_tailor_harness.tenancy.system_db import User
 
 
 def _login_legacy(client):
@@ -3702,7 +3702,7 @@ Expected: FAIL — 404 on the account routes, `KeyError: 'mailConfigured'` on he
 Task 2 already added `PasswordResetCode.pending_email` and its migration, and
 Task 12's reset query already filters it out. Verify before building on it:
 
-Run: `.venv/Scripts/python.exe -c "from resume_agent.tenancy.system_db import PasswordResetCode; print(PasswordResetCode.pending_email)"`
+Run: `.venv/Scripts/python.exe -c "from resume_tailor_harness.tenancy.system_db import PasswordResetCode; print(PasswordResetCode.pending_email)"`
 Expected: prints the column, no AttributeError.
 
 - [ ] **Step 4: Add the schemas**
@@ -3726,7 +3726,7 @@ class VerifyAccountEmailRequest(SetEmailRequest):
 Create `api/schemas/health.py`:
 
 ```python
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class HealthOut(CamelModel):
@@ -3864,8 +3864,8 @@ Replace `api/routers/health.py`:
 ```python
 from fastapi import APIRouter, Request
 
-from resume_agent.api.schemas.health import HealthOut
-from resume_agent.mail.mailer import mail_configured
+from resume_tailor_harness.api.schemas.health import HealthOut
+from resume_tailor_harness.mail.mailer import mail_configured
 
 router = APIRouter()
 
@@ -3879,7 +3879,7 @@ def health(request: Request) -> HealthOut:
 
 - [ ] **Step 7: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_agent`
+Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_tailor_harness`
 Expected: all pass.
 
 - [ ] **Step 8: Regenerate the API contract**
@@ -3890,7 +3890,7 @@ Expected: PASS. `contracts/openapi.json` and `contracts/ts/api.ts` both change �
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent tests/api contracts
+git add src/resume_tailor_harness tests/api contracts
 git commit -m "Adds account email adoption, sign-out-everywhere, and mailConfigured on health"
 ```
 
@@ -3906,7 +3906,7 @@ git commit -m "Adds account email adoption, sign-out-everywhere, and mailConfigu
 
 **Files:**
 
-- Modify: `src/resume_agent/api/auth.py` (append)
+- Modify: `src/resume_tailor_harness/api/auth.py` (append)
 - Test: `tests/api/test_oauth_state.py`
 
 **Interfaces:**
@@ -3923,8 +3923,8 @@ git commit -m "Adds account email adoption, sign-out-everywhere, and mailConfigu
 Create `tests/api/test_oauth_state.py`:
 
 ```python
-from resume_agent.api import auth
-from resume_agent.config import Settings
+from resume_tailor_harness.api import auth
+from resume_tailor_harness.config import Settings
 
 SETTINGS = Settings(_env_file=None, session_secret="s3cret")
 
@@ -4041,13 +4041,13 @@ Add `from dataclasses import dataclass` to the imports.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_oauth_state.py -v && ruff check src/resume_agent/api/auth.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_oauth_state.py -v && ruff check src/resume_tailor_harness/api/auth.py`
 Expected: 9 passed, ruff clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/auth.py tests/api/test_oauth_state.py
+git add src/resume_tailor_harness/api/auth.py tests/api/test_oauth_state.py
 git commit -m "Adds signed pre-account OAuth state carrying mode and invite"
 ```
 
@@ -4057,9 +4057,9 @@ git commit -m "Adds signed pre-account OAuth state carrying mode and invite"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/auth_google.py`
-- Create: `src/resume_agent/api/schemas/auth_google.py`
-- Modify: `src/resume_agent/api/app.py` (mount both routers unguarded)
+- Create: `src/resume_tailor_harness/api/routers/auth_google.py`
+- Create: `src/resume_tailor_harness/api/schemas/auth_google.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (mount both routers unguarded)
 - Test: `tests/api/test_auth_google.py`
 
 **Interfaces:**
@@ -4082,9 +4082,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.routers import auth_google
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, User
+from resume_tailor_harness.api.routers import auth_google
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, User
 
 CLIENT = {"google_oauth_client_id": "cid", "google_oauth_client_secret": "csecret"}
 
@@ -4162,7 +4162,7 @@ def test_callback_signs_in_a_matching_google_sub(mu_app, monkeypatch):
                  google_sub="g-123", password_hash="", role="user")
         )
         session.commit()
-    from resume_agent.api import auth as auth_module
+    from resume_tailor_harness.api import auth as auth_module
 
     with TestClient(mu_app) as client:
         # The state is minted directly rather than parsed out of the fake
@@ -4187,7 +4187,7 @@ def test_callback_links_an_existing_account_when_google_verified_the_email(mu_ap
                  password_hash="x", role="user")
         )
         session.commit()
-    from resume_agent.api import auth as auth_module
+    from resume_tailor_harness.api import auth as auth_module
 
     with TestClient(mu_app) as client:
         signed = auth_module.issue_oauth_state(mu_app.state.settings, mode="login")
@@ -4208,7 +4208,7 @@ def test_callback_refuses_to_link_when_google_did_not_verify_the_email(mu_app, m
                  password_hash="x", role="user")
         )
         session.commit()
-    from resume_agent.api import auth as auth_module
+    from resume_tailor_harness.api import auth as auth_module
 
     with TestClient(mu_app) as client:
         signed = auth_module.issue_oauth_state(mu_app.state.settings, mode="login")
@@ -4226,7 +4226,7 @@ def test_callback_registers_a_new_account_with_a_valid_invite(mu_app, monkeypatc
     _configure(mu_app)
     invite = _mint_invite(mu_app)
     _fake_google(monkeypatch, {"sub": "g-1", "email": "new@example.com", "email_verified": True})
-    from resume_agent.api import auth as auth_module
+    from resume_tailor_harness.api import auth as auth_module
 
     with TestClient(mu_app) as client:
         signed = auth_module.issue_oauth_state(
@@ -4251,7 +4251,7 @@ def test_callback_registers_a_new_account_with_a_valid_invite(mu_app, monkeypatc
 def test_callback_rejects_register_without_a_valid_invite(mu_app, monkeypatch):
     _configure(mu_app)
     _fake_google(monkeypatch, {"sub": "g-1", "email": "new@example.com", "email_verified": True})
-    from resume_agent.api import auth as auth_module
+    from resume_tailor_harness.api import auth as auth_module
 
     with TestClient(mu_app) as client:
         signed = auth_module.issue_oauth_state(
@@ -4268,7 +4268,7 @@ def test_callback_rejects_register_without_a_valid_invite(mu_app, monkeypatch):
 def test_callback_on_login_mode_with_no_account_redirects(mu_app, monkeypatch):
     _configure(mu_app)
     _fake_google(monkeypatch, {"sub": "g-1", "email": "ghost@example.com", "email_verified": True})
-    from resume_agent.api import auth as auth_module
+    from resume_tailor_harness.api import auth as auth_module
 
     with TestClient(mu_app) as client:
         signed = auth_module.issue_oauth_state(mu_app.state.settings, mode="login")
@@ -4312,7 +4312,7 @@ def test_a_disabled_account_cannot_sign_in_with_google(mu_app, monkeypatch):
                  disabled_at=datetime.now(timezone.utc))
         )
         session.commit()
-    from resume_agent.api import auth as auth_module
+    from resume_tailor_harness.api import auth as auth_module
 
     with TestClient(mu_app) as client:
         signed = auth_module.issue_oauth_state(mu_app.state.settings, mode="login")
@@ -4327,12 +4327,12 @@ def test_a_disabled_account_cannot_sign_in_with_google(mu_app, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_google.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.api.routers.auth_google'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.api.routers.auth_google'`
 
 - [ ] **Step 3: Write `api/schemas/auth_google.py`**
 
 ```python
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class GoogleStartOut(CamelModel):
@@ -4363,16 +4363,16 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from resume_agent.api import attempts, auth as auth_module
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.auth_google import GoogleStartOut
-from resume_agent.config import Settings
-from resume_agent.mail import messages
-from resume_agent.tenancy.context import new_user_id
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.api import attempts, auth as auth_module
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.auth_google import GoogleStartOut
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.mail import messages
+from resume_tailor_harness.tenancy.context import new_user_id
+from resume_tailor_harness.tenancy.secrets import hash_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -4613,13 +4613,13 @@ In `api/app.py`, beside the other unguarded auth routers:
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_google.py -v && ruff check src/resume_agent/api`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_auth_google.py -v && ruff check src/resume_tailor_harness/api`
 Expected: 11 passed, ruff clean.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_auth_google.py
+git add src/resume_tailor_harness/api tests/api/test_auth_google.py
 git commit -m "Adds Google sign-in pinned to sub and refusing unverified email links"
 ```
 
@@ -4629,8 +4629,8 @@ git commit -m "Adds Google sign-in pinned to sub and refusing unverified email l
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/gmail.py` (`gmail_connect`)
-- Modify: `src/resume_agent/api/routers/account.py` (append `DELETE /google`)
+- Modify: `src/resume_tailor_harness/api/routers/gmail.py` (`gmail_connect`)
+- Modify: `src/resume_tailor_harness/api/routers/account.py` (append `DELETE /google`)
 - Test: `tests/api/test_gmail_prewire.py`
 
 **Interfaces:**
@@ -4645,8 +4645,8 @@ Create `tests/api/test_gmail_prewire.py`:
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from resume_agent.api.routers import gmail as gmail_router
-from resume_agent.tenancy.system_db import User
+from resume_tailor_harness.api.routers import gmail as gmail_router
+from resume_tailor_harness.tenancy.system_db import User
 
 
 def _configure(app):
@@ -4720,7 +4720,7 @@ def test_unlink_is_refused_when_it_would_lock_the_account_out(mu_app):
         session.commit()
     with TestClient(mu_app) as client:
         # Sign in through the Google path is not needed; forge the session.
-        from resume_agent.api import auth as auth_module
+        from resume_tailor_harness.api import auth as auth_module
 
         with Session(mu_app.state.system_engine) as session:
             user = session.query(User).filter(User.username == "owner").one()
@@ -4772,7 +4772,7 @@ def _account_email(request: Request) -> str:
         return ""
     from sqlalchemy.orm import Session as SystemSession
 
-    from resume_agent.tenancy.system_db import User
+    from resume_tailor_harness.tenancy.system_db import User
 
     with SystemSession(engine) as session:
         user = session.get(User, context.user_id)
@@ -4813,7 +4813,7 @@ def unlink_google(
         notice = messages.google_linked(settings.app_base_url)
         request.app.state.mailer.notify(
             to=email,
-            subject="A Google account was unlinked from your Resume Agent account",
+            subject="A Google account was unlinked from your Résumé Tailor Harness account",
             body=notice.body,
         )
     return MeResponse(
@@ -4830,7 +4830,7 @@ Add `has_password` to the `system_db` import in `account.py`.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_agent`
+Run: `.venv/Scripts/python.exe -m pytest tests/api -q && ruff check src/resume_tailor_harness`
 Expected: all pass.
 
 - [ ] **Step 6: Regenerate the contract**
@@ -4841,7 +4841,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent tests/api contracts
+git add src/resume_tailor_harness tests/api contracts
 git commit -m "Pre-wires Gmail connect for Google accounts and adds a safe unlink"
 ```
 
@@ -4963,7 +4963,7 @@ export function AuthLayout({
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,color-mix(in_oklab,var(--primary-foreground)_22%,transparent),transparent_55%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,color-mix(in_oklab,var(--primary-foreground)_8%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--primary-foreground)_8%,transparent)_1px,transparent_1px)] bg-[size:3rem_3rem]" />
         <p className="relative text-lg font-semibold tracking-tight">
-          Resume Agent
+          Résumé Tailor Harness
         </p>
         <div className="relative max-w-md">
           <p className="text-3xl font-semibold leading-tight tracking-tight">
@@ -6887,7 +6887,7 @@ Expected: no diff — the contract was regenerated in Tasks 13 and 16 and commit
 
 - [ ] **Step 5: Confirm no code leaks into a response**
 
-Run: `grep -rn "code" src/resume_agent/api/schemas/auth_email.py`
+Run: `grep -rn "code" src/resume_tailor_harness/api/schemas/auth_email.py`
 Expected: `code` appears only on **request** models (`VerifyEmailRequest`, `ResetPasswordRequest`), never on `CodeSentResponse` or `MeResponse`.
 
 - [ ] **Step 6: Update CLAUDE.md**
@@ -6908,7 +6908,7 @@ gh pr create --base dev --title "Email-verified accounts, Google sign-in, and au
 Set on Railway before merging to `main`:
 
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` — without these the app runs with `NullMailer` and **logs verification codes instead of sending them**. Confirm `GET /api/health` reports `mailConfigured: true` after deploy.
-- `APP_BASE_URL` — the public origin, e.g. `https://resume-agent.up.railway.app`. Blank only drops the links from notice emails.
+- `APP_BASE_URL` — the public origin, e.g. `https://resume-tailor-harness.up.railway.app`. Blank only drops the links from notice emails.
 - `AUTH_EMAIL` — only used when bootstrapping an empty `users` table.
 - Add `https://<host>/api/auth/google/callback` to the Google OAuth client's authorized redirect URIs. The existing Gmail callback URI stays as it is.
 

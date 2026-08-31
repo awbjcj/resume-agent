@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.container_runtime import (
+from resume_tailor_harness.container_runtime import (
     _drop_privileges_to_app_user,
     configure_environment,
     resolve_app_mode,
@@ -58,12 +58,12 @@ def test_image_creates_app_user_and_starts_as_root_and_does_not_copy_local_confi
     dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
 
     # The container starts as root so container_runtime.py can reclaim the
-    # mounted /app/data volume before dropping to resume-agent -- a static
-    # `USER resume-agent` here would skip that reclaim and reintroduce the
+    # mounted /app/data volume before dropping to resume-tailor-harness -- a static
+    # `USER resume-tailor-harness` here would skip that reclaim and reintroduce the
     # UID-drift permission failure it fixes.
-    assert "useradd --system --gid resume-agent" in dockerfile
-    assert "USER resume-agent" not in dockerfile
-    assert 'ENTRYPOINT ["python", "-m", "resume_agent.container_runtime"]' in dockerfile
+    assert "useradd --system --gid resume-tailor-harness" in dockerfile
+    assert "USER resume-tailor-harness" not in dockerfile
+    assert 'ENTRYPOINT ["python", "-m", "resume_tailor_harness.container_runtime"]' in dockerfile
     assert "COPY config ./config.defaults" not in dockerfile
     assert "config/*" in dockerignore
     assert "!config/*.example" in dockerignore
@@ -80,6 +80,6 @@ def test_drop_privileges_is_a_noop_when_not_root():
 def test_compose_binds_localhost_and_persists_the_data_root():
     compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
 
-    assert '"127.0.0.1:${RESUME_AGENT_PORT:-8000}:8000"' in compose
+    assert '"127.0.0.1:${RESUME_TAILOR_HARNESS_PORT:-8000}:8000"' in compose
     assert "APP_MODE: local" in compose
-    assert "resume-agent-data:/app/data" in compose
+    assert "resume-tailor-harness-data:/app/data" in compose

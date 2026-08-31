@@ -84,12 +84,12 @@ coach` resumes an existing active session instead of always trying to create
 
 **Files:**
 
-- Create: `src/resume_agent/profile/coach_store.py`
+- Create: `src/resume_tailor_harness/profile/coach_store.py`
 - Test: `tests/test_coach_store.py`
 
 **Interfaces:**
 
-- Consumes: `resume_agent.models.base.ExtensibleModel`, `resume_agent.progress.atomic_write_text`.
+- Consumes: `resume_tailor_harness.models.base.ExtensibleModel`, `resume_tailor_harness.progress.atomic_write_text`.
 - Produces (used by Tasks 2, 6, 7):
   - Models: `CoachTopic(id, gap, why_it_matters, related_ref, status, note_doc_id)`, `CoachDraftNote(topic_id, title, summary, quotes, status)`, `CoachTurnRecord(role, kind, text, topic_id, at)`, `CoachSession(session_id, started_at, ended_at, status, turns, topics, draft_notes, recap, impact)`.
   - `coach_dir(profile_dir) -> Path`, `coach_lock()` context manager.
@@ -108,7 +108,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from resume_agent.profile.coach_store import (
+from resume_tailor_harness.profile.coach_store import (
     CoachDraftNote,
     CoachTopic,
     CoachTurnRecord,
@@ -220,12 +220,12 @@ def test_concurrent_deltas_do_not_lose_updates(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_coach_store.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.coach_store'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.coach_store'`
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/profile/coach_store.py
+# src/resume_tailor_harness/profile/coach_store.py
 """Coach session store: durable per-session files, delta-under-lock (ADR 0006)."""
 
 from __future__ import annotations
@@ -240,8 +240,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.progress import atomic_write_text
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.progress import atomic_write_text
 
 _COACH_LOCK = threading.RLock()
 
@@ -457,7 +457,7 @@ Expected: 5 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/coach_store.py tests/test_coach_store.py
+git add src/resume_tailor_harness/profile/coach_store.py tests/test_coach_store.py
 git commit -m "feat: add coach session store with delta-under-lock mutations"
 ```
 
@@ -467,12 +467,12 @@ git commit -m "feat: add coach session store with delta-under-lock mutations"
 
 **Files:**
 
-- Create: `src/resume_agent/profile/coach.py`
+- Create: `src/resume_tailor_harness/profile/coach.py`
 - Test: `tests/test_profile_coach.py`
 
 **Interfaces:**
 
-- Consumes: `ResearchAction` from `resume_agent.profile.interview`; `CoachTopic`, `CoachDraftNote`, `CoachTurnRecord` from Task 1.
+- Consumes: `ResearchAction` from `resume_tailor_harness.profile.interview`; `CoachTopic`, `CoachDraftNote`, `CoachTurnRecord` from Task 1.
 - Produces (used by Tasks 4, 6):
   - `AGENDA_CAP = 12`, `TRANSCRIPT_CHAR_CAP = 12_000`.
   - Models: `NewTopic(gap, why_it_matters, related_ref)`, `TopicUpdate(op: Literal["add","skip"], topic_id, gap, why_it_matters, related_ref)`, `DraftNote(title, summary, quotes)`, `CoachTurn(message, action: Literal["ask","draft","recap"], topic_id, topic_updates, draft_note, research_actions)`, `OpeningTurn(CoachTurn + topics: list[NewTopic])`.
@@ -487,7 +487,7 @@ git commit -m "feat: add coach session store with delta-under-lock mutations"
 # tests/test_profile_coach.py
 import pytest
 
-from resume_agent.profile.coach import (
+from resume_tailor_harness.profile.coach import (
     AGENDA_CAP,
     CoachTurn,
     DraftNote,
@@ -600,12 +600,12 @@ def test_topic_updates_add_under_cap_and_skip_open_only():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_coach.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.coach'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.coach'`
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/profile/coach.py
+# src/resume_tailor_harness/profile/coach.py
 """Profile Coach turn schemas, validation, context assembly, and agents.
 
 ADR 0005 (read-only tools, deterministic writes) + ADR 0006 (turn-per-run
@@ -620,13 +620,13 @@ from typing import Literal
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.profile.coach_store import (
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.profile.coach_store import (
     CoachDraftNote,
     CoachTopic,
     CoachTurnRecord,
 )
-from resume_agent.profile.interview import ResearchAction
+from resume_tailor_harness.profile.interview import ResearchAction
 
 AGENDA_CAP = 12
 TRANSCRIPT_CHAR_CAP = 12_000
@@ -785,7 +785,7 @@ Expected: 4 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/coach.py tests/test_profile_coach.py
+git add src/resume_tailor_harness/profile/coach.py tests/test_profile_coach.py
 git commit -m "feat: add coach turn schemas with quote and agenda validation"
 ```
 
@@ -795,12 +795,12 @@ git commit -m "feat: add coach turn schemas with quote and agenda validation"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/coach.py` (append)
+- Modify: `src/resume_tailor_harness/profile/coach.py` (append)
 - Test: `tests/test_profile_coach.py` (append)
 
 **Interfaces:**
 
-- Consumes: `load_facts`, `load_matrix`, `load_manifest` (same imports as `services/profile_interview.interview_context`); `asked_questions` + `load_history` from `resume_agent.profile.interview`; `list_sessions` from Task 1.
+- Consumes: `load_facts`, `load_matrix`, `load_manifest` (same imports as `services/profile_interview.interview_context`); `asked_questions` + `load_history` from `resume_tailor_harness.profile.interview`; `list_sessions` from Task 1.
 - Produces (used by Task 6):
   - `profile_overview(profile_dir, session=None) -> str` — the FACTS / TOP SKILLS / CORPUS / MARKET GAPS blocks, moved verbatim from `services/profile_interview.interview_context` (same `_block` helper, same `_market_gaps_report`), with the PREVIOUSLY ASKED block replaced by `previously_asked(profile_dir)`.
   - `previously_asked(profile_dir) -> list[str]` — legacy `asked_questions(profile_dir)` + every coach turn with `kind == "question"` across all stored sessions.
@@ -810,7 +810,7 @@ git commit -m "feat: add coach turn schemas with quote and agenda validation"
 - [ ] **Step 1: Write the failing tests** (append to `tests/test_profile_coach.py`)
 
 ```python
-from resume_agent.profile.coach import (  # noqa: E402 - appended imports
+from resume_tailor_harness.profile.coach import (  # noqa: E402 - appended imports
     previously_asked,
     profile_overview,
     render_agenda,
@@ -826,10 +826,10 @@ def test_profile_overview_degrades_on_fresh_workspace(tmp_path):
 
 
 def test_previously_asked_merges_legacy_history_and_coach_sessions(tmp_path):
-    from resume_agent.profile.coach_store import (
+    from resume_tailor_harness.profile.coach_store import (
         CoachTopic, CoachTurnRecord, create_session,
     )
-    from resume_agent.profile.interview import (
+    from resume_tailor_harness.profile.interview import (
         InterviewQuestion, InterviewRound, append_round,
     )
 
@@ -882,7 +882,7 @@ def test_transcript_elision_keeps_active_topic_verbatim():
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_coach.py -v -k "overview or previously or elision"`
 Expected: FAIL — `ImportError: cannot import name 'profile_overview'`
 
-- [ ] **Step 3: Write the implementation** (append to `src/resume_agent/profile/coach.py`)
+- [ ] **Step 3: Write the implementation** (append to `src/resume_tailor_harness/profile/coach.py`)
 
 Move the body of `services/profile_interview.interview_context` here (do NOT delete the original yet — that happens in Task 10):
 
@@ -890,11 +890,11 @@ Move the body of `services/profile_interview.interview_context` here (do NOT del
 # --- context assembly -------------------------------------------------------
 from pathlib import Path  # noqa: E402  (keep imports at top of file in practice)
 
-from resume_agent.profile.corpus import load_manifest
-from resume_agent.profile.interview import asked_questions
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.store import load_facts
-from resume_agent.profile.coach_store import list_sessions
+from resume_tailor_harness.profile.corpus import load_manifest
+from resume_tailor_harness.profile.interview import asked_questions
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.profile.coach_store import list_sessions
 
 _METRIC = re.compile(r"\d")
 _TOP_GAPS = 10
@@ -902,9 +902,9 @@ _TOP_SKILLS = 20
 
 
 def _market_gaps_report(profile_dir: Path, session):
-    from resume_agent.profile.matrix import effective_cluster_map, load_overrides
-    from resume_agent.taxonomy.clusters import load_cluster_map
-    from resume_agent.tracking.match_gap import match_gap
+    from resume_tailor_harness.profile.matrix import effective_cluster_map, load_overrides
+    from resume_tailor_harness.taxonomy.clusters import load_cluster_map
+    from resume_tailor_harness.tracking.match_gap import match_gap
 
     facts_path = profile_dir / "facts.json"
     if not facts_path.exists():
@@ -1044,7 +1044,7 @@ Expected: 7 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/coach.py tests/test_profile_coach.py
+git add src/resume_tailor_harness/profile/coach.py tests/test_profile_coach.py
 git commit -m "feat: add coach context assembly with topic-aware transcript elision"
 ```
 
@@ -1054,12 +1054,12 @@ git commit -m "feat: add coach context assembly with topic-aware transcript elis
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/coach.py` (append)
+- Modify: `src/resume_tailor_harness/profile/coach.py` (append)
 - Test: `tests/test_profile_coach.py` (append)
 
 **Interfaces:**
 
-- Consumes: `AgentRunner`, `Runner`, `build_model`, `retry_kwargs`, `tool_kwargs`, `use_json_mode_for` from `resume_agent.llm_runner`; `make_corpus_tools` from `resume_agent.profile.interview`; `get_settings` from `resume_agent.config`.
+- Consumes: `AgentRunner`, `Runner`, `build_model`, `retry_kwargs`, `tool_kwargs`, `use_json_mode_for` from `resume_tailor_harness.llm_runner`; `make_corpus_tools` from `resume_tailor_harness.profile.interview`; `get_settings` from `resume_tailor_harness.config`.
 - Produces (used by Task 6):
   - `build_coach_agent(tools) -> Runner` — mid-tier tool loop with `_COACH_INSTRUCTIONS`.
   - `build_coach_formatter_agent(schema: type[CoachTurn]) -> Runner` — cheap tier, `output_schema=schema` (`CoachTurn` or `OpeningTurn`).
@@ -1068,8 +1068,8 @@ git commit -m "feat: add coach context assembly with topic-aware transcript elis
 
 ```python
 def test_agent_builders_construct_offline(monkeypatch, tmp_path):
-    import resume_agent.profile.coach as coach_mod
-    from resume_agent.profile.interview import make_corpus_tools
+    import resume_tailor_harness.profile.coach as coach_mod
+    from resume_tailor_harness.profile.interview import make_corpus_tools
 
     class Settings:
         mid_model = "claude-mid"
@@ -1082,20 +1082,20 @@ def test_agent_builders_construct_offline(monkeypatch, tmp_path):
     assert formatter.agent.output_schema is coach_mod.OpeningTurn
 ```
 
-Note: `AgentRunner` stores the agno agent as `.agent` — verify with `Grep "class AgentRunner" src/resume_agent/llm_runner.py -A 10` and adjust the attribute name in the assert if it differs (e.g. `_agent`).
+Note: `AgentRunner` stores the agno agent as `.agent` — verify with `Grep "class AgentRunner" src/resume_tailor_harness/llm_runner.py -A 10` and adjust the attribute name in the assert if it differs (e.g. `_agent`).
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_coach.py::test_agent_builders_construct_offline -v`
 Expected: FAIL — `AttributeError: ... has no attribute 'build_coach_agent'`
 
-- [ ] **Step 3: Write the implementation** (append to `src/resume_agent/profile/coach.py`; hoist imports)
+- [ ] **Step 3: Write the implementation** (append to `src/resume_tailor_harness/profile/coach.py`; hoist imports)
 
 ```python
 from agno.agent import Agent
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
@@ -1176,7 +1176,7 @@ Expected: 8 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/coach.py tests/test_profile_coach.py
+git add src/resume_tailor_harness/profile/coach.py tests/test_profile_coach.py
 git commit -m "feat: add coach inspector and formatter agents"
 ```
 
@@ -1186,12 +1186,12 @@ git commit -m "feat: add coach inspector and formatter agents"
 
 **Files:**
 
-- Create: `src/resume_agent/profile/snapshot.py`
+- Create: `src/resume_tailor_harness/profile/snapshot.py`
 - Test: `tests/test_profile_snapshot.py`
 
 **Interfaces:**
 
-- Consumes: `load_facts` (`resume_agent.profile.store`), `load_matrix` (`resume_agent.profile.matrix`).
+- Consumes: `load_facts` (`resume_tailor_harness.profile.store`), `load_matrix` (`resume_tailor_harness.profile.matrix`).
 - Produces (used by Task 7):
   - `profile_snapshot(profile_dir) -> dict` with shape `{"factIds": [str], "bullets": {experience_id: {"total": int, "withMetrics": int}}, "skills": {matrix_key: evidence_ref_count}}`. Missing `facts.json`/`matrix.json` yield empty collections.
   - `snapshot_diff(before, after) -> dict` with shape `{"newFactIds": [str], "bulletsGainedMetrics": [{"experienceId": str, "before": int, "after": int}], "skillsGainedEvidence": [{"skill": str, "before": int, "after": int}], "newSkills": [str]}`.
@@ -1202,7 +1202,7 @@ git commit -m "feat: add coach inspector and formatter agents"
 # tests/test_profile_snapshot.py
 import json
 
-from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
+from resume_tailor_harness.profile.snapshot import profile_snapshot, snapshot_diff
 
 
 def _write_profile(profile_dir, *, metrics_bullet: str, skills_refs: int, extra_project=False):
@@ -1266,12 +1266,12 @@ def test_diff_reports_gains_only(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_snapshot.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.snapshot'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.snapshot'`
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/profile/snapshot.py
+# src/resume_tailor_harness/profile/snapshot.py
 """Compact profile snapshots and the coach Impact diff (pure functions)."""
 
 from __future__ import annotations
@@ -1279,8 +1279,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.store import load_facts
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import load_facts
 
 _METRIC = re.compile(r"\d")
 
@@ -1344,7 +1344,7 @@ Expected: 3 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/snapshot.py tests/test_profile_snapshot.py
+git add src/resume_tailor_harness/profile/snapshot.py tests/test_profile_snapshot.py
 git commit -m "feat: add profile snapshot and impact diff functions"
 ```
 
@@ -1354,12 +1354,12 @@ git commit -m "feat: add profile snapshot and impact diff functions"
 
 **Files:**
 
-- Create: `src/resume_agent/services/profile_coach.py`
+- Create: `src/resume_tailor_harness/services/profile_coach.py`
 - Test: `tests/test_profile_coach_service.py`
 
 **Interfaces:**
 
-- Consumes: Tasks 1–4 (`coach_store`, `coach` validation/context/agents), `make_corpus_tools` (`resume_agent.profile.interview`), `get_session` (`resume_agent.db`).
+- Consumes: Tasks 1–4 (`coach_store`, `coach` validation/context/agents), `make_corpus_tools` (`resume_tailor_harness.profile.interview`), `get_session` (`resume_tailor_harness.db`).
 - Produces (used by Tasks 8, 9):
   - `run_opening_turn(reporter, *, profile_dir, engine=None, coach_agent=None, formatter_agent=None) -> dict` — returns `session_view(...)` of the new session (`{"sessionId", "status", "turns", "topics", "draftNotes", "recap", "impact"}` camelCase keys).
   - `run_message_turn(reporter, *, profile_dir, session_id, message, engine=None, coach_agent=None, formatter_agent=None) -> dict` — same return; raises `ValueError` on unknown/ended session or empty/oversized message (`> 100_000` chars).
@@ -1375,9 +1375,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from resume_agent.profile.coach import CoachTurn, DraftNote, NewTopic, OpeningTurn
-from resume_agent.profile.coach_store import load_session
-from resume_agent.services.profile_coach import (
+from resume_tailor_harness.profile.coach import CoachTurn, DraftNote, NewTopic, OpeningTurn
+from resume_tailor_harness.profile.coach_store import load_session
+from resume_tailor_harness.services.profile_coach import (
     run_message_turn,
     run_opening_turn,
     session_view,
@@ -1525,12 +1525,12 @@ def test_message_size_and_session_guards(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_coach_service.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.profile_coach'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.profile_coach'`
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/services/profile_coach.py
+# src/resume_tailor_harness/services/profile_coach.py
 """Profile Coach service: turn execution, views, approval, recap, impact."""
 
 from __future__ import annotations
@@ -1538,8 +1538,8 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from resume_agent.llm_runner import Runner
-from resume_agent.profile.coach import (
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.profile.coach import (
     CoachTurn,
     OpeningTurn,
     TurnRejected,
@@ -1551,13 +1551,13 @@ from resume_agent.profile.coach import (
     render_agenda,
     render_transcript,
 )
-from resume_agent.profile.coach_store import (
+from resume_tailor_harness.profile.coach_store import (
     apply_turn_delta,
     create_session,
     list_sessions,
     load_session,
 )
-from resume_agent.profile.interview import make_corpus_tools
+from resume_tailor_harness.profile.interview import make_corpus_tools
 
 _MAX_MESSAGE_CHARS = 100_000
 
@@ -1618,7 +1618,7 @@ def sessions_view(profile_dir: Path | str) -> dict:
 def _overview(profile_dir: Path, engine) -> str:
     if engine is None:
         return profile_overview(profile_dir)
-    from resume_agent.db import get_session
+    from resume_tailor_harness.db import get_session
 
     with get_session(engine) as db:
         return profile_overview(profile_dir, db)
@@ -1734,7 +1734,7 @@ Expected: 5 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_coach.py tests/test_profile_coach_service.py
+git add src/resume_tailor_harness/services/profile_coach.py tests/test_profile_coach_service.py
 git commit -m "feat: add coach service opening and message turns"
 ```
 
@@ -1744,12 +1744,12 @@ git commit -m "feat: add coach service opening and message turns"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/profile_coach.py` (append)
+- Modify: `src/resume_tailor_harness/services/profile_coach.py` (append)
 - Test: `tests/test_profile_coach_service.py` (append)
 
 **Interfaces:**
 
-- Consumes: `add_note_source` (`resume_agent.profile.intake`), `load_manifest` (`resume_agent.profile.corpus`), `profile_snapshot`/`snapshot_diff` (Task 5), `run_corpus_build` (`resume_agent.services.profile_build`), store helpers (Task 1).
+- Consumes: `add_note_source` (`resume_tailor_harness.profile.intake`), `load_manifest` (`resume_tailor_harness.profile.corpus`), `profile_snapshot`/`snapshot_diff` (Task 5), `run_corpus_build` (`resume_tailor_harness.services.profile_build`), store helpers (Task 1).
 - Produces (used by Tasks 8, 9):
   - `approve_draft(profile_dir, session_id, topic_id, *, title, summary, quotes) -> str` — requires a literal primary corpus source (same guard as the old `submit_interview_answers`); renders the note markdown; `add_note_source`; `set_draft_status(..., "saved", doc.id)`; returns the doc id. Raises `ValueError` (`"upload a primary resume"`, `"unknown draft"`, `"draft already resolved"`, `"empty note"`).
   - `discard_draft(profile_dir, session_id, topic_id) -> None`.
@@ -1759,7 +1759,7 @@ git commit -m "feat: add coach service opening and message turns"
 - [ ] **Step 1: Write the failing tests** (append to `tests/test_profile_coach_service.py`)
 
 ```python
-from resume_agent.services.profile_coach import (  # noqa: E402
+from resume_tailor_harness.services.profile_coach import (  # noqa: E402
     approve_draft,
     discard_draft,
     run_build_with_impact,
@@ -1768,7 +1768,7 @@ from resume_agent.services.profile_coach import (  # noqa: E402
 
 
 def _seed_primary(profile_dir):
-    from resume_agent.profile.corpus import add_source
+    from resume_tailor_harness.profile.corpus import add_source
 
     source = profile_dir.parent / "resume.txt"
     source.write_text("Resume body", encoding="utf-8")
@@ -1804,7 +1804,7 @@ def test_approve_draft_writes_note_with_quote_block(tmp_path):
         title="Acme deploys", summary="Cut deploy time from 40 min to 6 min.",
         quotes=["I cut deploy time from 40 min to 6 min."],
     )
-    from resume_agent.profile.corpus import doc_path, load_manifest
+    from resume_tailor_harness.profile.corpus import doc_path, load_manifest
 
     doc = next(d for d in load_manifest(profile_dir).docs if d.id == doc_id)
     body = doc_path(profile_dir, doc).read_text(encoding="utf-8")
@@ -1858,7 +1858,7 @@ def test_recap_ends_session_and_approval_still_allowed(tmp_path):
 
 def test_build_with_impact_records_diff_and_error(tmp_path, monkeypatch):
     profile_dir, sid = _drafted_session(tmp_path)
-    import resume_agent.services.profile_coach as svc
+    import resume_tailor_harness.services.profile_coach as svc
 
     monkeypatch.setattr(
         svc, "run_corpus_build", lambda reporter, **kwargs: {"experiences": 1}
@@ -1886,14 +1886,14 @@ def test_build_with_impact_records_diff_and_error(tmp_path, monkeypatch):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_coach_service.py -v -k "approve or recap or build_with"`
 Expected: FAIL — `ImportError: cannot import name 'approve_draft'`
 
-- [ ] **Step 3: Write the implementation** (append to `src/resume_agent/services/profile_coach.py`; hoist imports)
+- [ ] **Step 3: Write the implementation** (append to `src/resume_tailor_harness/services/profile_coach.py`; hoist imports)
 
 ```python
-from resume_agent.profile.coach_store import end_session, set_draft_status, set_impact
-from resume_agent.profile.corpus import load_manifest
-from resume_agent.profile.intake import add_note_source
-from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
-from resume_agent.services.profile_build import run_corpus_build
+from resume_tailor_harness.profile.coach_store import end_session, set_draft_status, set_impact
+from resume_tailor_harness.profile.corpus import load_manifest
+from resume_tailor_harness.profile.intake import add_note_source
+from resume_tailor_harness.profile.snapshot import profile_snapshot, snapshot_diff
+from resume_tailor_harness.services.profile_build import run_corpus_build
 
 
 def _primary_exists(profile_dir: Path) -> bool:
@@ -2026,7 +2026,7 @@ Expected: 9 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_coach.py tests/test_profile_coach_service.py
+git add src/resume_tailor_harness/services/profile_coach.py tests/test_profile_coach_service.py
 git commit -m "feat: add coach draft approval, recap, and build-with-impact"
 ```
 
@@ -2036,9 +2036,9 @@ git commit -m "feat: add coach draft approval, recap, and build-with-impact"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/coach.py`
-- Create: `src/resume_agent/api/routers/coach.py`
-- Modify: `src/resume_agent/api/app.py` (register router)
+- Create: `src/resume_tailor_harness/api/schemas/coach.py`
+- Create: `src/resume_tailor_harness/api/routers/coach.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register router)
 - Test: `tests/api/test_coach_router.py`
 
 **Interfaces:**
@@ -2062,9 +2062,9 @@ import time
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import coach as coach_router
-from resume_agent.profile.coach_store import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import coach as coach_router
+from resume_tailor_harness.profile.coach_store import (
     CoachDraftNote,
     CoachTopic,
     CoachTurnRecord,
@@ -2230,19 +2230,19 @@ def test_end_run_chains_build_and_skips_when_busy(monkeypatch, tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_coach_router.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.api.routers.coach'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.api.routers.coach'`
 
 - [ ] **Step 3: Write schemas**
 
 ```python
-# src/resume_agent/api/schemas/coach.py
+# src/resume_tailor_harness/api/schemas/coach.py
 """Profile Coach wire schemas (camelCase via CamelModel)."""
 
 from __future__ import annotations
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class CoachTurnOut(CamelModel):
@@ -2316,7 +2316,7 @@ class CoachEndIn(CamelModel):
 - [ ] **Step 4: Write the router**
 
 ```python
-# src/resume_agent/api/routers/coach.py
+# src/resume_tailor_harness/api/routers/coach.py
 """Profile Coach endpoints: turn runs + deterministic approval writes."""
 
 from __future__ import annotations
@@ -2326,20 +2326,20 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, Request
 
-from resume_agent.api.deps import (
+from resume_tailor_harness.api.deps import (
     get_config_store,
     get_profile_dir,
     get_run_manager,
     get_settings_dep,
 )
-from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.manager import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.runs.manager import (
     RunManager,
     RunResetConflict,
     RunSingletonConflict,
 )
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.coach import (
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.coach import (
     CoachEndIn,
     CoachMessageIn,
     CoachNoteIn,
@@ -2347,13 +2347,13 @@ from resume_agent.api.schemas.coach import (
     CoachSessionOut,
     CoachSessionsOut,
 )
-from resume_agent.api.schemas.config import ProfileConfigDoc
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.config import Settings
-from resume_agent.llm_runner import resolve_api_key
-from resume_agent.profile.coach_store import active_session
-from resume_agent.profile.corpus import load_manifest
-from resume_agent.services.profile_coach import (
+from resume_tailor_harness.api.schemas.config import ProfileConfigDoc
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_runner import resolve_api_key
+from resume_tailor_harness.profile.coach_store import active_session
+from resume_tailor_harness.profile.corpus import load_manifest
+from resume_tailor_harness.services.profile_coach import (
     approve_draft,
     discard_draft,
     run_build_with_impact,
@@ -2572,14 +2572,14 @@ def get_coach_session(session_id: str, request: Request):
 
 - [ ] **Step 5: Register the router**
 
-Find the registration block: `Grep "include_router" src/resume_agent/api/app.py -n`. Add, matching the existing pattern exactly (same prefix/dependency arguments as the profile router line):
+Find the registration block: `Grep "include_router" src/resume_tailor_harness/api/app.py -n`. Add, matching the existing pattern exactly (same prefix/dependency arguments as the profile router line):
 
 ```python
-from resume_agent.api.routers import coach as coach_router_module
+from resume_tailor_harness.api.routers import coach as coach_router_module
 app.include_router(coach_router_module.router, prefix="/api", ...)  # copy the profile router's exact kwargs
 ```
 
-Also check `mgr.submit` inside a worker: `Grep "def submit" src/resume_agent/api/runs/manager.py -A 40` — confirm nothing blocks nested submission (the singleton lock is not held while workers run). If `record_to_run` lives elsewhere, fix the import (`Grep "def record_to_run" src/`).
+Also check `mgr.submit` inside a worker: `Grep "def submit" src/resume_tailor_harness/api/runs/manager.py -A 40` — confirm nothing blocks nested submission (the singleton lock is not held while workers run). If `record_to_run` lives elsewhere, fix the import (`Grep "def record_to_run" src/`).
 
 - [ ] **Step 6: Run tests to verify they pass**
 
@@ -2589,7 +2589,7 @@ Expected: 4 passed
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/coach.py src/resume_agent/api/routers/coach.py src/resume_agent/api/app.py tests/api/test_coach_router.py
+git add src/resume_tailor_harness/api/schemas/coach.py src/resume_tailor_harness/api/routers/coach.py src/resume_tailor_harness/api/app.py tests/api/test_coach_router.py
 git commit -m "feat: expose profile coach API"
 ```
 
@@ -2599,14 +2599,14 @@ git commit -m "feat: expose profile coach API"
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (delete `profile_interview_cmd` at ~`cli.py:306-398`, add `profile_coach_cmd` in its place)
+- Modify: `src/resume_tailor_harness/cli.py` (delete `profile_interview_cmd` at ~`cli.py:306-398`, add `profile_coach_cmd` in its place)
 - Create: `tests/test_cli_profile_coach.py`
 - Delete: `tests/test_cli_profile_interview.py`
 
 **Interfaces:**
 
-- Consumes: `run_opening_turn`, `run_message_turn`, `run_recap_turn`, `approve_draft`, `discard_draft`, `run_build_with_impact` (imported lazily inside the command like the old command did, so tests can monkeypatch `resume_agent.services.profile_coach.*`).
-- Produces: `resume-agent profile coach [--facts …] [--db-url …] [--no-build] [--profile-sources …]`. Loop: print coach message → `typer.prompt("You")` → send; `/end` finishes; when a turn returns a new pending draft, prompt `Save this note? [s]ave / [d]iscard / [l]eave` and dispatch accordingly.
+- Consumes: `run_opening_turn`, `run_message_turn`, `run_recap_turn`, `approve_draft`, `discard_draft`, `run_build_with_impact` (imported lazily inside the command like the old command did, so tests can monkeypatch `resume_tailor_harness.services.profile_coach.*`).
+- Produces: `resume-tailor-harness profile coach [--facts …] [--db-url …] [--no-build] [--profile-sources …]`. Loop: print coach message → `typer.prompt("You")` → send; `/end` finishes; when a turn returns a new pending draft, prompt `Save this note? [s]ave / [d]iscard / [l]eave` and dispatch accordingly.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2614,8 +2614,8 @@ git commit -m "feat: expose profile coach API"
 # tests/test_cli_profile_coach.py
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.profile.corpus import add_source
+from resume_tailor_harness import cli
+from resume_tailor_harness.profile.corpus import add_source
 
 
 def _view(sid="s1", *, status="active", turns=None, drafts=None):
@@ -2645,7 +2645,7 @@ def _setup(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(cli, "_engine", lambda db_url: object())
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.run_opening_turn",
+        "resume_tailor_harness.services.profile_coach.run_opening_turn",
         lambda reporter, **kw: _view(),
     )
 
@@ -2660,10 +2660,10 @@ def _setup(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.run_message_turn", message
+        "resume_tailor_harness.services.profile_coach.run_message_turn", message
     )
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.run_recap_turn",
+        "resume_tailor_harness.services.profile_coach.run_recap_turn",
         lambda reporter, **kw: _view(status="ended") | {"recap": "Covered Acme."},
     )
 
@@ -2672,10 +2672,10 @@ def _setup(monkeypatch, tmp_path):
         return "doc-1"
 
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.approve_draft", approve
+        "resume_tailor_harness.services.profile_coach.approve_draft", approve
     )
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.run_build_with_impact",
+        "resume_tailor_harness.services.profile_coach.run_build_with_impact",
         lambda reporter, **kw: calls["built"].append(kw) or {"impact": {}},
     )
     return profile_dir, calls
@@ -2731,8 +2731,8 @@ def profile_coach_cmd(
     ),
 ) -> None:
     """Interactive coaching chat: strengthen profile evidence one topic at a time."""
-    from resume_agent.profile.corpus import load_manifest
-    from resume_agent.services import profile_coach as coach_svc
+    from resume_tailor_harness.profile.corpus import load_manifest
+    from resume_tailor_harness.services import profile_coach as coach_svc
 
     profile_dir = _tenant_cli_path(facts).parent
     if not any(
@@ -2851,7 +2851,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/ -k cli -v` — expected: no fail
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_profile_coach.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_profile_coach.py
 git commit -m "feat: replace profile interview command with interactive coach chat"
 ```
 
@@ -2861,10 +2861,10 @@ git commit -m "feat: replace profile interview command with interactive coach ch
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/profile.py` — delete `launch_interview` (~193-234), `answer_interview` (~237-288), `interview_history` (~291-295), and the now-unused imports (`InterviewAnswersIn`, `InterviewAnswersOut`, `InterviewHistoryOut`, `interview_history_view`, `run_interview_round`, `submit_interview_answers`).
-- Modify: `src/resume_agent/api/schemas/profile.py` — delete `InterviewQuestionOut`, `InterviewResearchActionOut`, `InterviewHistoryAnswerOut`, `InterviewHistoryRoundOut`, `InterviewHistoryOut`, `InterviewAnswerIn`, `InterviewAnswersIn`, `InterviewAnswersOut` (lines ~72-119).
-- Delete: `src/resume_agent/services/profile_interview.py`
-- Modify: `src/resume_agent/profile/interview.py` — keep `InterviewQuestion`, `ResearchAction`, `_HistoryAnswer`, `_HistoryRound`, `_History`, `load_history`, `asked_questions`, `make_corpus_tools`, `_DOC_READ_CAP`, `append_round` (tests and `previously_asked` fixtures still write legacy rounds); delete `InterviewRound`… wait — `append_round` takes an `InterviewRound`, keep it too; delete `MAX_QUESTIONS`, `normalize_round`, `record_answers`, `history_lock`, `_INSPECT_INSTRUCTIONS`, `_FORMAT_INSTRUCTIONS`, `build_interview_inspector_agent`, `build_interview_formatter_agent`, and the now-unused imports (`AgentRunner`, `build_model`, `retry_kwargs`, `tool_kwargs`, `use_json_mode_for`, `Agent`, `get_settings`, `threading`/`contextmanager` if `history_lock` goes — check each with Grep before removing).
+- Modify: `src/resume_tailor_harness/api/routers/profile.py` — delete `launch_interview` (~193-234), `answer_interview` (~237-288), `interview_history` (~291-295), and the now-unused imports (`InterviewAnswersIn`, `InterviewAnswersOut`, `InterviewHistoryOut`, `interview_history_view`, `run_interview_round`, `submit_interview_answers`).
+- Modify: `src/resume_tailor_harness/api/schemas/profile.py` — delete `InterviewQuestionOut`, `InterviewResearchActionOut`, `InterviewHistoryAnswerOut`, `InterviewHistoryRoundOut`, `InterviewHistoryOut`, `InterviewAnswerIn`, `InterviewAnswersIn`, `InterviewAnswersOut` (lines ~72-119).
+- Delete: `src/resume_tailor_harness/services/profile_interview.py`
+- Modify: `src/resume_tailor_harness/profile/interview.py` — keep `InterviewQuestion`, `ResearchAction`, `_HistoryAnswer`, `_HistoryRound`, `_History`, `load_history`, `asked_questions`, `make_corpus_tools`, `_DOC_READ_CAP`, `append_round` (tests and `previously_asked` fixtures still write legacy rounds); delete `InterviewRound`… wait — `append_round` takes an `InterviewRound`, keep it too; delete `MAX_QUESTIONS`, `normalize_round`, `record_answers`, `history_lock`, `_INSPECT_INSTRUCTIONS`, `_FORMAT_INSTRUCTIONS`, `build_interview_inspector_agent`, `build_interview_formatter_agent`, and the now-unused imports (`AgentRunner`, `build_model`, `retry_kwargs`, `tool_kwargs`, `use_json_mode_for`, `Agent`, `get_settings`, `threading`/`contextmanager` if `history_lock` goes — check each with Grep before removing).
 - Delete: `tests/test_profile_interview_service.py`, `tests/api/test_profile_interview_router.py`
 - Modify: `tests/test_profile_interview.py` — delete tests exercising removed functions (`normalize_round`, `record_answers`, agent builders); keep tests for `load_history`, `asked_questions`, `append_round`, `make_corpus_tools`. Read the file first; if all remaining coverage is duplicated by `tests/test_profile_coach.py`, delete the whole file instead.
 
@@ -3216,7 +3216,7 @@ git commit -m "feat: route coach page, add nav entry, retire interview panel"
 
 **Files:**
 
-- Modify: `CLAUDE.md` — in "Hot paths" replace nothing (add `src/resume_agent/profile/coach.py | Coach turn validation, context, agents` and `src/resume_agent/services/profile_coach.py | Coach session service: turns, approval, recap, impact`); in "Known design notes" add one bullet summarizing the coach (turn-per-run sessions per ADR 0006, quote-validated draft notes per ADR 0005 amendment, batch interview retired) and delete any stale reference to the batch interview if present.
+- Modify: `CLAUDE.md` — in "Hot paths" replace nothing (add `src/resume_tailor_harness/profile/coach.py | Coach turn validation, context, agents` and `src/resume_tailor_harness/services/profile_coach.py | Coach session service: turns, approval, recap, impact`); in "Known design notes" add one bullet summarizing the coach (turn-per-run sessions per ADR 0006, quote-validated draft notes per ADR 0005 amendment, batch interview retired) and delete any stale reference to the batch interview if present.
 - Modify: `docs/superpowers/specs/2026-07-15-profile-coach-design.md` — add the `DELETE …/notes/{topic_id}` discard endpoint to the Part 3 table (implemented in Task 8; the spec table omitted it).
 
 - [ ] **Step 1: Make the doc edits.**

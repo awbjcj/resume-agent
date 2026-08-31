@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def test_list_runs_returns_paginated_active_snapshots(tmp_path):

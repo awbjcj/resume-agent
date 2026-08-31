@@ -1,9 +1,9 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.cover_letter.service import generate_cover_letter
-from resume_agent.discovery.ingest import add_job
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact, Experience, ProfileFacts
+from resume_tailor_harness.cover_letter.service import generate_cover_letter
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts
 
 
 def _session():

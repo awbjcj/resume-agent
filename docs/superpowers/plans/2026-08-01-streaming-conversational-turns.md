@@ -88,8 +88,8 @@ where a later task says to apply a snippet "verbatim":
 
 | Path                                              | Responsibility                                                                 |
 | ------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `src/resume_agent/sessions/stream.py`             | `StreamEvent` types, ndjson codec, `StreamSink` protocol + three sinks, reader |
-| `src/resume_agent/api/runs/stream_sse.py`         | Async generator tailing a run's ndjson from an offset                          |
+| `src/resume_tailor_harness/sessions/stream.py`             | `StreamEvent` types, ndjson codec, `StreamSink` protocol + three sinks, reader |
+| `src/resume_tailor_harness/api/runs/stream_sse.py`         | Async generator tailing a run's ndjson from an offset                          |
 | `tests/test_sessions_stream.py`                   | Codec, sinks, reader, offset resume                                            |
 | `tests/test_llm_runner_stream.py`                 | `AgentRunner.stream` event mapping + retry policy                              |
 | `tests/test_turn_prose.py`                        | `ProseEmitter` delimiter handling                                              |
@@ -111,20 +111,20 @@ where a later task says to apply a snippet "verbatim":
 
 | Path                                                       | Change                                                                               |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `src/resume_agent/llm_runner.py`                           | `StreamEvent` re-export, `AgentRunner.stream()`                                      |
-| `src/resume_agent/sessions/turns.py`                       | `DraftRejected`, `ProseEmitter`, `format_with_retry` strict/lenient                  |
-| `src/resume_agent/profile/coach.py`                        | Metadata contract in instructions; `normalize_*` strict flag; `ValidatedTurn.notice` |
-| `src/resume_agent/profile/coach_store.py`                  | `CoachTurnRecord.notice`                                                             |
-| `src/resume_agent/services/profile_coach.py`               | `sink=` parameter; stream the coach agent                                            |
-| `src/resume_agent/interview/agent.py`                      | Same treatment as coach                                                              |
-| `src/resume_agent/interview/store.py`                      | `InterviewTurnRecord.notice`                                                         |
-| `src/resume_agent/services/mock_interview.py`              | `sink=` parameter; stream the interviewer                                            |
-| `src/resume_agent/api/runs/manager.py`                     | `stream_path(run_id)` accessor                                                       |
-| `src/resume_agent/api/routers/runs.py`                     | `GET /runs/{run_id}/stream`                                                          |
-| `src/resume_agent/api/routers/coach.py`, `interview.py`    | Pass `RunStreamSink` into the worker                                                 |
-| `src/resume_agent/api/schemas/coach.py`, `interview.py`    | `notice` on turn schemas                                                             |
-| `src/resume_agent/config.py`                               | `stream_enabled: bool = True`                                                        |
-| `src/resume_agent/cli.py`                                  | `ConsoleStreamSink` for `profile coach`                                              |
+| `src/resume_tailor_harness/llm_runner.py`                           | `StreamEvent` re-export, `AgentRunner.stream()`                                      |
+| `src/resume_tailor_harness/sessions/turns.py`                       | `DraftRejected`, `ProseEmitter`, `format_with_retry` strict/lenient                  |
+| `src/resume_tailor_harness/profile/coach.py`                        | Metadata contract in instructions; `normalize_*` strict flag; `ValidatedTurn.notice` |
+| `src/resume_tailor_harness/profile/coach_store.py`                  | `CoachTurnRecord.notice`                                                             |
+| `src/resume_tailor_harness/services/profile_coach.py`               | `sink=` parameter; stream the coach agent                                            |
+| `src/resume_tailor_harness/interview/agent.py`                      | Same treatment as coach                                                              |
+| `src/resume_tailor_harness/interview/store.py`                      | `InterviewTurnRecord.notice`                                                         |
+| `src/resume_tailor_harness/services/mock_interview.py`              | `sink=` parameter; stream the interviewer                                            |
+| `src/resume_tailor_harness/api/runs/manager.py`                     | `stream_path(run_id)` accessor                                                       |
+| `src/resume_tailor_harness/api/routers/runs.py`                     | `GET /runs/{run_id}/stream`                                                          |
+| `src/resume_tailor_harness/api/routers/coach.py`, `interview.py`    | Pass `RunStreamSink` into the worker                                                 |
+| `src/resume_tailor_harness/api/schemas/coach.py`, `interview.py`    | `notice` on turn schemas                                                             |
+| `src/resume_tailor_harness/config.py`                               | `stream_enabled: bool = True`                                                        |
+| `src/resume_tailor_harness/cli.py`                                  | `ConsoleStreamSink` for `profile coach`                                              |
 | `web/src/features/coach/*`, `web/src/features/interview/*` | Refactor onto `<ChatThread>`                                                         |
 
 ---
@@ -133,7 +133,7 @@ where a later task says to apply a snippet "verbatim":
 
 **Files:**
 
-- Create: `src/resume_agent/sessions/stream.py`
+- Create: `src/resume_tailor_harness/sessions/stream.py`
 - Test: `tests/test_sessions_stream.py`
 
 **Interfaces:**
@@ -147,7 +147,7 @@ where a later task says to apply a snippet "verbatim":
 # tests/test_sessions_stream.py
 import json
 
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.sessions.stream import (
     Completed,
     ConsoleStreamSink,
     Failed,
@@ -264,12 +264,12 @@ def test_reasoning_event_tag():
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_sessions_stream.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.sessions.stream'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.sessions.stream'`
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/sessions/stream.py
+# src/resume_tailor_harness/sessions/stream.py
 """Streaming turn events, their ndjson wire form, and the sinks that carry them.
 
 A conversational turn emits typed events as it runs. The API appends them to
@@ -513,8 +513,8 @@ Expected: all PASS
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/sessions/stream.py tests/test_sessions_stream.py
-git add src/resume_agent/sessions/stream.py tests/test_sessions_stream.py
+ruff check src/resume_tailor_harness/sessions/stream.py tests/test_sessions_stream.py
+git add src/resume_tailor_harness/sessions/stream.py tests/test_sessions_stream.py
 git commit -m "feat(sessions): add stream events, ndjson codec, and sinks"
 ```
 
@@ -524,7 +524,7 @@ git commit -m "feat(sessions): add stream events, ndjson codec, and sinks"
 
 **Files:**
 
-- Modify: `src/resume_agent/llm_runner.py` (add to `AgentRunner`, after `arun`)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (add to `AgentRunner`, after `arun`)
 - Test: `tests/test_llm_runner_stream.py`
 
 **Interfaces:**
@@ -540,8 +540,8 @@ git commit -m "feat(sessions): add stream events, ndjson codec, and sinks"
 # tests/test_llm_runner_stream.py
 import pytest
 
-from resume_agent.llm_runner import AgentRunner
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.llm_runner import AgentRunner
+from resume_tailor_harness.sessions.stream import (
     Completed,
     Failed,
     ReasoningDelta,
@@ -606,10 +606,10 @@ class _Transient(Exception):
 @pytest.fixture(autouse=True)
 def _no_budget(monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.tenancy.limits.enforce_agent_budget", lambda agent: None
+        "resume_tailor_harness.tenancy.limits.enforce_agent_budget", lambda agent: None
     )
-    monkeypatch.setattr("resume_agent.tenancy.usage.record_call", lambda a, r: None)
-    monkeypatch.setattr("resume_agent.llm_runner.refresh_agent_api_key", lambda a: None)
+    monkeypatch.setattr("resume_tailor_harness.tenancy.usage.record_call", lambda a, r: None)
+    monkeypatch.setattr("resume_tailor_harness.llm_runner.refresh_agent_api_key", lambda a: None)
 
 
 def test_stream_maps_content_events_to_text_deltas():
@@ -655,7 +655,7 @@ def test_run_error_event_becomes_failed():
 
 def test_transient_failure_before_first_token_retries(monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.get_settings",
+        "resume_tailor_harness.llm_runner.get_settings",
         lambda: _settings(retries=1),
     )
     agent = _FakeAgent([_Event("RunContent", content="hi")], fail_with=_Transient(), fail_after=0)
@@ -681,7 +681,7 @@ def test_transient_failure_before_first_token_retries(monkeypatch):
 
 def test_transient_failure_after_first_token_does_not_retry(monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.get_settings", lambda: _settings(retries=3)
+        "resume_tailor_harness.llm_runner.get_settings", lambda: _settings(retries=3)
     )
     agent = _FakeAgent(
         [_Event("RunContent", content="hi"), _Event("RunContent", content="there")],
@@ -702,7 +702,7 @@ def test_last_output_is_available_after_a_successful_stream():
 
 
 def _settings(retries: int):
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     return Settings.model_construct(llm_retries=retries, llm_retry_delay=0.0)
 ```
@@ -714,10 +714,10 @@ Expected: FAIL — `AttributeError: 'AgentRunner' object has no attribute 'strea
 
 - [ ] **Step 3: Write the implementation**
 
-Add this import near the other `resume_agent` imports in `llm_runner.py`:
+Add this import near the other `resume_tailor_harness` imports in `llm_runner.py`:
 
 ```python
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.sessions.stream import (
     Completed,
     Failed,
     ReasoningDelta,
@@ -745,7 +745,7 @@ Add to `AgentRunner`, directly after `arun`:
             emitted = False
             try:
                 refresh_agent_api_key(self._agent)
-                from resume_agent.tenancy.limits import enforce_agent_budget
+                from resume_tailor_harness.tenancy.limits import enforce_agent_budget
 
                 enforce_agent_budget(self._agent)
                 stream = self._agent.run(
@@ -758,7 +758,7 @@ Add to `AgentRunner`, directly after `arun`:
                         # yield_run_output=True. Record usage against it exactly
                         # as the blocking path does.
                         self.last_output = raw
-                        from resume_agent.tenancy.usage import record_call
+                        from resume_tailor_harness.tenancy.usage import record_call
 
                         record_call(self._agent, raw)
                         continue
@@ -839,8 +839,8 @@ Expected: all PASS
 
 ```bash
 .venv/Scripts/python.exe -m pytest tests/test_llm_runner.py tests/test_agent_json_mode.py -q
-ruff check src/resume_agent/llm_runner.py tests/test_llm_runner_stream.py
-git add src/resume_agent/llm_runner.py tests/test_llm_runner_stream.py
+ruff check src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_stream.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner_stream.py
 git commit -m "feat(llm): stream agent events with retry only before first token"
 ```
 
@@ -850,7 +850,7 @@ git commit -m "feat(llm): stream agent events with retry only before first token
 
 **Files:**
 
-- Modify: `src/resume_agent/sessions/turns.py`
+- Modify: `src/resume_tailor_harness/sessions/turns.py`
 - Test: `tests/test_turn_prose.py`
 
 **Interfaces:**
@@ -864,8 +864,8 @@ git commit -m "feat(llm): stream agent events with retry only before first token
 
 ```python
 # tests/test_turn_prose.py
-from resume_agent.sessions.stream import TextDelta
-from resume_agent.sessions.turns import DELIMITER, ProseEmitter
+from resume_tailor_harness.sessions.stream import TextDelta
+from resume_tailor_harness.sessions.turns import DELIMITER, ProseEmitter
 
 
 class _Recorder:
@@ -958,10 +958,10 @@ Expected: FAIL — `ImportError: cannot import name 'DELIMITER'`
 
 - [ ] **Step 3: Write the implementation**
 
-Append to `src/resume_agent/sessions/turns.py`:
+Append to `src/resume_tailor_harness/sessions/turns.py`:
 
 ```python
-from resume_agent.sessions.stream import StreamSink, TextDelta
+from resume_tailor_harness.sessions.stream import StreamSink, TextDelta
 
 #: Separates the persona agent's user-facing prose from its structured metadata.
 #: Everything before it streams; everything after is buffered for the formatter.
@@ -1029,8 +1029,8 @@ Expected: all PASS
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/sessions/turns.py tests/test_turn_prose.py
-git add src/resume_agent/sessions/turns.py tests/test_turn_prose.py
+ruff check src/resume_tailor_harness/sessions/turns.py tests/test_turn_prose.py
+git add src/resume_tailor_harness/sessions/turns.py tests/test_turn_prose.py
 git commit -m "feat(sessions): split streamed prose from buffered turn metadata"
 ```
 
@@ -1040,7 +1040,7 @@ git commit -m "feat(sessions): split streamed prose from buffered turn metadata"
 
 **Files:**
 
-- Modify: `src/resume_agent/sessions/turns.py`, `src/resume_agent/profile/coach.py`, `src/resume_agent/profile/coach_store.py`, `src/resume_agent/interview/agent.py`, `src/resume_agent/interview/store.py`, `src/resume_agent/api/schemas/coach.py`, `src/resume_agent/api/schemas/interview.py`, `src/resume_agent/services/profile_coach.py` (view projection only)
+- Modify: `src/resume_tailor_harness/sessions/turns.py`, `src/resume_tailor_harness/profile/coach.py`, `src/resume_tailor_harness/profile/coach_store.py`, `src/resume_tailor_harness/interview/agent.py`, `src/resume_tailor_harness/interview/store.py`, `src/resume_tailor_harness/api/schemas/coach.py`, `src/resume_tailor_harness/api/schemas/interview.py`, `src/resume_tailor_harness/services/profile_coach.py` (view projection only)
 - Test: `tests/test_profile_coach.py` (extend), `tests/test_interview_agent.py` (extend)
 
 **Interfaces:**
@@ -1054,8 +1054,8 @@ git commit -m "feat(sessions): split streamed prose from buffered turn metadata"
 
 ```python
 # append to tests/test_profile_coach.py
-from resume_agent.profile.coach import CoachTurn, DraftNote, normalize_turn
-from resume_agent.sessions.turns import DraftRejected, TurnRejected
+from resume_tailor_harness.profile.coach import CoachTurn, DraftNote, normalize_turn
+from resume_tailor_harness.sessions.turns import DraftRejected, TurnRejected
 
 
 def _session_with_answer(answer: str) -> dict:
@@ -1122,7 +1122,7 @@ def test_valid_draft_is_unaffected_by_lenient_mode():
 
 ```python
 # append to tests/test_sessions_turns.py (create if absent)
-from resume_agent.sessions.turns import format_with_retry
+from resume_tailor_harness.sessions.turns import format_with_retry
 
 
 class _Formatter:
@@ -1282,7 +1282,7 @@ git commit -m "feat(sessions): scope the draft integrity gate so a bad quote spa
 
 **Files:**
 
-- Modify: `src/resume_agent/services/profile_coach.py`, `src/resume_agent/profile/coach.py` (instructions), `src/resume_agent/config.py`
+- Modify: `src/resume_tailor_harness/services/profile_coach.py`, `src/resume_tailor_harness/profile/coach.py` (instructions), `src/resume_tailor_harness/config.py`
 - Test: `tests/test_profile_coach_service.py` (extend)
 
 **Interfaces:**
@@ -1294,8 +1294,8 @@ git commit -m "feat(sessions): scope the draft integrity gate so a bad quote spa
 
 ```python
 # append to tests/test_profile_coach_service.py
-from resume_agent.sessions.stream import Completed, TextDelta, ToolStarted
-from resume_agent.services.profile_coach import run_message_turn
+from resume_tailor_harness.sessions.stream import Completed, TextDelta, ToolStarted
+from resume_tailor_harness.services.profile_coach import run_message_turn
 
 
 class _StreamingCoach:
@@ -1358,7 +1358,7 @@ def test_tool_events_reach_the_sink(tmp_path, coach_session):
 
 def test_stream_disabled_uses_the_blocking_path_and_the_formatter_message(tmp_path, coach_session, monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.get_settings",
+        "resume_tailor_harness.services.profile_coach.get_settings",
         lambda: Settings.model_construct(stream_enabled=False),
     )
     sink = _Recorder()
@@ -1530,7 +1530,7 @@ git commit -m "feat(coach): stream persona prose and store it as the turn text"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/mock_interview.py`, `src/resume_agent/interview/agent.py`
+- Modify: `src/resume_tailor_harness/services/mock_interview.py`, `src/resume_tailor_harness/interview/agent.py`
 - Test: `tests/test_mock_interview_service.py` (extend)
 
 **Interfaces:**
@@ -1604,8 +1604,8 @@ git commit -m "feat(interview): stream interviewer prose; leave the debrief stru
 
 **Files:**
 
-- Create: `src/resume_agent/api/runs/stream_sse.py`, `tests/api/test_run_stream_route.py`
-- Modify: `src/resume_agent/api/runs/manager.py`, `src/resume_agent/api/routers/runs.py`, `src/resume_agent/api/routers/coach.py`, `src/resume_agent/api/routers/interview.py`
+- Create: `src/resume_tailor_harness/api/runs/stream_sse.py`, `tests/api/test_run_stream_route.py`
+- Modify: `src/resume_tailor_harness/api/runs/manager.py`, `src/resume_tailor_harness/api/routers/runs.py`, `src/resume_tailor_harness/api/routers/coach.py`, `src/resume_tailor_harness/api/routers/interview.py`
 
 **Interfaces:**
 
@@ -1667,7 +1667,7 @@ Add to `RunManager`:
         return self._root_for(run_id) / f"{run_id}.stream.ndjson"
 ```
 
-Create `src/resume_agent/api/runs/stream_sse.py`:
+Create `src/resume_tailor_harness/api/runs/stream_sse.py`:
 
 ```python
 """Tail a run's ndjson event log as SSE.
@@ -1683,7 +1683,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 
-from resume_agent.sessions.stream import TERMINAL_TAGS, read_stream
+from resume_tailor_harness.sessions.stream import TERMINAL_TAGS, read_stream
 
 #: Give up on a run whose record went terminal but whose log never closed, so a
 #: crashed worker cannot hold a connection open forever.
@@ -1776,7 +1776,7 @@ git commit -m "feat(api): tail conversational run events over SSE with offset re
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (`profile_coach_cmd`, around lines 317-460)
+- Modify: `src/resume_tailor_harness/cli.py` (`profile_coach_cmd`, around lines 317-460)
 - Test: `tests/test_cli_profile_coach.py` (extend)
 
 **Interfaces:**
@@ -1799,7 +1799,7 @@ def test_cli_coach_prints_streamed_prose_incrementally(tmp_path, monkeypatch, ca
         captured.append(sink)
         return _session_view_stub()
 
-    monkeypatch.setattr("resume_agent.services.profile_coach.run_message_turn", fake_turn)
+    monkeypatch.setattr("resume_tailor_harness.services.profile_coach.run_message_turn", fake_turn)
     result = runner.invoke(app, ["profile", "coach"], input="my answer\n/quit\n")
     assert "Streamed reply." in result.stdout
 ```
@@ -1814,7 +1814,7 @@ Expected: FAIL — `AssertionError: the CLI must pass a console sink`
 In `profile_coach_cmd`, build one sink and pass it to each turn call:
 
 ```python
-    from resume_agent.sessions.stream import ConsoleStreamSink
+    from resume_tailor_harness.sessions.stream import ConsoleStreamSink
 
     def _write(text: str) -> None:
         typer.echo(text, nl=False)
@@ -1832,7 +1832,7 @@ Expected: all PASS
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/cli.py tests/test_cli_profile_coach.py
+ruff check src/resume_tailor_harness/cli.py tests/test_cli_profile_coach.py
 git add -A
 git commit -m "feat(cli): stream coach replies to the terminal"
 ```
@@ -2021,7 +2021,7 @@ describe("useChatStream", () => {
 import re
 from pathlib import Path
 
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.sessions.stream import (
     Completed, Failed, Notice, ReasoningDelta, TextDelta, ToolCompleted, ToolStarted,
 )
 
@@ -3070,7 +3070,7 @@ git commit -m "feat(web): stream the interview transcript with reasoning suppres
 
 - [ ] **Step 6: Manual smoke check**
 
-Start the API with `resume-agent serve`, open the Coach page, send a message, and confirm: text appears incrementally; a tool chip appears and resolves; refreshing mid-turn resumes the partial answer rather than losing it; Stop halts generation and leaves the transcript unchanged; setting `STREAM_ENABLED=false` restores the blocking behavior.
+Start the API with `resume-tailor-harness serve`, open the Coach page, send a message, and confirm: text appears incrementally; a tool chip appears and resolves; refreshing mid-turn resumes the partial answer rather than losing it; Stop halts generation and leaves the transcript unchanged; setting `STREAM_ENABLED=false` restores the blocking behavior.
 
 ---
 

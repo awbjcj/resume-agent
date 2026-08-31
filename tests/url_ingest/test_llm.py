@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from resume_agent.discovery.url_ingest.llm import extract_fields, html_to_text
-from resume_agent.discovery.url_ingest.models import ExtractedJob
+from resume_tailor_harness.discovery.url_ingest.llm import extract_fields, html_to_text
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob
 
 
 def test_html_to_text_strips_scripts_and_chrome():

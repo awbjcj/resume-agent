@@ -85,8 +85,8 @@ validated against the current repository before implementation.
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py` (ShortlistRow, TriageRow, PipelineRow dataclasses + their constructor sites)
-- Modify: `src/resume_agent/api/schemas/jobs.py` (ShortlistItem, TriageItem, PipelineItem)
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (ShortlistRow, TriageRow, PipelineRow dataclasses + their constructor sites)
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py` (ShortlistItem, TriageItem, PipelineItem)
 - Test: `tests/test_queries_row_url.py` (new)
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
 
@@ -98,10 +98,10 @@ validated against the current repository before implementation.
 
 ```python
 # tests/test_queries_row_url.py
-from resume_agent.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.queries import pipeline_rows, triage_rows
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.queries import pipeline_rows, triage_rows
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():
@@ -146,12 +146,12 @@ Expected: FAIL (`AttributeError: 'TriageRow' object has no attribute 'url'` / as
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/tracking/queries.py`:
+In `src/resume_tailor_harness/tracking/queries.py`:
 
 - Add `url: str | None = None` as the **last** field of `ShortlistRow`, `TriageRow`, and `PipelineRow` (they already end with defaulted fields; keep dataclass default ordering valid).
 - In `_shortlist_row(...)` (the constructor `shortlist_rows`/`job_detail_row` share), `_triage_row(...)`, and the `PipelineRow(...)` construction inside `pipeline_rows`, add `url=job.url,`.
 
-In `src/resume_agent/api/schemas/jobs.py`, add to each of `ShortlistItem`, `TriageItem`, `PipelineItem`:
+In `src/resume_tailor_harness/api/schemas/jobs.py`, add to each of `ShortlistItem`, `TriageItem`, `PipelineItem`:
 
 ```python
     url: str | None = None
@@ -165,7 +165,7 @@ Expected: url test PASS, contract test FAIL (drift) → run `bash scripts/gen_ts
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/queries.py src/resume_agent/api/schemas/jobs.py tests/test_queries_row_url.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_tailor_harness/tracking/queries.py src/resume_tailor_harness/api/schemas/jobs.py tests/test_queries_row_url.py contracts/openapi.json contracts/ts/api.ts
 git commit -m "feat: expose job url on shortlist/triage/pipeline rows"
 ```
 
@@ -856,7 +856,7 @@ git commit -m "feat(web): pipeline quick actions + per-stage list view"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/runs/manager.py`
+- Modify: `src/resume_tailor_harness/api/runs/manager.py`
 - Test: `tests/api/test_run_manager.py` (extend)
 
 **Interfaces:**
@@ -870,7 +870,7 @@ def test_singleton_conflict_raise_mode(manager_with_blocking_run):
     """Second submit with the same key raises instead of joining."""
     import pytest
 
-    from resume_agent.api.runs.manager import RunSingletonConflict
+    from resume_tailor_harness.api.runs.manager import RunSingletonConflict
 
     mgr, first_run_id, release = manager_with_blocking_run  # fixture: a run holding "k" active
 
@@ -925,7 +925,7 @@ Expected: PASS (join-mode tests unchanged)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/manager.py tests/api/test_run_manager.py
+git add src/resume_tailor_harness/api/runs/manager.py tests/api/test_run_manager.py
 git commit -m "feat: raise-mode singleton conflicts on RunManager.submit"
 ```
 
@@ -935,8 +935,8 @@ git commit -m "feat: raise-mode singleton conflicts on RunManager.submit"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/runs.py` (new endpoint lives here, beside `_submit`/`_workspace_args`)
-- Modify: `src/resume_agent/api/routers/resumes.py` (delete the old sync endpoint + now-unused imports)
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (new endpoint lives here, beside `_submit`/`_workspace_args`)
+- Modify: `src/resume_tailor_harness/api/routers/resumes.py` (delete the old sync endpoint + now-unused imports)
 - Test: `tests/api/test_runs_launch.py` (extend)
 - Regenerate: contracts
 
@@ -996,7 +996,7 @@ Expected: FAIL (405/404 — endpoint not in runs router; old sync endpoint retur
 
 In `runs.py`:
 
-- Extend imports: `from resume_agent.api.runs.manager import RunManager, RunQuotaError, RunSingletonConflict`; `from resume_agent.api.schemas.jobs import ReviseRequest`; `from resume_agent.services.revision import revise_resume_version`; `from resume_agent.tracking.repository import get_resume_version`.
+- Extend imports: `from resume_tailor_harness.api.runs.manager import RunManager, RunQuotaError, RunSingletonConflict`; `from resume_tailor_harness.api.schemas.jobs import ReviseRequest`; `from resume_tailor_harness.services.revision import revise_resume_version`; `from resume_tailor_harness.tracking.repository import get_resume_version`.
 - Extend `_submit` with the conflict mode:
 
 ```python
@@ -1091,7 +1091,7 @@ Expected: revise tests PASS; contract drift → `bash scripts/gen_ts_client.sh` 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/runs.py src/resume_agent/api/routers/resumes.py tests/api/test_runs_launch.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_tailor_harness/api/routers/runs.py src/resume_tailor_harness/api/routers/resumes.py tests/api/test_runs_launch.py contracts/openapi.json contracts/ts/api.ts
 git commit -m "feat: resume revise runs in the background (202 + run)"
 ```
 
@@ -1101,14 +1101,14 @@ git commit -m "feat: resume revise runs in the background (202 + run)"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/runs.py`
-- Modify: `src/resume_agent/api/routers/cover_letters.py` (delete old sync revise endpoint + unused imports)
+- Modify: `src/resume_tailor_harness/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/api/routers/cover_letters.py` (delete old sync revise endpoint + unused imports)
 - Test: `tests/api/test_runs_launch.py` (extend)
 - Regenerate: contracts
 
 **Interfaces:**
 
-- Consumes: `revise_cover_letter_version(session, cover_letter_id, instruction, *, facts_path)` (exists), `get_cover_letter` from `resume_agent.tracking.repository`.
+- Consumes: `revise_cover_letter_version(session, cover_letter_id, instruction, *, facts_path)` (exists), `get_cover_letter` from `resume_tailor_harness.tracking.repository`.
 - Produces: `POST /api/cover-letters/{cover_letter_id}/revise` → 202 `RunOut`, kind `coverLetterRevise`, result `{"coverLetterId": int | None, "jobId": int | None}`, singleton `cl-revise:{id}` in raise mode. The request body stays `ReviseRequest` (its `reReview` field is accepted and ignored — cover letters have no panel).
 
 - [ ] **Step 1: Write the failing test (append to tests/api/test_runs_launch.py)**
@@ -1143,7 +1143,7 @@ Expected: FAIL
 
 - [ ] **Step 3: Implement**
 
-In `runs.py` add imports `from resume_agent.services.cover_letter_revision import revise_cover_letter_version` and `get_cover_letter` (from `resume_agent.tracking.repository`), then:
+In `runs.py` add imports `from resume_tailor_harness.services.cover_letter_revision import revise_cover_letter_version` and `get_cover_letter` (from `resume_tailor_harness.tracking.repository`), then:
 
 ```python
 @router.post(
@@ -1199,7 +1199,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/api/test_runs_launch.py tests/api
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/runs.py src/resume_agent/api/routers/cover_letters.py tests/api/test_runs_launch.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_tailor_harness/api/routers/runs.py src/resume_tailor_harness/api/routers/cover_letters.py tests/api/test_runs_launch.py contracts/openapi.json contracts/ts/api.ts
 git commit -m "feat: cover-letter revise runs in the background"
 ```
 
@@ -1466,7 +1466,7 @@ git commit -m "feat(web): revise as tracked background run with inline pending/e
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/account.py`
+- Modify: `src/resume_tailor_harness/api/routers/account.py`
 - Test: `tests/api/test_account_backup.py` (new)
 
 **Interfaces:**
@@ -1634,7 +1634,7 @@ Expected: PASS (admin backup untouched)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/account.py src/resume_agent/api/app.py tests/api/test_account_backup.py
+git add src/resume_tailor_harness/api/routers/account.py src/resume_tailor_harness/api/app.py tests/api/test_account_backup.py
 git commit -m "feat: per-user workspace export/import (Workspace export, ADR-0003 scoped)"
 ```
 
@@ -1942,22 +1942,22 @@ git commit -m "feat(web): bulk + drag-drop profile document upload"
 
 **Files:**
 
-- Create: `src/resume_agent/services/jobs_import.py`
-- Modify: `src/resume_agent/api/routers/jobs.py`, `src/resume_agent/api/schemas/jobs.py`
+- Create: `src/resume_tailor_harness/services/jobs_import.py`
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py`, `src/resume_tailor_harness/api/schemas/jobs.py`
 - Test: `tests/test_jobs_import.py` (new)
 - Regenerate: contracts
 
 **Interfaces:**
 
-- Consumes: `save_or_upgrade(session, *, source, jd_text, url, company, title, location, posted_at, commit=False)` (exists), `parse_iso_datetime` from `resume_agent.discovery.connectors.dates`.
+- Consumes: `save_or_upgrade(session, *, source, jd_text, url, company, title, location, posted_at, commit=False)` (exists), `parse_iso_datetime` from `resume_tailor_harness.discovery.connectors.dates`.
 - Produces: `import_jobs_file(session, filename: str, data: bytes) -> JobsImportReport` where `JobsImportReport` is a dataclass `{added: int, upgraded: int, skipped: int, errors: list[tuple[int, str]]}` (row numbers 1-based, header excluded for CSV); schema `JobsImportReportOut(CamelModel)` with `added/upgraded/skipped: int`, `errors: list[JobsImportError]` (`row: int`, `reason: str`); endpoint `POST /api/jobs/import` (multipart `file`) → 200 `JobsImportReportOut`, 400 code `UNSUPPORTED_FORMAT` for other extensions, 400 code `INVALID_FILE` for undecodable/unparseable content. Task 16 consumes it.
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_jobs_import.py
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services.jobs_import import import_jobs_file
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services.jobs_import import import_jobs_file
 
 CSV = (
     "title,company,url,location,jd_text,posted_at\n"
@@ -2010,7 +2010,7 @@ Expected: FAIL (module not found)
 - [ ] **Step 3: Implement the service**
 
 ```python
-# src/resume_agent/services/jobs_import.py
+# src/resume_tailor_harness/services/jobs_import.py
 """File-based job import: CSV/JSON rows through save_or_upgrade (source='manual').
 
 Rows without jd_text are rejected per row — never silently skipped, never
@@ -2026,8 +2026,8 @@ from dataclasses import dataclass, field
 
 from sqlmodel import Session
 
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.ingest import IngestOutcome, save_or_upgrade
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.ingest import IngestOutcome, save_or_upgrade
 
 _COLUMNS = ("title", "company", "url", "location", "jd_text", "posted_at")
 _BLANK_JD = (
@@ -2130,7 +2130,7 @@ class JobsImportReportOut(CamelModel):
 # routers/jobs.py
 @router.post("/jobs/import", response_model=JobsImportReportOut)
 def import_jobs_endpoint(file: UploadFile, session: Session = Depends(get_session)):
-    from resume_agent.services.jobs_import import (
+    from resume_tailor_harness.services.jobs_import import (
         InvalidFile,
         UnsupportedFormat,
         import_jobs_file,
@@ -2159,7 +2159,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/test_jobs_import.py tests/api/tes
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/jobs_import.py src/resume_agent/api/routers/jobs.py src/resume_agent/api/schemas/jobs.py tests/test_jobs_import.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_tailor_harness/services/jobs_import.py src/resume_tailor_harness/api/routers/jobs.py src/resume_tailor_harness/api/schemas/jobs.py tests/test_jobs_import.py contracts/openapi.json contracts/ts/api.ts
 git commit -m "feat: CSV/JSON job import through save_or_upgrade"
 ```
 
@@ -2169,7 +2169,7 @@ git commit -m "feat: CSV/JSON job import through save_or_upgrade"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py`
 - Test: `tests/api/test_runs_launch.py` (extend)
 - Regenerate: contracts
 
@@ -2274,7 +2274,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/api/test_runs_launch.py tests/api
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/runs.py tests/api/test_runs_launch.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_tailor_harness/api/routers/runs.py tests/api/test_runs_launch.py contracts/openapi.json contracts/ts/api.ts
 git commit -m "feat: URL-list job import as background run"
 ```
 
@@ -2512,9 +2512,9 @@ git commit -m "feat(web): import-jobs dialog (CSV/JSON sync + URL-list run)"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/base.py` (RawJob)
-- Modify: `src/resume_agent/discovery/merge.py`
-- Modify: `src/resume_agent/discovery/ingest.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/base.py` (RawJob)
+- Modify: `src/resume_tailor_harness/discovery/merge.py`
+- Modify: `src/resume_tailor_harness/discovery/ingest.py`
 - Test: `tests/test_merge_refresh_company.py` (new)
 
 **Interfaces:**
@@ -2526,11 +2526,11 @@ git commit -m "feat(web): import-jobs dialog (CSV/JSON sync + URL-list run)"
 ```python
 # tests/test_merge_refresh_company.py
 """ADR-0004: company renames recompute dedup_key and skip on collision."""
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import IngestOutcome, save_or_upgrade
-from resume_agent.discovery.merge import IncomingJob, RefreshCompany, Skip, decide
-from resume_agent.tracking.dedup import compute_dedup_key
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.ingest import IngestOutcome, save_or_upgrade
+from resume_tailor_harness.discovery.merge import IncomingJob, RefreshCompany, Skip, decide
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 JD = "We build rockets and need platform engineers."
 
@@ -2722,7 +2722,7 @@ def _rename_collides(session: Session, dedup_key: str | None, existing: Job) -> 
     )
 ```
 
-(Import `RefreshCompany` from merge, `locations_compatible` from `resume_agent.tracking.dedup`, and `select` from sqlmodel — `func`/`select` from sqlalchemy are already imported; use `session.exec(select(...))` in the sqlmodel style used by `pipeline_rows`.)
+(Import `RefreshCompany` from merge, `locations_compatible` from `resume_tailor_harness.tracking.dedup`, and `select` from sqlmodel — `func`/`select` from sqlalchemy are already imported; use `session.exec(select(...))` in the sqlmodel style used by `pipeline_rows`.)
 
 - In `_apply`, handle the new action before `_persist`:
 
@@ -2742,7 +2742,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/base.py src/resume_agent/discovery/merge.py src/resume_agent/discovery/ingest.py tests/test_merge_refresh_company.py
+git add src/resume_tailor_harness/discovery/connectors/base.py src/resume_tailor_harness/discovery/merge.py src/resume_tailor_harness/discovery/ingest.py tests/test_merge_refresh_company.py
 git commit -m "feat: RefreshCompany heal with dedup-key recompute + collision skip (ADR-0004)"
 ```
 
@@ -2752,9 +2752,9 @@ git commit -m "feat: RefreshCompany heal with dedup-key recompute + collision sk
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/greenhouse.py`
-- Modify: `src/resume_agent/discovery/connectors/workday.py`
-- Modify: `src/resume_agent/discovery/connectors/companies.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/greenhouse.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/workday.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py`
 - Test: `tests/test_company_resolution.py` (new)
 
 **Interfaces:**
@@ -2775,13 +2775,13 @@ git commit -m "feat: RefreshCompany heal with dedup-key recompute + collision sk
 # tests/test_company_resolution.py
 import httpx
 
-from resume_agent.discovery.connectors.config import GreenhouseBoard
-from resume_agent.discovery.connectors.greenhouse import (
+from resume_tailor_harness.discovery.connectors.config import GreenhouseBoard
+from resume_tailor_harness.discovery.connectors.greenhouse import (
     GreenhouseConnector,
     fetch_greenhouse_board_name,
     parse_greenhouse,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _payload():
@@ -2810,7 +2810,7 @@ def test_connector_resolves_name_and_sets_stale(monkeypatch):
     connector = GreenhouseConnector([GreenhouseBoard(token="acmecorp")])
     monkeypatch.setattr(connector, "_get_board", lambda token: _payload())
     monkeypatch.setattr(
-        "resume_agent.discovery.connectors.greenhouse.fetch_greenhouse_board_name",
+        "resume_tailor_harness.discovery.connectors.greenhouse.fetch_greenhouse_board_name",
         lambda token: "Acme Corp",
     )
     result = connector.fetch(SearchConfig())
@@ -2824,7 +2824,7 @@ def test_configured_company_wins_over_resolution(monkeypatch):
     )
     monkeypatch.setattr(connector, "_get_board", lambda token: _payload())
     monkeypatch.setattr(
-        "resume_agent.discovery.connectors.greenhouse.fetch_greenhouse_board_name",
+        "resume_tailor_harness.discovery.connectors.greenhouse.fetch_greenhouse_board_name",
         lambda token: "Acme Corp",
     )
     result = connector.fetch(SearchConfig())
@@ -2909,18 +2909,18 @@ Expected: PASS; fix any existing workday/companies fixtures that now assert `com
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/greenhouse.py src/resume_agent/discovery/connectors/workday.py src/resume_agent/discovery/connectors/companies.py tests/test_company_resolution.py
+git add src/resume_tailor_harness/discovery/connectors/greenhouse.py src/resume_tailor_harness/discovery/connectors/workday.py src/resume_tailor_harness/discovery/connectors/companies.py tests/test_company_resolution.py
 git commit -m "feat: resolve company display names (label > payload > token)"
 ```
 
 ---
 
-### Task 19: `resume-agent fix-company-names` backfill CLI
+### Task 19: `resume-tailor-harness fix-company-names` backfill CLI
 
 **Files:**
 
-- Create: `src/resume_agent/services/company_fix.py`
-- Modify: `src/resume_agent/cli.py`
+- Create: `src/resume_tailor_harness/services/company_fix.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_company_fix.py` (new)
 
 **Interfaces:**
@@ -2947,18 +2947,18 @@ def fix_company_names(
 ```
 
 
-  and CLI command `resume-agent fix-company-names [--dry-run]` printing per-token rename counts, conflicts, and unresolved tokens.
+  and CLI command `resume-tailor-harness fix-company-names [--dry-run]` printing per-token rename counts, conflicts, and unresolved tokens.
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_company_fix.py
 """ADR-0004 backfill: rename token-named rows, skip and report collisions."""
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.services.company_fix import fix_company_names
-from resume_agent.tracking.dedup import compute_dedup_key
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.services.company_fix import fix_company_names
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 JD = "We build rockets and need platform engineers."
 
@@ -3039,7 +3039,7 @@ Expected: FAIL (module not found)
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/services/company_fix.py
+# src/resume_tailor_harness/services/company_fix.py
 """Backfill token company names from configured labels / resolved names.
 
 ADR-0004: renames recompute dedup_key; collisions are skipped and reported,
@@ -3053,10 +3053,10 @@ from typing import Callable
 
 from sqlmodel import Session, col, select
 
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.greenhouse import fetch_greenhouse_board_name
-from resume_agent.tracking.dedup import compute_dedup_key, locations_compatible
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.greenhouse import fetch_greenhouse_board_name
+from resume_tailor_harness.tracking.dedup import compute_dedup_key, locations_compatible
+from resume_tailor_harness.tracking.tables import Job
 
 
 @dataclass(frozen=True)
@@ -3149,8 +3149,8 @@ def fix_company_names_cmd(
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Rename token-named companies from labels/resolved names (ADR-0004)."""
-    from resume_agent.discovery.connectors.config import load_connectors_config
-    from resume_agent.services.company_fix import fix_company_names
+    from resume_tailor_harness.discovery.connectors.config import load_connectors_config
+    from resume_tailor_harness.services.company_fix import fix_company_names
 
     if not _tenant_cli_path(connectors_path).exists():
         typer.echo(f"No connectors config found at {connectors_path}.")
@@ -3169,13 +3169,13 @@ def fix_company_names_cmd(
 
 - [ ] **Step 4: Run tests + smoke the CLI help**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_company_fix.py -v` then `.venv/Scripts/python.exe -m resume_agent --help | grep fix-company-names` (or the repo's CLI entry — check how other CLI tests invoke it in `tests/test_cli_*.py`).
+Run: `.venv/Scripts/python.exe -m pytest tests/test_company_fix.py -v` then `.venv/Scripts/python.exe -m resume_tailor_harness --help | grep fix-company-names` (or the repo's CLI entry — check how other CLI tests invoke it in `tests/test_cli_*.py`).
 Expected: PASS; command listed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/company_fix.py src/resume_agent/cli.py tests/test_company_fix.py
+git add src/resume_tailor_harness/services/company_fix.py src/resume_tailor_harness/cli.py tests/test_company_fix.py
 git commit -m "feat: fix-company-names backfill CLI (ADR-0004)"
 ```
 

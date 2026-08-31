@@ -1,8 +1,8 @@
 from typing import Any, cast
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.sources import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.sources import (
     SourceView,
     company_url_id,
     list_source_views,

@@ -19,18 +19,18 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.discovery.fit import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.fit import (
     bind_profile,
     build_fit_agent,
     compose_fit_input,
 )
-from resume_agent.llm_runner import AgentRunner, resolve_api_key
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.costs import seed_llm_rates
-from resume_agent.tenancy.system_db import User, init_system_db, make_system_engine
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.llm_runner import AgentRunner, resolve_api_key
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.costs import seed_llm_rates
+from resume_tailor_harness.tenancy.system_db import User, init_system_db, make_system_engine
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 from scripts.perf_harness import (
     count_connections,
     count_prompt_tokens,
@@ -152,7 +152,7 @@ def test_spend_path_statements_per_llm_call(tmp_path):
 
 def test_board_requests_share_one_connection_per_host(monkeypatch):
     """A board pull opens a pool per host, not a TCP+TLS handshake per request."""
-    from resume_agent.discovery.connectors.http import BoardSession
+    from resume_tailor_harness.discovery.connectors.http import BoardSession
 
     def _handle(_self, request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"jobs": []}, request=request)

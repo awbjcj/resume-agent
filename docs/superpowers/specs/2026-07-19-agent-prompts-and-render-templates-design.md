@@ -41,7 +41,7 @@ Two features, one spec:
 - **The fact-check reviewer is view-only.** It is the hard gate enforcing
   fact-lock; guidance could hollow it out.
 
-### Registry (`src/resume_agent/prompts/registry.py`)
+### Registry (`src/resume_tailor_harness/prompts/registry.py`)
 
 ```python
 @dataclass(frozen=True)

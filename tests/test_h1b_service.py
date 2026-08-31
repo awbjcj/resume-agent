@@ -5,16 +5,16 @@ from types import SimpleNamespace
 
 from sqlmodel import Session
 
-from resume_agent.config import Settings
-from resume_agent.db import init_db, make_engine
-from resume_agent.h1b.models import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.h1b.models import (
     H1BCompanyResolution,
     H1B_MCP_UNAVAILABLE_REASON,
     HISTORICAL_ONLY_CAVEAT,
     H1BSponsorshipEvidence,
 )
-from resume_agent.h1b.service import check_job_sponsorship, enrich_companies
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.h1b.service import check_job_sponsorship, enrich_companies
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _evidence(company: str) -> H1BSponsorshipEvidence:
@@ -119,7 +119,7 @@ def test_disabled_enrichment_is_unavailable_without_building_agent():
 
 
 def test_duplicate_company_spellings_are_researched_once_and_then_cached(monkeypatch):
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     @asynccontextmanager
     async def fake_tools(settings):
@@ -170,7 +170,7 @@ def test_duplicate_company_spellings_are_researched_once_and_then_cached(monkeyp
 
 
 def test_equivalent_legal_company_name_is_canonicalized_to_the_cache_key(monkeypatch):
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     @asynccontextmanager
     async def fake_tools(_settings):
@@ -200,7 +200,7 @@ def test_equivalent_legal_company_name_is_canonicalized_to_the_cache_key(monkeyp
 
 
 def test_company_name_resolver_rewrites_the_query_before_h1b_research(monkeypatch):
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     @asynccontextmanager
     async def fake_tools(_settings):
@@ -243,7 +243,7 @@ def test_company_name_resolver_rewrites_the_query_before_h1b_research(monkeypatc
 
 
 def test_company_name_resolver_rejects_a_different_company_identity():
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     runner = ResolutionRunner(
         H1BCompanyResolution(
@@ -259,7 +259,7 @@ def test_company_name_resolver_rejects_a_different_company_identity():
 
 
 def test_manual_job_check_records_cache_pointer_without_snapshot(monkeypatch):
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     @asynccontextmanager
     async def fake_tools(_settings):
@@ -317,7 +317,7 @@ def test_manual_check_records_the_cache_pointer_but_no_snapshot():
         session.commit()
         session.refresh(job)
 
-        import resume_agent.h1b.service as service
+        import resume_tailor_harness.h1b.service as service
 
         original = service.h1b_tools
         service.h1b_tools = fake_tools
@@ -339,7 +339,7 @@ def test_manual_check_records_the_cache_pointer_but_no_snapshot():
 
 
 def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     @asynccontextmanager
     async def failing_tools(_settings):
@@ -375,7 +375,7 @@ def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):
 
 
 def test_enrichment_closes_runner_before_mcp_context(monkeypatch):
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     events: list[str] = []
 
@@ -420,7 +420,7 @@ def test_sponsorship_agent_is_instructed_to_collect_three_years():
         h1b_mcp_transport="stdio",
         h1b_mcp_command="server",
     )
-    from resume_agent.h1b.service import DefaultSponsorshipAgentFactory
+    from resume_tailor_harness.h1b.service import DefaultSponsorshipAgentFactory
 
     runner = DefaultSponsorshipAgentFactory(settings).build(tools=None)
     # AgentRunner intentionally narrows the public runner API; tests in this
@@ -436,7 +436,7 @@ def test_sponsorship_agent_is_instructed_to_collect_three_years():
 
 
 def test_persisted_rows_are_written_at_schema_version_two():
-    from resume_agent.tracking.tables import H1BCompanyEvidence
+    from resume_tailor_harness.tracking.tables import H1BCompanyEvidence
     from sqlmodel import select as model_select
 
     engine = make_engine("sqlite://")
@@ -452,7 +452,7 @@ def test_persisted_rows_are_written_at_schema_version_two():
     async def fake_tools(_settings, **_kwargs):
         yield object()
 
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     original = service.h1b_tools
     service.h1b_tools = fake_tools
@@ -505,7 +505,7 @@ def test_unparsed_agent_output_is_diagnosed_not_swallowed(monkeypatch, caplog):
     """A systematic provider failure must be distinguishable from "no filings"."""
     import logging
 
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     @asynccontextmanager
     async def fake_tools(_settings):
@@ -521,7 +521,7 @@ def test_unparsed_agent_output_is_diagnosed_not_swallowed(monkeypatch, caplog):
         h1b_mcp_command="server",
     )
 
-    with caplog.at_level(logging.ERROR, logger="resume_agent.h1b.service"):
+    with caplog.at_level(logging.ERROR, logger="resume_tailor_harness.h1b.service"):
         report = asyncio.run(
             enrich_companies(
                 engine,
@@ -545,7 +545,7 @@ def test_unparsed_agent_output_is_diagnosed_not_swallowed(monkeypatch, caplog):
 
 def test_enrichment_reads_and_writes_the_cache_in_batches(monkeypatch):
     """2N queries for N companies is the display path's mistake, made twice."""
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
     from scripts.perf_harness import count_queries
 
     @asynccontextmanager

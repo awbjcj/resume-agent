@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import resumes
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import resumes
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def _client():
@@ -27,7 +27,7 @@ def test_render_endpoint_invokes_service(monkeypatch, tmp_path):
     pdf.write_bytes(b"%PDF-1.4")
 
     def fake_render(session, version_id, *, render_path="config/render.yaml"):
-        from resume_agent.tracking.repository import get_resume_version
+        from resume_tailor_harness.tracking.repository import get_resume_version
 
         v = get_resume_version(session, version_id)
         assert v is not None

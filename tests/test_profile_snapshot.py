@@ -1,6 +1,6 @@
 import json
 
-from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
+from resume_tailor_harness.profile.snapshot import profile_snapshot, snapshot_diff
 
 
 def _write_profile(

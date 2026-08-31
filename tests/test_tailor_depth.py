@@ -1,20 +1,20 @@
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     ProfileFacts,
     Project,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
 )
-from resume_agent.models.review import Severity
-from resume_agent.profile.aspects import Aspect
-from resume_agent.tailor.depth import DEPTH_REVIEWER, depth_critique
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.profile.aspects import Aspect
+from resume_tailor_harness.tailor.depth import DEPTH_REVIEWER, depth_critique
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def _facts(*, repeated_aspect: bool = False) -> ProfileFacts:

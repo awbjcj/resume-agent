@@ -326,23 +326,23 @@ legacy path and GitHub username.
 
 | Path | Change |
 | --- | --- |
-| `src/resume_agent/profile/corpus.py` | NEW — registry, manifest, readers dispatch. |
-| `src/resume_agent/profile/resume_reader.py` | `read_document_text` + `.md`/`.pptx`. |
-| `src/resume_agent/profile/extractor.py` | Prompt version const; deck-aware instruction. |
-| `src/resume_agent/profile/inference.py` | NEW — evidence-linked skill inference. |
-| `src/resume_agent/profile/merge.py` | Entity-key merge, bullet dedup, conflict report. |
-| `src/resume_agent/profile/matrix.py` | NEW — matrix generation + overrides. |
-| `src/resume_agent/profile/build.py` | Orchestrate corpus pipeline; legacy migration. |
-| `src/resume_agent/profile/store.py` | Atomic facts persistence for the bound facts/matrix artifact set. |
-| `src/resume_agent/models/base.py` | `FactItem.source_ref`. |
-| `src/resume_agent/models/profile.py` | `Skill.inferred/evidence_fact_ids/category`. |
-| `src/resume_agent/services/match_gap.py` | Token universe + prune keep-set. |
-| `src/resume_agent/tracking/match_gap.py` | Tri-state coverage. |
-| `src/resume_agent/tailor/match_plan.py` | MATRIX prompt section + instructions. |
-| `src/resume_agent/discovery/fit.py` | Matrix in fit input, adjacent partial credit. |
-| `src/resume_agent/discovery/pipeline.py` | Criteria prompt: soft-skill capture. |
-| `src/resume_agent/cli.py` | `profile add/remove/sources`; build report. |
-| `src/resume_agent/api/schemas/*` + `contracts/` | Coverage tri-state projection. |
+| `src/resume_tailor_harness/profile/corpus.py` | NEW — registry, manifest, readers dispatch. |
+| `src/resume_tailor_harness/profile/resume_reader.py` | `read_document_text` + `.md`/`.pptx`. |
+| `src/resume_tailor_harness/profile/extractor.py` | Prompt version const; deck-aware instruction. |
+| `src/resume_tailor_harness/profile/inference.py` | NEW — evidence-linked skill inference. |
+| `src/resume_tailor_harness/profile/merge.py` | Entity-key merge, bullet dedup, conflict report. |
+| `src/resume_tailor_harness/profile/matrix.py` | NEW — matrix generation + overrides. |
+| `src/resume_tailor_harness/profile/build.py` | Orchestrate corpus pipeline; legacy migration. |
+| `src/resume_tailor_harness/profile/store.py` | Atomic facts persistence for the bound facts/matrix artifact set. |
+| `src/resume_tailor_harness/models/base.py` | `FactItem.source_ref`. |
+| `src/resume_tailor_harness/models/profile.py` | `Skill.inferred/evidence_fact_ids/category`. |
+| `src/resume_tailor_harness/services/match_gap.py` | Token universe + prune keep-set. |
+| `src/resume_tailor_harness/tracking/match_gap.py` | Tri-state coverage. |
+| `src/resume_tailor_harness/tailor/match_plan.py` | MATRIX prompt section + instructions. |
+| `src/resume_tailor_harness/discovery/fit.py` | Matrix in fit input, adjacent partial credit. |
+| `src/resume_tailor_harness/discovery/pipeline.py` | Criteria prompt: soft-skill capture. |
+| `src/resume_tailor_harness/cli.py` | `profile add/remove/sources`; build report. |
+| `src/resume_tailor_harness/api/schemas/*` + `contracts/` | Coverage tri-state projection. |
 | `web/src/features/match-gap/*` | Render/filter adjacent separately from covered and true gaps. |
 | `pyproject.toml` | `python-pptx`. |
 | `uv.lock` | Lock `python-pptx`. |

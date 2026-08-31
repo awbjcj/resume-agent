@@ -1,7 +1,7 @@
 from click import unstyle
 from typer.testing import CliRunner
 
-from resume_agent import cli
+from resume_tailor_harness import cli
 
 
 def test_serve_invokes_uvicorn(monkeypatch):

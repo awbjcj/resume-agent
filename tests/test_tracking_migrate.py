@@ -1,9 +1,9 @@
 import pytest
 from sqlalchemy import text
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.api.schemas.jobs import ResumeVersionOut
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.api.schemas.jobs import ResumeVersionOut
+from resume_tailor_harness.tracking.migrate import (
     ensure_application_cover_letter_id_column,
     ensure_cover_letter_revision_columns,
     ensure_resume_version_attempt_columns,
@@ -12,7 +12,7 @@ from resume_agent.tracking.migrate import (
     ensure_resume_version_revision_columns,
     ensure_resume_version_taxonomy_columns,
 )
-from resume_agent.career_skills.models import read_job_analysis_meta, read_skill_uses
+from resume_tailor_harness.career_skills.models import read_job_analysis_meta, read_skill_uses
 
 
 def test_revision_migrations_backfill_origins():

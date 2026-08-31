@@ -3,15 +3,15 @@ from datetime import datetime, timedelta, timezone
 from sqlmodel import Session
 from sqlalchemy import event
 
-from resume_agent.company_intelligence.models import (
+from resume_tailor_harness.company_intelligence.models import (
     CompanyIntelligenceEvidence,
     CompanyIntelligenceInsight,
     CompanyIntelligenceSource,
 )
-from resume_agent.db import init_db, make_engine
-from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.services.role_comparison import compare_roles
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
+from resume_tailor_harness.services.role_comparison import compare_roles
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationEvent,
     CompanyIntelligenceEvidenceRow,

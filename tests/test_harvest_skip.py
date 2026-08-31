@@ -1,6 +1,6 @@
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.harvest import gate_and_limit, harvest_detailed
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.harvest import gate_and_limit, harvest_detailed
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _row(url):

@@ -47,7 +47,7 @@ API, no way to enumerate or revert corrections.
 
 New file `data/profile/group_corrections.json` (profile-scoped, beside
 `manual_skills.json`), managed by a new module
-`src/resume_agent/profile/group_corrections.py`:
+`src/resume_tailor_harness/profile/group_corrections.py`:
 
 ```json
 {

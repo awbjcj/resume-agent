@@ -13,7 +13,7 @@
 - Test command: `.venv/Scripts/python.exe -m pytest` (offline; no API key, no network). Lint: `ruff check`.
 - **Prerequisite:** Task 1 executes the remaining tasks of `docs/superpowers/plans/2026-07-16-architecture-deepening-round-3.md` (Tasks 4–9; Tasks 1–3 already shipped in `72dc10c`). Tasks 2+ of THIS plan depend on round-3 Task 6 (`api/runs/launch.py`) existing.
 - **Contract policy:** `contracts/openapi.json` must be byte-identical after every task EXCEPT Task 7, which may regenerate it with an order-only diff (verified by the jq gate inside that task). No parameter, route, or schema may be added, removed, renamed, or retyped anywhere in this plan.
-- **Dirty working tree:** the checkout has unrelated uncommitted Gmail changes (`src/resume_agent/api/routers/gmail.py`, `web/src/features/settings/*`). NEVER run `git add -A` or `git add .` — stage files explicitly in every commit, including when executing the round-3 plan (its Tasks 4–5 say `git add -A`; substitute the explicit file lists given in Task 1 below).
+- **Dirty working tree:** the checkout has unrelated uncommitted Gmail changes (`src/resume_tailor_harness/api/routers/gmail.py`, `web/src/features/settings/*`). NEVER run `git add -A` or `git add .` — stage files explicitly in every commit, including when executing the round-3 plan (its Tasks 4–5 say `git add -A`; substitute the explicit file lists given in Task 1 below).
 - Behavior-preserving: every existing test passes unmodified unless a task explicitly says otherwise (no task in this plan modifies an existing test's assertions).
 - Vocabulary: CONTEXT.md terms (Coach session, Board seam, Workspace, UserContext) plus the two terms Task 11 adds (Session substrate, Launch seam).
 - Windows dev box: use `.venv/Scripts/python.exe -m pytest ...` exactly as written.
@@ -62,9 +62,9 @@ Follow the round-3 plan verbatim, with one amendment: where its Task 4 Step 5 an
 
 ```bash
 # Task 4 commit:
-git add src/resume_agent/discovery/connectors/telemetry.py src/resume_agent/taxonomy/skills.py src/resume_agent/services/sources.py tests/tenancy/test_workspace.py
+git add src/resume_tailor_harness/discovery/connectors/telemetry.py src/resume_tailor_harness/taxonomy/skills.py src/resume_tailor_harness/services/sources.py tests/tenancy/test_workspace.py
 # Task 5 commit:
-git add src/resume_agent/tenancy/paths.py src/resume_agent/services/discovery.py src/resume_agent/services/tailoring.py src/resume_agent/services/board.py src/resume_agent/services/cover_letters.py src/resume_agent/services/cover_letter_revision.py src/resume_agent/services/revision.py src/resume_agent/cli.py src/resume_agent/api/routers/match_gap.py src/resume_agent/api/routers/suggestions.py src/resume_agent/tracking/queries.py src/resume_agent/discovery/pipeline.py
+git add src/resume_tailor_harness/tenancy/paths.py src/resume_tailor_harness/services/discovery.py src/resume_tailor_harness/services/tailoring.py src/resume_tailor_harness/services/board.py src/resume_tailor_harness/services/cover_letters.py src/resume_tailor_harness/services/cover_letter_revision.py src/resume_tailor_harness/services/revision.py src/resume_tailor_harness/cli.py src/resume_tailor_harness/api/routers/match_gap.py src/resume_tailor_harness/api/routers/suggestions.py src/resume_tailor_harness/tracking/queries.py src/resume_tailor_harness/discovery/pipeline.py
 ```
 
 - [ ] **Step 3: Execute round-3 Tasks 6–8 (Phase C — launch seam)**
@@ -92,7 +92,7 @@ git commit -m "docs(plans): round-3 fully executed; record Phase A commit and ro
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/interview.py:62-82` (`_submit`)
+- Modify: `src/resume_tailor_harness/api/routers/interview.py:62-82` (`_submit`)
 - Test: `tests/api/test_interview_router.py` (unmodified)
 
 **Interfaces:**
@@ -102,7 +102,7 @@ git commit -m "docs(plans): round-3 fully executed; record Phase A commit and ro
 
 - [ ] **Step 1: Replace the `_submit` body**
 
-In `src/resume_agent/api/routers/interview.py`, replace the whole `_submit` function with:
+In `src/resume_tailor_harness/api/routers/interview.py`, replace the whole `_submit` function with:
 
 ```python
 def _submit(
@@ -119,24 +119,24 @@ def _submit(
     )
 ```
 
-Add `from resume_agent.api.runs.launch import launch`. Delete the imports that ruff now flags as unused (`RunSingletonConflict`, `RunResetConflict`, `RunQuotaError`, `record_to_run` — keep any still used elsewhere in the file; trust ruff, not this list).
+Add `from resume_tailor_harness.api.runs.launch import launch`. Delete the imports that ruff now flags as unused (`RunSingletonConflict`, `RunResetConflict`, `RunQuotaError`, `record_to_run` — keep any still used elsewhere in the file; trust ruff, not this list).
 
 - [ ] **Step 2: Run the interview router tests, then lint**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_interview_router.py -q`
 Expected: PASS unmodified.
-Run: `ruff check src/resume_agent/api/routers/interview.py`
+Run: `ruff check src/resume_tailor_harness/api/routers/interview.py`
 Expected: clean.
 
 - [ ] **Step 3: Grep gate — no bare submit tails remain in routers**
 
-Run: `grep -rn "record = mgr.get(run_id)\|record = manager.get(run_id)" src/resume_agent/api/routers`
+Run: `grep -rn "record = mgr.get(run_id)\|record = manager.get(run_id)" src/resume_tailor_harness/api/routers`
 Expected: no hits outside `suggestions.py` (which rides its own service seam by design — see round-3 Task 8).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/interview.py
+git add src/resume_tailor_harness/api/routers/interview.py
 git commit -m "refactor(api): interview router launches through the shared seam"
 ```
 
@@ -148,14 +148,14 @@ git commit -m "refactor(api): interview router launches through the shared seam"
 
 **Files:**
 
-- Create: `src/resume_agent/sessions/__init__.py`
-- Create: `src/resume_agent/sessions/store.py`
+- Create: `src/resume_tailor_harness/sessions/__init__.py`
+- Create: `src/resume_tailor_harness/sessions/store.py`
 - Test: `tests/test_session_store.py` (new)
 
 **Interfaces:**
 
 - Consumes: `ExtensibleModel` (`models/base.py`), `atomic_write_text` (`progress.py`).
-- Produces (used by Tasks 4–5): in `resume_agent.sessions.store`:
+- Produces (used by Tasks 4–5): in `resume_tailor_harness.sessions.store`:
   - `valid_session_id(session_id: str) -> bool`
   - `now_iso() -> str` — UTC ISO-8601, seconds precision
   - `class SessionStore(Generic[M])` with `__init__(self, model: type[M], *, label: str)` and methods `lock()` (context manager), `path(root, session_id) -> Path`, `read(path) -> dict`, `write(root, session: dict) -> None`, `list(root, *, include_archived=False) -> list[dict]`, `load(root, session_id) -> dict`, `active(root) -> list[dict]`, `mutate(root, session_id, fn) -> dict`, `archive(root, session_id) -> dict`, `unarchive(root, session_id) -> dict`, `delete(root, session_id) -> None`.
@@ -170,8 +170,8 @@ Create `tests/test_session_store.py`:
 
 import pytest
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.sessions.store import SessionStore, now_iso, valid_session_id
 
 
 class _Session(ExtensibleModel):
@@ -286,17 +286,17 @@ def test_now_iso_is_utc_seconds():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_session_store.py -q`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.sessions'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.sessions'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/sessions/__init__.py`:
+Create `src/resume_tailor_harness/sessions/__init__.py`:
 
 ```python
 """Durable turn-per-run session infrastructure (ADR-0006)."""
 ```
 
-Create `src/resume_agent/sessions/store.py`:
+Create `src/resume_tailor_harness/sessions/store.py`:
 
 ```python
 """File custody for durable turn-per-run sessions (ADR-0006).
@@ -321,8 +321,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generic, TypeVar
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.progress import atomic_write_text
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.progress import atomic_write_text
 
 _SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
 
@@ -438,8 +438,8 @@ Expected: PASS.
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/sessions tests/test_session_store.py
-git add src/resume_agent/sessions tests/test_session_store.py
+ruff check src/resume_tailor_harness/sessions tests/test_session_store.py
+git add src/resume_tailor_harness/sessions tests/test_session_store.py
 git commit -m "feat(sessions): SessionStore — the Session substrate for turn-per-run session kinds"
 ```
 
@@ -449,7 +449,7 @@ git commit -m "feat(sessions): SessionStore — the Session substrate for turn-p
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/coach_store.py`
+- Modify: `src/resume_tailor_harness/profile/coach_store.py`
 - Test: `tests/test_coach_store.py`, `tests/test_profile_coach_service.py`, `tests/api/test_coach_router.py` (all unmodified)
 
 **Interfaces:**
@@ -459,7 +459,7 @@ git commit -m "feat(sessions): SessionStore — the Session substrate for turn-p
 
 - [ ] **Step 1: Rewrite the custody half as delegates**
 
-In `src/resume_agent/profile/coach_store.py`: keep the module docstring and the four model classes exactly as they are. Replace the imports and everything from `_COACH_LOCK` down to `mutate_session` (inclusive) with:
+In `src/resume_tailor_harness/profile/coach_store.py`: keep the module docstring and the four model classes exactly as they are. Replace the imports and everything from `_COACH_LOCK` down to `mutate_session` (inclusive) with:
 
 ```python
 from __future__ import annotations
@@ -471,9 +471,9 @@ from typing import Literal
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.profile.interview import ResearchAction
-from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.profile.interview import ResearchAction
+from resume_tailor_harness.sessions.store import SessionStore, now_iso, valid_session_id
 ```
 
 (then the unchanged model classes, then:)
@@ -555,8 +555,8 @@ Expected: PASS with zero test edits. If any test imports a deleted private (`_re
 - [ ] **Step 3: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/profile/coach_store.py
-git add src/resume_agent/profile/coach_store.py
+ruff check src/resume_tailor_harness/profile/coach_store.py
+git add src/resume_tailor_harness/profile/coach_store.py
 git commit -m "refactor(coach): coach store rides the Session substrate"
 ```
 
@@ -566,7 +566,7 @@ git commit -m "refactor(coach): coach store rides the Session substrate"
 
 **Files:**
 
-- Modify: `src/resume_agent/interview/store.py`
+- Modify: `src/resume_tailor_harness/interview/store.py`
 - Test: `tests/test_interview_store.py`, `tests/test_mock_interview_service.py`, `tests/api/test_interview_router.py` (all unmodified)
 
 **Interfaces:**
@@ -576,7 +576,7 @@ git commit -m "refactor(coach): coach store rides the Session substrate"
 
 - [ ] **Step 1: Rewrite the custody half as delegates**
 
-In `src/resume_agent/interview/store.py`: keep the module docstring, `STYLE_EXTRA_CAP`, and the seven model classes exactly as they are. Replace the imports and everything from `_INTERVIEW_LOCK` down to `mutate_session` (inclusive) with:
+In `src/resume_tailor_harness/interview/store.py`: keep the module docstring, `STYLE_EXTRA_CAP`, and the seven model classes exactly as they are. Replace the imports and everything from `_INTERVIEW_LOCK` down to `mutate_session` (inclusive) with:
 
 ```python
 from __future__ import annotations
@@ -588,8 +588,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.sessions.store import SessionStore, now_iso, valid_session_id
 ```
 
 (then the unchanged model classes, then:)
@@ -694,14 +694,14 @@ Expected: PASS with zero test edits. Same escape hatch as Task 4 for tests impor
 
 - [ ] **Step 3: Duplication grep gate**
 
-Run: `grep -rn "session-\*.json\|A-Za-z0-9\]\[A-Za-z0-9_-\]{0,63}" src/resume_agent --include="*.py" | grep -v sessions/store.py`
+Run: `grep -rn "session-\*.json\|A-Za-z0-9\]\[A-Za-z0-9_-\]{0,63}" src/resume_tailor_harness --include="*.py" | grep -v sessions/store.py`
 Expected: no hits — the glob pattern and id regex have exactly one author.
 
 - [ ] **Step 4: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/interview/store.py
-git add src/resume_agent/interview/store.py
+ruff check src/resume_tailor_harness/interview/store.py
+git add src/resume_tailor_harness/interview/store.py
 git commit -m "refactor(interview): interview store rides the Session substrate"
 ```
 
@@ -711,19 +711,19 @@ git commit -m "refactor(interview): interview store rides the Session substrate"
 
 **Files:**
 
-- Create: `src/resume_agent/sessions/turns.py`
-- Modify: `src/resume_agent/profile/coach.py:75` (the `TurnRejected` class), `src/resume_agent/interview/agent.py:67` (same)
-- Modify: `src/resume_agent/services/profile_coach.py` (`_format_with_retry`), `src/resume_agent/services/mock_interview.py` (`_format_with_retry`)
-- Modify: `src/resume_agent/llm_runner.py` (add `missing_model_keys`), `src/resume_agent/api/routers/coach.py` (`_guard_setup`), `src/resume_agent/api/routers/interview.py` (`_guard_keys`), `src/resume_agent/cli.py` (`profile_coach_cmd` key check)
+- Create: `src/resume_tailor_harness/sessions/turns.py`
+- Modify: `src/resume_tailor_harness/profile/coach.py:75` (the `TurnRejected` class), `src/resume_tailor_harness/interview/agent.py:67` (same)
+- Modify: `src/resume_tailor_harness/services/profile_coach.py` (`_format_with_retry`), `src/resume_tailor_harness/services/mock_interview.py` (`_format_with_retry`)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (add `missing_model_keys`), `src/resume_tailor_harness/api/routers/coach.py` (`_guard_setup`), `src/resume_tailor_harness/api/routers/interview.py` (`_guard_keys`), `src/resume_tailor_harness/cli.py` (`profile_coach_cmd` key check)
 - Test: `tests/test_session_turns.py` (new); existing coach/interview suites unmodified
 
 **Interfaces:**
 
 - Consumes: `Runner` protocol as used today (`formatter.run(prompt).content`).
 - Produces:
-  - `resume_agent.sessions.turns.TurnRejected(ValueError)` — the single class; `profile.coach.TurnRejected` and `interview.agent.TurnRejected` become re-exports of it, so every existing `raise`/`except`/test import keeps working and the classes are now identical.
-  - `resume_agent.sessions.turns.format_with_retry(formatter, notes, schema, validate, *, label: str)` — one formatter pass, validate, one retry on `TurnRejected`.
-  - `resume_agent.llm_runner.missing_model_keys(settings) -> list[str]` — `"tier (model)"` labels for the configured mid/cheap models whose provider key is absent.
+  - `resume_tailor_harness.sessions.turns.TurnRejected(ValueError)` — the single class; `profile.coach.TurnRejected` and `interview.agent.TurnRejected` become re-exports of it, so every existing `raise`/`except`/test import keeps working and the classes are now identical.
+  - `resume_tailor_harness.sessions.turns.format_with_retry(formatter, notes, schema, validate, *, label: str)` — one formatter pass, validate, one retry on `TurnRejected`.
+  - `resume_tailor_harness.llm_runner.missing_model_keys(settings) -> list[str]` — `"tier (model)"` labels for the configured mid/cheap models whose provider key is absent.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -734,7 +734,7 @@ Create `tests/test_session_turns.py`:
 
 import pytest
 
-from resume_agent.sessions.turns import TurnRejected, format_with_retry
+from resume_tailor_harness.sessions.turns import TurnRejected, format_with_retry
 
 
 class _Out:
@@ -795,16 +795,16 @@ def test_second_rejection_propagates():
 
 
 def test_turn_rejected_is_one_class_everywhere():
-    from resume_agent.interview.agent import TurnRejected as interview_cls
-    from resume_agent.profile.coach import TurnRejected as coach_cls
+    from resume_tailor_harness.interview.agent import TurnRejected as interview_cls
+    from resume_tailor_harness.profile.coach import TurnRejected as coach_cls
 
     assert coach_cls is TurnRejected
     assert interview_cls is TurnRejected
 
 
 def test_missing_model_keys_labels(monkeypatch):
-    from resume_agent import llm_runner
-    from resume_agent.config import Settings
+    from resume_tailor_harness import llm_runner
+    from resume_tailor_harness.config import Settings
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
     monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model: None)
@@ -820,7 +820,7 @@ def test_missing_model_keys_labels(monkeypatch):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_session_turns.py -q`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.sessions.turns'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.sessions.turns'`.
 
 - [ ] **Step 3: Implement `sessions/turns.py`**
 
@@ -857,11 +857,11 @@ def format_with_retry(formatter, notes: object, schema, validate, *, label: str)
 
 - [ ] **Step 4: Re-point the twins**
 
-1. `src/resume_agent/profile/coach.py` — delete the `class TurnRejected(ValueError): ...` block (line ~75) and add to the module's imports: `from resume_agent.sessions.turns import TurnRejected`. Keep the name exported (add a `# noqa: F401` only if ruff flags it AND nothing in the module references it — the module raises it, so it will be referenced).
-2. `src/resume_agent/interview/agent.py` — same replacement for its class at line ~67.
-3. `src/resume_agent/services/profile_coach.py` — delete `_format_with_retry`; add `from resume_agent.sessions.turns import format_with_retry`; change its two call sites from `_format_with_retry(formatter, notes, schema, validate)` to `format_with_retry(formatter, notes, schema, validate, label="COACH NOTES")`.
-4. `src/resume_agent/services/mock_interview.py` — same, with `label="INTERVIEWER NOTES"`.
-5. `src/resume_agent/llm_runner.py` — append:
+1. `src/resume_tailor_harness/profile/coach.py` — delete the `class TurnRejected(ValueError): ...` block (line ~75) and add to the module's imports: `from resume_tailor_harness.sessions.turns import TurnRejected`. Keep the name exported (add a `# noqa: F401` only if ruff flags it AND nothing in the module references it — the module raises it, so it will be referenced).
+2. `src/resume_tailor_harness/interview/agent.py` — same replacement for its class at line ~67.
+3. `src/resume_tailor_harness/services/profile_coach.py` — delete `_format_with_retry`; add `from resume_tailor_harness.sessions.turns import format_with_retry`; change its two call sites from `_format_with_retry(formatter, notes, schema, validate)` to `format_with_retry(formatter, notes, schema, validate, label="COACH NOTES")`.
+4. `src/resume_tailor_harness/services/mock_interview.py` — same, with `label="INTERVIEWER NOTES"`.
+5. `src/resume_tailor_harness/llm_runner.py` — append:
 
 ```python
 def missing_model_keys(settings) -> list[str]:
@@ -876,9 +876,9 @@ def missing_model_keys(settings) -> list[str]:
     ]
 ```
 
-1. `src/resume_agent/api/routers/coach.py` `_guard_setup` — replace the four `configured =` / `missing =` lines with `missing = missing_model_keys(settings)` (import `missing_model_keys` from `resume_agent.llm_runner`, replacing the `resolve_api_key` import if it becomes unused).
-2. `src/resume_agent/api/routers/interview.py` `_guard_keys` — same replacement.
-3. `src/resume_agent/cli.py` `profile_coach_cmd` — same replacement for its `configured` / `missing` block.
+1. `src/resume_tailor_harness/api/routers/coach.py` `_guard_setup` — replace the four `configured =` / `missing =` lines with `missing = missing_model_keys(settings)` (import `missing_model_keys` from `resume_tailor_harness.llm_runner`, replacing the `resolve_api_key` import if it becomes unused).
+2. `src/resume_tailor_harness/api/routers/interview.py` `_guard_keys` — same replacement.
+3. `src/resume_tailor_harness/cli.py` `profile_coach_cmd` — same replacement for its `configured` / `missing` block.
 
 - [ ] **Step 5: Run the new and affected suites**
 
@@ -887,16 +887,16 @@ Expected: PASS with zero test edits.
 
 - [ ] **Step 6: Grep gates**
 
-Run: `grep -rn "class TurnRejected" src/resume_agent --include="*.py"`
+Run: `grep -rn "class TurnRejected" src/resume_tailor_harness --include="*.py"`
 Expected: only `sessions/turns.py`.
-Run: `grep -rn "_format_with_retry" src/resume_agent --include="*.py"`
+Run: `grep -rn "_format_with_retry" src/resume_tailor_harness --include="*.py"`
 Expected: no hits.
 
 - [ ] **Step 7: Lint and commit**
 
 ```bash
-ruff check src/resume_agent tests/test_session_turns.py
-git add src/resume_agent/sessions/turns.py src/resume_agent/profile/coach.py src/resume_agent/interview/agent.py src/resume_agent/services/profile_coach.py src/resume_agent/services/mock_interview.py src/resume_agent/llm_runner.py src/resume_agent/api/routers/coach.py src/resume_agent/api/routers/interview.py src/resume_agent/cli.py tests/test_session_turns.py
+ruff check src/resume_tailor_harness tests/test_session_turns.py
+git add src/resume_tailor_harness/sessions/turns.py src/resume_tailor_harness/profile/coach.py src/resume_tailor_harness/interview/agent.py src/resume_tailor_harness/services/profile_coach.py src/resume_tailor_harness/services/mock_interview.py src/resume_tailor_harness/llm_runner.py src/resume_tailor_harness/api/routers/coach.py src/resume_tailor_harness/api/routers/interview.py src/resume_tailor_harness/cli.py tests/test_session_turns.py
 git commit -m "refactor(sessions): one TurnRejected, one format_with_retry, one missing-keys check"
 ```
 
@@ -908,7 +908,7 @@ git commit -m "refactor(sessions): one TurnRejected, one format_with_retry, one 
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/boards.py`
+- Modify: `src/resume_tailor_harness/api/routers/boards.py`
 - Modify (regenerate): `contracts/openapi.json`, `contracts/ts/api.ts`
 - Test: `tests/api/test_boards.py` (unmodified), `tests/api/test_openapi_contract.py`
 
@@ -921,7 +921,7 @@ git commit -m "refactor(sessions): one TurnRejected, one format_with_retry, one 
 
 - [ ] **Step 1: Add the dependency factory and rewrite the three endpoints**
 
-In `src/resume_agent/api/routers/boards.py`, delete `_filter_from_query` and add in its place:
+In `src/resume_tailor_harness/api/routers/boards.py`, delete `_filter_from_query` and add in its place:
 
 ```python
 def board_filter_query(default_sort: str):
@@ -1050,12 +1050,12 @@ Expected: `identical param sets` × 3. If any diff shows an added/removed/rename
 
 - [ ] **Step 5: Full suite, web typecheck, lint, commit**
 
-Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_agent/api/routers/boards.py`
+Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_tailor_harness/api/routers/boards.py`
 Run: `npm run test:run --prefix web` (the regenerated `api.ts` must still typecheck the web suite)
 Expected: PASS / clean / PASS.
 
 ```bash
-git add src/resume_agent/api/routers/boards.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_tailor_harness/api/routers/boards.py contracts/openapi.json contracts/ts/api.ts
 git commit -m "refactor(api): board filter query surface has one author (order-only contract regen)"
 ```
 
@@ -1103,9 +1103,9 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.board import list_board
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.board import list_board
+from resume_tailor_harness.tracking.tables import Job
 
 
 def seed(session: Session, n: int) -> None:
@@ -1204,7 +1204,7 @@ git commit -m "perf(board): benchmark harness + recorded read-path baseline"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py` (`shortlist_rows`, `triage_rows`, `archived_rows` — NOT `pipeline_rows`: `PipelineItem` ships `jdText` on the wire and must keep loading it)
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (`shortlist_rows`, `triage_rows`, `archived_rows` — NOT `pipeline_rows`: `PipelineItem` ships `jdText` on the wire and must keep loading it)
 - Test: `tests/test_tracking_queries.py` (append)
 
 **Interfaces:**
@@ -1226,7 +1226,7 @@ def test_shortlist_and_triage_rows_never_touch_jd_text():
     """
     import inspect
 
-    import resume_agent.tracking.queries as queries_module
+    import resume_tailor_harness.tracking.queries as queries_module
 
     for fn in (queries_module._shortlist_row, queries_module._triage_row):
         assert "jd_text" not in inspect.getsource(fn), (
@@ -1242,7 +1242,7 @@ Expected: PASS (the invariant already holds today).
 
 - [ ] **Step 2 (gated): Apply the deferral**
 
-In `src/resume_agent/tracking/queries.py`, add `from sqlalchemy.orm import defer` and change the three queries:
+In `src/resume_tailor_harness/tracking/queries.py`, add `from sqlalchemy.orm import defer` and change the three queries:
 
 `shortlist_rows`:
 
@@ -1267,12 +1267,12 @@ Expected: PASS unmodified.
 - [ ] **Step 4 (gated): Re-run the benchmark and record the delta**
 
 Run: `.venv/Scripts/python.exe scripts/bench_board.py`
-Paste the new table into the "Post-fix table" section of `docs/notes/board-read-baseline.md`. The p95 at 5,000 rows must improve; if it does not, revert Step 2 (`git checkout -- src/resume_agent/tracking/queries.py`) and record "no measurable win — deferral reverted" instead.
+Paste the new table into the "Post-fix table" section of `docs/notes/board-read-baseline.md`. The p95 at 5,000 rows must improve; if it does not, revert Step 2 (`git checkout -- src/resume_tailor_harness/tracking/queries.py`) and record "no measurable win — deferral reverted" instead.
 
 - [ ] **Step 5: Commit (whichever branch of the gate ran)**
 
 ```bash
-git add src/resume_agent/tracking/queries.py tests/test_tracking_queries.py docs/notes/board-read-baseline.md
+git add src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py docs/notes/board-read-baseline.md
 git commit -m "perf(board): defer jd_text on shortlist/triage list queries (measured)"
 # or, if the gate said skip:
 git add tests/test_tracking_queries.py docs/notes/board-read-baseline.md
@@ -1357,7 +1357,7 @@ run starter
 1. In the "Hot paths" table, add after the `services/profile_coach.py` row:
 
 ```markdown
-| `src/resume_agent/sessions/store.py` | Session substrate: file custody every turn-per-run session kind rides (ADR 0006) |
+| `src/resume_tailor_harness/sessions/store.py` | Session substrate: file custody every turn-per-run session kind rides (ADR 0006) |
 ```
 
 1. In "Known design notes", find the bullet beginning "**Mock interviews are practice artifacts, not progress.**" and append to it:
@@ -1394,10 +1394,10 @@ git commit -m "docs: Session substrate + Launch seam vocabulary; CLAUDE.md synce
 - [ ] Web build: `npm run build --prefix web` → PASS
 - [ ] Contract state: `git status contracts/` → clean (Task 7's regeneration committed; nothing pending)
 - [ ] Duplication grep gates:
-  - `grep -rn "class TurnRejected" src/resume_agent --include="*.py"` → only `sessions/turns.py`
-  - `grep -rn "session-\*.json" src/resume_agent --include="*.py"` → only `sessions/store.py`
-  - `grep -rn "data/profile/facts.json" src/resume_agent --include="*.py"` → only `tenancy/paths.py` (+ user-facing help text per round-3 Task 5)
-  - `grep -rn "record = mgr.get(run_id)\|record = manager.get(run_id)" src/resume_agent/api/routers` → only `suggestions.py`
+  - `grep -rn "class TurnRejected" src/resume_tailor_harness --include="*.py"` → only `sessions/turns.py`
+  - `grep -rn "session-\*.json" src/resume_tailor_harness --include="*.py"` → only `sessions/store.py`
+  - `grep -rn "data/profile/facts.json" src/resume_tailor_harness --include="*.py"` → only `tenancy/paths.py` (+ user-facing help text per round-3 Task 5)
+  - `grep -rn "record = mgr.get(run_id)\|record = manager.get(run_id)" src/resume_tailor_harness/api/routers` → only `suggestions.py`
 - [ ] The unrelated Gmail working-tree changes are still uncommitted and untouched: `git status` shows exactly the same four Gmail-related entries as before execution.
 - [ ] `docs/notes/board-read-baseline.md` has both a baseline table and a filled-in post-fix section (numbers or an explicit "skipped — within budget").
 

@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from resume_agent.services.backup import pack_local_checkout
+from resume_tailor_harness.services.backup import pack_local_checkout
 
 
 def main() -> None:

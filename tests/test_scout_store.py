@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.discovery.scout_store import (
+from resume_tailor_harness.discovery.scout_store import (
     ManualSourceConfirmation,
     ScoutProposal,
     ScoutProposalChangedError,
@@ -16,7 +16,7 @@ from resume_agent.discovery.scout_store import (
     replace_pending_source_resolution,
     set_proposal_status,
 )
-from resume_agent.discovery.source_resolution.models import (
+from resume_tailor_harness.discovery.source_resolution.models import (
     CompanySourceResolution,
     SourceEvidence,
 )

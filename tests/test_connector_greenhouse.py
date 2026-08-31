@@ -4,14 +4,14 @@ from pathlib import Path
 
 import httpx
 
-from resume_agent.discovery.url_ingest import fetch as url_fetch
-from resume_agent.discovery.connectors.config import GreenhouseBoard
-from resume_agent.discovery.connectors.greenhouse import (
+from resume_tailor_harness.discovery.url_ingest import fetch as url_fetch
+from resume_tailor_harness.discovery.connectors.config import GreenhouseBoard
+from resume_tailor_harness.discovery.connectors.greenhouse import (
     GreenhouseConnector,
     parse_greenhouse,
 )
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.discovery.url_ingest.models import PageContent
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.url_ingest.models import PageContent
 
 FIXTURE = json.loads(
     (Path(__file__).parent / "fixtures" / "greenhouse" / "jobs.json").read_text()
@@ -114,7 +114,7 @@ def test_connector_isolates_failing_board_and_records_it():
 
 
 def test_get_board_delegates_to_module_fetcher(monkeypatch):
-    import resume_agent.discovery.connectors.greenhouse as gh
+    import resume_tailor_harness.discovery.connectors.greenhouse as gh
 
     called = {}
 

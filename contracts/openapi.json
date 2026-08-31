@@ -14461,7 +14461,7 @@
         "title": "VerifyEmailRequest",
         "type": "object"
       },
-      "resume_agent__api__schemas__admin_users__ResetPasswordRequest": {
+      "resume_tailor_harness__api__schemas__admin_users__ResetPasswordRequest": {
         "properties": {
           "password": {
             "maxLength": 1024,
@@ -14476,7 +14476,7 @@
         "title": "ResetPasswordRequest",
         "type": "object"
       },
-      "resume_agent__api__schemas__auth_email__ResetPasswordRequest": {
+      "resume_tailor_harness__api__schemas__auth_email__ResetPasswordRequest": {
         "properties": {
           "code": {
             "pattern": "^\\d{6}$",
@@ -14503,7 +14503,7 @@
         "title": "ResetPasswordRequest",
         "type": "object"
       },
-      "resume_agent__api__schemas__profile__AddSkillIn": {
+      "resume_tailor_harness__api__schemas__profile__AddSkillIn": {
         "properties": {
           "category": {
             "anyOf": [
@@ -14534,7 +14534,7 @@
         "title": "AddSkillIn",
         "type": "object"
       },
-      "resume_agent__api__schemas__profile__SourceOut": {
+      "resume_tailor_harness__api__schemas__profile__SourceOut": {
         "properties": {
           "addedAt": {
             "title": "Addedat",
@@ -14597,7 +14597,7 @@
         "title": "SourceOut",
         "type": "object"
       },
-      "resume_agent__api__schemas__sources__SourceOut": {
+      "resume_tailor_harness__api__schemas__sources__SourceOut": {
         "properties": {
           "detail": {
             "title": "Detail",
@@ -14651,7 +14651,7 @@
         "title": "SourceOut",
         "type": "object"
       },
-      "resume_agent__api__schemas__taxonomy__AddSkillIn": {
+      "resume_tailor_harness__api__schemas__taxonomy__AddSkillIn": {
         "properties": {
           "domainId": {
             "anyOf": [
@@ -14690,7 +14690,7 @@
     }
   },
   "info": {
-    "title": "Resume Agent API",
+    "title": "R\u00e9sum\u00e9 Tailor Harness API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
@@ -17145,7 +17145,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/resume_agent__api__schemas__admin_users__ResetPasswordRequest"
+                "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__admin_users__ResetPasswordRequest"
               }
             }
           },
@@ -17782,7 +17782,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/resume_agent__api__schemas__auth_email__ResetPasswordRequest"
+                "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__auth_email__ResetPasswordRequest"
               }
             }
           },
@@ -25077,7 +25077,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/resume_agent__api__schemas__profile__AddSkillIn"
+                "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__profile__AddSkillIn"
               }
             }
           },
@@ -25359,7 +25359,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/resume_agent__api__schemas__profile__SourceOut"
+                    "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__profile__SourceOut"
                   },
                   "title": "Response List Sources Api Profile Sources Get",
                   "type": "array"
@@ -25416,7 +25416,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/resume_agent__api__schemas__profile__SourceOut"
+                  "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__profile__SourceOut"
                 }
               }
             },
@@ -25472,7 +25472,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/resume_agent__api__schemas__profile__SourceOut"
+                  "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__profile__SourceOut"
                 }
               }
             },
@@ -25528,7 +25528,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/resume_agent__api__schemas__profile__SourceOut"
+                  "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__profile__SourceOut"
                 }
               }
             },
@@ -25649,7 +25649,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/resume_agent__api__schemas__profile__SourceOut"
+                  "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__profile__SourceOut"
                 }
               }
             },
@@ -28641,7 +28641,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/resume_agent__api__schemas__sources__SourceOut"
+                    "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__sources__SourceOut"
                   },
                   "title": "Response List Sources Route Api Sources Get",
                   "type": "array"
@@ -28698,7 +28698,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/resume_agent__api__schemas__sources__SourceOut"
+                  "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__sources__SourceOut"
                 }
               }
             },
@@ -28912,7 +28912,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/resume_agent__api__schemas__sources__SourceOut"
+                  "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__sources__SourceOut"
                 }
               }
             },
@@ -29381,7 +29381,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/resume_agent__api__schemas__taxonomy__AddSkillIn"
+                "$ref": "#/components/schemas/resume_tailor_harness__api__schemas__taxonomy__AddSkillIn"
               }
             }
           },

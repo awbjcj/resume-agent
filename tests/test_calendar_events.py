@@ -2,9 +2,9 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session
 
-from resume_agent.calendar.events import entries_for_upcoming, entry_for_event
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.calendar.events import entries_for_upcoming, entry_for_event
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 
@@ -45,7 +45,7 @@ def test_event_mapping_preserves_actionable_calendar_details() -> None:
     assert "Dana Vale" in entry.description
     assert "Zoom" in entry.description
     assert "LRU cache" in entry.description
-    assert entry.uid == "application-event-1@resume-agent"
+    assert entry.uid == "application-event-1@resume-tailor-harness"
     assert entry.alarm_minutes_before == 60
 
 

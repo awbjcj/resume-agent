@@ -1,4 +1,4 @@
-from resume_agent.setup.preflight import (
+from resume_tailor_harness.setup.preflight import (
     CheckResult,
     check_examples_present,
     check_python,

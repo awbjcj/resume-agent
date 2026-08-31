@@ -6,16 +6,16 @@
 
 **Architecture:** A new pure module `tailor/style_guide.py` owns two functions — `load_style_guide(path)` (reads an opt-in prose file; missing/empty ⇒ `None`) and `compose_instructions(base, style_guide)` (appends a labeled block beneath fixed instructions, or returns the base unchanged). The three agent builders in `tailor/agents.py` gain an optional `style_guide` param and route their hardcoded instruction lists through `compose_instructions`. `review.yaml` gains a `style_guide_path` key; `cli.py`'s `tailor_cmd` loads the guide once and threads it into all loop agents. Zero DB changes.
 
-**Tech Stack:** Python 3.13, Pydantic, Typer, Agno (`Agent`), pytest. Follows the spec `docs/superpowers/specs/2026-06-13-resume-agent-v3-design.md` §5.1.
+**Tech Stack:** Python 3.13, Pydantic, Typer, Agno (`Agent`), pytest. Follows the spec `docs/superpowers/specs/2026-06-13-resume-tailor-harness-v3-design.md` §5.1.
 
 ---
 
 ## File Structure
 
-- **Create** `src/resume_agent/tailor/style_guide.py` — `STYLE_GUIDE_HEADER`, `compose_instructions()`, `load_style_guide()`. One responsibility: assemble/load the house-style layer. Pure (no Agno, no I/O beyond reading one file).
-- **Modify** `src/resume_agent/tailor/agents.py` — add `style_guide: str | None = None` to `build_tailor_agent`, `build_reviser_agent`, `build_reviewer_agent`; route base instructions through `compose_instructions`.
-- **Modify** `src/resume_agent/tailor/review_config.py` — add `style_guide_path: str` to `ReviewConfig`.
-- **Modify** `src/resume_agent/cli.py` — `build_reviewer_agents(config, style_guide)`; `tailor_cmd` loads the guide and threads it.
+- **Create** `src/resume_tailor_harness/tailor/style_guide.py` — `STYLE_GUIDE_HEADER`, `compose_instructions()`, `load_style_guide()`. One responsibility: assemble/load the house-style layer. Pure (no Agno, no I/O beyond reading one file).
+- **Modify** `src/resume_tailor_harness/tailor/agents.py` — add `style_guide: str | None = None` to `build_tailor_agent`, `build_reviser_agent`, `build_reviewer_agent`; route base instructions through `compose_instructions`.
+- **Modify** `src/resume_tailor_harness/tailor/review_config.py` — add `style_guide_path: str` to `ReviewConfig`.
+- **Modify** `src/resume_tailor_harness/cli.py` — `build_reviewer_agents(config, style_guide)`; `tailor_cmd` loads the guide and threads it.
 - **Create** `config/style_guide.md.example` — annotated prose example.
 - **Modify** `README.md` — document the new config file.
 - **Tests:** `tests/test_tailor_style_guide.py` (new), `tests/test_tailor_agents.py` (extend), `tests/test_tailor_review_config.py` (extend), `tests/test_cli_tailor.py` (extend).
@@ -28,14 +28,14 @@ Tasks 1–4 are independent of the CLI; Task 5 wires them together; Task 6 is do
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/style_guide.py`
+- Create: `src/resume_tailor_harness/tailor/style_guide.py`
 - Test: `tests/test_tailor_style_guide.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_tailor_style_guide.py
-from resume_agent.tailor.style_guide import STYLE_GUIDE_HEADER, compose_instructions
+from resume_tailor_harness.tailor.style_guide import STYLE_GUIDE_HEADER, compose_instructions
 
 
 def test_compose_appends_style_beneath_base():
@@ -61,12 +61,12 @@ def test_compose_does_not_mutate_base():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_tailor_style_guide.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.tailor.style_guide'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.style_guide'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/tailor/style_guide.py
+# src/resume_tailor_harness/tailor/style_guide.py
 STYLE_GUIDE_HEADER = (
     "HOUSE STYLE (user writing guidance — governs HOW you write, never WHAT is true; "
     "the fact-lock rules above always take precedence and may not be overridden):"
@@ -92,7 +92,7 @@ Expected: PASS (3 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/style_guide.py tests/test_tailor_style_guide.py
+git add src/resume_tailor_harness/tailor/style_guide.py tests/test_tailor_style_guide.py
 git commit -m "feat(tailor): compose_instructions appends house style beneath fact-lock core"
 ```
 
@@ -102,14 +102,14 @@ git commit -m "feat(tailor): compose_instructions appends house style beneath fa
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/style_guide.py`
+- Modify: `src/resume_tailor_harness/tailor/style_guide.py`
 - Test: `tests/test_tailor_style_guide.py`
 
 - [ ] **Step 1: Write the failing test** (append to the existing test file)
 
 ```python
 # tests/test_tailor_style_guide.py  (add these)
-from resume_agent.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tailor.style_guide import load_style_guide
 
 
 def test_load_returns_stripped_text(tmp_path):
@@ -137,12 +137,12 @@ Expected: FAIL with `ImportError: cannot import name 'load_style_guide'`
 - [ ] **Step 3: Write minimal implementation** (add to `style_guide.py`; add the import at top)
 
 ```python
-# src/resume_agent/tailor/style_guide.py  — add at the very top
+# src/resume_tailor_harness/tailor/style_guide.py  — add at the very top
 from pathlib import Path
 ```
 
 ```python
-# src/resume_agent/tailor/style_guide.py  — add at the bottom
+# src/resume_tailor_harness/tailor/style_guide.py  — add at the bottom
 def load_style_guide(path: "str | Path | None") -> str | None:
     """Read the prose house-style file. Missing or empty file => None (opt-in no-op)."""
     if not path:
@@ -162,7 +162,7 @@ Expected: PASS (6 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/style_guide.py tests/test_tailor_style_guide.py
+git add src/resume_tailor_harness/tailor/style_guide.py tests/test_tailor_style_guide.py
 git commit -m "feat(tailor): load_style_guide reads opt-in prose file (missing/empty => None)"
 ```
 
@@ -172,7 +172,7 @@ git commit -m "feat(tailor): load_style_guide reads opt-in prose file (missing/e
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/review_config.py:24-28`
+- Modify: `src/resume_tailor_harness/tailor/review_config.py:24-28`
 - Test: `tests/test_tailor_review_config.py`
 
 - [ ] **Step 1: Write the failing test** (append to the existing test file)
@@ -197,7 +197,7 @@ Expected: FAIL with `AttributeError: 'ReviewConfig' object has no attribute 'sty
 - [ ] **Step 3: Write minimal implementation** — add one field to `ReviewConfig`
 
 ```python
-# src/resume_agent/tailor/review_config.py — class ReviewConfig now reads:
+# src/resume_tailor_harness/tailor/review_config.py — class ReviewConfig now reads:
 class ReviewConfig(ExtensibleModel):
     max_rounds: int = Field(default=3, ge=1)
     score_threshold: int = 85
@@ -214,7 +214,7 @@ Expected: PASS (all, including the 2 new)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/review_config.py tests/test_tailor_review_config.py
+git add src/resume_tailor_harness/tailor/review_config.py tests/test_tailor_review_config.py
 git commit -m "feat(tailor): add style_guide_path to ReviewConfig (default config/style_guide.md)"
 ```
 
@@ -224,14 +224,14 @@ git commit -m "feat(tailor): add style_guide_path to ReviewConfig (default confi
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/agents.py:57-87`
+- Modify: `src/resume_tailor_harness/tailor/agents.py:57-87`
 - Test: `tests/test_tailor_agents.py`
 
 - [ ] **Step 1: Write the failing test** (append to the existing test file)
 
 ```python
 # tests/test_tailor_agents.py  (add these)
-from resume_agent.tailor.agents import _TAILOR_INSTRUCTIONS  # noqa: E402
+from resume_tailor_harness.tailor.agents import _TAILOR_INSTRUCTIONS  # noqa: E402
 
 
 def test_tailor_agent_includes_style_and_keeps_factlock(monkeypatch):
@@ -264,12 +264,12 @@ Expected: FAIL with `TypeError: build_tailor_agent() got an unexpected keyword a
 - [ ] **Step 3: Write minimal implementation** — add the import and the `style_guide` param to all three builders
 
 ```python
-# src/resume_agent/tailor/agents.py — add near the other imports
-from resume_agent.tailor.style_guide import compose_instructions
+# src/resume_tailor_harness/tailor/agents.py — add near the other imports
+from resume_tailor_harness.tailor.style_guide import compose_instructions
 ```
 
 ```python
-# src/resume_agent/tailor/agents.py — replace the three builder functions
+# src/resume_tailor_harness/tailor/agents.py — replace the three builder functions
 def build_tailor_agent(model_id: str | None = None, style_guide: str | None = None) -> Runner:
     return AgentRunner(
         Agent(
@@ -315,7 +315,7 @@ Expected: PASS (all, including the 3 new). If `agent._agent.instructions` is not
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/agents.py tests/test_tailor_agents.py
+git add src/resume_tailor_harness/tailor/agents.py tests/test_tailor_agents.py
 git commit -m "feat(tailor): thread optional style_guide through writer/reviser/reviewer builders"
 ```
 
@@ -325,14 +325,14 @@ git commit -m "feat(tailor): thread optional style_guide through writer/reviser/
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py:20-37` (imports), `src/resume_agent/cli.py:189-194` (`build_reviewer_agents`), `src/resume_agent/cli.py:214-249` (`tailor_cmd`)
+- Modify: `src/resume_tailor_harness/cli.py:20-37` (imports), `src/resume_tailor_harness/cli.py:189-194` (`build_reviewer_agents`), `src/resume_tailor_harness/cli.py:214-249` (`tailor_cmd`)
 - Test: `tests/test_cli_tailor.py`
 
 - [ ] **Step 1: Write the failing test** — replace `test_tailor_processes_a_job` and add a threading test
 
 ```python
 # tests/test_cli_tailor.py — add this import at the top
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.review_config import ReviewConfig
 ```
 
 ```python
@@ -405,21 +405,21 @@ def test_tailor_threads_style_guide_into_all_loop_agents(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cli_tailor.py::test_tailor_threads_style_guide_into_all_loop_agents -v`
-Expected: FAIL — `AttributeError: <module 'resume_agent.cli'> does not have the attribute 'load_style_guide'`
+Expected: FAIL — `AttributeError: <module 'resume_tailor_harness.cli'> does not have the attribute 'load_style_guide'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 Add the import (group it with the other tailor imports near `cli.py:29`):
 
 ```python
-# src/resume_agent/cli.py
-from resume_agent.tailor.style_guide import load_style_guide
+# src/resume_tailor_harness/cli.py
+from resume_tailor_harness.tailor.style_guide import load_style_guide
 ```
 
 Update the `build_reviewer_agents` helper to forward the style guide:
 
 ```python
-# src/resume_agent/cli.py — replace build_reviewer_agents
+# src/resume_tailor_harness/cli.py — replace build_reviewer_agents
 def build_reviewer_agents(config, style_guide: str | None = None) -> dict:
     """Build one Agno reviewer agent per configured reviewer, at its model tier."""
     return {
@@ -459,7 +459,7 @@ Expected: PASS (all 4 tests in the file)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_tailor.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_tailor.py
 git commit -m "feat(cli): load style guide once and thread it into the whole tailor loop"
 ```
 

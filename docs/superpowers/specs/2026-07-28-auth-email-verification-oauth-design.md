@@ -91,7 +91,7 @@ The two must not be conflated — `gmail.send` remains out of scope.
 
 ## 1. Mail seam
 
-New package `src/resume_agent/mail/`:
+New package `src/resume_tailor_harness/mail/`:
 
 ```
 mail/mailer.py     Mailer protocol, SmtpMailer, NullMailer
@@ -337,7 +337,7 @@ Rules, in order of cost:
 2. Rejected if it contains the email local-part or the display name as a
    case-insensitive substring of ≥4 characters.
 3. Rejected if present in a bundled top-1000 common-password list, shipped as
-   `src/resume_agent/api/data/common_passwords.txt` (~8 KB, one entry per line,
+   `src/resume_tailor_harness/api/data/common_passwords.txt` (~8 KB, one entry per line,
    loaded once and memoized). This is the **offline floor** — the rule that
    still applies when the network is gone.
 4. Rejected if breached, per HIBP.

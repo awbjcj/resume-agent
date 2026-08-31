@@ -1,14 +1,14 @@
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
     TailoredSkill,
 )
-from resume_agent.models.review import Severity
-from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
-from resume_agent.tailor.coverage import (
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
+from resume_tailor_harness.tailor.coverage import (
     COVERAGE_REVIEWER,
     CoverageCritique,
     coverage_critique,

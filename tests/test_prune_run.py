@@ -2,15 +2,15 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.prune_config import PruneConfig
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.prune_config import PruneConfig
+from resume_tailor_harness.tracking.repository import (
     get_job,
     prune_preview,
     prune_run,
     save_application,
     save_job,
 )
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 
 NOW = datetime(2026, 6, 20, tzinfo=timezone.utc)
 

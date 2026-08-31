@@ -2,14 +2,14 @@ from pathlib import Path
 
 from evals.metrics import portfolio_forbidden_hits, portfolio_mandatory_hits
 from evals.schema import load_cases, load_profile
-from resume_agent.profile.matrix import build_matrix, build_skill_match_context
-from resume_agent.tailor.evidence_portfolio import (
+from resume_tailor_harness.profile.matrix import build_matrix, build_skill_match_context
+from resume_tailor_harness.tailor.evidence_portfolio import (
     build_evidence_catalog,
     build_fallback_portfolio,
 )
-from resume_agent.tailor.review_config import LengthBudget
-from resume_agent.taxonomy.clusters import load_cluster_map
-from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
+from resume_tailor_harness.tailor.review_config import LengthBudget
+from resume_tailor_harness.taxonomy.clusters import load_cluster_map
+from resume_tailor_harness.taxonomy.snapshot import EffectiveTaxonomy
 
 
 def test_labeled_portfolio_cases_meet_deterministic_safety_floor():

@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.models.profile import Contact, Language
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact, Language
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredAward,
     TailoredBullet,

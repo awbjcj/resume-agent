@@ -1,5 +1,5 @@
-from resume_agent.models.base import Source
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.base import Source
+from resume_tailor_harness.models.profile import (
     Award,
     Bullet,
     Certification,
@@ -14,8 +14,8 @@ from resume_agent.models.profile import (
     Skill,
     Volunteer,
 )
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.merge import (
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.merge import (
     BulletDupGroups,
     MergeReport,
     apply_synthesis_fragments,
@@ -54,23 +54,23 @@ def test_merge_without_github_is_unchanged_copy():
 def test_merge_dedupes_github_project_by_normalized_name_and_enriches():
     resume_facts = ProfileFacts(
         contact=Contact(name="Ada"),
-        projects=[Project(name="Resume Agent", source=Source.resume)],
+        projects=[Project(name="Résumé Tailor Harness", source=Source.resume)],
     )
     gh_projects = [
         Project(
-            name="resume-agent",
+            name="resume-tailor-harness",
             source=Source.github,
             stars=42,
-            repo_url="https://github.com/ada/resume-agent",
+            repo_url="https://github.com/ada/resume-tailor-harness",
         )
     ]
 
     merged = merge_facts(resume_facts, github_projects=gh_projects)
 
     names = [p.name for p in merged.projects]
-    assert names == ["Resume Agent"]
+    assert names == ["Résumé Tailor Harness"]
     assert merged.projects[0].stars == 42
-    assert merged.projects[0].repo_url == "https://github.com/ada/resume-agent"
+    assert merged.projects[0].repo_url == "https://github.com/ada/resume-tailor-harness"
 
 
 def test_merge_keeps_distinct_github_project():
@@ -87,8 +87,8 @@ def test_project_identity_prefers_repo_url_across_fragment_and_metadata_merges()
         contact=Contact(name="Ada"),
         projects=[
             Project(
-                name="Resume Agent CLI",
-                repo_url="https://github.com/me/resume-agent",
+                name="Résumé Tailor Harness CLI",
+                repo_url="https://github.com/me/resume-tailor-harness",
                 description="from resume",
             )
         ],
@@ -97,8 +97,8 @@ def test_project_identity_prefers_repo_url_across_fragment_and_metadata_merges()
         contact=Contact(name=""),
         projects=[
             Project(
-                name="resume-agent",
-                repo_url="git@github.com:Me/Resume-Agent.git",
+                name="resume-tailor-harness",
+                repo_url="git@github.com:Me/Resume-Tailor-Harness.git",
                 highlights=[Bullet(text="From dossier")],
             )
         ],
@@ -112,7 +112,7 @@ def test_project_identity_prefers_repo_url_across_fragment_and_metadata_merges()
             Project(
                 source=Source.github,
                 name="different display",
-                repo_url="ssh://git@github.com/me/resume-agent.git",
+                repo_url="ssh://git@github.com/me/resume-tailor-harness.git",
                 stars=42,
                 languages=["Python"],
                 topics=["agents"],

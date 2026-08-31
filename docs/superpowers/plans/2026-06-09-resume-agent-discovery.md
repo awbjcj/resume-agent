@@ -1,8 +1,8 @@
-# Resume Agent — Discovery Implementation Plan
+# Résumé Tailor Harness — Discovery Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the Discovery funnel — turn raw job postings into a ranked **shortlist** in SQLite — plus a `resume-agent discover` command and a `resume-agent addjob` manual-entry fallback. The live LinkedIn Playwright scraper is intentionally **out of scope** here (its selectors must be calibrated against the live site) and becomes its own follow-up plan; this plan makes the entire pipeline usable today via `addjob`.
+**Goal:** Build the Discovery funnel — turn raw job postings into a ranked **shortlist** in SQLite — plus a `resume-tailor-harness discover` command and a `resume-tailor-harness addjob` manual-entry fallback. The live LinkedIn Playwright scraper is intentionally **out of scope** here (its selectors must be calibrated against the live site) and becomes its own follow-up plan; this plan makes the entire pipeline usable today via `addjob`.
 
 **Architecture:** SQLite `jobs` rows flow through statuses `raw → extracted → filtered|rejected → shortlisted`, one stage at a time (resumable). Deterministic stages (ingest/dedupe, hard filter) and the two cheap-LLM stages (extract → `JobCriteria`, fit-score → `FitScore`) are each pure/injected functions, tested with in-memory SQLite + fake agents — no network or API key in tests.
 
@@ -27,7 +27,7 @@ Design spec §5.2. Decisions for this plan:
 ## File Structure (created/modified)
 
 ```
-src/resume_agent/
+src/resume_tailor_harness/
   cli.py                       # MODIFY: add `discover` and `addjob` commands
   tracking/
     repository.py              # CREATE: Job persistence (save/query/dedupe/counts)
@@ -56,7 +56,7 @@ tests/
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/__init__.py`, `src/resume_agent/discovery/search_config.py`
+- Create: `src/resume_tailor_harness/discovery/__init__.py`, `src/resume_tailor_harness/discovery/search_config.py`
 - Test: `tests/test_discovery_search_config.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -64,7 +64,7 @@ tests/
 Create `tests/test_discovery_search_config.py`:
 
 ```python
-from resume_agent.discovery.search_config import SearchConfig, load_search_config
+from resume_tailor_harness.discovery.search_config import SearchConfig, load_search_config
 
 
 def test_defaults_are_empty():
@@ -96,25 +96,25 @@ Run:
 uv run pytest tests/test_discovery_search_config.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/discovery/__init__.py`:
+Create `src/resume_tailor_harness/discovery/__init__.py`:
 
 ```python
 """Discovery component: fetch/ingest jobs and funnel them to a shortlist."""
 ```
 
-Create `src/resume_agent/discovery/search_config.py`:
+Create `src/resume_tailor_harness/discovery/search_config.py`:
 
 ```python
 from pathlib import Path
 
 from pydantic import Field
 
-from resume_agent.config import load_yaml
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class SearchConfig(ExtensibleModel):
@@ -147,7 +147,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/__init__.py src/resume_agent/discovery/search_config.py tests/test_discovery_search_config.py
+git add src/resume_tailor_harness/discovery/__init__.py src/resume_tailor_harness/discovery/search_config.py tests/test_discovery_search_config.py
 git commit -m "feat(discovery): SearchConfig + loader" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -157,7 +157,7 @@ git commit -m "feat(discovery): SearchConfig + loader" -m "Co-Authored-By: Claud
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/repository.py`
+- Create: `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -167,13 +167,13 @@ Create `tests/test_repository.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     find_existing,
     jobs_by_status,
     save_job,
     status_counts,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session() -> Session:
@@ -217,17 +217,17 @@ Run:
 uv run pytest tests/test_repository.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.repository'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.repository'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/tracking/repository.py`:
+Create `src/resume_tailor_harness/tracking/repository.py`:
 
 ```python
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tracking.tables import Job
 
 
 def save_job(session: Session, job: Job) -> Job:
@@ -269,7 +269,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_repository.py
 git commit -m "feat(tracking): jobs repository (save/query/dedupe/counts)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -279,7 +279,7 @@ git commit -m "feat(tracking): jobs repository (save/query/dedupe/counts)" -m "C
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/ingest.py`
+- Create: `src/resume_tailor_harness/discovery/ingest.py`
 - Test: `tests/test_discovery_ingest.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -289,8 +289,8 @@ Create `tests/test_discovery_ingest.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.ingest import add_job
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 def _session() -> Session:
@@ -332,17 +332,17 @@ Run:
 uv run pytest tests/test_discovery_ingest.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.ingest'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.ingest'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/discovery/ingest.py`:
+Create `src/resume_tailor_harness/discovery/ingest.py`:
 
 ```python
 from sqlmodel import Session
 
-from resume_agent.tracking.repository import find_existing, save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.repository import find_existing, save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _clean(value: str | None) -> str | None:
@@ -392,7 +392,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/ingest.py tests/test_discovery_ingest.py
+git add src/resume_tailor_harness/discovery/ingest.py tests/test_discovery_ingest.py
 git commit -m "feat(discovery): add_job ingest with normalize + dedupe" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -402,7 +402,7 @@ git commit -m "feat(discovery): add_job ingest with normalize + dedupe" -m "Co-A
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/extract.py`
+- Create: `src/resume_tailor_harness/discovery/extract.py`
 - Test: `tests/test_discovery_extract.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -414,8 +414,8 @@ import pytest
 
 from agno.agent import Agent
 
-from resume_agent.models.job import JobCriteria, SponsorshipSignal
-from resume_agent.discovery.extract import build_extract_agent, extract_job_criteria
+from resume_tailor_harness.models.job import JobCriteria, SponsorshipSignal
+from resume_tailor_harness.discovery.extract import build_extract_agent, extract_job_criteria
 
 
 class _FakeResult:
@@ -459,11 +459,11 @@ Run:
 uv run pytest tests/test_discovery_extract.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.extract'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.extract'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/discovery/extract.py`:
+Create `src/resume_tailor_harness/discovery/extract.py`:
 
 ```python
 from typing import Any, Protocol
@@ -471,8 +471,8 @@ from typing import Any, Protocol
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
-from resume_agent.config import get_settings
-from resume_agent.models.job import JobCriteria
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.models.job import JobCriteria
 
 
 class Runner(Protocol):
@@ -517,7 +517,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/extract.py tests/test_discovery_extract.py
+git add src/resume_tailor_harness/discovery/extract.py tests/test_discovery_extract.py
 git commit -m "feat(discovery): Agno extractor -> JobCriteria" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -527,7 +527,7 @@ git commit -m "feat(discovery): Agno extractor -> JobCriteria" -m "Co-Authored-B
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/filter.py`
+- Create: `src/resume_tailor_harness/discovery/filter.py`
 - Test: `tests/test_discovery_filter.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -535,9 +535,9 @@ git commit -m "feat(discovery): Agno extractor -> JobCriteria" -m "Co-Authored-B
 Create `tests/test_discovery_filter.py`:
 
 ```python
-from resume_agent.discovery.filter import FilterDecision, apply_filters
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import JobCriteria, SalaryRange, SponsorshipSignal
+from resume_tailor_harness.discovery.filter import FilterDecision, apply_filters
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.job import JobCriteria, SalaryRange, SponsorshipSignal
 
 
 def test_sponsorship_denied_is_rejected():
@@ -590,18 +590,18 @@ Run:
 uv run pytest tests/test_discovery_filter.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.filter'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.filter'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/discovery/filter.py`:
+Create `src/resume_tailor_harness/discovery/filter.py`:
 
 ```python
 from pydantic import Field
 
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.job import JobCriteria, SponsorshipSignal
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.job import JobCriteria, SponsorshipSignal
 
 
 class FilterDecision(ExtensibleModel):
@@ -651,7 +651,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/filter.py tests/test_discovery_filter.py
+git add src/resume_tailor_harness/discovery/filter.py tests/test_discovery_filter.py
 git commit -m "feat(discovery): deterministic hard filter" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -661,7 +661,7 @@ git commit -m "feat(discovery): deterministic hard filter" -m "Co-Authored-By: C
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/fit.py`
+- Create: `src/resume_tailor_harness/discovery/fit.py`
 - Test: `tests/test_discovery_fit.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -674,8 +674,8 @@ from pydantic import ValidationError
 
 from agno.agent import Agent
 
-from resume_agent.discovery.fit import FitScore, build_fit_agent, compose_fit_input, score_fit
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.discovery.fit import FitScore, build_fit_agent, compose_fit_input, score_fit
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
 
 
 class _FakeResult:
@@ -727,11 +727,11 @@ Run:
 uv run pytest tests/test_discovery_fit.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.fit'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.fit'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/discovery/fit.py`:
+Create `src/resume_tailor_harness/discovery/fit.py`:
 
 ```python
 from typing import Any, Protocol
@@ -740,9 +740,9 @@ from agno.agent import Agent
 from agno.models.anthropic import Claude
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 class FitScore(ExtensibleModel):
@@ -801,7 +801,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/fit.py tests/test_discovery_fit.py
+git add src/resume_tailor_harness/discovery/fit.py tests/test_discovery_fit.py
 git commit -m "feat(discovery): Agno fit-scorer -> FitScore" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -811,7 +811,7 @@ git commit -m "feat(discovery): Agno fit-scorer -> FitScore" -m "Co-Authored-By:
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/pipeline.py`
+- Create: `src/resume_tailor_harness/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -821,14 +821,14 @@ Create `tests/test_discovery_pipeline.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.pipeline import discover
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import JobCriteria, SponsorshipSignal
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.discovery.fit import FitScore
-from resume_agent.tracking.repository import jobs_by_status
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.discovery.pipeline import discover
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.job import JobCriteria, SponsorshipSignal
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.discovery.fit import FitScore
+from resume_tailor_harness.tracking.repository import jobs_by_status
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 def _session() -> Session:
@@ -884,23 +884,23 @@ Run:
 uv run pytest tests/test_discovery_pipeline.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.pipeline'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.pipeline'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/discovery/pipeline.py`:
+Create `src/resume_tailor_harness/discovery/pipeline.py`:
 
 ```python
 from sqlmodel import Session
 
-from resume_agent.discovery.extract import Runner, extract_job_criteria
-from resume_agent.discovery.filter import apply_filters
-from resume_agent.discovery.fit import compose_fit_input, score_fit
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.tracking.repository import jobs_by_status, save_job, status_counts
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.extract import Runner, extract_job_criteria
+from resume_tailor_harness.discovery.filter import apply_filters
+from resume_tailor_harness.discovery.fit import compose_fit_input, score_fit
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.tracking.repository import jobs_by_status, save_job, status_counts
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 def run_extract(session: Session, agent: Runner) -> None:
@@ -959,7 +959,7 @@ Expected: PASS (1 test).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "feat(discovery): funnel pipeline (extract/filter/score/shortlist)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -969,7 +969,7 @@ git commit -m "feat(discovery): funnel pipeline (extract/filter/score/shortlist)
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_discovery.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -981,9 +981,9 @@ from sqlmodel import select
 
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 runner = CliRunner()
 
@@ -1049,20 +1049,20 @@ Expected: FAIL — `AttributeError`/`SystemExit`: the `addjob` and `discover` co
 
 - [ ] **Step 3: Write the implementation**
 
-Add these imports near the top of `src/resume_agent/cli.py` (below the existing imports):
+Add these imports near the top of `src/resume_tailor_harness/cli.py` (below the existing imports):
 
 ```python
-from resume_agent.config import get_settings
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.extract import build_extract_agent
-from resume_agent.discovery.fit import build_fit_agent
-from resume_agent.discovery.pipeline import discover
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.profile.store import load_facts
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.discovery.extract import build_extract_agent
+from resume_tailor_harness.discovery.fit import build_fit_agent
+from resume_tailor_harness.discovery.pipeline import discover
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.profile.store import load_facts
 ```
 
-Then append these two commands to the END of `src/resume_agent/cli.py` (before the `if __name__ == "__main__":` block — move that block to the very end if needed):
+Then append these two commands to the END of `src/resume_tailor_harness/cli.py` (before the `if __name__ == "__main__":` block — move that block to the very end if needed):
 
 ```python
 DEFAULT_SEARCH = "config/search.yaml"
@@ -1130,8 +1130,8 @@ Expected: PASS (3 tests).
 Run:
 
 ```bash
-uv run resume-agent addjob --help
-uv run resume-agent discover --help
+uv run resume-tailor-harness addjob --help
+uv run resume-tailor-harness discover --help
 ```
 
 Expected: help text for each (exit 0).
@@ -1149,7 +1149,7 @@ Expected: all tests pass (Profile total + Discovery additions).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_discovery.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_discovery.py
 git commit -m "feat(discovery): discover + addjob CLI commands" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

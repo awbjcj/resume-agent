@@ -1,4 +1,4 @@
-# Resume Agent — Design Spec
+# Résumé Tailor Harness — Design Spec
 
 - **Date:** 2026-06-08
 - **Status:** Approved (design) — ready for implementation planning
@@ -173,12 +173,12 @@ An **Agno `Workflow`** (premium models), run once per *approved* job. Input: `Jo
 
 ### 5.6 Orchestration / CLI (`cli.py`, Typer)
 ```
-resume-agent profile build [--refresh]   # resume + GitHub → facts.json
-resume-agent discover                     # scrape → clean → extract → filter → score → shortlist
-resume-agent addjob <url|->               # manual-assist fallback
-resume-agent tailor --approved            # Agno workflow over approved jobs
-resume-agent render <version_id>          # ResumeContent → PDF
-resume-agent dashboard                    # launch Streamlit
+resume-tailor-harness profile build [--refresh]   # resume + GitHub → facts.json
+resume-tailor-harness discover                     # scrape → clean → extract → filter → score → shortlist
+resume-tailor-harness addjob <url|->               # manual-assist fallback
+resume-tailor-harness tailor --approved            # Agno workflow over approved jobs
+resume-tailor-harness render <version_id>          # ResumeContent → PDF
+resume-tailor-harness dashboard                    # launch Streamlit
 ```
 Config: `.env` (API keys, GitHub token, burner LinkedIn creds), `config/{search,profile_sources,review,render}.yaml`.
 
@@ -186,7 +186,7 @@ Config: `.env` (API keys, GitHub token, burner LinkedIn creds), `config/{search,
 
 ## 6. Project layout
 ```
-src/resume_agent/
+src/resume_tailor_harness/
   models/      # ProfileFacts, JobCriteria, ResumeContent, ReviewCritique (+ schema_version, extra)
   profile/     # resume parse + github ingest
   discovery/   # scraper, clean, extract, filter, score

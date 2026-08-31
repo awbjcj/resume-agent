@@ -1,17 +1,17 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.dedup import compute_content_fingerprint
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.dedup import compute_content_fingerprint
+from resume_tailor_harness.tracking.repository import (
     find_existing,
     jobs_by_status,
     save_job,
     status_counts,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def test_archive_and_restore_preserve_status():
-    from resume_agent.tracking.repository import archive_job, restore_job
+    from resume_tailor_harness.tracking.repository import archive_job, restore_job
 
     with _session() as s:
         job = save_job(
@@ -82,8 +82,8 @@ def test_status_counts():
 
 
 def test_get_resume_version_roundtrip():
-    from resume_agent.tracking.repository import get_resume_version, save_resume_version
-    from resume_agent.tracking.tables import ResumeVersion
+    from resume_tailor_harness.tracking.repository import get_resume_version, save_resume_version
+    from resume_tailor_harness.tracking.tables import ResumeVersion
 
     with _session() as s:
         v = save_resume_version(
@@ -98,12 +98,12 @@ def test_get_resume_version_roundtrip():
 
 
 def test_has_progress_true_for_advanced_status_and_children():
-    from resume_agent.tracking.repository import (
+    from resume_tailor_harness.tracking.repository import (
         has_progress,
         save_application,
         save_resume_version,
     )
-    from resume_agent.tracking.tables import Application, ResumeVersion
+    from resume_tailor_harness.tracking.tables import Application, ResumeVersion
 
     with _session() as s:
         raw = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
@@ -137,7 +137,7 @@ def test_has_progress_true_for_advanced_status_and_children():
 
 
 def test_archived_jobs_excluded_from_status_views():
-    from resume_agent.tracking.repository import (
+    from resume_tailor_harness.tracking.repository import (
         archive_job,
         jobs_by_status,
         status_counts,
@@ -153,14 +153,14 @@ def test_archived_jobs_excluded_from_status_views():
 
 
 def test_delete_job_cascades_children_and_refuses_progress():
-    from resume_agent.tracking.repository import (
+    from resume_tailor_harness.tracking.repository import (
         delete_job,
         get_job,
         save_application,
         save_cover_letter,
         save_resume_version,
     )
-    from resume_agent.tracking.tables import Application, CoverLetter, ResumeVersion
+    from resume_tailor_harness.tracking.tables import Application, CoverLetter, ResumeVersion
     from sqlmodel import select
 
     with _session() as s:

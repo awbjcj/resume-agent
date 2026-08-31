@@ -1,7 +1,7 @@
 """Verify the local H-1B Streamable HTTP MCP connection.
 
 This probe uses the same Agno MCP client and read-only tool allowlist as the
-resume-agent integration, so a successful HTTP health response alone cannot
+resume-tailor-harness integration, so a successful HTTP health response alone cannot
 hide a broken MCP handshake or tool discovery step.
 """
 

@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 class InlineExecutor(Executor):
@@ -80,9 +80,9 @@ def test_ack_skips_another_users_run(mu_app, mu_client):
     """
     from sqlalchemy.orm import Session
 
-    from resume_agent.api.auth import hash_password
-    from resume_agent.tenancy.system_db import User
-    from resume_agent.tenancy.workspace import provision_workspace
+    from resume_tailor_harness.api.auth import hash_password
+    from resume_tailor_harness.tenancy.system_db import User
+    from resume_tailor_harness.tenancy.workspace import provision_workspace
 
     with Session(mu_app.state.system_engine) as session:
         session.add(

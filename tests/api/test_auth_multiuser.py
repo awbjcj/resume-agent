@@ -4,8 +4,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.secrets import hash_secret, mint_secret
-from resume_agent.tenancy.system_db import InviteCode, User
+from resume_tailor_harness.tenancy.secrets import hash_secret, mint_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode, User
 
 
 def _login(client, username="owner", password="owner-password"):

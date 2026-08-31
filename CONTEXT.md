@@ -1,9 +1,29 @@
-# Resume Agent — Domain Language
+# Résumé Tailor Harness — Domain Language
 
-Shared vocabulary for the resume agent, so code, tests, and architecture
+Shared vocabulary for Résumé Tailor Harness, so code, tests, and architecture
 discussion name the same concepts the same way. Architecture terms
 (module, interface, seam, deep/shallow) follow their usual meaning; this file
 records the **domain** nouns specific to this project.
+
+## The harness
+
+**Harness**:
+The machinery that stands between a model's output and a durable artifact — the
+closed schemas, the Career skill registry, the Deterministic gates, the single
+Verdict constructor, the read-only Tool loop rule, and the run/session
+substrates. Named in the project title because it, not any one agent, is what
+makes tailoring end-to-end and controllable. A model inside the harness may
+draft, reframe, and critique; it is never the last authority on what is saved.
+_Avoid_: framework, pipeline (the funnel is a pipeline; the harness is what
+constrains what moves through it), orchestration layer
+
+**Fact-lock**:
+The invariant that every generated claim must trace to a fact id in the
+candidate's evidence profile. Enforced by the Deterministic gates plus the
+configured fact-check gate, never by prompt instruction alone. Fact-lock governs
+*what may be claimed*; a style guide governs *how it is written*.
+_Avoid_: grounding, hallucination guard (both name a technique, not the
+invariant), truthfulness check
 
 ## LLM providers
 
@@ -41,9 +61,10 @@ influences.
 _Avoid_: skill name (name alone cannot identify approved bytes), prompt version
 
 **Agent family**:
-A reusable purpose-specific Agno agent boundary (Job Analysis, Resume Authoring,
-Resume Review, Cover Letter, Interview, or Career Lab). Stable application
-policy plus exactly one SkillRef defines a skilled task agent.
+A reusable purpose-specific Agno agent boundary — the eight members of
+`AgentFamily`: Job Analysis, Resume Authoring, Resume Review, Cover Letter,
+Interview, Career Lab, Internal Profile, and Sponsorship Research. Stable
+application policy plus exactly one SkillRef defines a skilled task agent.
 _Avoid_: super-agent, skill agent (skills configure a family; they do not each
 create a separate architecture)
 
@@ -163,11 +184,15 @@ fact-lock invariant rides here, not in a separate bool.
 _Avoid_: hard gate (the gate is the policy; this is one critique that carries it)
 
 **Deterministic gate**:
-A gate decided in-process without an LLM — provenance: every cited id must
-resolve to a real fact. Emitted as a gate critique by `provenance_critique`, it
-guards the expensive panel: when it fails the round, the workflow skips the LLM
-reviewers. `DETERMINISTIC_GATES` in `verdict.py` names the set; `aggregate`
-gates on it alongside the configured reviewer gates.
+A gate decided in-process without an LLM. Three of them, named by
+`DETERMINISTIC_GATES` in `verdict.py`: **provenance** (every cited id resolves to
+a real fact), **skill-naming** (no skill the profile does not establish), and
+**numeric-evidence** (no metric the evidence does not support). Each is emitted
+as a gate critique by its own module and `aggregate` gates on it alongside the
+configured reviewer gates. Because each is mechanically provable, they are
+computed for the round they belong to rather than being rediscovered by a
+premium fact-check round — their issues reach the reviser immediately. Their
+names are reserved: configuring a reviewer with one is a `ReviewConfig` error.
 _Avoid_: pre-check, structural check (it is a first-class gate, not a precondition)
 
 ## Ingest & source priority

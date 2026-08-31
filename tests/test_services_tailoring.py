@@ -4,21 +4,21 @@ from typing import cast
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-import resume_agent.profile.effective as effective_module
-from resume_agent.profile.effective import build_effective_taxonomy
-from resume_agent.profile.matrix import build_matrix, save_matrix
-from resume_agent.profile.store import save_facts
-from resume_agent.services import rendering, tailoring
-from resume_agent.services.errors import StageFailure
-from resume_agent.tailor.service import TailorOutcome
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+import resume_tailor_harness.profile.effective as effective_module
+from resume_tailor_harness.profile.effective import build_effective_taxonomy
+from resume_tailor_harness.profile.matrix import build_matrix, save_matrix
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness.services import rendering, tailoring
+from resume_tailor_harness.services.errors import StageFailure
+from resume_tailor_harness.tailor.service import TailorOutcome
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 @pytest.fixture

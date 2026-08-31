@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.store import load_facts, save_facts
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.store import load_facts, save_facts
 
 
 def test_load_facts_caches_until_file_changes(tmp_path):

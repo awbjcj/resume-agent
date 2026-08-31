@@ -3,9 +3,9 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.config import Settings
-from resume_agent.render.export import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.render.export import (
     build_manifest,
     cover_letter_download_name,
     cover_letter_pdf_name,
@@ -16,15 +16,15 @@ from resume_agent.render.export import (
     resume_json_name,
     resume_pdf_name,
 )
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     save_application,
     save_cover_letter,
     save_job,
     save_resume_version,
 )
-from resume_agent.tracking.tables import Application, CoverLetter, Job, ResumeVersion
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tracking.tables import Application, CoverLetter, Job, ResumeVersion
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def test_job_slug_and_version_filenames():

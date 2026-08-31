@@ -60,7 +60,7 @@ always _integrity rules → craft block → house style_, and the existing
 
 ## Craft distillation — hybrid, role-targeted
 
-New module `src/resume_agent/tailor/craft.py` holds per-role instruction lists.
+New module `src/resume_tailor_harness/tailor/craft.py` holds per-role instruction lists.
 `tailor/agents.py` appends them after the integrity instructions and before the
 style guide. `config/style_guide.md` is untouched and remains the user's short
 preference doc. The **fact-check reviewer receives no craft block** — it is the

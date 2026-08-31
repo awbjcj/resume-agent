@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.interview.store import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.interview.store import (
     InterviewContext,
     InterviewDebrief,
     InterviewStyle,
@@ -17,8 +17,8 @@ from resume_agent.interview.store import (
     create_session,
     end_with_debrief,
 )
-from resume_agent.services.errors import record_error
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.services.errors import record_error
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 @pytest.fixture()

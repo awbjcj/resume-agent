@@ -21,7 +21,7 @@
 
 | #   | Finding                                                                                                                                                                                                                                                                                                                                 | Evidence                                                                        |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1   | `pipeline_rows` issues `best_resume_version` (1 query) + `application_for_job` (1) + `has_progress` (up to 4) **per job**; `triage_rows`/`archived_rows` issue `has_progress` per job. `_progressed_job_ids` (repository.py:346) already demonstrates the 3-query batched fix.                                                          | `src/resume_agent/tracking/queries.py:295-393`, `repository.py:333-355`         |
+| 1   | `pipeline_rows` issues `best_resume_version` (1 query) + `application_for_job` (1) + `has_progress` (up to 4) **per job**; `triage_rows`/`archived_rows` issue `has_progress` per job. `_progressed_job_ids` (repository.py:346) already demonstrates the 3-query batched fix.                                                          | `src/resume_tailor_harness/tracking/queries.py:295-393`, `repository.py:333-355`         |
 | 2   | `ingest_jobs_with_outcomes` → `save_or_upgrade` → `save_job` commits **once per RawJob**; `find_existing` probes `Job.url` (unindexed) and `Job.jd_text` (unindexed) with full scans. `content_fingerprint` **is** indexed and is a pure function of `jd_text` (`compute_content_fingerprint`), so equal `jd_text` ⇒ equal fingerprint. | `ingest.py:128-170`, `repository.py:52-86`, `tables.py:42-54`, `dedup.py:47-52` |
 | 3   | `registry.py` hand-enumerates all 7 connector kinds in two near-duplicate builders (`build_connectors`, `build_source_connectors`); adding an ATS touches both plus imports.                                                                                                                                                            | `registry.py:15-116`                                                            |
 | 4   | `load_facts` re-reads + re-validates `facts.json` on every board/detail request (`services/board.py:280,324`); `load_aliases` re-reads on every `shortlist_rows`/`job_facets`/`job_detail_row` call.                                                                                                                                    | `profile/store.py:34-36`, `taxonomy/skills.py:56-61`                            |
@@ -37,14 +37,14 @@ Task order is safest-first and keeps the two tasks that touch `repository.py` (1
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py` (add batched loaders near `_progressed_job_ids`, repository.py:346)
-- Modify: `src/resume_agent/tracking/queries.py:295-393` (`pipeline_rows`, `_triage_row`, `triage_rows`, `archived_rows`)
+- Modify: `src/resume_tailor_harness/tracking/repository.py` (add batched loaders near `_progressed_job_ids`, repository.py:346)
+- Modify: `src/resume_tailor_harness/tracking/queries.py:295-393` (`pipeline_rows`, `_triage_row`, `triage_rows`, `archived_rows`)
 - Test: `tests/test_tracking_queries.py` (append)
 
 **Interfaces:**
 
 - Consumes: existing `pick_best(versions) -> BestResume`, `_PROGRESS_STATUSES` (both already in repository.py).
-- Produces (new public functions in `resume_agent.tracking.repository`):
+- Produces (new public functions in `resume_tailor_harness.tracking.repository`):
   - `versions_by_job(session: Session) -> dict[int, list[ResumeVersion]]`
   - `applications_by_job(session: Session) -> dict[int, Application]`
   - `progressed_job_ids(session: Session) -> set[int]` (rename of `_progressed_job_ids`; update its one internal caller `_prune_rows`)
@@ -58,9 +58,9 @@ Append to `tests/test_tracking_queries.py`:
 ```python
 from sqlalchemy import event
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.queries import pipeline_rows, triage_rows
-from resume_agent.tracking.tables import Application, Job, JobStatus, ResumeVersion
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.queries import pipeline_rows, triage_rows
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus, ResumeVersion
 
 
 def _seeded_engine(job_count: int):
@@ -122,7 +122,7 @@ Expected: both FAIL — the large seeding issues more SELECTs than the small one
 
 - [ ] **Step 3: Add the batched loaders to repository.py**
 
-In `src/resume_agent/tracking/repository.py`, rename `_progressed_job_ids` → `progressed_job_ids` (update the docstring's first line to "Job ids owning any child row, resolved in one query per child table." and its single caller in `_prune_rows`), then add below it:
+In `src/resume_tailor_harness/tracking/repository.py`, rename `_progressed_job_ids` → `progressed_job_ids` (update the docstring's first line to "Job ids owning any child row, resolved in one query per child table." and its single caller in `_prune_rows`), then add below it:
 
 ```python
 def versions_by_job(session: Session) -> dict[int, list[ResumeVersion]]:
@@ -151,10 +151,10 @@ Note: `application_for_job` is `.first()` with no ORDER BY — SQLite returns ro
 
 - [ ] **Step 4: Rewrite the two hot read-models in queries.py**
 
-In `src/resume_agent/tracking/queries.py`, change the repository import block to:
+In `src/resume_tailor_harness/tracking/queries.py`, change the repository import block to:
 
 ```python
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     applications_by_job,
     cover_letters_for_job,
@@ -271,7 +271,7 @@ Expected: all PASS. The pre-existing DTO tests prove the projection didn't chang
 
 ```bash
 ruff check
-git add src/resume_agent/tracking/repository.py src/resume_agent/tracking/queries.py tests/test_tracking_queries.py
+git add src/resume_tailor_harness/tracking/repository.py src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py
 git commit -m "Batches board read-model queries to constant count"
 ```
 
@@ -281,12 +281,12 @@ git commit -m "Batches board read-model queries to constant count"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py:42` (`Job.url` gains `index=True`)
-- Modify: `src/resume_agent/tracking/migrate.py` (add `ensure_url_index`)
-- Modify: `src/resume_agent/db.py:54-63` (wire `ensure_url_index` into `init_db`)
-- Modify: `src/resume_agent/tracking/repository.py:52-86` (`find_existing` jd probe uses the fingerprint index)
-- Modify: `src/resume_agent/discovery/ingest.py` (one commit per batch)
-- Modify: `src/resume_agent/discovery/connectors/runner.py:114-120` (rollback on failed connector ingest)
+- Modify: `src/resume_tailor_harness/tracking/tables.py:42` (`Job.url` gains `index=True`)
+- Modify: `src/resume_tailor_harness/tracking/migrate.py` (add `ensure_url_index`)
+- Modify: `src/resume_tailor_harness/db.py:54-63` (wire `ensure_url_index` into `init_db`)
+- Modify: `src/resume_tailor_harness/tracking/repository.py:52-86` (`find_existing` jd probe uses the fingerprint index)
+- Modify: `src/resume_tailor_harness/discovery/ingest.py` (one commit per batch)
+- Modify: `src/resume_tailor_harness/discovery/connectors/runner.py:114-120` (rollback on failed connector ingest)
 - Test: `tests/test_migrate.py`, `tests/test_ingest_jobs.py` (append)
 
 **Interfaces:**
@@ -303,7 +303,7 @@ Append to `tests/test_migrate.py`:
 def test_url_index_created(tmp_path):
     from sqlalchemy import text
 
-    from resume_agent.db import init_db, make_engine
+    from resume_tailor_harness.db import init_db, make_engine
 
     engine = make_engine(f"sqlite:///{tmp_path / 'idx.db'}")
     init_db(engine)
@@ -350,13 +350,13 @@ Expected: `test_url_index_created` FAILS (no `ix_jobs_url`); `test_ingest_batch_
 
 - [ ] **Step 3: Add the index (model + migration)**
 
-`src/resume_agent/tracking/tables.py:42`:
+`src/resume_tailor_harness/tracking/tables.py:42`:
 
 ```python
     url: str | None = Field(default=None, index=True)
 ```
 
-`src/resume_agent/tracking/migrate.py`, append:
+`src/resume_tailor_harness/tracking/migrate.py`, append:
 
 ```python
 def ensure_url_index(engine: Engine) -> None:
@@ -368,11 +368,11 @@ def ensure_url_index(engine: Engine) -> None:
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_jobs_url ON jobs (url)"))
 ```
 
-`src/resume_agent/db.py`: import `ensure_url_index` alongside the other `ensure_*` imports and append `ensure_url_index(engine)` at the end of `init_db`.
+`src/resume_tailor_harness/db.py`: import `ensure_url_index` alongside the other `ensure_*` imports and append `ensure_url_index(engine)` at the end of `init_db`.
 
 - [ ] **Step 4: Use the fingerprint index for the exact-JD probe**
 
-In `src/resume_agent/tracking/repository.py`, add the import `from resume_agent.tracking.dedup import compute_content_fingerprint` and replace the `if jd_text:` block of `find_existing` with:
+In `src/resume_tailor_harness/tracking/repository.py`, add the import `from resume_tailor_harness.tracking.dedup import compute_content_fingerprint` and replace the `if jd_text:` block of `find_existing` with:
 
 ```python
     if jd_text:
@@ -390,9 +390,9 @@ In `src/resume_agent/tracking/repository.py`, add the import `from resume_agent.
 
 - [ ] **Step 5: Batch the commits in ingest.py**
 
-In `src/resume_agent/discovery/ingest.py`:
+In `src/resume_tailor_harness/discovery/ingest.py`:
 
-1. Drop the `save_job` import (`from resume_agent.tracking.repository import find_existing`) and add a local persist helper:
+1. Drop the `save_job` import (`from resume_tailor_harness.tracking.repository import find_existing`) and add a local persist helper:
 
 ```python
 def _persist(session: Session, job: Job, commit: bool) -> Job:
@@ -430,7 +430,7 @@ def save_or_upgrade(
 
 - [ ] **Step 6: Roll back a failed connector batch in run_pull**
 
-In `src/resume_agent/discovery/connectors/runner.py`, the `except Exception as exc:` branch of `run_pull` (line 114) gains a rollback as its first statement so a mid-batch crash leaves no partial rows pending on the shared session:
+In `src/resume_tailor_harness/discovery/connectors/runner.py`, the `except Exception as exc:` branch of `run_pull` (line 114) gains a rollback as its first statement so a mid-batch crash leaves no partial rows pending on the shared session:
 
 ```python
         except Exception as exc:
@@ -453,7 +453,7 @@ Expected: all PASS. If any fixture hand-crafts a `Job` with `jd_text` but **no**
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/migrate.py src/resume_agent/db.py src/resume_agent/tracking/repository.py src/resume_agent/discovery/ingest.py src/resume_agent/discovery/connectors/runner.py tests/test_migrate.py tests/test_ingest_jobs.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py src/resume_tailor_harness/tracking/repository.py src/resume_tailor_harness/discovery/ingest.py src/resume_tailor_harness/discovery/connectors/runner.py tests/test_migrate.py tests/test_ingest_jobs.py
 git commit -m "Batches ingest commits and indexes dedup probes"
 ```
 
@@ -463,7 +463,7 @@ git commit -m "Batches ingest commits and indexes dedup probes"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/registry.py` (full rewrite around `ConnectorSpec`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py` (full rewrite around `ConnectorSpec`)
 - Test: `tests/test_connectors_registry.py` (existing tests are the conformance gate; append one drift test)
 
 **Interfaces:**
@@ -479,24 +479,24 @@ Expected: PASS (baseline — these must still pass after the rewrite, unmodified
 
 - [ ] **Step 2: Rewrite registry.py around a spec table**
 
-Replace the entire body of `src/resume_agent/discovery/connectors/registry.py` with:
+Replace the entire body of `src/resume_tailor_harness/discovery/connectors/registry.py` with:
 
 ```python
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.adzuna import AdzunaConnector
-from resume_agent.discovery.connectors.base import Connector
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
-from resume_agent.discovery.connectors.lever import LeverConnector
-from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
-from resume_agent.discovery.connectors.sources import company_url_id
-from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
-from resume_agent.discovery.scraper.recipe_store import host_key
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.adzuna import AdzunaConnector
+from resume_tailor_harness.discovery.connectors.base import Connector
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.greenhouse import GreenhouseConnector
+from resume_tailor_harness.discovery.connectors.lever import LeverConnector
+from resume_tailor_harness.discovery.connectors.remoteok import RemoteOKConnector
+from resume_tailor_harness.discovery.connectors.sources import company_url_id
+from resume_tailor_harness.discovery.scraper.linkedin import build_linkedin_scraper
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper
+from resume_tailor_harness.discovery.scraper.recipe_store import host_key
 
 
 @dataclass(frozen=True)
@@ -634,7 +634,7 @@ Append to `tests/test_connectors_registry.py`:
 
 ```python
 def test_spec_table_is_the_single_enumeration():
-    from resume_agent.discovery.connectors.registry import CONNECTOR_SPECS
+    from resume_tailor_harness.discovery.connectors.registry import CONNECTOR_SPECS
 
     kinds = [spec.kind for spec in CONNECTOR_SPECS]
     assert kinds == [
@@ -652,7 +652,7 @@ Expected: all PASS with zero edits to the pre-existing tests. If any pre-existin
 
 ```bash
 ruff check
-git add src/resume_agent/discovery/connectors/registry.py tests/test_connectors_registry.py
+git add src/resume_tailor_harness/discovery/connectors/registry.py tests/test_connectors_registry.py
 git commit -m "Collapses connector registry to one spec table"
 ```
 
@@ -662,8 +662,8 @@ git commit -m "Collapses connector registry to one spec table"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/store.py:34-36`
-- Modify: `src/resume_agent/taxonomy/skills.py:56-61`
+- Modify: `src/resume_tailor_harness/profile/store.py:34-36`
+- Modify: `src/resume_tailor_harness/taxonomy/skills.py:56-61`
 - Test: `tests/test_taxonomy_skills.py` (append), Create: `tests/test_profile_store_cache.py`
 
 **Interfaces:**
@@ -680,8 +680,8 @@ import os
 
 import pytest
 
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.store import load_facts, save_facts
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.profile.store import load_facts, save_facts
 
 
 def test_load_facts_caches_until_file_changes(tmp_path):
@@ -709,7 +709,7 @@ def test_load_aliases_caches_until_file_changes(tmp_path):
     import json
     import os
 
-    from resume_agent.taxonomy.skills import load_aliases
+    from resume_tailor_harness.taxonomy.skills import load_aliases
 
     path = tmp_path / "aliases.json"
     path.write_text(json.dumps({"js": "javascript"}), "utf-8")
@@ -722,7 +722,7 @@ def test_load_aliases_caches_until_file_changes(tmp_path):
 
 
 def test_load_aliases_missing_file_returns_empty(tmp_path):
-    from resume_agent.taxonomy.skills import load_aliases
+    from resume_tailor_harness.taxonomy.skills import load_aliases
 
     assert load_aliases(tmp_path / "absent.json") == {}
 ```
@@ -734,7 +734,7 @@ Expected: FAIL on the `is first` assertions (every call currently re-parses).
 
 - [ ] **Step 3: Implement both caches**
 
-`src/resume_agent/profile/store.py` — replace `load_facts`:
+`src/resume_tailor_harness/profile/store.py` — replace `load_facts`:
 
 ```python
 _FACTS_CACHE: dict[Path, tuple[int, int, ProfileFacts]] = {}
@@ -756,7 +756,7 @@ def load_facts(path: str | Path) -> ProfileFacts:
     return facts
 ```
 
-`src/resume_agent/taxonomy/skills.py` — replace `load_aliases`:
+`src/resume_tailor_harness/taxonomy/skills.py` — replace `load_aliases`:
 
 ```python
 _ALIAS_CACHE: dict[Path, tuple[int, int, dict[str, str]]] = {}
@@ -784,7 +784,7 @@ def load_aliases(path: str | Path) -> dict[str, str]:
 
 - [ ] **Step 4: Verify no caller mutates the shared returns**
 
-Run: `grep -rn "load_facts(\|load_aliases(" src/resume_agent --include=*.py`
+Run: `grep -rn "load_facts(\|load_aliases(" src/resume_tailor_harness --include=*.py`
 Inspect each call site: confirm none assigns into the returned dict/model (`aliases[...] =`, `facts.x =`, `.append(`, `.update(` on the return). Known-safe today: `merge_aliases` copies (`merged = dict(new)`), `queries.py` only reads. If a mutating caller exists, give it a copy at that call site (`dict(load_aliases(...))`) — do not weaken the cache.
 
 - [ ] **Step 5: Run the new tests + everything touching facts/aliases**
@@ -796,7 +796,7 @@ Expected: all PASS.
 
 ```bash
 ruff check
-git add src/resume_agent/profile/store.py src/resume_agent/taxonomy/skills.py tests/test_profile_store_cache.py tests/test_taxonomy_skills.py
+git add src/resume_tailor_harness/profile/store.py src/resume_tailor_harness/taxonomy/skills.py tests/test_profile_store_cache.py tests/test_taxonomy_skills.py
 git commit -m "Caches facts and alias loads on file mtime"
 ```
 
@@ -806,7 +806,7 @@ git commit -m "Caches facts and alias loads on file mtime"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/board.py:89-265` (`_row_value`, `_passes_filter`, `board_facets`)
+- Modify: `src/resume_tailor_harness/services/board.py:89-265` (`_row_value`, `_passes_filter`, `board_facets`)
 - Test: `tests/test_services_board.py` (existing tests are the conformance gate; append one drift test)
 
 **Interfaces:**
@@ -821,7 +821,7 @@ Expected: PASS (must still pass unmodified after the change).
 
 - [ ] **Step 2: Introduce the table and derive the three call sites**
 
-In `src/resume_agent/services/board.py`, immediately after the `BulkResult` dataclass, add:
+In `src/resume_tailor_harness/services/board.py`, immediately after the `BulkResult` dataclass, add:
 
 ```python
 @dataclass(frozen=True)
@@ -900,7 +900,7 @@ Append to `tests/test_services_board.py`:
 def test_facet_specs_match_board_filter_fields():
     import dataclasses
 
-    from resume_agent.services.board import FACET_SPECS, BoardFilter
+    from resume_tailor_harness.services.board import FACET_SPECS, BoardFilter
 
     filter_fields = {f.name for f in dataclasses.fields(BoardFilter)}
     keys = [spec.key for spec in FACET_SPECS]
@@ -918,7 +918,7 @@ Expected: all PASS with zero edits to pre-existing tests (`tests/api/test_openap
 
 ```bash
 ruff check
-git add src/resume_agent/services/board.py tests/test_services_board.py
+git add src/resume_tailor_harness/services/board.py tests/test_services_board.py
 git commit -m "Derives board facet vocabulary from one spec table"
 ```
 
@@ -928,10 +928,10 @@ git commit -m "Derives board facet vocabulary from one spec table"
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py` (add `pull_concurrency` next to `llm_concurrency`, config.py:36)
-- Modify: `src/resume_agent/discovery/connectors/base.py` (class attribute `concurrent_fetch: bool = True` on `Connector`)
-- Modify: `src/resume_agent/discovery/scraper/dashboard.py`, `src/resume_agent/discovery/scraper/linkedin.py` (or wherever its scraper class lives — grep `build_linkedin_scraper`), `src/resume_agent/discovery/connectors/adzuna.py` (set `concurrent_fetch = False` — they drive a real browser)
-- Modify: `src/resume_agent/discovery/connectors/runner.py` (fetch phase fans out; ingest phase stays serial)
+- Modify: `src/resume_tailor_harness/config.py` (add `pull_concurrency` next to `llm_concurrency`, config.py:36)
+- Modify: `src/resume_tailor_harness/discovery/connectors/base.py` (class attribute `concurrent_fetch: bool = True` on `Connector`)
+- Modify: `src/resume_tailor_harness/discovery/scraper/dashboard.py`, `src/resume_tailor_harness/discovery/scraper/linkedin.py` (or wherever its scraper class lives — grep `build_linkedin_scraper`), `src/resume_tailor_harness/discovery/connectors/adzuna.py` (set `concurrent_fetch = False` — they drive a real browser)
+- Modify: `src/resume_tailor_harness/discovery/connectors/runner.py` (fetch phase fans out; ingest phase stays serial)
 - Test: `tests/test_pull_runner_concurrency.py` (create)
 
 **Interfaces:**
@@ -949,10 +949,10 @@ import threading
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
-from resume_agent.discovery.connectors.runner import run_pull
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob
+from resume_tailor_harness.discovery.connectors.runner import run_pull
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 class _HandshakeConnector:
@@ -1026,13 +1026,13 @@ Expected: `test_fetches_overlap_and_ingest_is_ordered` FAILS (serial `run_pull` 
 
 - [ ] **Step 3: Add the setting and the connector attribute**
 
-`src/resume_agent/config.py`, next to `llm_concurrency` (line 36):
+`src/resume_tailor_harness/config.py`, next to `llm_concurrency` (line 36):
 
 ```python
     pull_concurrency: int = Field(default=4, ge=1)
 ```
 
-`src/resume_agent/discovery/connectors/base.py`, on the `Connector` base (class-level, near `name`):
+`src/resume_tailor_harness/discovery/connectors/base.py`, on the `Connector` base (class-level, near `name`):
 
 ```python
     # Whether fetch() may run on a worker thread alongside other connectors.
@@ -1044,13 +1044,13 @@ Set `concurrent_fetch = False` as a class attribute on `DashboardScraper`, the L
 
 - [ ] **Step 4: Split run_pull into concurrent fetch + serial ingest**
 
-In `src/resume_agent/discovery/connectors/runner.py`, add imports:
+In `src/resume_tailor_harness/discovery/connectors/runner.py`, add imports:
 
 ```python
 import asyncio
 
-from resume_agent.concurrency import Result, gather_isolated
-from resume_agent.config import get_settings
+from resume_tailor_harness.concurrency import Result, gather_isolated
+from resume_tailor_harness.config import get_settings
 ```
 
 Add the fetch fan-out helper above `run_pull`:
@@ -1158,7 +1158,7 @@ Expected: all PASS. `run_pull` is also driven by the API's RunManager workers (e
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/config.py src/resume_agent/discovery/connectors/base.py src/resume_agent/discovery/connectors/runner.py src/resume_agent/discovery/connectors/adzuna.py src/resume_agent/discovery/scraper/dashboard.py src/resume_agent/discovery/scraper/linkedin.py tests/test_pull_runner_concurrency.py
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/discovery/connectors/base.py src/resume_tailor_harness/discovery/connectors/runner.py src/resume_tailor_harness/discovery/connectors/adzuna.py src/resume_tailor_harness/discovery/scraper/dashboard.py src/resume_tailor_harness/discovery/scraper/linkedin.py tests/test_pull_runner_concurrency.py
 git commit -m "Fetches connectors concurrently with serial ordered ingest"
 ```
 
@@ -1168,8 +1168,8 @@ git commit -m "Fetches connectors concurrently with serial ordered ingest"
 
 **Files:**
 
-- Modify: `src/resume_agent/llm_runner.py` (`AgentRunner.run/arun` gain the retry loop; new `is_transient`; `retry_kwargs` stops feeding agno)
-- Modify: `src/resume_agent/discovery/pipeline.py:158-165` (log classifier outages instead of swallowing)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (`AgentRunner.run/arun` gain the retry loop; new `is_transient`; `retry_kwargs` stops feeding agno)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py:158-165` (log classifier outages instead of swallowing)
 - Test: `tests/test_llm_runner_retry.py` (create)
 
 **Interfaces:**
@@ -1187,8 +1187,8 @@ import asyncio
 
 import pytest
 
-import resume_agent.llm_runner as llm_runner
-from resume_agent.llm_runner import AgentRunner, is_transient
+import resume_tailor_harness.llm_runner as llm_runner
+from resume_tailor_harness.llm_runner import AgentRunner, is_transient
 
 
 class _TransientError(Exception):
@@ -1269,7 +1269,7 @@ Expected: FAIL — `is_transient` doesn't exist; `AgentRunner.run` doesn't retry
 
 - [ ] **Step 3: Implement the predicate and the retry loop**
 
-In `src/resume_agent/llm_runner.py`, add `import time` to the imports, then add above `AgentRunner`:
+In `src/resume_tailor_harness/llm_runner.py`, add `import time` to the imports, then add above `AgentRunner`:
 
 ```python
 # Failures worth retrying: rate limits, overload, timeouts, dropped connections.
@@ -1349,7 +1349,7 @@ Note: the retry sleeps run while `acall`'s semaphore permit is held — identica
 
 - [ ] **Step 4: Surface classifier outages in pipeline.py**
 
-In `src/resume_agent/discovery/pipeline.py`, add near the top (after the imports):
+In `src/resume_tailor_harness/discovery/pipeline.py`, add near the top (after the imports):
 
 ```python
 import logging
@@ -1386,7 +1386,7 @@ Expected: all PASS (fake agents in the suite don't raise transient errors, so th
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/llm_runner.py src/resume_agent/discovery/pipeline.py tests/test_llm_runner_retry.py
+git add src/resume_tailor_harness/llm_runner.py src/resume_tailor_harness/discovery/pipeline.py tests/test_llm_runner_retry.py
 git commit -m "Retries only transient LLM failures at the runner seam"
 ```
 

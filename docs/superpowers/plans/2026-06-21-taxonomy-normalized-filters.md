@@ -19,22 +19,22 @@
 
 **New — pure `taxonomy` package** (each module one responsibility; the interface is the test surface):
 
-- `src/resume_agent/taxonomy/__init__.py`
-- `src/resume_agent/taxonomy/sic.py` — load SIC table, derive label/division, coerce code.
-- `src/resume_agent/taxonomy/data/sic_codes.json` — bundled static reference (divisions + 2-digit major groups).
-- `src/resume_agent/taxonomy/skills.py` — split compounds, load/apply/merge/refresh alias map.
-- `src/resume_agent/taxonomy/location.py` — country→ISO-2, US state→USPS, `is_us`, assemble `StructuredLocation`.
-- `src/resume_agent/taxonomy/company_size.py` — snap free-text to {startup, scaleup, enterprise}.
+- `src/resume_tailor_harness/taxonomy/__init__.py`
+- `src/resume_tailor_harness/taxonomy/sic.py` — load SIC table, derive label/division, coerce code.
+- `src/resume_tailor_harness/taxonomy/data/sic_codes.json` — bundled static reference (divisions + 2-digit major groups).
+- `src/resume_tailor_harness/taxonomy/skills.py` — split compounds, load/apply/merge/refresh alias map.
+- `src/resume_tailor_harness/taxonomy/location.py` — country→ISO-2, US state→USPS, `is_us`, assemble `StructuredLocation`.
+- `src/resume_tailor_harness/taxonomy/company_size.py` — snap free-text to {startup, scaleup, enterprise}.
 
 **Modified:**
 
-- `src/resume_agent/discovery/extract.py` — prompt: atomic skills + bucketed company-size.
-- `src/resume_agent/discovery/fit.py` — `FitScore` gains `sic_major` + `location`; `compose_fit_input` takes location.
-- `src/resume_agent/discovery/pipeline.py` — `run_score` writes SIC + location into `criteria_json` + alias refresh; `discover` threads canonicalizer; new `backfill_rescore`.
-- `src/resume_agent/cli.py` — `--rescore` flag on `discover`.
-- `src/resume_agent/tracking/queries.py` — widened `ShortlistRow`; canonical skill tags; SIC/location/size flatten.
-- `src/resume_agent/dashboard/filtering.py` — `FilterState` keeps the existing `industry` interface but stores SIC major-group codes; add location/size; `_passes`; cascade option builders.
-- `src/resume_agent/dashboard/pages.py` — control-desk cascades (industry + location + company-size).
+- `src/resume_tailor_harness/discovery/extract.py` — prompt: atomic skills + bucketed company-size.
+- `src/resume_tailor_harness/discovery/fit.py` — `FitScore` gains `sic_major` + `location`; `compose_fit_input` takes location.
+- `src/resume_tailor_harness/discovery/pipeline.py` — `run_score` writes SIC + location into `criteria_json` + alias refresh; `discover` threads canonicalizer; new `backfill_rescore`.
+- `src/resume_tailor_harness/cli.py` — `--rescore` flag on `discover`.
+- `src/resume_tailor_harness/tracking/queries.py` — widened `ShortlistRow`; canonical skill tags; SIC/location/size flatten.
+- `src/resume_tailor_harness/dashboard/filtering.py` — `FilterState` keeps the existing `industry` interface but stores SIC major-group codes; add location/size; `_passes`; cascade option builders.
+- `src/resume_tailor_harness/dashboard/pages.py` — control-desk cascades (industry + location + company-size).
 
 **Convention note:** backfill is a `--rescore` flag on `discover`, mirroring the existing `--reextract` flag (`cli.py:171`), not a new top-level command.
 
@@ -44,18 +44,18 @@
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/__init__.py` (empty)
-- Create: `src/resume_agent/taxonomy/data/sic_codes.json`
-- Create: `src/resume_agent/taxonomy/sic.py`
+- Create: `src/resume_tailor_harness/taxonomy/__init__.py` (empty)
+- Create: `src/resume_tailor_harness/taxonomy/data/sic_codes.json`
+- Create: `src/resume_tailor_harness/taxonomy/sic.py`
 - Test: `tests/test_taxonomy_sic.py`
 
 - [ ] **Step 1: Create the package `__init__.py`**
 
-Create `src/resume_agent/taxonomy/__init__.py` as an empty file.
+Create `src/resume_tailor_harness/taxonomy/__init__.py` as an empty file.
 
 - [ ] **Step 2: Create the bundled SIC reference data**
 
-Create `src/resume_agent/taxonomy/data/sic_codes.json`:
+Create `src/resume_tailor_harness/taxonomy/data/sic_codes.json`:
 
 ```json
 {
@@ -200,7 +200,7 @@ Create `src/resume_agent/taxonomy/data/sic_codes.json`:
 Create `tests/test_taxonomy_sic.py`:
 
 ```python
-from resume_agent.taxonomy import sic
+from resume_tailor_harness.taxonomy import sic
 
 
 def test_load_table_has_divisions_and_major_groups():
@@ -243,7 +243,7 @@ Expected: FAIL with `ModuleNotFoundError`/`AttributeError` (sic module/functions
 
 - [ ] **Step 5: Write minimal implementation**
 
-Create `src/resume_agent/taxonomy/sic.py`:
+Create `src/resume_tailor_harness/taxonomy/sic.py`:
 
 ```python
 """SIC industry vocabulary: load the bundled 2-digit table and derive labels."""
@@ -256,7 +256,7 @@ UNCLASSIFIED = "Unclassified"
 
 def load_sic_table() -> dict:
     """Load the bundled divisions + major-groups reference."""
-    raw = files("resume_agent.taxonomy").joinpath("data", "sic_codes.json").read_text("utf-8")
+    raw = files("resume_tailor_harness.taxonomy").joinpath("data", "sic_codes.json").read_text("utf-8")
     return json.loads(raw)
 
 
@@ -296,11 +296,11 @@ Expected: PASS (5 tests).
 
 - [ ] **Step 7: Ensure the data file ships with the package**
 
-Open `pyproject.toml`. This project uses Hatchling, so verify the built wheel includes `src/resume_agent/taxonomy/data/sic_codes.json`. If it does not, add:
+Open `pyproject.toml`. This project uses Hatchling, so verify the built wheel includes `src/resume_tailor_harness/taxonomy/data/sic_codes.json`. If it does not, add:
 
 ```toml
 [tool.hatch.build.targets.wheel.force-include]
-"src/resume_agent/taxonomy/data/sic_codes.json" = "resume_agent/taxonomy/data/sic_codes.json"
+"src/resume_tailor_harness/taxonomy/data/sic_codes.json" = "resume_tailor_harness/taxonomy/data/sic_codes.json"
 ```
 
 Then run `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_sic.py -v` again to confirm still green.
@@ -308,7 +308,7 @@ Then run `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_sic.py -v` agai
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/__init__.py src/resume_agent/taxonomy/sic.py src/resume_agent/taxonomy/data/sic_codes.json tests/test_taxonomy_sic.py pyproject.toml
+git add src/resume_tailor_harness/taxonomy/__init__.py src/resume_tailor_harness/taxonomy/sic.py src/resume_tailor_harness/taxonomy/data/sic_codes.json tests/test_taxonomy_sic.py pyproject.toml
 git commit -m "Add SIC taxonomy table and derivation"
 ```
 
@@ -318,7 +318,7 @@ git commit -m "Add SIC taxonomy table and derivation"
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/skills.py`
+- Create: `src/resume_tailor_harness/taxonomy/skills.py`
 - Test: `tests/test_taxonomy_skills.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -326,7 +326,7 @@ git commit -m "Add SIC taxonomy table and derivation"
 Create `tests/test_taxonomy_skills.py`:
 
 ```python
-from resume_agent.taxonomy import skills
+from resume_tailor_harness.taxonomy import skills
 
 
 def test_split_skill_on_comma_and_or():
@@ -358,7 +358,7 @@ Expected: FAIL (`AttributeError`: `split_skill` not defined).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/taxonomy/skills.py`:
+Create `src/resume_tailor_harness/taxonomy/skills.py`:
 
 ```python
 """Skill taxonomy: split compound skills and apply a synonym alias map."""
@@ -420,7 +420,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/skills.py tests/test_taxonomy_skills.py
+git add src/resume_tailor_harness/taxonomy/skills.py tests/test_taxonomy_skills.py
 git commit -m "Add deterministic compound-skill splitter"
 ```
 
@@ -430,7 +430,7 @@ git commit -m "Add deterministic compound-skill splitter"
 
 **Files:**
 
-- Modify: `src/resume_agent/taxonomy/skills.py`
+- Modify: `src/resume_tailor_harness/taxonomy/skills.py`
 - Test: `tests/test_taxonomy_skills.py` (extend)
 
 - [ ] **Step 1: Write the failing test (append)**
@@ -484,16 +484,16 @@ Expected: FAIL (`AttributeError`: `load_aliases` not defined).
 
 - [ ] **Step 3: Write minimal implementation (append to `skills.py`)**
 
-Add these imports at the top of `src/resume_agent/taxonomy/skills.py` (below the existing `import re`):
+Add these imports at the top of `src/resume_tailor_harness/taxonomy/skills.py` (below the existing `import re`):
 
 ```python
 import json
 from pathlib import Path
 
-from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
+from resume_tailor_harness.tracking.match_gap import Canonicalizer, normalize_skill
 ```
 
-Append to `src/resume_agent/taxonomy/skills.py`:
+Append to `src/resume_tailor_harness/taxonomy/skills.py`:
 
 ```python
 def load_aliases(path: str | Path) -> dict[str, str]:
@@ -539,7 +539,7 @@ Expected: PASS (9 tests total).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/skills.py tests/test_taxonomy_skills.py
+git add src/resume_tailor_harness/taxonomy/skills.py tests/test_taxonomy_skills.py
 git commit -m "Add machine-grown skill alias map (load/canonical/merge/refresh)"
 ```
 
@@ -549,7 +549,7 @@ git commit -m "Add machine-grown skill alias map (load/canonical/merge/refresh)"
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/location.py`
+- Create: `src/resume_tailor_harness/taxonomy/location.py`
 - Test: `tests/test_taxonomy_location.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -557,7 +557,7 @@ git commit -m "Add machine-grown skill alias map (load/canonical/merge/refresh)"
 Create `tests/test_taxonomy_location.py`:
 
 ```python
-from resume_agent.taxonomy import location
+from resume_tailor_harness.taxonomy import location
 
 
 def test_normalize_country_variants_to_iso2():
@@ -616,7 +616,7 @@ Expected: FAIL (`ModuleNotFoundError`).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/taxonomy/location.py`:
+Create `src/resume_tailor_harness/taxonomy/location.py`:
 
 ```python
 """Location taxonomy: parse free-text into a normalized {city, region, country}."""
@@ -711,7 +711,7 @@ Expected: PASS (6 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/location.py tests/test_taxonomy_location.py
+git add src/resume_tailor_harness/taxonomy/location.py tests/test_taxonomy_location.py
 git commit -m "Add location normalization (ISO-2 country, USPS state, is_us)"
 ```
 
@@ -721,7 +721,7 @@ git commit -m "Add location normalization (ISO-2 country, USPS state, is_us)"
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/company_size.py`
+- Create: `src/resume_tailor_harness/taxonomy/company_size.py`
 - Test: `tests/test_taxonomy_company_size.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -729,7 +729,7 @@ git commit -m "Add location normalization (ISO-2 country, USPS state, is_us)"
 Create `tests/test_taxonomy_company_size.py`:
 
 ```python
-from resume_agent.taxonomy import company_size
+from resume_tailor_harness.taxonomy import company_size
 
 
 def test_snap_canonical_passthrough():
@@ -764,7 +764,7 @@ Expected: FAIL (`ModuleNotFoundError`).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/taxonomy/company_size.py`:
+Create `src/resume_tailor_harness/taxonomy/company_size.py`:
 
 ```python
 """Company-size taxonomy: snap free-text stage/size to three buckets."""
@@ -833,7 +833,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/company_size.py tests/test_taxonomy_company_size.py
+git add src/resume_tailor_harness/taxonomy/company_size.py tests/test_taxonomy_company_size.py
 git commit -m "Add company-size snap to {startup, scaleup, enterprise}"
 ```
 
@@ -843,7 +843,7 @@ git commit -m "Add company-size snap to {startup, scaleup, enterprise}"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/extract.py:9-18` (the `_INSTRUCTIONS` list)
+- Modify: `src/resume_tailor_harness/discovery/extract.py:9-18` (the `_INSTRUCTIONS` list)
 - Test: `tests/test_discovery_extract.py` (extend)
 
 - [ ] **Step 1: Write the failing test (append)**
@@ -864,7 +864,7 @@ Expected: FAIL (assertion error — guidance not present).
 
 - [ ] **Step 3: Edit the instructions**
 
-In `src/resume_agent/discovery/extract.py`, replace the skills + company-size lines inside `_INSTRUCTIONS`. Change the existing line:
+In `src/resume_tailor_harness/discovery/extract.py`, replace the skills + company-size lines inside `_INSTRUCTIONS`. Change the existing line:
 
 ```python
     "Capture company size or stage (startup, scaleup, enterprise) when stated.",
@@ -891,7 +891,7 @@ Expected: PASS (all extract tests, including the existing `test_instructions_men
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/extract.py tests/test_discovery_extract.py
+git add src/resume_tailor_harness/discovery/extract.py tests/test_discovery_extract.py
 git commit -m "Extract prompt: atomic skills + bucketed company size"
 ```
 
@@ -901,7 +901,7 @@ git commit -m "Extract prompt: atomic skills + bucketed company size"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/fit.py`
+- Modify: `src/resume_tailor_harness/discovery/fit.py`
 - Test: `tests/test_discovery_fit.py` (create)
 
 - [ ] **Step 1: Write the failing test**
@@ -909,8 +909,8 @@ git commit -m "Extract prompt: atomic skills + bucketed company size"
 Create `tests/test_discovery_fit.py`:
 
 ```python
-from resume_agent.discovery.fit import FitLocation, FitScore, compose_fit_input, score_fit
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.discovery.fit import FitLocation, FitScore, compose_fit_input, score_fit
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
 
 
 class _Result:
@@ -958,7 +958,7 @@ Expected: FAIL (`ImportError`: `FitLocation` not defined).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/fit.py`, update the imports line:
+In `src/resume_tailor_harness/discovery/fit.py`, update the imports line:
 
 ```python
 from pydantic import ConfigDict, Field
@@ -1024,7 +1024,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/fit.py tests/test_discovery_fit.py
+git add src/resume_tailor_harness/discovery/fit.py tests/test_discovery_fit.py
 git commit -m "Fit schema: emit sic_major + parsed location; thread location into input"
 ```
 
@@ -1034,7 +1034,7 @@ git commit -m "Fit schema: emit sic_major + parsed location; thread location int
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py`
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py` (extend)
 
 - [ ] **Step 1: Write the failing test (append)**
@@ -1042,8 +1042,8 @@ git commit -m "Fit schema: emit sic_major + parsed location; thread location int
 Append to `tests/test_discovery_pipeline.py`:
 
 ```python
-from resume_agent.discovery.fit import FitLocation
-from resume_agent.discovery.pipeline import run_score
+from resume_tailor_harness.discovery.fit import FitLocation
+from resume_tailor_harness.discovery.pipeline import run_score
 
 
 class _SicLocFitAgent:
@@ -1105,17 +1105,17 @@ Expected: FAIL (`TypeError`: `run_score` got unexpected keyword `aliases_path`).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/pipeline.py`, add imports at the top:
+In `src/resume_tailor_harness/discovery/pipeline.py`, add imports at the top:
 
 ```python
 from pathlib import Path
 
-from resume_agent.discovery.fit import FitScore
-from resume_agent.taxonomy import sic
-from resume_agent.taxonomy.location import build_location
-from resume_agent.taxonomy.skills import refresh_aliases, split_skills
-from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.fit import FitScore
+from resume_tailor_harness.taxonomy import sic
+from resume_tailor_harness.taxonomy.location import build_location
+from resume_tailor_harness.taxonomy.skills import refresh_aliases, split_skills
+from resume_tailor_harness.tracking.match_gap import Canonicalizer, normalize_skill
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 ```
 
 Add a module constant near the top (after imports):
@@ -1182,7 +1182,7 @@ def _refresh_skill_aliases(
         refresh_aliases(tokens, canonicalizer, aliases_path)
 ```
 
-Update `compose_fit_input` import usage is unchanged (already imported). Update the `score_fit`/`compose_fit_input` import line at the top of pipeline.py if needed — it already imports `from resume_agent.discovery.fit import compose_fit_input, score_fit`.
+Update `compose_fit_input` import usage is unchanged (already imported). Update the `score_fit`/`compose_fit_input` import line at the top of pipeline.py if needed — it already imports `from resume_tailor_harness.discovery.fit import compose_fit_input, score_fit`.
 
 Update `discover` to thread the canonicalizer through:
 
@@ -1212,7 +1212,7 @@ Expected: PASS — including the pre-existing `test_discover_commits_once_per_st
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "run_score: write SIC + location to criteria_json; refresh skill aliases"
 ```
 
@@ -1222,8 +1222,8 @@ git commit -m "run_score: write SIC + location to criteria_json; refresh skill a
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py` (add `backfill_rescore`)
-- Modify: `src/resume_agent/cli.py:166-194` (the `discover` command)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py` (add `backfill_rescore`)
+- Modify: `src/resume_tailor_harness/cli.py:166-194` (the `discover` command)
 - Test: `tests/test_discovery_pipeline.py` (extend)
 
 - [ ] **Step 1: Write the failing test (append)**
@@ -1231,7 +1231,7 @@ git commit -m "run_score: write SIC + location to criteria_json; refresh skill a
 Append to `tests/test_discovery_pipeline.py`:
 
 ```python
-from resume_agent.discovery.pipeline import backfill_rescore
+from resume_tailor_harness.discovery.pipeline import backfill_rescore
 
 
 def test_backfill_rescore_populates_without_changing_fit_or_status(tmp_path):
@@ -1266,7 +1266,7 @@ Expected: FAIL (`ImportError`: `backfill_rescore` not defined).
 
 - [ ] **Step 3: Write minimal implementation (append to `pipeline.py`)**
 
-Append to `src/resume_agent/discovery/pipeline.py`:
+Append to `src/resume_tailor_harness/discovery/pipeline.py`:
 
 ```python
 def backfill_rescore(
@@ -1305,15 +1305,15 @@ Expected: PASS.
 
 - [ ] **Step 5: Wire the CLI flag**
 
-In `src/resume_agent/cli.py`, add an import alongside the existing pipeline imports (near `cli.py:18-20`):
+In `src/resume_tailor_harness/cli.py`, add an import alongside the existing pipeline imports (near `cli.py:18-20`):
 
 ```python
-from resume_agent.discovery.pipeline import backfill_rescore
+from resume_tailor_harness.discovery.pipeline import backfill_rescore
 ```
 
 (If `discover`, `reextract`, etc. are imported there as a group, add `backfill_rescore` to that group import instead.)
 
-Also import the canonicalizer if not already at top: `from resume_agent.tracking.canonicalize import build_skill_canonicalizer` already exists (`cli.py:43`).
+Also import the canonicalizer if not already at top: `from resume_tailor_harness.tracking.canonicalize import build_skill_canonicalizer` already exists (`cli.py:43`).
 
 In `discover_cmd` (`cli.py:166`), add a new option to the signature (after `reextract_existing`):
 
@@ -1362,7 +1362,7 @@ Expected: clean.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py src/resume_agent/cli.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py src/resume_tailor_harness/cli.py tests/test_discovery_pipeline.py
 git commit -m "Add discover --rescore backfill for SIC + location"
 ```
 
@@ -1372,7 +1372,7 @@ git commit -m "Add discover --rescore backfill for SIC + location"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py`
+- Modify: `src/resume_tailor_harness/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py` (extend)
 
 - [ ] **Step 1: Write the failing test (append)**
@@ -1423,14 +1423,14 @@ Expected: FAIL (`TypeError`: `shortlist_rows` got unexpected keyword `aliases_pa
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/tracking/queries.py`, add imports:
+In `src/resume_tailor_harness/tracking/queries.py`, add imports:
 
 ```python
 from pathlib import Path
 
-from resume_agent.taxonomy import sic as sic_tax
-from resume_agent.taxonomy.company_size import snap as snap_size
-from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_skills
+from resume_tailor_harness.taxonomy import sic as sic_tax
+from resume_tailor_harness.taxonomy.company_size import snap as snap_size
+from resume_tailor_harness.taxonomy.skills import canonical_skill, load_aliases, split_skills
 ```
 
 Add the new `ShortlistRow` fields (append to the dataclass, after `skills`, all with defaults so existing construction is unaffected):
@@ -1536,7 +1536,7 @@ Expected: PASS (new test + existing queries tests unaffected — new fields have
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/queries.py tests/test_tracking_queries.py
+git add src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py
 git commit -m "Widen ShortlistRow with SIC/location/size; split + canonicalize skills"
 ```
 
@@ -1546,7 +1546,7 @@ git commit -m "Widen ShortlistRow with SIC/location/size; split + canonicalize s
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/filtering.py`
+- Modify: `src/resume_tailor_harness/dashboard/filtering.py`
 - Test: `tests/test_dashboard_filtering.py` (extend; update the `_row` helper)
 
 - [ ] **Step 1: Update the `_row` helper and write failing tests**
@@ -1607,7 +1607,7 @@ def _row(
 Append new tests:
 
 ```python
-from resume_agent.dashboard.filtering import (
+from resume_tailor_harness.dashboard.filtering import (
     available_industries,
     available_countries,
     available_states,
@@ -1667,7 +1667,7 @@ Expected: FAIL (SIC filter still reads `row.industry` and `available_industries`
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/dashboard/filtering.py`, update `FilterState` — keep the existing `industry` field, but treat its values as SIC major-group codes; add the location/size sets:
+In `src/resume_tailor_harness/dashboard/filtering.py`, update `FilterState` — keep the existing `industry` field, but treat its values as SIC major-group codes; add the location/size sets:
 
 ```python
 @dataclass
@@ -1757,7 +1757,7 @@ Expected: PASS (existing + new tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/filtering.py tests/test_dashboard_filtering.py
+git add src/resume_tailor_harness/dashboard/filtering.py tests/test_dashboard_filtering.py
 git commit -m "Filtering: SIC/location/company-size filters + cascade builders"
 ```
 
@@ -1767,13 +1767,13 @@ git commit -m "Filtering: SIC/location/company-size filters + cascade builders"
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/pages.py:125-180` (filter control desk + `FilterState` construction)
+- Modify: `src/resume_tailor_harness/dashboard/pages.py:125-180` (filter control desk + `FilterState` construction)
 
 > This is Streamlit wiring (manual-verified). The pure option-builders it calls are already covered by Task 11. Keep edits surgical: only the industry/location/size controls change.
 
 - [ ] **Step 1: Replace the flat Industry control with the SIC cascade**
 
-In `src/resume_agent/dashboard/pages.py`, locate the industry block (`pages.py:146-148`):
+In `src/resume_tailor_harness/dashboard/pages.py`, locate the industry block (`pages.py:146-148`):
 
 ```python
             industry_options = sorted({r.industry for r in rows if r.industry})
@@ -1806,7 +1806,7 @@ Replace it with a Division→Major Group cascade driven by `available_industries
 Add the import at the top of `pages.py` (the file already imports `available_skill_cloud` from `dashboard.filtering` near `pages.py:12`; extend that import group):
 
 ```python
-from resume_agent.dashboard.filtering import (
+from resume_tailor_harness.dashboard.filtering import (
     available_cities,
     available_countries,
     available_industries,
@@ -1856,14 +1856,14 @@ Expected: clean.
 
 - [ ] **Step 5: Manual dashboard verification (headless smoke)**
 
-Run: `.venv/Scripts/python.exe -c "import resume_agent.dashboard.pages"`
+Run: `.venv/Scripts/python.exe -c "import resume_tailor_harness.dashboard.pages"`
 Expected: imports without error (catches signature/name mistakes).
-Then, if a dev DB is available, launch `resume-agent dashboard`, open the Shortlist page, and confirm: the Industry division→group cascade, the Country→State→City cascade, and the Company-size control all render and narrow results; the skill cloud shows deduped canonical chips.
+Then, if a dev DB is available, launch `resume-tailor-harness dashboard`, open the Shortlist page, and confirm: the Industry division→group cascade, the Country→State→City cascade, and the Company-size control all render and narrow results; the skill cloud shows deduped canonical chips.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/pages.py
+git add src/resume_tailor_harness/dashboard/pages.py
 git commit -m "Shortlist control desk: SIC + location cascades + company-size filter"
 ```
 

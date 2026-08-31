@@ -1,5 +1,5 @@
-from resume_agent.discovery.scout_store import ScoutProposal, SourcePayload
-from resume_agent.services.scout_context import (
+from resume_tailor_harness.discovery.scout_store import ScoutProposal, SourcePayload
+from resume_tailor_harness.services.scout_context import (
     render_goal,
     render_ledger,
     render_transcript,

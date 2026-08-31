@@ -1,4 +1,4 @@
-from resume_agent.tailor.style_guide import (
+from resume_tailor_harness.tailor.style_guide import (
     STYLE_GUIDE_HEADER,
     compose_instructions,
     load_style_guide,

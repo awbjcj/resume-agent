@@ -4,14 +4,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.config import Settings
-from resume_agent.services.errors import list_error_records
-from resume_agent.tenancy.bootstrap import BootstrapError
-from resume_agent.tenancy.context import UserContext, current_context, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.services.errors import list_error_records
+from resume_tailor_harness.tenancy.bootstrap import BootstrapError
+from resume_tailor_harness.tenancy.context import UserContext, current_context, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def _env(tmp_path, *, include_seed=True):

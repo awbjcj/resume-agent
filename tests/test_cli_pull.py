@@ -1,7 +1,7 @@
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.discovery.connectors.runner import PullReport
+from resume_tailor_harness import cli
+from resume_tailor_harness.discovery.connectors.runner import PullReport
 
 runner = CliRunner()
 

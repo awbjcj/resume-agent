@@ -6,16 +6,16 @@
 
 **Architecture:** A new pure module `tracking/match_gap.py` (sibling of `analytics.py`) holds `normalize_skill`, `profile_skill_tokens`, the `GapRow`/`MatchGapReport` dataclasses, and `match_gap(session, facts, canonicalizer=None)`. It reads `Job.criteria_json["must_have_skills"]` for jobs in `{shortlisted, approved, tailored, rendered}` and set-subtracts the profile's skill names+aliases. An optional cheap-LLM `canonicalizer` (in `tracking/canonicalize.py`) collapses synonyms like `k8s`≈`kubernetes`; it is off by default and injected as a plain callable so tests stay offline. `cli.py` gains a `match-gap` command; `dashboard/app.py` gains a Match-gap page. Zero DB changes.
 
-**Tech Stack:** Python 3.13, SQLModel/SQLAlchemy, Pydantic, Typer, Streamlit, Agno (optional LLM pass), pytest. Follows the spec `docs/superpowers/specs/2026-06-13-resume-agent-v3-design.md` §5.2.
+**Tech Stack:** Python 3.13, SQLModel/SQLAlchemy, Pydantic, Typer, Streamlit, Agno (optional LLM pass), pytest. Follows the spec `docs/superpowers/specs/2026-06-13-resume-tailor-harness-v3-design.md` §5.2.
 
 ---
 
 ## File Structure
 
-- **Create** `src/resume_agent/tracking/match_gap.py` — normalization, profile token set, gap dataclasses, and the pure `match_gap()`. One responsibility: compute the gap, no presentation, no LLM construction.
-- **Create** `src/resume_agent/tracking/canonicalize.py` — the optional cheap-LLM synonym canonicalizer (`SkillClusters`, `clusters_to_mapping`, `build_skill_canonicalizer`). Isolated so `match_gap` never depends on Agno.
-- **Modify** `src/resume_agent/cli.py` — add the `match-gap` command.
-- **Modify** `src/resume_agent/dashboard/app.py` — `match_gap_table_rows` helper, `render_match_gap_page`, and a sidebar entry.
+- **Create** `src/resume_tailor_harness/tracking/match_gap.py` — normalization, profile token set, gap dataclasses, and the pure `match_gap()`. One responsibility: compute the gap, no presentation, no LLM construction.
+- **Create** `src/resume_tailor_harness/tracking/canonicalize.py` — the optional cheap-LLM synonym canonicalizer (`SkillClusters`, `clusters_to_mapping`, `build_skill_canonicalizer`). Isolated so `match_gap` never depends on Agno.
+- **Modify** `src/resume_tailor_harness/cli.py` — add the `match-gap` command.
+- **Modify** `src/resume_tailor_harness/dashboard/app.py` — `match_gap_table_rows` helper, `render_match_gap_page`, and a sidebar entry.
 - **Tests:** `tests/test_tracking_match_gap.py`, `tests/test_tracking_canonicalize.py`, `tests/test_cli_match_gap.py`, `tests/test_dashboard_match_gap.py` (all new).
 
 Order matters: Tasks 1→2→3 build the pure core; Task 4 adds the optional LLM pass; Tasks 5–6 add the two surfaces (independent of each other once 3 is done).
@@ -26,14 +26,14 @@ Order matters: Tasks 1→2→3 build the pure core; Task 4 adds the optional LLM
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/match_gap.py`
+- Create: `src/resume_tailor_harness/tracking/match_gap.py`
 - Test: `tests/test_tracking_match_gap.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_tracking_match_gap.py
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 
 def test_normalize_lowercases_and_collapses_whitespace():
@@ -51,12 +51,12 @@ def test_normalize_keeps_plus_hash_dot_drops_other_punct():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_tracking_match_gap.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.tracking.match_gap'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.match_gap'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/tracking/match_gap.py
+# src/resume_tailor_harness/tracking/match_gap.py
 import re
 
 _PUNCT = re.compile(r"[^a-z0-9+#. ]+")
@@ -78,7 +78,7 @@ Expected: PASS (2 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/match_gap.py tests/test_tracking_match_gap.py
+git add src/resume_tailor_harness/tracking/match_gap.py tests/test_tracking_match_gap.py
 git commit -m "feat(match-gap): normalize_skill comparison key"
 ```
 
@@ -88,15 +88,15 @@ git commit -m "feat(match-gap): normalize_skill comparison key"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/match_gap.py`
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py`
 - Test: `tests/test_tracking_match_gap.py`
 
 - [ ] **Step 1: Write the failing test** (append)
 
 ```python
 # tests/test_tracking_match_gap.py  (add)
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.tracking.match_gap import profile_skill_tokens
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.tracking.match_gap import profile_skill_tokens
 
 
 def test_profile_skill_tokens_includes_names_and_aliases():
@@ -122,12 +122,12 @@ Expected: FAIL with `ImportError: cannot import name 'profile_skill_tokens'`
 - [ ] **Step 3: Write minimal implementation** (add to `match_gap.py`; add the import)
 
 ```python
-# src/resume_agent/tracking/match_gap.py — add to imports
-from resume_agent.models.profile import ProfileFacts
+# src/resume_tailor_harness/tracking/match_gap.py — add to imports
+from resume_tailor_harness.models.profile import ProfileFacts
 ```
 
 ```python
-# src/resume_agent/tracking/match_gap.py — add
+# src/resume_tailor_harness/tracking/match_gap.py — add
 def profile_skill_tokens(facts: ProfileFacts) -> set[str]:
     """Every profile skill name + alias, normalized, as a lookup set."""
     tokens: set[str] = set()
@@ -148,7 +148,7 @@ Expected: PASS (4 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/match_gap.py tests/test_tracking_match_gap.py
+git add src/resume_tailor_harness/tracking/match_gap.py tests/test_tracking_match_gap.py
 git commit -m "feat(match-gap): profile_skill_tokens (names + aliases, normalized)"
 ```
 
@@ -158,7 +158,7 @@ git commit -m "feat(match-gap): profile_skill_tokens (names + aliases, normalize
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/match_gap.py`
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py`
 - Test: `tests/test_tracking_match_gap.py`
 
 - [ ] **Step 1: Write the failing test** (append)
@@ -167,9 +167,9 @@ git commit -m "feat(match-gap): profile_skill_tokens (names + aliases, normalize
 # tests/test_tracking_match_gap.py  (add)
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.match_gap import GapRow, MatchGapReport, match_gap
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tracking.match_gap import GapRow, MatchGapReport, match_gap
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _session():
@@ -256,13 +256,13 @@ Expected: FAIL with `ImportError: cannot import name 'match_gap'`
 - [ ] **Step 3: Write minimal implementation** (add to `match_gap.py`)
 
 ```python
-# src/resume_agent/tracking/match_gap.py — add to imports
+# src/resume_tailor_harness/tracking/match_gap.py — add to imports
 from dataclasses import dataclass
 from typing import Any, Callable, cast
 
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 TARGET_STATUSES = (
     JobStatus.shortlisted.value,
@@ -275,7 +275,7 @@ Canonicalizer = Callable[[set[str]], dict[str, str]]
 ```
 
 ```python
-# src/resume_agent/tracking/match_gap.py — add
+# src/resume_tailor_harness/tracking/match_gap.py — add
 @dataclass
 class GapRow:
     """One missing skill, aggregated across target jobs."""
@@ -359,7 +359,7 @@ Expected: PASS (all, including the 7 new)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/match_gap.py tests/test_tracking_match_gap.py
+git add src/resume_tailor_harness/tracking/match_gap.py tests/test_tracking_match_gap.py
 git commit -m "feat(match-gap): pure match_gap() — frequency-ranked gaps + per-job, optional canonicalizer"
 ```
 
@@ -369,14 +369,14 @@ git commit -m "feat(match-gap): pure match_gap() — frequency-ranked gaps + per
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/canonicalize.py`
+- Create: `src/resume_tailor_harness/tracking/canonicalize.py`
 - Test: `tests/test_tracking_canonicalize.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_tracking_canonicalize.py
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.tracking.canonicalize import (
     SkillClusters,
     build_skill_canonicalizer,
     clusters_to_mapping,
@@ -418,12 +418,12 @@ def test_canonicalizer_short_circuits_on_empty():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_tracking_canonicalize.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.tracking.canonicalize'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.canonicalize'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/tracking/canonicalize.py
+# src/resume_tailor_harness/tracking/canonicalize.py
 import json
 from typing import Callable
 
@@ -431,9 +431,9 @@ from agno.agent import Agent
 from agno.models.anthropic import Claude
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import AgentRunner, Runner
+from resume_tailor_harness.models.base import ExtensibleModel
 
 _INSTRUCTIONS = [
     "You canonicalize technical skill names.",
@@ -496,7 +496,7 @@ Expected: PASS (3 passed). No API key needed — the fake `Runner` is injected.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/canonicalize.py tests/test_tracking_canonicalize.py
+git add src/resume_tailor_harness/tracking/canonicalize.py tests/test_tracking_canonicalize.py
 git commit -m "feat(match-gap): optional cheap-LLM skill canonicalizer (synonym clustering)"
 ```
 
@@ -506,7 +506,7 @@ git commit -m "feat(match-gap): optional cheap-LLM skill canonicalizer (synonym 
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (imports near line 34-36; new command after `sources_cmd`, ~line 184)
+- Modify: `src/resume_tailor_harness/cli.py` (imports near line 34-36; new command after `sources_cmd`, ~line 184)
 - Test: `tests/test_cli_match_gap.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -515,10 +515,10 @@ git commit -m "feat(match-gap): optional cheap-LLM skill canonicalizer (synonym 
 # tests/test_cli_match_gap.py
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.tracking.tables import Job
 
 runner = CliRunner()
 
@@ -583,15 +583,15 @@ Expected: FAIL — `match-gap` is not a registered command (Typer exits non-zero
 Add imports (group with the other `tracking`/`discovery` imports near the top of `cli.py`):
 
 ```python
-# src/resume_agent/cli.py
-from resume_agent.tracking.match_gap import match_gap
-from resume_agent.tracking.canonicalize import build_skill_canonicalizer
+# src/resume_tailor_harness/cli.py
+from resume_tailor_harness.tracking.match_gap import match_gap
+from resume_tailor_harness.tracking.canonicalize import build_skill_canonicalizer
 ```
 
 Add the command (place it after `sources_cmd`, before `DEFAULT_REVIEW`):
 
 ```python
-# src/resume_agent/cli.py
+# src/resume_tailor_harness/cli.py
 @app.command("match-gap")
 def match_gap_cmd(
     job_id: int = typer.Option(None, help="Show gaps for one job instead of the aggregate."),
@@ -641,7 +641,7 @@ Expected: PASS (3 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_match_gap.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_match_gap.py
 git commit -m "feat(cli): match-gap command (aggregate + --job-id + --llm)"
 ```
 
@@ -651,15 +651,15 @@ git commit -m "feat(cli): match-gap command (aggregate + --job-id + --llm)"
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/app.py` (imports near line 9-24; new helpers + page after `render_analytics_page` ~line 434; sidebar/dispatch in `main` ~line 446-462)
+- Modify: `src/resume_tailor_harness/dashboard/app.py` (imports near line 9-24; new helpers + page after `render_analytics_page` ~line 434; sidebar/dispatch in `main` ~line 446-462)
 - Test: `tests/test_dashboard_match_gap.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_dashboard_match_gap.py
-from resume_agent.dashboard.app import match_gap_table_rows, render_match_gap_page
-from resume_agent.tracking.match_gap import GapRow, MatchGapReport
+from resume_tailor_harness.dashboard.app import match_gap_table_rows, render_match_gap_page
+from resume_tailor_harness.tracking.match_gap import GapRow, MatchGapReport
 
 
 def test_render_match_gap_page_is_importable_and_callable():
@@ -688,12 +688,12 @@ Expected: FAIL with `ImportError: cannot import name 'match_gap_table_rows'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add imports to `dashboard/app.py` (next to the existing `from resume_agent.tracking...` imports):
+Add imports to `dashboard/app.py` (next to the existing `from resume_tailor_harness.tracking...` imports):
 
 ```python
-# src/resume_agent/dashboard/app.py
-from resume_agent.profile.store import load_facts
-from resume_agent.tracking.match_gap import MatchGapReport, match_gap
+# src/resume_tailor_harness/dashboard/app.py
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.tracking.match_gap import MatchGapReport, match_gap
 
 _FACTS_PATH = "data/profile/facts.json"
 ```
@@ -701,7 +701,7 @@ _FACTS_PATH = "data/profile/facts.json"
 Add the pure helper + page (place after `render_analytics_page`):
 
 ```python
-# src/resume_agent/dashboard/app.py
+# src/resume_tailor_harness/dashboard/app.py
 def match_gap_table_rows(report: MatchGapReport) -> list[dict]:
     """Pure table rows for the match-gap page."""
     return [
@@ -725,7 +725,7 @@ def render_match_gap_page(session) -> None:
         _empty_state(
             "◇",
             "No profile yet",
-            "Run <code>resume-agent profile build</code> to create your fact-lock profile first.",
+            "Run <code>resume-tailor-harness profile build</code> to create your fact-lock profile first.",
         )
         return
 
@@ -756,7 +756,7 @@ def render_match_gap_page(session) -> None:
 Wire it into the sidebar + dispatch in `main()` — replace the radio line and the if/elif block:
 
 ```python
-# src/resume_agent/dashboard/app.py — inside main(), replace the radio line
+# src/resume_tailor_harness/dashboard/app.py — inside main(), replace the radio line
         page = st.radio(
             "View",
             ["Shortlist", "Pipeline board", "Analytics", "Match-gap"],
@@ -765,7 +765,7 @@ Wire it into the sidebar + dispatch in `main()` — replace the radio line and t
 ```
 
 ```python
-# src/resume_agent/dashboard/app.py — replace the dispatch block in main()
+# src/resume_tailor_harness/dashboard/app.py — replace the dispatch block in main()
     engine = _engine()
     with get_session(engine) as session:
         if page == "Shortlist":
@@ -786,7 +786,7 @@ Expected: PASS (2 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/app.py tests/test_dashboard_match_gap.py
+git add src/resume_tailor_harness/dashboard/app.py tests/test_dashboard_match_gap.py
 git commit -m "feat(dashboard): Match-gap page (most-demanded missing skills)"
 ```
 
@@ -809,9 +809,9 @@ Compares the `must_have_skills` of every job that survived discovery
 each. Read-only — it never edits `facts.json`; you decide what to add or learn.
 
 ```bash
-uv run resume-agent match-gap                 # aggregate, most-demanded first
-uv run resume-agent match-gap --job-id 7      # gaps for one job
-uv run resume-agent match-gap --llm           # add cheap-LLM synonym matching (k8s≈Kubernetes)
+uv run resume-tailor-harness match-gap                 # aggregate, most-demanded first
+uv run resume-tailor-harness match-gap --job-id 7      # gaps for one job
+uv run resume-tailor-harness match-gap --llm           # add cheap-LLM synonym matching (k8s≈Kubernetes)
 ```
 ````
 

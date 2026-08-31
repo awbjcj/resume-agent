@@ -4,12 +4,12 @@ import threading
 import pytest
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.api.runs.manager import RunManager, RunQuotaError, RunResetConflict
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import UserContext, new_user_id, use_context
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import WorkspacePaths, provision_workspace
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.api.runs.manager import RunManager, RunQuotaError, RunResetConflict
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import UserContext, new_user_id, use_context
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths, provision_workspace
 
 
 def _add_user(app, username: str, password: str) -> None:
@@ -74,7 +74,7 @@ def test_direct_submissions_inherit_active_context_quota(tmp_path, monkeypatch):
         system_engine=None,
         own_key_providers=frozenset(),
     )
-    monkeypatch.setattr("resume_agent.tenancy.limits.active_limit", lambda *_args: 1)
+    monkeypatch.setattr("resume_tailor_harness.tenancy.limits.active_limit", lambda *_args: 1)
 
     def blocker(_reporter):
         release.wait(timeout=5)

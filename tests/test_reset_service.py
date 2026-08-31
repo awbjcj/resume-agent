@@ -4,15 +4,15 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services import reset as reset_module
-from resume_agent.services.reset import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services import reset as reset_module
+from resume_tailor_harness.services.reset import (
     ResetPaths,
     ResetScope,
     reset_workspace,
     scope_paths,
 )
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     CoverLetter,
     Job,

@@ -1,7 +1,7 @@
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.discovery.connectors.telemetry import record_run
+from resume_tailor_harness import cli
+from resume_tailor_harness.discovery.connectors.telemetry import record_run
 
 runner = CliRunner()
 

@@ -14,24 +14,24 @@ from evals.metrics import (
 )
 from evals.schema import EvalCase, Trap
 from evals.usage import MeteredRunner, UsageCollector, UsageTotals
-from resume_agent.discovery.extract import extract_job_criteria
-from resume_agent.llm_runner import Runner
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import Severity
-from resume_agent.profile.matrix import (
+from resume_tailor_harness.discovery.extract import extract_job_criteria
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.profile.matrix import (
     build_matrix,
     build_skill_match_context,
 )
-from resume_agent.services.agents import TailorBundle
-from resume_agent.taxonomy.clusters import load_cluster_map
-from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
-from resume_agent.tailor.panel import compose_evidence_review_input, review_one
-from resume_agent.tailor.provenance import resolve_evidence
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.workflow import TailorRound, run_tailor_review
-from resume_agent.tracking.repository import select_surfaced
+from resume_tailor_harness.services.agents import TailorBundle
+from resume_tailor_harness.taxonomy.clusters import load_cluster_map
+from resume_tailor_harness.taxonomy.snapshot import EffectiveTaxonomy
+from resume_tailor_harness.tailor.panel import compose_evidence_review_input, review_one
+from resume_tailor_harness.tailor.provenance import resolve_evidence
+from resume_tailor_harness.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.workflow import TailorRound, run_tailor_review
+from resume_tailor_harness.tracking.repository import select_surfaced
 
 
 @dataclass

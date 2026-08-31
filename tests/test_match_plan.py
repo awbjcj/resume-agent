@@ -1,10 +1,10 @@
 import asyncio
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
-from resume_agent.tailor.match_plan import (
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.match_plan import MatchPlan, MatchPlanRequirement
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
+from resume_tailor_harness.tailor.match_plan import (
     amatch_plan,
     build_match_plan_agent,
     compose_match_plan_input,

@@ -1,4 +1,4 @@
-from resume_agent.tracking.prune_config import PruneConfig, load_prune_config
+from resume_tailor_harness.tracking.prune_config import PruneConfig, load_prune_config
 
 
 def test_defaults_when_file_missing(tmp_path):

@@ -1,4 +1,4 @@
-from resume_agent.tracking.dedup import (
+from resume_tailor_harness.tracking.dedup import (
     compute_content_fingerprint,
     compute_dedup_key,
     locations_compatible,

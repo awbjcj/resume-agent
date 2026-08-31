@@ -9,12 +9,12 @@ from pathlib import Path
 from evals.cl_runner import CLCaseResult, run_cl_case
 from evals.judge import build_cl_judge_agent, cl_judge_prompt_hash
 from evals.schema import load_cases, load_profile
-from resume_agent.cover_letter.agents import (
+from resume_tailor_harness.cover_letter.agents import (
     build_cover_letter_agent,
     build_cover_letter_reviser_agent,
 )
-from resume_agent.tailor.agents import model_for_tier
-from resume_agent.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tailor.agents import model_for_tier
+from resume_tailor_harness.tailor.style_guide import load_style_guide
 
 
 def result_dict(result: CLCaseResult) -> dict:

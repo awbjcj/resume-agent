@@ -74,16 +74,16 @@ provider-search and generic agent primitives can land independently.
 
 | Path                                             | Responsibility                                                                                           |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `src/resume_agent/config.py`                     | **Add** validated `search_mode` and `advisor_model` to `Settings`. (`github_token` already exists.)      |
+| `src/resume_tailor_harness/config.py`                     | **Add** validated `search_mode` and `advisor_model` to `Settings`. (`github_token` already exists.)      |
 | `pyproject.toml`, `uv.lock`                      | **Add** the DDGS search-tool runtime dependency.                                                         |
-| `src/resume_agent/llm_runner.py`                 | **Add** `plan_search` (pure decision) + `build_search_equipped` (model+tools) + native-search constants. |
-| `src/resume_agent/suggestions/agents.py`         | **New.** `SuggestionDraft` + nested models; `build_search_agent`, `build_formatter_agent`.               |
-| `src/resume_agent/github/repos.py`               | **New.** `RepoMeta`, `parse_github_url`, `verify_repo`.                                                  |
-| `src/resume_agent/services/suggestions.py`       | **New.** `generate_suggestion`, `suggestion_fingerprint`, context-prompt helpers, upsert.                |
-| `src/resume_agent/tracking/tables.py`            | **Add** `SkillSuggestion` table.                                                                         |
-| `src/resume_agent/api/schemas/suggestions.py`    | **New.** camelCase `SuggestionOut` + envelope.                                                           |
-| `src/resume_agent/api/routers/suggestions.py`    | **New.** `POST /suggestions/generate` (Run) + `GET /suggestions`.                                        |
-| `src/resume_agent/api/app.py`                    | **Add** router registration.                                                                             |
+| `src/resume_tailor_harness/llm_runner.py`                 | **Add** `plan_search` (pure decision) + `build_search_equipped` (model+tools) + native-search constants. |
+| `src/resume_tailor_harness/suggestions/agents.py`         | **New.** `SuggestionDraft` + nested models; `build_search_agent`, `build_formatter_agent`.               |
+| `src/resume_tailor_harness/github/repos.py`               | **New.** `RepoMeta`, `parse_github_url`, `verify_repo`.                                                  |
+| `src/resume_tailor_harness/services/suggestions.py`       | **New.** `generate_suggestion`, `suggestion_fingerprint`, context-prompt helpers, upsert.                |
+| `src/resume_tailor_harness/tracking/tables.py`            | **Add** `SkillSuggestion` table.                                                                         |
+| `src/resume_tailor_harness/api/schemas/suggestions.py`    | **New.** camelCase `SuggestionOut` + envelope.                                                           |
+| `src/resume_tailor_harness/api/routers/suggestions.py`    | **New.** `POST /suggestions/generate` (Run) + `GET /suggestions`.                                        |
+| `src/resume_tailor_harness/api/app.py`                    | **Add** router registration.                                                                             |
 | `web/src/features/match-gap/use-suggestion.ts`   | **New.** query + generate hooks.                                                                         |
 | `web/src/features/match-gap/SuggestionPanel.tsx` | **New.** rendered suggestion.                                                                            |
 | `web/src/features/match-gap/SkillDrawer.tsx`     | **Modify** (Spec A's file) to host the suggestion section + theme learning-path.                         |
@@ -94,7 +94,7 @@ provider-search and generic agent primitives can land independently.
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py`
+- Modify: `src/resume_tailor_harness/config.py`
 - Modify: `pyproject.toml`, `uv.lock`
 - Test: `tests/test_config_search.py` (new)
 
@@ -109,7 +109,7 @@ provider-search and generic agent primitives can land independently.
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 def test_search_settings_defaults():
@@ -130,7 +130,7 @@ Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'search_m
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/config.py`, add inside `Settings` (after `llm_retry_delay`):
+In `src/resume_tailor_harness/config.py`, add inside `Settings` (after `llm_retry_delay`):
 
 ```python
     # Gap-closing advisor (Spec B).
@@ -150,7 +150,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/config.py tests/test_config_search.py
+git add src/resume_tailor_harness/config.py tests/test_config_search.py
 git commit -m "feat: add advisor search settings"
 ```
 
@@ -160,7 +160,7 @@ git commit -m "feat: add advisor search settings"
 
 **Files:**
 
-- Modify: `src/resume_agent/llm_runner.py`
+- Modify: `src/resume_tailor_harness/llm_runner.py`
 - Test: `tests/test_search_seam.py` (new)
 
 **Interfaces:**
@@ -179,7 +179,7 @@ git commit -m "feat: add advisor search settings"
 # tests/test_search_seam.py
 import pytest
 
-from resume_agent.llm_runner import (
+from resume_tailor_harness.llm_runner import (
     ANTHROPIC_WEB_SEARCH_TOOL,
     OPENAI_WEB_SEARCH_TOOL,
     build_search_equipped,
@@ -239,7 +239,7 @@ Expected: FAIL — `ImportError: cannot import name 'plan_search'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/llm_runner.py`:
+Append to `src/resume_tailor_harness/llm_runner.py`:
 
 ```python
 from dataclasses import dataclass
@@ -315,7 +315,7 @@ Expected: PASS. (The anthropic `build_search_equipped` case only constructs a `C
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/llm_runner.py tests/test_search_seam.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_search_seam.py
 git commit -m "feat: native/tool web-search seam"
 ```
 
@@ -325,7 +325,7 @@ git commit -m "feat: native/tool web-search seam"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py`
+- Modify: `src/resume_tailor_harness/tracking/tables.py`
 - Test: `tests/test_skill_suggestion_table.py` (new)
 
 **Interfaces:**
@@ -338,8 +338,8 @@ git commit -m "feat: native/tool web-search seam"
 # tests/test_skill_suggestion_table.py
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import SkillSuggestion
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import SkillSuggestion
 
 
 def test_skill_suggestion_table_created_by_init_db():
@@ -366,7 +366,7 @@ Expected: FAIL — `ImportError: cannot import name 'SkillSuggestion'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/tracking/tables.py`:
+Append to `src/resume_tailor_harness/tracking/tables.py`:
 
 ```python
 class SkillSuggestion(SQLModel, table=True):
@@ -394,7 +394,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py tests/test_skill_suggestion_table.py
+git add src/resume_tailor_harness/tracking/tables.py tests/test_skill_suggestion_table.py
 git commit -m "feat: add skill_suggestions table"
 ```
 
@@ -404,7 +404,7 @@ git commit -m "feat: add skill_suggestions table"
 
 **Files:**
 
-- Create: `src/resume_agent/suggestions/__init__.py` (empty), `src/resume_agent/suggestions/agents.py`
+- Create: `src/resume_tailor_harness/suggestions/__init__.py` (empty), `src/resume_tailor_harness/suggestions/agents.py`
 - Test: `tests/test_suggestion_agents.py` (new)
 
 **Interfaces:**
@@ -420,7 +420,7 @@ git commit -m "feat: add skill_suggestions table"
 
 ```python
 # tests/test_suggestion_agents.py
-from resume_agent.suggestions.agents import (
+from resume_tailor_harness.suggestions.agents import (
     ProjectIdea,
     RepoRef,
     SuggestionDraft,
@@ -448,7 +448,7 @@ def test_suggestion_draft_roundtrips_nested():
 
 def test_builders_return_runners(monkeypatch):
     # Avoid constructing real provider models: stub build_search_equipped + build_model.
-    import resume_agent.suggestions.agents as agents_mod
+    import resume_tailor_harness.suggestions.agents as agents_mod
 
     monkeypatch.setattr(agents_mod, "build_search_equipped", lambda *a, **k: (object(), []))
     monkeypatch.setattr(agents_mod, "build_model", lambda *a, **k: object())
@@ -464,10 +464,10 @@ Expected: FAIL — `ModuleNotFoundError: ...suggestions.agents`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/suggestions/__init__.py` (empty file). Then:
+Create `src/resume_tailor_harness/suggestions/__init__.py` (empty file). Then:
 
 ```python
-# src/resume_agent/suggestions/agents.py
+# src/resume_tailor_harness/suggestions/agents.py
 """Two-stage advisor agents: a search-equipped researcher + a schema formatter."""
 
 from typing import Literal
@@ -475,8 +475,8 @@ from typing import Literal
 from agno.agent import Agent
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
@@ -484,7 +484,7 @@ from resume_agent.llm_runner import (
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class RepoRef(ExtensibleModel):
@@ -570,7 +570,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/suggestions/ tests/test_suggestion_agents.py
+git add src/resume_tailor_harness/suggestions/ tests/test_suggestion_agents.py
 git commit -m "feat: two-stage advisor agents"
 ```
 
@@ -580,7 +580,7 @@ git commit -m "feat: two-stage advisor agents"
 
 **Files:**
 
-- Create: `src/resume_agent/github/__init__.py` (empty), `src/resume_agent/github/repos.py`
+- Create: `src/resume_tailor_harness/github/__init__.py` (empty), `src/resume_tailor_harness/github/repos.py`
 - Test: `tests/test_github_repos.py` (new)
 
 **Interfaces:**
@@ -597,7 +597,7 @@ git commit -m "feat: two-stage advisor agents"
 import httpx
 import pytest
 
-from resume_agent.github.repos import RepoMeta, parse_github_url, verify_repo
+from resume_tailor_harness.github.repos import RepoMeta, parse_github_url, verify_repo
 
 
 def test_parse_github_url_variants():
@@ -646,10 +646,10 @@ Expected: FAIL — `ModuleNotFoundError: ...github.repos`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/github/__init__.py` (empty). Then:
+Create `src/resume_tailor_harness/github/__init__.py` (empty). Then:
 
 ```python
-# src/resume_agent/github/repos.py
+# src/resume_tailor_harness/github/repos.py
 """Verify + enrich GitHub repos via the public API. Faked offline."""
 
 from __future__ import annotations
@@ -715,7 +715,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/github/ tests/test_github_repos.py
+git add src/resume_tailor_harness/github/ tests/test_github_repos.py
 git commit -m "feat: github repo verification"
 ```
 
@@ -725,7 +725,7 @@ git commit -m "feat: github repo verification"
 
 **Files:**
 
-- Create: `src/resume_agent/services/suggestions.py`
+- Create: `src/resume_tailor_harness/services/suggestions.py`
 - Test: `tests/test_services_suggestions.py` (new)
 
 **Interfaces:**
@@ -751,16 +751,16 @@ GET call this same function.
 # tests/test_services_suggestions.py
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.github.repos import RepoMeta
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.suggestions.agents import ProjectIdea, RepoRef, SuggestionDraft
-from resume_agent.services.suggestions import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.github.repos import RepoMeta
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.suggestions.agents import ProjectIdea, RepoRef, SuggestionDraft
+from resume_tailor_harness.services.suggestions import (
     SuggestionContext,
     generate_suggestion,
     suggestion_fingerprint,
 )
-from resume_agent.tracking.tables import SkillSuggestion
+from resume_tailor_harness.tracking.tables import SkillSuggestion
 
 
 class _Result:
@@ -849,7 +849,7 @@ Expected: FAIL — `ModuleNotFoundError: ...services.suggestions`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/suggestions.py
+# src/resume_tailor_harness/services/suggestions.py
 """Use-case: generate + cache a gap-closing suggestion (search -> format -> verify)."""
 
 from __future__ import annotations
@@ -863,12 +863,12 @@ from urllib.parse import urlsplit, urlunsplit
 
 from sqlmodel import Session, select
 
-from resume_agent.github.repos import RepoMeta
-from resume_agent.github.repos import parse_github_url
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.suggestions.agents import SuggestionDraft
-from resume_agent.tracking.match_gap import DemandGraph, profile_skill_tokens
-from resume_agent.tracking.tables import SkillSuggestion, utcnow
+from resume_tailor_harness.github.repos import RepoMeta
+from resume_tailor_harness.github.repos import parse_github_url
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.suggestions.agents import SuggestionDraft
+from resume_tailor_harness.tracking.match_gap import DemandGraph, profile_skill_tokens
+from resume_tailor_harness.tracking.tables import SkillSuggestion, utcnow
 
 RepoVerifier = Callable[[str, str], RepoMeta | None]
 
@@ -1073,7 +1073,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/suggestions.py tests/test_services_suggestions.py
+git add src/resume_tailor_harness/services/suggestions.py tests/test_services_suggestions.py
 git commit -m "feat: generate_suggestion service"
 ```
 
@@ -1083,7 +1083,7 @@ git commit -m "feat: generate_suggestion service"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/suggestions.py`
+- Create: `src/resume_tailor_harness/api/schemas/suggestions.py`
 - Test: `tests/api/test_schemas_suggestions.py` (new)
 
 **Interfaces:**
@@ -1097,7 +1097,7 @@ git commit -m "feat: generate_suggestion service"
 # tests/api/test_schemas_suggestions.py
 from datetime import datetime, timezone
 
-from resume_agent.api.schemas.suggestions import SuggestionEnvelope, SuggestionOut
+from resume_tailor_harness.api.schemas.suggestions import SuggestionEnvelope, SuggestionOut
 
 
 def test_suggestion_out_camelizes_nested():
@@ -1127,7 +1127,7 @@ Expected: FAIL — `ModuleNotFoundError`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/schemas/suggestions.py
+# src/resume_tailor_harness/api/schemas/suggestions.py
 """Gap-closing advisor API schemas."""
 
 from __future__ import annotations
@@ -1137,7 +1137,7 @@ from typing import Literal
 
 from pydantic import AnyHttpUrl
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class RepoOut(CamelModel):
@@ -1184,7 +1184,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/suggestions.py tests/api/test_schemas_suggestions.py
+git add src/resume_tailor_harness/api/schemas/suggestions.py tests/api/test_schemas_suggestions.py
 git commit -m "feat: advisor api schemas"
 ```
 
@@ -1194,8 +1194,8 @@ git commit -m "feat: advisor api schemas"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/suggestions.py`
-- Modify: `src/resume_agent/api/app.py`
+- Create: `src/resume_tailor_harness/api/routers/suggestions.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_suggestions.py` (new)
 
 **Interfaces:**
@@ -1211,12 +1211,12 @@ import time
 
 from fastapi.testclient import TestClient
 
-import resume_agent.api.routers.suggestions as router_mod
-from resume_agent.api.app import create_app
-from resume_agent.github.repos import RepoMeta
-from resume_agent.suggestions.agents import RepoRef, SuggestionDraft
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+import resume_tailor_harness.api.routers.suggestions as router_mod
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.github.repos import RepoMeta
+from resume_tailor_harness.suggestions.agents import RepoRef, SuggestionDraft
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 class _Result:
@@ -1233,7 +1233,7 @@ class _Agent:
 
 
 def _seed_skill(engine):
-    from resume_agent.db import get_session
+    from resume_tailor_harness.db import get_session
 
     with get_session(engine) as session:
         save_job(session, Job(
@@ -1297,7 +1297,7 @@ Expected: FAIL — `ModuleNotFoundError: ...routers.suggestions`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/routers/suggestions.py
+# src/resume_tailor_harness/api/routers/suggestions.py
 """Gap-closing advisor: cached GET + generation Run."""
 
 from __future__ import annotations
@@ -1308,20 +1308,20 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from resume_agent.api.deps import get_run_manager, get_session
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.api.schemas.suggestions import SuggestionEnvelope, SuggestionOut
-from resume_agent.db import get_session as open_session
-from resume_agent.github.repos import verify_repo
-from resume_agent.config import get_settings
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.store import load_facts
-from resume_agent.services.suggestions import generate_suggestion, suggestion_fingerprint
-from resume_agent.suggestions.agents import build_formatter_agent, build_search_agent
-from resume_agent.tracking.match_gap import profile_skill_tokens
-from resume_agent.tracking.tables import SkillSuggestion
+from resume_tailor_harness.api.deps import get_run_manager, get_session
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.api.schemas.suggestions import SuggestionEnvelope, SuggestionOut
+from resume_tailor_harness.db import get_session as open_session
+from resume_tailor_harness.github.repos import verify_repo
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.services.suggestions import generate_suggestion, suggestion_fingerprint
+from resume_tailor_harness.suggestions.agents import build_formatter_agent, build_search_agent
+from resume_tailor_harness.tracking.match_gap import profile_skill_tokens
+from resume_tailor_harness.tracking.tables import SkillSuggestion
 
 router = APIRouter()
 
@@ -1409,10 +1409,10 @@ def launch_generate(
     return record_to_run(run_id, record)
 ```
 
-In `src/resume_agent/api/app.py`, add the import (near the other router imports) and registration (near the others):
+In `src/resume_tailor_harness/api/app.py`, add the import (near the other router imports) and registration (near the others):
 
 ```python
-from resume_agent.api.routers import suggestions as suggestions_router
+from resume_tailor_harness.api.routers import suggestions as suggestions_router
 ```
 
 ```python
@@ -1434,7 +1434,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/suggestions.py src/resume_agent/api/app.py tests/api/test_suggestions.py
+git add src/resume_tailor_harness/api/routers/suggestions.py src/resume_tailor_harness/api/app.py tests/api/test_suggestions.py
 git commit -m "feat: advisor generate + cached suggestion endpoints"
 ```
 

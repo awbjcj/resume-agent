@@ -1,13 +1,13 @@
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.bamboohr import (
+from resume_tailor_harness.discovery.connectors.bamboohr import (
     apply_detail,
     fetch_bamboohr,
     parse_bamboohr,
 )
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURES = Path(__file__).parent / "fixtures" / "bamboohr"
 
@@ -89,7 +89,7 @@ def test_bamboohr_skip_seen_prevents_detail_request(monkeypatch):
         def json(self):
             return payload
 
-    import resume_agent.discovery.connectors.bamboohr as connector
+    import resume_tailor_harness.discovery.connectors.bamboohr as connector
 
     monkeypatch.setattr(connector.board, "get", lambda *args, **kwargs: Response())
     jobs = fetch_bamboohr(

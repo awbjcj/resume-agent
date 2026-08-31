@@ -28,8 +28,8 @@
 **Files:**
 
 - Modify: `pyproject.toml`, `uv.lock` (via uv commands)
-- Modify: `src/resume_agent/profile/resume_reader.py`
-- Modify: `src/resume_agent/profile/fragments.py` (meta gains `converter_version`)
+- Modify: `src/resume_tailor_harness/profile/resume_reader.py`
+- Modify: `src/resume_tailor_harness/profile/fragments.py` (meta gains `converter_version`)
 - Test: `tests/test_profile_resume_reader.py`, `tests/test_profile_fragments.py`
 
 **Interfaces:**
@@ -40,7 +40,7 @@
 - [ ] **Step 1: Swap dependencies**
 
 ```bash
-cd /d/Fun/resume-agent
+cd /d/Fun/resume-tailor-harness
 uv remove python-docx python-pptx
 uv add "markitdown[docx,pdf,pptx,xlsx]"
 uv add --group dev python-docx python-pptx openpyxl
@@ -91,7 +91,7 @@ def test_converter_version_bump_invalidates_cache(tmp_path, monkeypatch):
     extract_fragments(profile_dir, manifest, agent)
     assert agent.calls == 1
 
-    monkeypatch.setattr("resume_agent.profile.fragments.CONVERTER_VERSION", 99)
+    monkeypatch.setattr("resume_tailor_harness.profile.fragments.CONVERTER_VERSION", 99)
     again = extract_fragments(profile_dir, load_manifest(profile_dir), agent)
     assert agent.calls == 2
     assert again.status[doc_id] == "extracted"
@@ -104,7 +104,7 @@ Expected: FAIL — `.html`/`.xlsx` raise `ValueError`, suffix-set assertion fail
 
 - [ ] **Step 4: Implement**
 
-Replace `src/resume_agent/profile/resume_reader.py` entirely:
+Replace `src/resume_tailor_harness/profile/resume_reader.py` entirely:
 
 ```python
 from pathlib import Path
@@ -145,9 +145,9 @@ def read_document_text(path: str | Path) -> str:
 read_resume_text = read_document_text
 ```
 
-In `src/resume_agent/profile/fragments.py`:
+In `src/resume_tailor_harness/profile/fragments.py`:
 
-- change the reader import to `from resume_agent.profile.resume_reader import CONVERTER_VERSION, read_document_text`
+- change the reader import to `from resume_tailor_harness.profile.resume_reader import CONVERTER_VERSION, read_document_text`
 - in `_meta_matches`, add a third condition:
 
 ```python
@@ -177,7 +177,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS. If the existing `test_read_pptx_slides_and_notes` fails on speaker notes, markitdown's pptx converter includes notes — check the produced text and adjust the assertion only if notes genuinely appear under a `### Notes` heading (keep asserting the note text is present).
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/profile/resume_reader.py src/resume_agent/profile/fragments.py tests/test_profile_resume_reader.py tests/test_profile_fragments.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/profile/resume_reader.py src/resume_tailor_harness/profile/fragments.py tests/test_profile_resume_reader.py tests/test_profile_fragments.py
 git commit -m "Converts all documents through markitdown with a versioned cache key"
 ```
 
@@ -187,8 +187,8 @@ git commit -m "Converts all documents through markitdown with a versioned cache 
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/corpus.py`
-- Modify: `src/resume_agent/cli.py` (`profile_add`, `profile_sources`)
+- Modify: `src/resume_tailor_harness/profile/corpus.py`
+- Modify: `src/resume_tailor_harness/cli.py` (`profile_add`, `profile_sources`)
 - Test: `tests/test_profile_corpus.py`, `tests/test_cli_profile.py`
 
 **Interfaces:**
@@ -203,7 +203,7 @@ Add to `tests/test_profile_corpus.py`:
 ```python
 import pytest
 
-from resume_agent.profile.corpus import (
+from resume_tailor_harness.profile.corpus import (
     _UNSET,
     SourceManifest,
     add_source,
@@ -333,7 +333,7 @@ Expected: FAIL — `default_mode`/`update_source`/`_UNSET` don't exist; `add_sou
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/profile/corpus.py`:
+In `src/resume_tailor_harness/profile/corpus.py`:
 
 Add near the top (after existing imports): `from typing import Literal` and:
 
@@ -471,7 +471,7 @@ def update_source(
     return doc
 ```
 
-In `src/resume_agent/cli.py`, extend `profile_add` with two options and pass them through:
+In `src/resume_tailor_harness/cli.py`, extend `profile_add` with two options and pass them through:
 
 ```python
     mode: str | None = typer.Option(
@@ -504,7 +504,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/corpus.py src/resume_agent/cli.py tests/test_profile_corpus.py tests/test_cli_profile.py
+git add src/resume_tailor_harness/profile/corpus.py src/resume_tailor_harness/cli.py tests/test_profile_corpus.py tests/test_cli_profile.py
 git commit -m "Adds per-source mode and anchor routing to the corpus manifest"
 ```
 
@@ -514,8 +514,8 @@ git commit -m "Adds per-source mode and anchor routing to the corpus manifest"
 
 **Files:**
 
-- Modify: `src/resume_agent/models/base.py`
-- Create: `src/resume_agent/profile/synthesis.py`
+- Modify: `src/resume_tailor_harness/models/base.py`
+- Create: `src/resume_tailor_harness/profile/synthesis.py`
 - Test: `tests/test_profile_synthesis.py` (new)
 
 **Interfaces:**
@@ -527,8 +527,8 @@ git commit -m "Adds per-source mode and anchor routing to the corpus manifest"
 Create `tests/test_profile_synthesis.py`:
 
 ```python
-from resume_agent.models.profile import Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.synthesis import (
     SynthesizedClaim,
     SynthesizedEntry,
     SynthesizedFragment,
@@ -600,17 +600,17 @@ def test_synthesized_fragment_models_validate():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_synthesis.py -v`
-Expected: FAIL — `resume_agent.profile.synthesis` module doesn't exist; `synthesized` attribute error.
+Expected: FAIL — `resume_tailor_harness.profile.synthesis` module doesn't exist; `synthesized` attribute error.
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/models/base.py`, add one field to `FactItem` (after `source_ref`):
+In `src/resume_tailor_harness/models/base.py`, add one field to `FactItem` (after `source_ref`):
 
 ```python
     synthesized: bool = False
 ```
 
-Create `src/resume_agent/profile/synthesis.py`:
+Create `src/resume_tailor_harness/profile/synthesis.py`:
 
 ```python
 """Verified synthesis of supporting documents into claimable profile facts.
@@ -629,16 +629,16 @@ from typing import Literal
 from agno.agent import Agent
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import ProfileFacts
 
 # Bump whenever synthesis or entailment instructions change so cached
 # synthesis fragments re-run.
@@ -772,7 +772,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/models/base.py src/resume_agent/profile/synthesis.py tests/test_profile_synthesis.py
+git add src/resume_tailor_harness/models/base.py src/resume_tailor_harness/profile/synthesis.py tests/test_profile_synthesis.py
 git commit -m "Adds synthesis fragment models, agents, and the anchor skeleton"
 ```
 
@@ -782,7 +782,7 @@ git commit -m "Adds synthesis fragment models, agents, and the anchor skeleton"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/synthesis.py`
+- Modify: `src/resume_tailor_harness/profile/synthesis.py`
 - Test: `tests/test_profile_synthesis.py`
 
 **Interfaces:**
@@ -794,7 +794,7 @@ git commit -m "Adds synthesis fragment models, agents, and the anchor skeleton"
 Add to `tests/test_profile_synthesis.py`:
 
 ```python
-from resume_agent.profile.synthesis import deterministic_failures
+from resume_tailor_harness.profile.synthesis import deterministic_failures
 
 _SOURCE = (
     "Slide 3: The billing rewrite at Acme cut p99 latency 30% across 4 services.\n"
@@ -866,7 +866,7 @@ Expected: FAIL — `deterministic_failures` not defined.
 
 - [ ] **Step 3: Implement**
 
-Add to `src/resume_agent/profile/synthesis.py` (add `import re` at the top):
+Add to `src/resume_tailor_harness/profile/synthesis.py` (add `import re` at the top):
 
 ```python
 _NUMBER = re.compile(r"\d[\d,.]*%?")
@@ -932,7 +932,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/synthesis.py tests/test_profile_synthesis.py
+git add src/resume_tailor_harness/profile/synthesis.py tests/test_profile_synthesis.py
 git commit -m "Verifies synthesized claims deterministically against source text"
 ```
 
@@ -942,7 +942,7 @@ git commit -m "Verifies synthesized claims deterministically against source text
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/synthesis.py`
+- Modify: `src/resume_tailor_harness/profile/synthesis.py`
 - Test: `tests/test_profile_synthesis.py`
 
 **Interfaces:**
@@ -957,8 +957,8 @@ git commit -m "Verifies synthesized claims deterministically against source text
 Add to `tests/test_profile_synthesis.py`:
 
 ```python
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.synthesis import (
     ClaimVerdict,
     ClaimVerdicts,
     fragment_to_facts,
@@ -1148,14 +1148,14 @@ Expected: FAIL — `synthesize_document` / `fragment_to_facts` not defined.
 
 - [ ] **Step 3: Implement**
 
-Add to `src/resume_agent/profile/synthesis.py`. New imports at the top:
+Add to `src/resume_tailor_harness/profile/synthesis.py`. New imports at the top:
 
 ```python
 from pathlib import Path
 
-from resume_agent.models.profile import Bullet, Contact, Experience, Project, Skill
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.ids import deterministic_id
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, Project, Skill
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.ids import deterministic_id
 ```
 
 Then the orchestration:
@@ -1378,7 +1378,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/synthesis.py tests/test_profile_synthesis.py
+git add src/resume_tailor_harness/profile/synthesis.py tests/test_profile_synthesis.py
 git commit -m "Orchestrates verified synthesis with one repair round"
 ```
 
@@ -1388,8 +1388,8 @@ git commit -m "Orchestrates verified synthesis with one repair round"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/fragments.py`
-- Modify: `src/resume_agent/profile/corpus.py` (`remove_source` cleans the evidence sidecar)
+- Modify: `src/resume_tailor_harness/profile/fragments.py`
+- Modify: `src/resume_tailor_harness/profile/corpus.py` (`remove_source` cleans the evidence sidecar)
 - Test: `tests/test_profile_fragments.py`
 
 **Interfaces:**
@@ -1407,9 +1407,9 @@ git commit -m "Orchestrates verified synthesis with one repair round"
 Add to `tests/test_profile_fragments.py`:
 
 ```python
-from resume_agent.profile.corpus import add_source as _add_source, remove_source
-from resume_agent.profile.fragments import extract_synthesis_fragments
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.profile.corpus import add_source as _add_source, remove_source
+from resume_tailor_harness.profile.fragments import extract_synthesis_fragments
+from resume_tailor_harness.profile.synthesis import (
     ClaimVerdict,
     ClaimVerdicts,
     SynthesizedClaim,
@@ -1487,7 +1487,7 @@ def test_synthesis_fragments_cache_and_write_evidence(tmp_path):
 
 
 def test_anchor_change_invalidates_synthesis_cache(tmp_path):
-    from resume_agent.profile.corpus import update_source
+    from resume_tailor_harness.profile.corpus import update_source
 
     profile_dir, doc = _corpus_with_deck(tmp_path)
     synth = _synth_agent()
@@ -1535,12 +1535,12 @@ Expected: FAIL — `extract_synthesis_fragments` not defined; literal loop still
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/profile/fragments.py`:
+In `src/resume_tailor_harness/profile/fragments.py`:
 
 New imports:
 
 ```python
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.profile.synthesis import (
     SYNTHESIS_PROMPT_VERSION,
     fragment_to_facts,
     synthesize_document,
@@ -1679,7 +1679,7 @@ Update `fragment_cache_status` to dispatch on mode:
         return "cached"
 ```
 
-In `src/resume_agent/profile/corpus.py`, `remove_source`, extend the stale-file cleanup:
+In `src/resume_tailor_harness/profile/corpus.py`, `remove_source`, extend the stale-file cleanup:
 
 ```python
     for stale in (
@@ -1698,7 +1698,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/fragments.py src/resume_agent/profile/corpus.py tests/test_profile_fragments.py
+git add src/resume_tailor_harness/profile/fragments.py src/resume_tailor_harness/profile/corpus.py tests/test_profile_fragments.py
 git commit -m "Caches synthesis fragments with mode-aware keys and evidence sidecars"
 ```
 
@@ -1708,9 +1708,9 @@ git commit -m "Caches synthesis fragments with mode-aware keys and evidence side
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/merge.py`
-- Modify: `src/resume_agent/profile/build.py`
-- Modify: `src/resume_agent/cli.py` (`profile_build`)
+- Modify: `src/resume_tailor_harness/profile/merge.py`
+- Modify: `src/resume_tailor_harness/profile/build.py`
+- Modify: `src/resume_tailor_harness/cli.py` (`profile_build`)
 - Modify: `CLAUDE.md` (hot-paths row)
 - Test: `tests/test_profile_merge.py`, `tests/test_profile_build.py`, `tests/test_cli_profile.py`
 
@@ -1728,9 +1728,9 @@ git commit -m "Caches synthesis fragments with mode-aware keys and evidence side
 Add to `tests/test_profile_merge.py`:
 
 ```python
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project, Skill
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.merge import MergeReport, apply_synthesis_fragments
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Project, Skill
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.merge import MergeReport, apply_synthesis_fragments
 
 
 def _deck_doc():
@@ -1813,9 +1813,9 @@ Expected: FAIL — `apply_synthesis_fragments` not defined.
 
 - [ ] **Step 3: Implement the merge phase**
 
-In `src/resume_agent/profile/merge.py`:
+In `src/resume_tailor_harness/profile/merge.py`:
 
-Add `from pathlib import Path` and `from resume_agent.profile.ids import deterministic_id` to the imports, and `Skill` to the profile-model import if not present.
+Add `from pathlib import Path` and `from resume_tailor_harness.profile.ids import deterministic_id` to the imports, and `Skill` to the profile-model import if not present.
 
 Extract the skill-union loop from `merge_fragments` (the `for category, skills in fragment.skills.items()` block) into a module function and call it from `merge_fragments`:
 
@@ -1945,10 +1945,10 @@ Add to `tests/test_profile_build.py`:
 ```python
 import json
 
-from resume_agent.models.profile import Contact, Experience, ProfileFacts
-from resume_agent.profile.build import build_corpus_profile
-from resume_agent.profile.corpus import add_source
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts
+from resume_tailor_harness.profile.build import build_corpus_profile
+from resume_tailor_harness.profile.corpus import add_source
+from resume_tailor_harness.profile.synthesis import (
     ClaimVerdict,
     ClaimVerdicts,
     SynthesizedClaim,
@@ -2042,10 +2042,10 @@ Update `tests/test_cli_profile.py`'s `_configure_build` to also neutralize the n
 
 ```python
     monkeypatch.setattr(
-        "resume_agent.profile.synthesis.build_synthesis_agent", lambda: object()
+        "resume_tailor_harness.profile.synthesis.build_synthesis_agent", lambda: object()
     )
     monkeypatch.setattr(
-        "resume_agent.profile.synthesis.build_entailment_agent", lambda: object()
+        "resume_tailor_harness.profile.synthesis.build_entailment_agent", lambda: object()
     )
 ```
 
@@ -2056,7 +2056,7 @@ Expected: FAIL — `build_corpus_profile` rejects `synthesis_agent` kwarg; `anch
 
 - [ ] **Step 6: Implement build orchestration + CLI**
 
-In `src/resume_agent/profile/build.py`:
+In `src/resume_tailor_harness/profile/build.py`:
 
 Extend `BuildReport`:
 
@@ -2089,17 +2089,17 @@ def build_corpus_profile(
 New imports:
 
 ```python
-from resume_agent.profile.fragments import extract_fragments, extract_synthesis_fragments
-from resume_agent.profile.merge import (
+from resume_tailor_harness.profile.fragments import extract_fragments, extract_synthesis_fragments
+from resume_tailor_harness.profile.merge import (
     apply_synthesis_fragments,
     dedup_experience_bullets,
     merge_facts,
     merge_fragments,
 )
-from resume_agent.profile.synthesis import profile_skeleton
+from resume_tailor_harness.profile.synthesis import profile_skeleton
 ```
 
-(The existing `from resume_agent.profile.fragments import extract_fragments` line changes to include the new function.)
+(The existing `from resume_tailor_harness.profile.fragments import extract_fragments` line changes to include the new function.)
 
 After the existing `merged, merge_report = merge_fragments(...)` block (and its report copies), insert the synthesis phase **before** the GitHub merge:
 
@@ -2136,9 +2136,9 @@ After the existing `merged, merge_report = merge_fragments(...)` block (and its 
                 report.dropped_bullets = merge_report.dropped_bullets
 ```
 
-In `src/resume_agent/cli.py` `profile_build`:
+In `src/resume_tailor_harness/cli.py` `profile_build`:
 
-- add to the local imports: `from resume_agent.profile.synthesis import build_entailment_agent, build_synthesis_agent`
+- add to the local imports: `from resume_tailor_harness.profile.synthesis import build_entailment_agent, build_synthesis_agent`
 - pass the agents:
 
 ```python
@@ -2164,7 +2164,7 @@ In `src/resume_agent/cli.py` `profile_build`:
 In `CLAUDE.md`, add one row to the "Hot paths" table after the `matrix.py` row:
 
 ```markdown
-| `src/resume_agent/profile/synthesis.py` | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round) |
+| `src/resume_tailor_harness/profile/synthesis.py` | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round) |
 ```
 
 and one bullet to "Known design notes":
@@ -2182,7 +2182,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/merge.py src/resume_agent/profile/build.py src/resume_agent/cli.py CLAUDE.md tests/test_profile_merge.py tests/test_profile_build.py tests/test_cli_profile.py
+git add src/resume_tailor_harness/profile/merge.py src/resume_tailor_harness/profile/build.py src/resume_tailor_harness/cli.py CLAUDE.md tests/test_profile_merge.py tests/test_profile_build.py tests/test_cli_profile.py
 git commit -m "Merges verified synthesis fragments by anchor id into the corpus build"
 ```
 
@@ -2192,4 +2192,4 @@ git commit -m "Merges verified synthesis fragments by anchor id into the corpus 
 
 - [ ] `.venv/Scripts/python.exe -m pytest` — full suite green.
 - [ ] `ruff check` — clean.
-- [ ] Manual smoke (optional, needs an API key): `resume-agent profile add deck.pptx --anchor <exp-id>` then `resume-agent profile build --refresh` — report shows anchor decisions and any drops.
+- [ ] Manual smoke (optional, needs an API key): `resume-tailor-harness profile add deck.pptx --anchor <exp-id>` then `resume-tailor-harness profile build --refresh` — report shows anchor decisions and any drops.

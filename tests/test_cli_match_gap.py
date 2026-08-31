@@ -1,16 +1,16 @@
 from typer.testing import CliRunner
 
-from resume_agent import cli
-import resume_agent.profile.effective as effective_module
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.store import save_facts
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness import cli
+import resume_tailor_harness.profile.effective as effective_module
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tracking.tables import Job
 
 runner = CliRunner()
 

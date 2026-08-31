@@ -33,8 +33,8 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/agents.py` (`_COMMON_REVIEWER_INSTRUCTIONS`, ~line 117)
-- Modify: `src/resume_agent/tailor/review_config.py`, `src/resume_agent/services/agents.py`, `evals/run_eval.py`
+- Modify: `src/resume_tailor_harness/tailor/agents.py` (`_COMMON_REVIEWER_INSTRUCTIONS`, ~line 117)
+- Modify: `src/resume_tailor_harness/tailor/review_config.py`, `src/resume_tailor_harness/services/agents.py`, `evals/run_eval.py`
 - Test: `tests/test_tailor_agents.py` (append)
 
 **Interfaces:**
@@ -46,7 +46,7 @@
 
 ```python
 # tests/test_tailor_agents.py  (append)
-from resume_agent.tailor.agents import _reviewer_instructions
+from resume_tailor_harness.tailor.agents import _reviewer_instructions
 
 
 def test_reviewer_instructions_carry_score_bands():
@@ -92,7 +92,7 @@ Expected: PASS (2 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/agents.py tests/test_tailor_agents.py
+git add src/resume_tailor_harness/tailor/agents.py tests/test_tailor_agents.py
 git commit -m "Adds shared score-band rubric to reviewer instructions"
 ```
 
@@ -102,7 +102,7 @@ git commit -m "Adds shared score-band rubric to reviewer instructions"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/tailoring.py` (`compose_revise_input`, ~line 48; add `Severity` import, line 7)
+- Modify: `src/resume_tailor_harness/tailor/tailoring.py` (`compose_revise_input`, ~line 48; add `Severity` import, line 7)
 - Test: `tests/test_tailoring.py` (append; create if absent)
 
 **Interfaces:**
@@ -114,10 +114,10 @@ git commit -m "Adds shared score-band rubric to reviewer instructions"
 
 ```python
 # tests/test_tailoring.py  (append or create)
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.tailor.tailoring import compose_revise_input
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.tailor.tailoring import compose_revise_input
 
 
 def _critique() -> ReviewCritique:
@@ -163,10 +163,10 @@ Expected: FAIL — issues are emitted reviewer-grouped, not severity-grouped (`b
 
 - [ ] **Step 3: Write the implementation**
 
-In `src/resume_agent/tailor/tailoring.py`, extend the import on line 7 to add `Severity`:
+In `src/resume_tailor_harness/tailor/tailoring.py`, extend the import on line 7 to add `Severity`:
 
 ```python
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
 ```
 
 Replace `compose_revise_input` (lines 48–76) with the severity-grouped version:
@@ -225,7 +225,7 @@ Expected: PASS (3 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/tailoring.py tests/test_tailoring.py
+git add src/resume_tailor_harness/tailor/tailoring.py tests/test_tailoring.py
 git commit -m "Restructures revise input by severity with locations"
 ```
 
@@ -235,8 +235,8 @@ git commit -m "Restructures revise input by severity with locations"
 
 **Files:**
 
-- Create: `src/resume_agent/models/match_plan.py`
-- Create: `src/resume_agent/tailor/match_plan.py`
+- Create: `src/resume_tailor_harness/models/match_plan.py`
+- Create: `src/resume_tailor_harness/tailor/match_plan.py`
 - Test: `tests/test_match_plan.py`
 
 **Interfaces:**
@@ -257,10 +257,10 @@ git commit -m "Restructures revise input by severity with locations"
 # tests/test_match_plan.py
 import asyncio
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.tailor.match_plan import (
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.match_plan import MatchPlan, MatchPlanRequirement
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.tailor.match_plan import (
     amatch_plan,
     build_match_plan_agent,
     compose_match_plan_input,
@@ -313,15 +313,15 @@ def test_build_match_plan_agent_is_runnable():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_match_plan.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.match_plan'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.models.match_plan'`
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/models/match_plan.py
+# src/resume_tailor_harness/models/match_plan.py
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class MatchPlanRequirement(ExtensibleModel):
@@ -340,12 +340,12 @@ class MatchPlan(ExtensibleModel):
 ```
 
 ```python
-# src/resume_agent/tailor/match_plan.py
+# src/resume_tailor_harness/tailor/match_plan.py
 import asyncio
 
 from agno.agent import Agent
 
-from resume_agent.llm_runner import (
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     acall,
@@ -353,11 +353,11 @@ from resume_agent.llm_runner import (
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.match_plan import MatchPlan
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.tailor.agents import model_for_tier
-from resume_agent.tailor.style_guide import compose_instructions
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.match_plan import MatchPlan
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.tailor.agents import model_for_tier
+from resume_tailor_harness.tailor.style_guide import compose_instructions
 
 _MATCH_PLAN_INSTRUCTIONS = [
     "The input contains CANDIDATE PROFILE (JSON), JOB CRITERIA (JSON), and JOB DESCRIPTION. "
@@ -423,7 +423,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/match_plan.py src/resume_agent/tailor/match_plan.py tests/test_match_plan.py
+git add src/resume_tailor_harness/models/match_plan.py src/resume_tailor_harness/tailor/match_plan.py tests/test_match_plan.py
 git commit -m "Adds referential MatchPlan model and pre-draft agent"
 ```
 
@@ -433,9 +433,9 @@ git commit -m "Adds referential MatchPlan model and pre-draft agent"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/review_config.py` (`ReviewConfig`, ~line 24)
-- Modify: `src/resume_agent/tailor/tailoring.py` (`compose_tailor_input`, ~line 12)
-- Modify: `src/resume_agent/tailor/workflow.py` (both `run_tailor_review` and `arun_tailor_review`)
+- Modify: `src/resume_tailor_harness/tailor/review_config.py` (`ReviewConfig`, ~line 24)
+- Modify: `src/resume_tailor_harness/tailor/tailoring.py` (`compose_tailor_input`, ~line 12)
+- Modify: `src/resume_tailor_harness/tailor/workflow.py` (both `run_tailor_review` and `arun_tailor_review`)
 - Test: `tests/test_tailor_workflow.py` (append; create if absent)
 
 **Interfaces:**
@@ -452,13 +452,13 @@ git commit -m "Adds referential MatchPlan model and pre-draft agent"
 # tests/test_tailor_workflow.py  (append or create)
 import asyncio
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.workflow import run_tailor_review
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.match_plan import MatchPlan, MatchPlanRequirement
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.workflow import run_tailor_review
 
 
 class _Result:
@@ -535,7 +535,7 @@ Expected: FAIL — `TypeError: ReviewConfig() got an unexpected keyword argument
 
 - [ ] **Step 3: Write the implementation**
 
-Add the flag to `ReviewConfig` in `src/resume_agent/tailor/review_config.py` (after `reviewers`, line 27):
+Add the flag to `ReviewConfig` in `src/resume_tailor_harness/tailor/review_config.py` (after `reviewers`, line 27):
 
 ```python
 class ReviewConfig(ExtensibleModel):
@@ -547,10 +547,10 @@ class ReviewConfig(ExtensibleModel):
     style_guide_path: str = "config/style_guide.md"
 ```
 
-Extend `compose_tailor_input` in `src/resume_agent/tailor/tailoring.py` (lines 12–27). Add the import at the top of the file:
+Extend `compose_tailor_input` in `src/resume_tailor_harness/tailor/tailoring.py` (lines 12–27). Add the import at the top of the file:
 
 ```python
-from resume_agent.models.match_plan import MatchPlan
+from resume_tailor_harness.models.match_plan import MatchPlan
 ```
 
 Then:
@@ -582,7 +582,7 @@ def compose_tailor_input(
     )
 ```
 
-Add a writer instruction so the tailor knows how to treat the plan. In `src/resume_agent/tailor/agents.py`, append to `_TAILOR_INSTRUCTIONS` (after line 39):
+Add a writer instruction so the tailor knows how to treat the plan. In `src/resume_tailor_harness/tailor/agents.py`, append to `_TAILOR_INSTRUCTIONS` (after line 39):
 
 ```python
     "If a MATCH PLAN is present, use it only as selection/emphasis strategy. It references profile "
@@ -590,10 +590,10 @@ Add a writer instruction so the tailor knows how to treat the plan. In `src/resu
     "are absent from CANDIDATE PROFILE.",
 ```
 
-Wire the workflow in `src/resume_agent/tailor/workflow.py`. Extend the import from `tailor.match_plan` and add the optional agent + pre-draft step to **both** functions. Sync (`run_tailor_review`, lines 29–41):
+Wire the workflow in `src/resume_tailor_harness/tailor/workflow.py`. Extend the import from `tailor.match_plan` and add the optional agent + pre-draft step to **both** functions. Sync (`run_tailor_review`, lines 29–41):
 
 ```python
-from resume_agent.tailor.match_plan import amatch_plan, compose_match_plan_input, match_plan
+from resume_tailor_harness.tailor.match_plan import amatch_plan, compose_match_plan_input, match_plan
 ```
 
 ```python
@@ -666,7 +666,7 @@ Expected: PASS — the new param defaults to `None`, so every existing call is u
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/review_config.py src/resume_agent/tailor/tailoring.py src/resume_agent/tailor/workflow.py src/resume_agent/tailor/agents.py tests/test_tailor_workflow.py
+git add src/resume_tailor_harness/tailor/review_config.py src/resume_tailor_harness/tailor/tailoring.py src/resume_tailor_harness/tailor/workflow.py src/resume_tailor_harness/tailor/agents.py tests/test_tailor_workflow.py
 git commit -m "Threads optional match-plan into the tailor loop behind a default-off flag"
 ```
 
@@ -676,8 +676,8 @@ git commit -m "Threads optional match-plan into the tailor loop behind a default
 
 **Files:**
 
-- Modify: `src/resume_agent/services/agents.py` (`TailorBundle`, `build_tailor_bundle`)
-- Modify: `src/resume_agent/tailor/service.py` (`tailor_job`, `tailor_jobs` — thread `match_plan_agent`)
+- Modify: `src/resume_tailor_harness/services/agents.py` (`TailorBundle`, `build_tailor_bundle`)
+- Modify: `src/resume_tailor_harness/tailor/service.py` (`tailor_job`, `tailor_jobs` — thread `match_plan_agent`)
 - Modify: `evals/runner.py` (`run_case` — pass `bundle.match_plan` into `run_tailor_review`)
 - Test: `tests/test_services_agents.py` (append; create if absent), `tests/eval/test_runner.py` (append)
 
@@ -694,9 +694,9 @@ git commit -m "Threads optional match-plan into the tailor loop behind a default
 
 ```python
 # tests/test_services_agents.py  (append or create)
-from resume_agent.services import agents as agents_mod
-from resume_agent.services.agents import TailorBundle, build_tailor_bundle
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.services import agents as agents_mod
+from resume_tailor_harness.services.agents import TailorBundle, build_tailor_bundle
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 def _config(enabled: bool) -> ReviewConfig:
@@ -726,10 +726,10 @@ Expected: FAIL — `TailorBundle` has no `match_plan` field / `build_match_plan_
 
 - [ ] **Step 3: Write the implementation**
 
-In `src/resume_agent/services/agents.py`, import the builder and re-export it, add the field, and build it when enabled. Add to the `tailor.match_plan` import area (after line 28):
+In `src/resume_tailor_harness/services/agents.py`, import the builder and re-export it, add the field, and build it when enabled. Add to the `tailor.match_plan` import area (after line 28):
 
 ```python
-from resume_agent.tailor.match_plan import build_match_plan_agent
+from resume_tailor_harness.tailor.match_plan import build_match_plan_agent
 ```
 
 Extend `TailorBundle` (line 42):
@@ -769,7 +769,7 @@ def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
 
 Add `"build_match_plan_agent"` to the `__all__` list (so tests can monkeypatch it on this module).
 
-In `src/resume_agent/tailor/service.py`, thread the optional agent through both entry points. For `tailor_job` (lines 40–70), add the param and forward it; include it in the `run_with_cleanup` runners tuple only when present:
+In `src/resume_tailor_harness/tailor/service.py`, thread the optional agent through both entry points. For `tailor_job` (lines 40–70), add the param and forward it; include it in the `run_with_cleanup` runners tuple only when present:
 
 ```python
 def tailor_job(
@@ -837,7 +837,7 @@ In `evals/runner.py`, forward the plan agent in `run_case` so the harness A/Bs b
 # tests/eval/test_runner.py  (append)
 def test_run_case_invokes_match_plan_when_enabled():
     # Reuse _Tailor/_Reviewer/_Judge/_facts from the existing module-level fixtures.
-    from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
+    from resume_tailor_harness.models.match_plan import MatchPlan, MatchPlanRequirement
 
     class _Planner:
         def __init__(self):
@@ -885,7 +885,7 @@ Expected: all green.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/services/agents.py src/resume_agent/tailor/service.py evals/runner.py config/review.match_plan.yaml tests/test_services_agents.py tests/eval/test_runner.py
+git add src/resume_tailor_harness/services/agents.py src/resume_tailor_harness/tailor/service.py evals/runner.py config/review.match_plan.yaml tests/test_services_agents.py tests/eval/test_runner.py
 git commit -m "Wires match-plan into the bundle, service, and eval A/B harness"
 ```
 

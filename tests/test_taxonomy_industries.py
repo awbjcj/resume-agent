@@ -1,6 +1,6 @@
 import json
 
-from resume_agent.taxonomy.industries import (
+from resume_tailor_harness.taxonomy.industries import (
     IndustryTaxonomy,
     canonical_industry,
     clean_industry_label,

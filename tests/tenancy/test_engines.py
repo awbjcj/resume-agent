@@ -1,6 +1,6 @@
 from sqlalchemy import inspect
 
-from resume_agent.tenancy.engines import EngineRegistry
+from resume_tailor_harness.tenancy.engines import EngineRegistry
 
 
 def test_registry_caches_per_user_and_evicts(tmp_path):

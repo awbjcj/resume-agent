@@ -16,18 +16,18 @@
 
 | File                                        | Responsibility                                                                                                                                | Action |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| `src/resume_agent/tracking/tables.py`       | Add `Job.archived_at` column                                                                                                                  | Modify |
-| `src/resume_agent/tracking/migrate.py`      | `ensure_archived_at_column`                                                                                                                   | Modify |
-| `src/resume_agent/db.py`                    | Wire migration into `init_db`                                                                                                                 | Modify |
-| `src/resume_agent/tracking/repository.py`   | `has_progress`, `archive_job`, `restore_job`, `delete_job`, `prune_preview`, `prune_run`; archived filter on `jobs_by_status`/`status_counts` | Modify |
-| `src/resume_agent/tracking/queries.py`      | Archived filter on `shortlist_rows`/`pipeline_rows`; `triage_rows`, `archived_rows`, `TriageRow`                                              | Modify |
-| `src/resume_agent/tracking/prune.py`        | Pure prune predicates, `PruneRow`, `PruneReport`                                                                                              | Create |
-| `src/resume_agent/tracking/prune_config.py` | `PruneConfig`, `load_prune_config`                                                                                                            | Create |
+| `src/resume_tailor_harness/tracking/tables.py`       | Add `Job.archived_at` column                                                                                                                  | Modify |
+| `src/resume_tailor_harness/tracking/migrate.py`      | `ensure_archived_at_column`                                                                                                                   | Modify |
+| `src/resume_tailor_harness/db.py`                    | Wire migration into `init_db`                                                                                                                 | Modify |
+| `src/resume_tailor_harness/tracking/repository.py`   | `has_progress`, `archive_job`, `restore_job`, `delete_job`, `prune_preview`, `prune_run`; archived filter on `jobs_by_status`/`status_counts` | Modify |
+| `src/resume_tailor_harness/tracking/queries.py`      | Archived filter on `shortlist_rows`/`pipeline_rows`; `triage_rows`, `archived_rows`, `TriageRow`                                              | Modify |
+| `src/resume_tailor_harness/tracking/prune.py`        | Pure prune predicates, `PruneRow`, `PruneReport`                                                                                              | Create |
+| `src/resume_tailor_harness/tracking/prune_config.py` | `PruneConfig`, `load_prune_config`                                                                                                            | Create |
 | `config/prune.yaml.example`                 | Documented default thresholds                                                                                                                 | Create |
-| `src/resume_agent/cli.py`                   | `prune` command                                                                                                                               | Modify |
-| `src/resume_agent/dashboard/selection.py`   | Pure selection-state helpers                                                                                                                  | Create |
-| `src/resume_agent/dashboard/pages.py`       | `render_triage_page`, prune panel, pipeline enhancements                                                                                      | Modify |
-| `src/resume_agent/dashboard/app.py`         | Sidebar nav + routing for Triage                                                                                                              | Modify |
+| `src/resume_tailor_harness/cli.py`                   | `prune` command                                                                                                                               | Modify |
+| `src/resume_tailor_harness/dashboard/selection.py`   | Pure selection-state helpers                                                                                                                  | Create |
+| `src/resume_tailor_harness/dashboard/pages.py`       | `render_triage_page`, prune panel, pipeline enhancements                                                                                      | Modify |
+| `src/resume_tailor_harness/dashboard/app.py`         | Sidebar nav + routing for Triage                                                                                                              | Modify |
 
 Tasks are ordered as a dependency chain; each leaves the suite green.
 
@@ -37,9 +37,9 @@ Tasks are ordered as a dependency chain; each leaves the suite green.
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py`
-- Modify: `src/resume_agent/tracking/migrate.py`
-- Modify: `src/resume_agent/db.py`
+- Modify: `src/resume_tailor_harness/tracking/tables.py`
+- Modify: `src/resume_tailor_harness/tracking/migrate.py`
+- Modify: `src/resume_tailor_harness/db.py`
 - Test: `tests/test_migrate.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -51,7 +51,7 @@ def test_ensure_archived_at_column_adds_missing_column():
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
-    from resume_agent.tracking.migrate import ensure_archived_at_column
+    from resume_tailor_harness.tracking.migrate import ensure_archived_at_column
     ensure_archived_at_column(engine)
     with engine.begin() as conn:
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
@@ -64,7 +64,7 @@ def test_ensure_archived_at_column_is_idempotent():
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
-    from resume_agent.tracking.migrate import ensure_archived_at_column
+    from resume_tailor_harness.tracking.migrate import ensure_archived_at_column
     ensure_archived_at_column(engine)
     ensure_archived_at_column(engine)
     with engine.begin() as conn:
@@ -79,7 +79,7 @@ Expected: FAIL with `ImportError: cannot import name 'ensure_archived_at_column'
 
 - [ ] **Step 3: Add the column to the model**
 
-In `src/resume_agent/tracking/tables.py`, inside `class Job`, after the `posted_at` line:
+In `src/resume_tailor_harness/tracking/tables.py`, inside `class Job`, after the `posted_at` line:
 
 ```python
     archived_at: datetime | None = Field(default=None, index=True)
@@ -87,7 +87,7 @@ In `src/resume_agent/tracking/tables.py`, inside `class Job`, after the `posted_
 
 - [ ] **Step 4: Add the migration**
 
-Append to `src/resume_agent/tracking/migrate.py`:
+Append to `src/resume_tailor_harness/tracking/migrate.py`:
 
 ```python
 def ensure_archived_at_column(engine: Engine) -> None:
@@ -105,10 +105,10 @@ def ensure_archived_at_column(engine: Engine) -> None:
 
 - [ ] **Step 5: Wire it into `init_db`**
 
-In `src/resume_agent/db.py`, update the import and `init_db`:
+In `src/resume_tailor_harness/db.py`, update the import and `init_db`:
 
 ```python
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.tracking.migrate import (
     ensure_archived_at_column,
     ensure_dedup_key_column,
     ensure_posted_at_column,
@@ -131,7 +131,7 @@ Expected: PASS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_migrate.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_migrate.py
 git commit -m "Add jobs.archived_at column and migration"
 ```
 
@@ -141,7 +141,7 @@ git commit -m "Add jobs.archived_at column and migration"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -150,10 +150,10 @@ Add to `tests/test_repository.py`:
 
 ```python
 def test_has_progress_true_for_advanced_status_and_children():
-    from resume_agent.tracking.repository import (
+    from resume_tailor_harness.tracking.repository import (
         has_progress, save_application, save_resume_version,
     )
-    from resume_agent.tracking.tables import Application, ResumeVersion
+    from resume_tailor_harness.tracking.tables import Application, ResumeVersion
 
     with _session() as s:
         raw = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
@@ -177,10 +177,10 @@ Expected: FAIL with `ImportError: cannot import name 'has_progress'`
 
 - [ ] **Step 3: Implement the predicate**
 
-In `src/resume_agent/tracking/repository.py`, update the tables import to include `CoverLetter`, `Job`, `JobStatus` (CoverLetter and Job/JobStatus may already be partially imported — ensure all are present):
+In `src/resume_tailor_harness/tracking/repository.py`, update the tables import to include `CoverLetter`, `Job`, `JobStatus` (CoverLetter and Job/JobStatus may already be partially imported — ensure all are present):
 
 ```python
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationStatus,
     CoverLetter,
@@ -222,7 +222,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_repository.py
 git commit -m "Add has_progress safety predicate"
 ```
 
@@ -232,7 +232,7 @@ git commit -m "Add has_progress safety predicate"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -241,7 +241,7 @@ Add to `tests/test_repository.py`:
 
 ```python
 def test_archive_and_restore_preserve_status():
-    from resume_agent.tracking.repository import archive_job, restore_job
+    from resume_tailor_harness.tracking.repository import archive_job, restore_job
 
     with _session() as s:
         job = save_job(s, Job(source="m", jd_text="a", status=JobStatus.shortlisted.value))
@@ -268,7 +268,7 @@ Expected: FAIL with `ImportError: cannot import name 'archive_job'`
 
 - [ ] **Step 3: Implement**
 
-Add to `src/resume_agent/tracking/repository.py`:
+Add to `src/resume_tailor_harness/tracking/repository.py`:
 
 ```python
 def archive_job(session: Session, job_id: int) -> Job | None:
@@ -303,7 +303,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_repository.py
 git commit -m "Add archive_job and restore_job"
 ```
 
@@ -313,7 +313,7 @@ git commit -m "Add archive_job and restore_job"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -322,10 +322,10 @@ Add to `tests/test_repository.py`:
 
 ```python
 def test_delete_job_cascades_children_and_refuses_progress():
-    from resume_agent.tracking.repository import (
+    from resume_tailor_harness.tracking.repository import (
         delete_job, get_job, save_application, save_cover_letter, save_resume_version,
     )
-    from resume_agent.tracking.tables import Application, CoverLetter, ResumeVersion
+    from resume_tailor_harness.tracking.tables import Application, CoverLetter, ResumeVersion
     from sqlmodel import select
 
     with _session() as s:
@@ -352,7 +352,7 @@ Expected: FAIL with `ImportError: cannot import name 'delete_job'`
 
 - [ ] **Step 3: Implement**
 
-Add to `src/resume_agent/tracking/repository.py`:
+Add to `src/resume_tailor_harness/tracking/repository.py`:
 
 ```python
 def delete_job(session: Session, job_id: int) -> bool:
@@ -383,7 +383,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_repository.py
 git commit -m "Add delete_job with cascade and progress guard"
 ```
 
@@ -393,10 +393,10 @@ git commit -m "Add delete_job with cascade and progress guard"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py` (`jobs_by_status`, `status_counts`)
-- Modify: `src/resume_agent/tracking/queries.py` (`shortlist_rows`, `pipeline_rows`, `application_job_pairs`)
-- Modify: `src/resume_agent/tracking/match_gap.py` (`_target_jobs`)
-- Modify: `src/resume_agent/tracking/analytics.py` (`_rows`)
+- Modify: `src/resume_tailor_harness/tracking/repository.py` (`jobs_by_status`, `status_counts`)
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (`shortlist_rows`, `pipeline_rows`, `application_job_pairs`)
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py` (`_target_jobs`)
+- Modify: `src/resume_tailor_harness/tracking/analytics.py` (`_rows`)
 - Test: `tests/test_repository.py`, `tests/test_tracking_queries.py`, `tests/test_tracking_match_gap.py`, `tests/test_tracking_analytics.py`
 
 > Note: `jobs_by_status` is also how the discovery pipeline (`discovery/pipeline.py`)
@@ -409,7 +409,7 @@ Add to `tests/test_repository.py`:
 
 ```python
 def test_archived_jobs_excluded_from_status_views():
-    from resume_agent.tracking.repository import archive_job, jobs_by_status, status_counts
+    from resume_tailor_harness.tracking.repository import archive_job, jobs_by_status, status_counts
 
     with _session() as s:
         a = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
@@ -424,7 +424,7 @@ Add to `tests/test_tracking_queries.py`:
 
 ```python
 def test_archived_jobs_excluded_from_shortlist_and_pipeline():
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as s:
         keep = save_job(s, Job(source="m", jd_text="a", company="Keep", title="E",
@@ -439,9 +439,9 @@ def test_archived_jobs_excluded_from_shortlist_and_pipeline():
 
 
 def test_archived_jobs_excluded_from_application_job_pairs():
-    from resume_agent.tracking.queries import application_job_pairs
-    from resume_agent.tracking.repository import archive_job, save_application
-    from resume_agent.tracking.tables import Application, ApplicationStatus
+    from resume_tailor_harness.tracking.queries import application_job_pairs
+    from resume_tailor_harness.tracking.repository import archive_job, save_application
+    from resume_tailor_harness.tracking.tables import Application, ApplicationStatus
 
     with _session() as s:
         keep = save_job(s, Job(source="m", jd_text="a", company="Keep", title="E",
@@ -461,7 +461,7 @@ Add to `tests/test_tracking_match_gap.py`:
 
 ```python
 def test_match_gap_excludes_archived_targets():
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.repository import archive_job
 
     facts = _facts({"lang": [Skill(name="Python")]})
     with _session() as s:
@@ -477,7 +477,7 @@ Add to `tests/test_tracking_analytics.py`:
 
 ```python
 def test_analytics_excludes_archived_jobs():
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as session:
         _seed(session, "greenhouse", 85, ApplicationStatus.submitted.value)
@@ -500,7 +500,7 @@ Expected: FAIL (archived rows still returned)
 
 - [ ] **Step 3: Add the filter to `repository.py`**
 
-In `src/resume_agent/tracking/repository.py`, replace `jobs_by_status` and `status_counts`:
+In `src/resume_tailor_harness/tracking/repository.py`, replace `jobs_by_status` and `status_counts`:
 
 ```python
 def jobs_by_status(session: Session, status: str) -> list[Job]:
@@ -526,7 +526,7 @@ def status_counts(session: Session) -> dict[str, int]:
 
 - [ ] **Step 4: Add the filter to `queries.py`**
 
-In `src/resume_agent/tracking/queries.py`, in `shortlist_rows`, change the select to add the archived guard:
+In `src/resume_tailor_harness/tracking/queries.py`, in `shortlist_rows`, change the select to add the archived guard:
 
 ```python
     fit_score_col = cast(Any, Job.fit_score)
@@ -554,7 +554,7 @@ In `pipeline_rows`, change the select:
 
 - [ ] **Step 5: Add the filter to `application_job_pairs`**
 
-In `src/resume_agent/tracking/queries.py`, change `application_job_pairs` so Gmail
+In `src/resume_tailor_harness/tracking/queries.py`, change `application_job_pairs` so Gmail
 status sync also ignores archived jobs:
 
 ```python
@@ -571,7 +571,7 @@ def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
 
 - [ ] **Step 6: Add the filter to `match_gap.py`**
 
-In `src/resume_agent/tracking/match_gap.py`, replace `_target_jobs` so the Match-gap report ignores archived jobs (`cast` and `Any` are already imported there):
+In `src/resume_tailor_harness/tracking/match_gap.py`, replace `_target_jobs` so the Match-gap report ignores archived jobs (`cast` and `Any` are already imported there):
 
 ```python
 def _target_jobs(session: Session) -> list[Job]:
@@ -589,7 +589,7 @@ def _target_jobs(session: Session) -> list[Job]:
 
 - [ ] **Step 7: Add the filter to `analytics.py`**
 
-In `src/resume_agent/tracking/analytics.py`, add `Any` and `cast` to the typing
+In `src/resume_tailor_harness/tracking/analytics.py`, add `Any` and `cast` to the typing
 imports, then update `_rows`:
 
 ```python
@@ -615,7 +615,7 @@ Expected: PASS (all, including existing tests)
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py src/resume_agent/tracking/queries.py src/resume_agent/tracking/match_gap.py src/resume_agent/tracking/analytics.py tests/test_repository.py tests/test_tracking_queries.py tests/test_tracking_match_gap.py tests/test_tracking_analytics.py
+git add src/resume_tailor_harness/tracking/repository.py src/resume_tailor_harness/tracking/queries.py src/resume_tailor_harness/tracking/match_gap.py src/resume_tailor_harness/tracking/analytics.py tests/test_repository.py tests/test_tracking_queries.py tests/test_tracking_match_gap.py tests/test_tracking_analytics.py
 git commit -m "Exclude archived jobs from normal dashboard and sync views"
 ```
 
@@ -625,7 +625,7 @@ git commit -m "Exclude archived jobs from normal dashboard and sync views"
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/prune_config.py`
+- Create: `src/resume_tailor_harness/tracking/prune_config.py`
 - Create: `config/prune.yaml.example`
 - Test: `tests/test_prune_config.py`
 
@@ -634,7 +634,7 @@ git commit -m "Exclude archived jobs from normal dashboard and sync views"
 Create `tests/test_prune_config.py`:
 
 ```python
-from resume_agent.tracking.prune_config import PruneConfig, load_prune_config
+from resume_tailor_harness.tracking.prune_config import PruneConfig, load_prune_config
 
 
 def test_defaults_when_file_missing(tmp_path):
@@ -664,17 +664,17 @@ def test_is_a_pydantic_model_copy_updates():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_prune_config.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.tracking.prune_config'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.prune_config'`
 
 - [ ] **Step 3: Implement the config**
 
-Create `src/resume_agent/tracking/prune_config.py`:
+Create `src/resume_tailor_harness/tracking/prune_config.py`:
 
 ```python
 from pathlib import Path
 
-from resume_agent.config import load_yaml
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class PruneConfig(ExtensibleModel):
@@ -722,7 +722,7 @@ Expected: PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tracking/prune_config.py config/prune.yaml.example tests/test_prune_config.py
+git add src/resume_tailor_harness/tracking/prune_config.py config/prune.yaml.example tests/test_prune_config.py
 git commit -m "Add PruneConfig with YAML loader and example"
 ```
 
@@ -732,7 +732,7 @@ git commit -m "Add PruneConfig with YAML loader and example"
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/prune.py`
+- Create: `src/resume_tailor_harness/tracking/prune.py`
 - Test: `tests/test_prune.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -742,7 +742,7 @@ Create `tests/test_prune.py`:
 ```python
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.tracking.prune import (
+from resume_tailor_harness.tracking.prune import (
     PruneRow,
     expire_candidates,
     is_zero_progress,
@@ -750,8 +750,8 @@ from resume_agent.tracking.prune import (
     prune_reason_counts,
     prune_skipped,
 )
-from resume_agent.tracking.prune_config import PruneConfig
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.tracking.prune_config import PruneConfig
+from resume_tailor_harness.tracking.tables import JobStatus
 
 NOW = datetime(2026, 6, 20, tzinfo=timezone.utc)
 
@@ -826,18 +826,18 @@ def test_expire_candidates_only_old_archived_zero_progress():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_prune.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.tracking.prune'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.prune'`
 
 - [ ] **Step 3: Implement the pure predicates**
 
-Create `src/resume_agent/tracking/prune.py`:
+Create `src/resume_tailor_harness/tracking/prune.py`:
 
 ```python
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from resume_agent.tracking.prune_config import PruneConfig
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.tracking.prune_config import PruneConfig
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 @dataclass
@@ -937,7 +937,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/prune.py tests/test_prune.py
+git add src/resume_tailor_harness/tracking/prune.py tests/test_prune.py
 git commit -m "Add pure prune and expire predicates"
 ```
 
@@ -947,7 +947,7 @@ git commit -m "Add pure prune and expire predicates"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_prune_run.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -959,11 +959,11 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.prune_config import PruneConfig
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.prune_config import PruneConfig
+from resume_tailor_harness.tracking.repository import (
     get_job, prune_preview, prune_run, save_application, save_job,
 )
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 
 NOW = datetime(2026, 6, 20, tzinfo=timezone.utc)
 
@@ -1010,10 +1010,10 @@ Expected: FAIL with `ImportError: cannot import name 'prune_preview'`
 
 - [ ] **Step 3: Implement the orchestrators**
 
-In `src/resume_agent/tracking/repository.py`, add the import near the other tracking imports:
+In `src/resume_tailor_harness/tracking/repository.py`, add the import near the other tracking imports:
 
 ```python
-from resume_agent.tracking.prune import (
+from resume_tailor_harness.tracking.prune import (
     PruneReport,
     PruneRow,
     expire_candidates,
@@ -1021,7 +1021,7 @@ from resume_agent.tracking.prune import (
     prune_reason_counts,
     prune_skipped,
 )
-from resume_agent.tracking.prune_config import PruneConfig
+from resume_tailor_harness.tracking.prune_config import PruneConfig
 ```
 
 Add:
@@ -1105,17 +1105,17 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_prune_run.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_prune_run.py
 git commit -m "Add prune_preview and prune_run orchestrators"
 ```
 
 ---
 
-## Task 9: `resume-agent prune` CLI command
+## Task 9: `resume-tailor-harness prune` CLI command
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_prune.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1125,10 +1125,10 @@ Create `tests/test_cli_prune.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 runner = CliRunner()
 
@@ -1177,13 +1177,13 @@ Expected: FAIL (no `prune` command → non-zero exit / usage error)
 
 - [ ] **Step 3: Implement the command**
 
-In `src/resume_agent/cli.py`, extend the existing repository import (line ~41) to add `prune_preview, prune_run`, and add the config import:
+In `src/resume_tailor_harness/cli.py`, extend the existing repository import (line ~41) to add `prune_preview, prune_run`, and add the config import:
 
 ```python
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     get_job, jobs_by_status, prune_preview, prune_run, save_job, update_application_status,
 )
-from resume_agent.tracking.prune_config import load_prune_config
+from resume_tailor_harness.tracking.prune_config import load_prune_config
 ```
 
 `_engine` (which does `make_engine` + `init_db`), `get_session`, and `get_settings` are already imported in `cli.py` — reuse `_engine`, don't duplicate engine setup.
@@ -1241,8 +1241,8 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_prune.py
-git commit -m "Add resume-agent prune CLI command"
+git add src/resume_tailor_harness/cli.py tests/test_cli_prune.py
+git commit -m "Add resume-tailor-harness prune CLI command"
 ```
 
 ---
@@ -1251,7 +1251,7 @@ git commit -m "Add resume-agent prune CLI command"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py`
+- Modify: `src/resume_tailor_harness/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1260,8 +1260,8 @@ Add to `tests/test_tracking_queries.py`:
 
 ```python
 def test_triage_rows_are_pre_shortlist_and_unarchived():
-    from resume_agent.tracking.queries import triage_rows
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.queries import triage_rows
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as s:
         save_job(s, Job(source="m", jd_text="a", company="Raw", title="E",
@@ -1279,8 +1279,8 @@ def test_triage_rows_are_pre_shortlist_and_unarchived():
 
 
 def test_archived_rows_lists_all_archived_any_status():
-    from resume_agent.tracking.queries import archived_rows
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.queries import archived_rows
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as s:
         a = save_job(s, Job(source="m", jd_text="a", company="A", title="E",
@@ -1302,7 +1302,7 @@ Expected: FAIL with `ImportError: cannot import name 'triage_rows'`
 
 - [ ] **Step 3: Implement the builders**
 
-In `src/resume_agent/tracking/queries.py`, add the dataclass after `PipelineRow`:
+In `src/resume_tailor_harness/tracking/queries.py`, add the dataclass after `PipelineRow`:
 
 ```python
 @dataclass
@@ -1368,7 +1368,7 @@ def archived_rows(session: Session) -> list[TriageRow]:
 Update the repository import in `queries.py` to include `has_progress`:
 
 ```python
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     has_progress,
     latest_rendered_resume_version,
@@ -1384,7 +1384,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/queries.py tests/test_tracking_queries.py
+git add src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py
 git commit -m "Add triage_rows and archived_rows builders"
 ```
 
@@ -1394,7 +1394,7 @@ git commit -m "Add triage_rows and archived_rows builders"
 
 **Files:**
 
-- Create: `src/resume_agent/dashboard/selection.py`
+- Create: `src/resume_tailor_harness/dashboard/selection.py`
 - Test: `tests/test_dashboard_selection.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1402,7 +1402,7 @@ git commit -m "Add triage_rows and archived_rows builders"
 Create `tests/test_dashboard_selection.py`:
 
 ```python
-from resume_agent.dashboard.selection import all_deletable
+from resume_tailor_harness.dashboard.selection import all_deletable
 
 
 def test_all_deletable_requires_nonempty_subset():
@@ -1414,11 +1414,11 @@ def test_all_deletable_requires_nonempty_subset():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_dashboard_selection.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.dashboard.selection'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.dashboard.selection'`
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/dashboard/selection.py`:
+Create `src/resume_tailor_harness/dashboard/selection.py`:
 
 ```python
 """Pure helper for the Triage page's bulk-delete gate.
@@ -1441,7 +1441,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/selection.py tests/test_dashboard_selection.py
+git add src/resume_tailor_harness/dashboard/selection.py tests/test_dashboard_selection.py
 git commit -m "Add pure Triage selection helpers"
 ```
 
@@ -1451,8 +1451,8 @@ git commit -m "Add pure Triage selection helpers"
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/pages.py`
-- Modify: `src/resume_agent/dashboard/app.py`
+- Modify: `src/resume_tailor_harness/dashboard/pages.py`
+- Modify: `src/resume_tailor_harness/dashboard/app.py`
 - Test: `tests/test_dashboard_app.py`
 
 > **Note on UI testing:** Streamlit render functions are verified the way this repo
@@ -1466,18 +1466,18 @@ Add to `tests/test_dashboard_app.py`:
 
 ```python
 def test_dashboard_exposes_triage_page():
-    from resume_agent.dashboard import app
+    from resume_tailor_harness.dashboard import app
     assert callable(app.render_triage_page)
 
 
 def test_triage_page_renders_with_a_raw_job(tmp_path, monkeypatch):
     from streamlit.testing.v1 import AppTest
 
-    import resume_agent.dashboard.app as appmod
-    from resume_agent.config import get_settings
-    from resume_agent.db import get_session, init_db, make_engine
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job, JobStatus
+    import resume_tailor_harness.dashboard.app as appmod
+    from resume_tailor_harness.config import get_settings
+    from resume_tailor_harness.db import get_session, init_db, make_engine
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job, JobStatus
 
     db_url = f"sqlite:///{(tmp_path / 'jobs.db').as_posix()}"
     monkeypatch.setenv("DB_URL", db_url)
@@ -1506,21 +1506,21 @@ def test_triage_page_renders_with_a_raw_job(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_dashboard_app.py::test_dashboard_exposes_triage_page -v`
-Expected: FAIL with `AttributeError: module 'resume_agent.dashboard.app' has no attribute 'render_triage_page'`
+Expected: FAIL with `AttributeError: module 'resume_tailor_harness.dashboard.app' has no attribute 'render_triage_page'`
 
 - [ ] **Step 3: Implement the Triage page**
 
-Add to `src/resume_agent/dashboard/pages.py`. Update imports at the top:
+Add to `src/resume_tailor_harness/dashboard/pages.py`. Update imports at the top:
 
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.dashboard.selection import all_deletable
-from resume_agent.tracking.prune_config import load_prune_config
-from resume_agent.tracking.queries import (
+from resume_tailor_harness.dashboard.selection import all_deletable
+from resume_tailor_harness.tracking.prune_config import load_prune_config
+from resume_tailor_harness.tracking.queries import (
     PipelineRow, TriageRow, archived_rows, pipeline_rows, shortlist_rows, triage_rows,
 )
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job, archive_job, delete_job, get_job, prune_preview, prune_run,
     restore_job, save_application, save_job, update_application_status,
 )
@@ -1633,7 +1633,7 @@ def render_triage_page(session) -> None:
 
     if not rows:
         empty_state("◇", "Nothing to triage",
-                    "Run <code>resume-agent pull</code> to bring in jobs, or toggle archived.")
+                    "Run <code>resume-tailor-harness pull</code> to bring in jobs, or toggle archived.")
         return
 
     visible = _filter_sort_triage_rows(rows)
@@ -1723,7 +1723,7 @@ def _confirm_prune(session, run_config) -> None:
 
 - [ ] **Step 4: Add the grid CSS**
 
-In `src/resume_agent/dashboard/ui.py`, after the `st-key-cardgrid_shortlist` grid rule (around line 80), add a triage grid that matches the shortlist grid:
+In `src/resume_tailor_harness/dashboard/ui.py`, after the `st-key-cardgrid_shortlist` grid rule (around line 80), add a triage grid that matches the shortlist grid:
 
 ```css
 div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_triage"] {
@@ -1747,10 +1747,10 @@ div[data-testid="stVerticalBlock"][class*="st-key-triage_actionbar"] {
 
 - [ ] **Step 5: Wire nav + routing in `app.py`**
 
-In `src/resume_agent/dashboard/app.py`, add `render_triage_page` to the `pages` import, add `"Triage"` to the radio options, and route it:
+In `src/resume_tailor_harness/dashboard/app.py`, add `render_triage_page` to the `pages` import, add `"Triage"` to the radio options, and route it:
 
 ```python
-from resume_agent.dashboard.pages import (  # noqa: F401  (re-exported)
+from resume_tailor_harness.dashboard.pages import (  # noqa: F401  (re-exported)
     analytics_table_rows,
     match_gap_table_rows,
     render_analytics_page,
@@ -1790,7 +1790,7 @@ Expected: PASS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/pages.py src/resume_agent/dashboard/app.py src/resume_agent/dashboard/ui.py tests/test_dashboard_app.py
+git add src/resume_tailor_harness/dashboard/pages.py src/resume_tailor_harness/dashboard/app.py src/resume_tailor_harness/dashboard/ui.py tests/test_dashboard_app.py
 git commit -m "Add Triage filtering, bulk actions, undo, restore, and prune panel"
 ```
 
@@ -1800,7 +1800,7 @@ git commit -m "Add Triage filtering, bulk actions, undo, restore, and prune pane
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/pages.py`
+- Modify: `src/resume_tailor_harness/dashboard/pages.py`
 - Test: `tests/test_dashboard_app.py`
 
 > Adds a filter/sort control desk, collapsible stage groups, and per-card archive,
@@ -1815,9 +1815,9 @@ Add to `tests/test_dashboard_app.py`:
 ```python
 def test_pipeline_row_carries_has_progress_flag():
     from sqlmodel import Session, SQLModel, create_engine
-    from resume_agent.tracking.queries import pipeline_rows
-    from resume_agent.tracking.repository import save_application, save_job
-    from resume_agent.tracking.tables import Application, Job, JobStatus
+    from resume_tailor_harness.tracking.queries import pipeline_rows
+    from resume_tailor_harness.tracking.repository import save_application, save_job
+    from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 
     engine = create_engine("sqlite://")
     SQLModel.metadata.create_all(engine)
@@ -1847,7 +1847,7 @@ Expected: FAIL with `AttributeError: 'PipelineRow' object has no attribute 'has_
 
 - [ ] **Step 3: Add `has_progress` to `PipelineRow`**
 
-In `src/resume_agent/tracking/queries.py`, add the field to the `PipelineRow` dataclass (after `seniority`):
+In `src/resume_tailor_harness/tracking/queries.py`, add the field to the `PipelineRow` dataclass (after `seniority`):
 
 ```python
     has_progress: bool = False
@@ -1868,7 +1868,7 @@ Expected: PASS
 
 - [ ] **Step 5: Add the controls to `_render_pipeline_card`**
 
-In `src/resume_agent/dashboard/pages.py`, inside `_render_pipeline_card`, after the existing "Save status" block, add stage-change + archive/delete controls:
+In `src/resume_tailor_harness/dashboard/pages.py`, inside `_render_pipeline_card`, after the existing "Save status" block, add stage-change + archive/delete controls:
 
 ```python
         st.markdown('<div class="rail-head">Manage</div>', unsafe_allow_html=True)
@@ -1896,7 +1896,7 @@ In `src/resume_agent/dashboard/pages.py`, inside `_render_pipeline_card`, after 
 
 - [ ] **Step 6: Add the Pipeline filter/sort desk**
 
-Add a small page-local helper in `src/resume_agent/dashboard/pages.py`:
+Add a small page-local helper in `src/resume_tailor_harness/dashboard/pages.py`:
 
 ```python
 def _filter_sort_pipeline_rows(rows: list[PipelineRow]) -> list[PipelineRow]:
@@ -1969,7 +1969,7 @@ Expected: PASS
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/pages.py src/resume_agent/tracking/queries.py tests/test_dashboard_app.py
+git add src/resume_tailor_harness/dashboard/pages.py src/resume_tailor_harness/tracking/queries.py tests/test_dashboard_app.py
 git commit -m "Add pipeline board filtering, archive/delete, stage change, and collapsible groups"
 ```
 
@@ -2008,7 +2008,7 @@ cascades incidental children in FK-safe order otherwise. `prune_run` (config:
 `config/prune.yaml`) archives rejected/low-fit/stale zero-progress jobs, reports
 primary reason counts, then hard-deletes archived zero-progress jobs older than
 `retention_days`. Surfaced via the dashboard Triage page and
-`resume-agent prune [--dry-run]`.
+`resume-tailor-harness prune [--dry-run]`.
 ```
 
 - [ ] **Step 4: Commit**

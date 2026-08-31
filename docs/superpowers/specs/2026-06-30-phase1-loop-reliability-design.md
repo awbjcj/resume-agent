@@ -37,7 +37,7 @@ keep-best-round is a **selection-side** problem, not a loop rewrite.
 - The resume surfaced by default is the **best round that respects the fact-lock gate**.
 - A gate-failing round is never silently surfaced as the default (close the safety bug).
 - Regression is **visible** (a marker), so the eval harness and the UI can see it.
-- **Zero behavior change** to `src/resume_agent/tailor/` — all rounds still persist; the loop
+- **Zero behavior change** to `src/resume_tailor_harness/tailor/` — all rounds still persist; the loop
   is untouched (this phase stays observation-respecting, like Phase 0).
 
 **Non-goals (this phase)**

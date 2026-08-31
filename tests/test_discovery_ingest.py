@@ -1,13 +1,13 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.ingest import (
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.ingest import (
     IngestOutcome,
     add_job,
     ingest_jobs_with_outcomes,
     save_or_upgrade,
 )
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     archive_job,
     get_cover_letter,
@@ -16,7 +16,7 @@ from resume_agent.tracking.repository import (
     save_cover_letter,
     save_resume_version,
 )
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationStatus,
     CoverLetter,
@@ -539,9 +539,9 @@ def test_same_source_different_url_inserts_as_distinct_posting():
 
 
 def test_keyless_near_duplicate_collapses_via_fingerprint():
-    from resume_agent.discovery.ingest import add_job
-    from resume_agent.tracking.repository import jobs_by_status
-    from resume_agent.tracking.tables import JobStatus
+    from resume_tailor_harness.discovery.ingest import add_job
+    from resume_tailor_harness.tracking.repository import jobs_by_status
+    from resume_tailor_harness.tracking.tables import JobStatus
 
     with _session() as s:
         first = add_job(s, source="remoteok", jd_text="Build great systems for us")
@@ -727,8 +727,8 @@ def test_archived_duplicate_does_not_block_new_active_job():
 
 
 def test_skipped_outcome_is_counted():
-    from resume_agent.discovery.connectors.base import RawJob
-    from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+    from resume_tailor_harness.discovery.connectors.base import RawJob
+    from resume_tailor_harness.discovery.ingest import ingest_jobs_with_outcomes
 
     with _session() as s:
         job = RawJob(
@@ -748,8 +748,8 @@ def test_skipped_outcome_is_counted():
 
 
 def test_active_job_cap_blocks_only_new_rows():
-    from resume_agent.discovery.connectors.base import RawJob
-    from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+    from resume_tailor_harness.discovery.connectors.base import RawJob
+    from resume_tailor_harness.discovery.ingest import ingest_jobs_with_outcomes
 
     with _session() as s:
         first = RawJob(
@@ -788,8 +788,8 @@ def test_active_job_cap_blocks_only_new_rows():
 
 
 def test_archived_jobs_do_not_count_toward_active_job_cap():
-    from resume_agent.discovery.connectors.base import RawJob
-    from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+    from resume_tailor_harness.discovery.connectors.base import RawJob
+    from resume_tailor_harness.discovery.ingest import ingest_jobs_with_outcomes
 
     with _session() as s:
         old = add_job(s, source="manual", jd_text="old")

@@ -31,22 +31,22 @@
 
 | File | Responsibility |
 | --- | --- |
-| `src/resume_agent/discovery/source_resolution/catalog.py` | Supported ATS family metadata, canonical board URLs, and generated search guidance |
-| `src/resume_agent/discovery/source_resolution/models.py` | Resolution, evidence, crawl, and reason-code value models |
-| `src/resume_agent/discovery/source_resolution/identity.py` | Registrable-domain and company-name identity rules |
-| `src/resume_agent/discovery/source_resolution/crawler.py` | Bounded first-party navigation and ATS candidate extraction |
-| `src/resume_agent/discovery/source_resolution/resolver.py` | Candidate inspection, ownership verdict, and best-result selection |
-| `src/resume_agent/discovery/source_resolution/search.py` | Five-use fallback search budget and streamed search-coverage tracking |
-| `src/resume_agent/discovery/source_resolution/__init__.py` | Stable public imports for the resolver package |
-| `src/resume_agent/discovery/connectors/base.py` | Provider-vs-token company provenance on fetched jobs |
-| `src/resume_agent/discovery/connectors/detect.py` | Pure host detection plus all-target extraction from first-party HTML |
-| `src/resume_agent/discovery/connectors/registry.py` | Attaches discovery metadata to the existing canonical connector registrations |
-| `src/resume_agent/services/sources.py` | Canonical source roots and provider-company identities in `SourcePreview` |
-| `src/resume_agent/discovery/scout.py` | Identity-aware read-only resolver tool and generated ATS search instructions |
-| `src/resume_agent/discovery/scout_store.py` | Durable resolution evidence and manual-confirmation audit fields |
-| `src/resume_agent/services/scout.py` | Resolver orchestration, deterministic post-processing, correction, and approval policy |
-| `src/resume_agent/api/schemas/scout.py` | Resolve/approve request bodies and evidence-rich Scout responses |
-| `src/resume_agent/api/routers/scout.py` | Source re-resolution route and optional manual approval body |
+| `src/resume_tailor_harness/discovery/source_resolution/catalog.py` | Supported ATS family metadata, canonical board URLs, and generated search guidance |
+| `src/resume_tailor_harness/discovery/source_resolution/models.py` | Resolution, evidence, crawl, and reason-code value models |
+| `src/resume_tailor_harness/discovery/source_resolution/identity.py` | Registrable-domain and company-name identity rules |
+| `src/resume_tailor_harness/discovery/source_resolution/crawler.py` | Bounded first-party navigation and ATS candidate extraction |
+| `src/resume_tailor_harness/discovery/source_resolution/resolver.py` | Candidate inspection, ownership verdict, and best-result selection |
+| `src/resume_tailor_harness/discovery/source_resolution/search.py` | Five-use fallback search budget and streamed search-coverage tracking |
+| `src/resume_tailor_harness/discovery/source_resolution/__init__.py` | Stable public imports for the resolver package |
+| `src/resume_tailor_harness/discovery/connectors/base.py` | Provider-vs-token company provenance on fetched jobs |
+| `src/resume_tailor_harness/discovery/connectors/detect.py` | Pure host detection plus all-target extraction from first-party HTML |
+| `src/resume_tailor_harness/discovery/connectors/registry.py` | Attaches discovery metadata to the existing canonical connector registrations |
+| `src/resume_tailor_harness/services/sources.py` | Canonical source roots and provider-company identities in `SourcePreview` |
+| `src/resume_tailor_harness/discovery/scout.py` | Identity-aware read-only resolver tool and generated ATS search instructions |
+| `src/resume_tailor_harness/discovery/scout_store.py` | Durable resolution evidence and manual-confirmation audit fields |
+| `src/resume_tailor_harness/services/scout.py` | Resolver orchestration, deterministic post-processing, correction, and approval policy |
+| `src/resume_tailor_harness/api/schemas/scout.py` | Resolve/approve request bodies and evidence-rich Scout responses |
+| `src/resume_tailor_harness/api/routers/scout.py` | Source re-resolution route and optional manual approval body |
 | `contracts/openapi.json` | Regenerated published API contract |
 | `contracts/ts/api.ts` | Regenerated TypeScript API types |
 | `web/src/lib/api/schema.ts` | SPA copy of the regenerated API types |
@@ -64,11 +64,11 @@
 ### Task 1: Establish the supported-board catalog and canonical URL seam
 
 **Files:**
-- Create: `src/resume_agent/discovery/source_resolution/__init__.py`
-- Create: `src/resume_agent/discovery/source_resolution/catalog.py`
-- Modify: `src/resume_agent/discovery/connectors/detect.py:10-79,213-229`
-- Modify: `src/resume_agent/discovery/connectors/registry.py:58-80,94-230`
-- Modify: `src/resume_agent/services/sources.py:57-68,206-303`
+- Create: `src/resume_tailor_harness/discovery/source_resolution/__init__.py`
+- Create: `src/resume_tailor_harness/discovery/source_resolution/catalog.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/detect.py:10-79,213-229`
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py:58-80,94-230`
+- Modify: `src/resume_tailor_harness/services/sources.py:57-68,206-303`
 - Create: `tests/test_source_resolution_catalog.py`
 - Test: `tests/test_connector_detect.py`
 - Test: `tests/test_services_sources.py:407-469`
@@ -81,9 +81,9 @@
 
 ```python
 # tests/test_source_resolution_catalog.py
-from resume_agent.discovery.connectors.detect import identify_host
-from resume_agent.discovery.connectors.registry import discoverable_board_families
-from resume_agent.discovery.source_resolution.catalog import (
+from resume_tailor_harness.discovery.connectors.detect import identify_host
+from resume_tailor_harness.discovery.connectors.registry import discoverable_board_families
+from resume_tailor_harness.discovery.source_resolution.catalog import (
     BOARD_FAMILIES,
     canonical_target_url,
     render_supported_board_guidance,
@@ -146,11 +146,11 @@ Expected: FAIL during collection because `source_resolution.catalog`, `discovera
 - [ ] **Step 3: Add the catalog with all supported families and canonical templates**
 
 ```python
-# src/resume_agent/discovery/source_resolution/catalog.py
+# src/resume_tailor_harness/discovery/source_resolution/catalog.py
 from dataclasses import dataclass
 from html import unescape
 
-from resume_agent.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
 
 
 @dataclass(frozen=True)
@@ -266,7 +266,7 @@ Expected: PASS, including all eleven catalog entries and the SmartRecruiters pub
 - [ ] **Step 7: Commit the catalog seam**
 
 ```bash
-git add src/resume_agent/discovery/source_resolution src/resume_agent/discovery/connectors/detect.py src/resume_agent/discovery/connectors/registry.py src/resume_agent/services/sources.py tests/test_source_resolution_catalog.py tests/test_connector_detect.py tests/test_services_sources.py
+git add src/resume_tailor_harness/discovery/source_resolution src/resume_tailor_harness/discovery/connectors/detect.py src/resume_tailor_harness/discovery/connectors/registry.py src/resume_tailor_harness/services/sources.py tests/test_source_resolution_catalog.py tests/test_connector_detect.py tests/test_services_sources.py
 git commit -m "feat: centralize supported ATS discovery metadata"
 ```
 
@@ -277,9 +277,9 @@ git commit -m "feat: centralize supported ATS discovery metadata"
 **Files:**
 - Modify: `pyproject.toml:14-31`
 - Modify: `uv.lock`
-- Create: `src/resume_agent/discovery/source_resolution/models.py`
-- Create: `src/resume_agent/discovery/source_resolution/identity.py`
-- Modify: `src/resume_agent/discovery/source_resolution/__init__.py`
+- Create: `src/resume_tailor_harness/discovery/source_resolution/models.py`
+- Create: `src/resume_tailor_harness/discovery/source_resolution/identity.py`
+- Modify: `src/resume_tailor_harness/discovery/source_resolution/__init__.py`
 - Create: `tests/test_source_resolution_identity.py`
 
 **Interfaces:**
@@ -290,12 +290,12 @@ git commit -m "feat: centralize supported ATS discovery metadata"
 
 ```python
 # tests/test_source_resolution_identity.py
-from resume_agent.discovery.source_resolution.identity import (
+from resume_tailor_harness.discovery.source_resolution.identity import (
     company_claims_from_html,
     company_names_match,
     registrable_domain,
 )
-from resume_agent.discovery.source_resolution.models import CompanySourceResolution
+from resume_tailor_harness.discovery.source_resolution.models import CompanySourceResolution
 
 
 def test_brand_aliases_match_without_collapsing_similarly_named_companies():
@@ -347,10 +347,10 @@ def registrable_domain(url: str) -> str:
 - [ ] **Step 4: Implement closed resolution and evidence models**
 
 ```python
-# src/resume_agent/discovery/source_resolution/models.py
+# src/resume_tailor_harness/discovery/source_resolution/models.py
 from typing import Literal
 from pydantic import Field
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.models.base import ExtensibleModel
 
 ResolutionStatus = Literal["verified", "unverified", "conflict", "failed"]
 ResolutionReason = Literal[
@@ -411,14 +411,14 @@ Parse `<title>`, `og:site_name`, `application-name`, and JSON-LD `Organization.n
 
 Run: `.venv\Scripts\python.exe -m pytest tests/test_source_resolution_identity.py -q`
 
-Run: `uv run ruff check src/resume_agent/discovery/source_resolution tests/test_source_resolution_identity.py`
+Run: `uv run ruff check src/resume_tailor_harness/discovery/source_resolution tests/test_source_resolution_identity.py`
 
 Expected: both commands PASS without network access.
 
 - [ ] **Step 7: Commit the identity boundary**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/discovery/source_resolution tests/test_source_resolution_identity.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/discovery/source_resolution tests/test_source_resolution_identity.py
 git commit -m "feat: define Scout source ownership evidence"
 ```
 
@@ -427,9 +427,9 @@ git commit -m "feat: define Scout source ownership evidence"
 ### Task 3: Crawl first-party careers pages within explicit bounds
 
 **Files:**
-- Create: `src/resume_agent/discovery/source_resolution/crawler.py`
-- Modify: `src/resume_agent/security/outbound.py:13-22,81-160`
-- Modify: `src/resume_agent/discovery/source_resolution/__init__.py`
+- Create: `src/resume_tailor_harness/discovery/source_resolution/crawler.py`
+- Modify: `src/resume_tailor_harness/security/outbound.py:13-22,81-160`
+- Modify: `src/resume_tailor_harness/discovery/source_resolution/__init__.py`
 - Create: `tests/fixtures/scout_resolution/intuitive-careers.html`
 - Create: `tests/fixtures/scout_resolution/tempus-careers.html`
 - Create: `tests/fixtures/scout_resolution/multi-provider-embeds.html`
@@ -444,8 +444,8 @@ git commit -m "feat: define Scout source ownership evidence"
 
 ```python
 # tests/test_source_resolution_crawler.py
-from resume_agent.discovery.source_resolution.crawler import FirstPartyCrawler
-from resume_agent.security.outbound import PublicTextResponse
+from resume_tailor_harness.discovery.source_resolution.crawler import FirstPartyCrawler
+from resume_tailor_harness.security.outbound import PublicTextResponse
 
 
 def response(url: str, html: str, *redirects: str) -> PublicTextResponse:
@@ -510,7 +510,7 @@ Add `redirect_chain: tuple[str, ...] = ()` to `PublicTextResponse`. In `fetch_pu
 - [ ] **Step 4: Implement bounded first-party crawling and candidate extraction**
 
 ```python
-# src/resume_agent/discovery/source_resolution/crawler.py
+# src/resume_tailor_harness/discovery/source_resolution/crawler.py
 MAX_FIRST_PARTY_PAGES = 5
 MAX_ATS_CANDIDATES = 5
 MAX_PAGE_BYTES = 1_048_576
@@ -580,7 +580,7 @@ Expected: PASS with no live DNS or HTTP calls.
 - [ ] **Step 7: Commit first-party crawling**
 
 ```bash
-git add src/resume_agent/security/outbound.py src/resume_agent/discovery/source_resolution tests/fixtures/scout_resolution tests/test_source_resolution_crawler.py tests/test_security_outbound.py
+git add src/resume_tailor_harness/security/outbound.py src/resume_tailor_harness/discovery/source_resolution tests/fixtures/scout_resolution tests/test_source_resolution_crawler.py tests/test_security_outbound.py
 git commit -m "feat: crawl first-party careers provenance"
 ```
 
@@ -589,17 +589,17 @@ git commit -m "feat: crawl first-party careers provenance"
 ### Task 4: Inspect ATS candidates with provider-owned company metadata
 
 **Files:**
-- Modify: `src/resume_agent/discovery/connectors/base.py:31-42`
-- Modify: `src/resume_agent/discovery/connectors/greenhouse.py:34-98`
-- Modify: `src/resume_agent/discovery/connectors/smartrecruiters.py:52-70`
-- Modify: `src/resume_agent/discovery/connectors/workday.py:192-246`
-- Modify: `src/resume_agent/discovery/connectors/workable.py:31-55`
-- Modify: `src/resume_agent/discovery/connectors/recruitee.py:24-43`
-- Modify: `src/resume_agent/discovery/connectors/breezy.py:15-42`
-- Modify: `src/resume_agent/discovery/connectors/jazzhr.py:19-58`
-- Modify: `src/resume_agent/services/sources.py:75-84,376-409`
-- Create: `src/resume_agent/discovery/source_resolution/resolver.py`
-- Modify: `src/resume_agent/discovery/source_resolution/__init__.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/base.py:31-42`
+- Modify: `src/resume_tailor_harness/discovery/connectors/greenhouse.py:34-98`
+- Modify: `src/resume_tailor_harness/discovery/connectors/smartrecruiters.py:52-70`
+- Modify: `src/resume_tailor_harness/discovery/connectors/workday.py:192-246`
+- Modify: `src/resume_tailor_harness/discovery/connectors/workable.py:31-55`
+- Modify: `src/resume_tailor_harness/discovery/connectors/recruitee.py:24-43`
+- Modify: `src/resume_tailor_harness/discovery/connectors/breezy.py:15-42`
+- Modify: `src/resume_tailor_harness/discovery/connectors/jazzhr.py:19-58`
+- Modify: `src/resume_tailor_harness/services/sources.py:75-84,376-409`
+- Create: `src/resume_tailor_harness/discovery/source_resolution/resolver.py`
+- Modify: `src/resume_tailor_harness/discovery/source_resolution/__init__.py`
 - Create: `tests/test_connector_company_provenance.py`
 - Create: `tests/test_source_resolution_resolver.py`
 - Create: `tests/test_scout_resolution_golden.py`
@@ -612,9 +612,9 @@ git commit -m "feat: crawl first-party careers provenance"
 
 ```python
 # tests/test_source_resolution_resolver.py
-from resume_agent.discovery.source_resolution.models import CrawlCandidate, CrawlReport, SourceEvidence
-from resume_agent.discovery.source_resolution.resolver import CompanySourceResolver
-from resume_agent.services.sources import SourcePreview
+from resume_tailor_harness.discovery.source_resolution.models import CrawlCandidate, CrawlReport, SourceEvidence
+from resume_tailor_harness.discovery.source_resolution.resolver import CompanySourceResolver
+from resume_tailor_harness.services.sources import SourcePreview
 
 
 def strong_report(company: str, url: str) -> CrawlReport:
@@ -705,7 +705,7 @@ Add `observed_companies: tuple[str, ...] = ()` to `SourcePreview`; it remains in
 - [ ] **Step 4: Implement deterministic candidate selection and ownership verdicts**
 
 ```python
-# src/resume_agent/discovery/source_resolution/resolver.py
+# src/resume_tailor_harness/discovery/source_resolution/resolver.py
 def resolution_cache_key(company: str, url: str) -> tuple[str, str]:
     return normalize_company_name(company), board_root_url(url.strip())
 
@@ -780,7 +780,7 @@ Expected: PASS with zero false verified boards.
 - [ ] **Step 7: Commit provider-aware resolution**
 
 ```bash
-git add src/resume_agent/discovery/connectors/base.py src/resume_agent/discovery/connectors/greenhouse.py src/resume_agent/discovery/connectors/smartrecruiters.py src/resume_agent/discovery/connectors/workday.py src/resume_agent/discovery/connectors/workable.py src/resume_agent/discovery/connectors/recruitee.py src/resume_agent/discovery/connectors/breezy.py src/resume_agent/discovery/connectors/jazzhr.py src/resume_agent/discovery/source_resolution/resolver.py src/resume_agent/discovery/source_resolution/__init__.py src/resume_agent/services/sources.py tests/test_connector_company_provenance.py tests/test_source_resolution_resolver.py tests/test_scout_resolution_golden.py
+git add src/resume_tailor_harness/discovery/connectors/base.py src/resume_tailor_harness/discovery/connectors/greenhouse.py src/resume_tailor_harness/discovery/connectors/smartrecruiters.py src/resume_tailor_harness/discovery/connectors/workday.py src/resume_tailor_harness/discovery/connectors/workable.py src/resume_tailor_harness/discovery/connectors/recruitee.py src/resume_tailor_harness/discovery/connectors/breezy.py src/resume_tailor_harness/discovery/connectors/jazzhr.py src/resume_tailor_harness/discovery/source_resolution/resolver.py src/resume_tailor_harness/discovery/source_resolution/__init__.py src/resume_tailor_harness/services/sources.py tests/test_connector_company_provenance.py tests/test_source_resolution_resolver.py tests/test_scout_resolution_golden.py
 git commit -m "feat: verify ATS ownership for Scout sources"
 ```
 
@@ -789,8 +789,8 @@ git commit -m "feat: verify ATS ownership for Scout sources"
 ### Task 5: Persist resolution evidence and exact manual-confirmation audits
 
 **Files:**
-- Modify: `src/resume_agent/discovery/scout_store.py:22-65,190-209`
-- Modify: `src/resume_agent/services/scout.py:67-75,469-533`
+- Modify: `src/resume_tailor_harness/discovery/scout_store.py:22-65,190-209`
+- Modify: `src/resume_tailor_harness/services/scout.py:67-75,469-533`
 - Test: `tests/test_scout_store.py`
 - Test: `tests/test_scout_enrichment_schemas.py`
 - Test: `tests/test_scout_service.py`
@@ -886,7 +886,7 @@ Expected: PASS, including loading sessions written before these fields existed.
 - [ ] **Step 7: Commit durable resolution state**
 
 ```bash
-git add src/resume_agent/discovery/scout_store.py src/resume_agent/services/scout.py tests/test_scout_store.py tests/test_scout_enrichment_schemas.py tests/test_scout_service.py
+git add src/resume_tailor_harness/discovery/scout_store.py src/resume_tailor_harness/services/scout.py tests/test_scout_store.py tests/test_scout_enrichment_schemas.py tests/test_scout_service.py
 git commit -m "feat: persist Scout source verification evidence"
 ```
 
@@ -895,10 +895,10 @@ git commit -m "feat: persist Scout source verification evidence"
 ### Task 6: Give the Scout a budgeted identity-aware resolver tool
 
 **Files:**
-- Create: `src/resume_agent/discovery/source_resolution/search.py`
-- Modify: `src/resume_agent/llm_runner.py:1406-1463`
-- Modify: `src/resume_agent/discovery/scout.py:14-28,238-336`
-- Modify: `src/resume_agent/services/scout.py:12-61,87-240,243-323`
+- Create: `src/resume_tailor_harness/discovery/source_resolution/search.py`
+- Modify: `src/resume_tailor_harness/llm_runner.py:1406-1463`
+- Modify: `src/resume_tailor_harness/discovery/scout.py:14-28,238-336`
+- Modify: `src/resume_tailor_harness/services/scout.py:12-61,87-240,243-323`
 - Create: `tests/test_source_resolution_search.py`
 - Test: `tests/test_llm_runner_search_equipped.py`
 - Test: `tests/test_scout.py`
@@ -971,7 +971,7 @@ Expected: FAIL because the search budget, resolver tool, generated guidance, and
 - [ ] **Step 3: Implement the fallback five-use budget and rate-limit circuit**
 
 ```python
-# src/resume_agent/discovery/source_resolution/search.py
+# src/resume_tailor_harness/discovery/source_resolution/search.py
 @dataclass
 class SearchBudget:
     max_uses: int = 5
@@ -1054,17 +1054,17 @@ Expected: PASS; tool events remain ordered, resolver calls are cached, and no li
 - [ ] **Step 9: Commit the agent search/resolution flow**
 
 ```bash
-git add src/resume_agent/discovery/source_resolution/search.py src/resume_agent/llm_runner.py src/resume_agent/discovery/scout.py src/resume_agent/services/scout.py tests/test_source_resolution_search.py tests/test_llm_runner_search_equipped.py tests/test_scout.py tests/test_scout_service.py tests/test_prompt_registry.py
+git add src/resume_tailor_harness/discovery/source_resolution/search.py src/resume_tailor_harness/llm_runner.py src/resume_tailor_harness/discovery/scout.py src/resume_tailor_harness/services/scout.py tests/test_source_resolution_search.py tests/test_llm_runner_search_equipped.py tests/test_scout.py tests/test_scout_service.py tests/test_prompt_registry.py
 git commit -m "feat: make Scout ATS search ownership-aware"
 ```
 
 ### Task 7: Enforce verification at the service and API boundary
 
 **Files:**
-- Modify: `src/resume_agent/discovery/scout_store.py`
-- Modify: `src/resume_agent/services/scout.py`
-- Modify: `src/resume_agent/api/schemas/scout.py`
-- Modify: `src/resume_agent/api/routers/scout.py`
+- Modify: `src/resume_tailor_harness/discovery/scout_store.py`
+- Modify: `src/resume_tailor_harness/services/scout.py`
+- Modify: `src/resume_tailor_harness/api/schemas/scout.py`
+- Modify: `src/resume_tailor_harness/api/routers/scout.py`
 - Test: `tests/test_scout_store.py`
 - Test: `tests/test_scout_service.py`
 - Test: `tests/api/test_scout_router.py`
@@ -1212,7 +1212,7 @@ Expected: PASS; there is no service or API path that normally adds an unverified
 - [ ] **Step 8: Commit the backend enforcement boundary**
 
 ```bash
-git add src/resume_agent/discovery/scout_store.py src/resume_agent/services/scout.py src/resume_agent/api/schemas/scout.py src/resume_agent/api/routers/scout.py tests/test_scout_store.py tests/test_scout_service.py tests/api/test_scout_router.py tests/api/test_schemas_scout.py
+git add src/resume_tailor_harness/discovery/scout_store.py src/resume_tailor_harness/services/scout.py src/resume_tailor_harness/api/schemas/scout.py src/resume_tailor_harness/api/routers/scout.py tests/test_scout_store.py tests/test_scout_service.py tests/api/test_scout_router.py tests/api/test_schemas_scout.py
 git commit -m "feat: gate Scout source approval on verification"
 ```
 

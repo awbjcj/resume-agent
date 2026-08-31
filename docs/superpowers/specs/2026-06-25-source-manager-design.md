@@ -69,7 +69,7 @@ parking-lot into `enabled: false` rows so the backlog survives as data. |
 
 ## 4. Data model — changes to `connectors.yaml`
 
-File: `src/resume_agent/discovery/connectors/config.py`
+File: `src/resume_tailor_harness/discovery/connectors/config.py`
 
 - `GreenhouseBoard`, `LeverBoard`: add `enabled: bool = True`
   (back-compatible — an absent flag means enabled).

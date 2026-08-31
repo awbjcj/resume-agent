@@ -1,12 +1,12 @@
 ---
 name: project-dossier
-description: Generate an evidence-backed project dossier markdown for the resume-agent profile corpus. Use when the user asks to create a project dossier, document a repository for their resume profile, or extract a project profile from the current repository.
+description: Generate an evidence-backed project dossier markdown for the resume-tailor-harness profile corpus. Use when the user asks to create a project dossier, document a repository for their resume profile, or extract a project profile from the current repository.
 ---
 
 # Project Dossier
 
 Distill the current repository into one fact-locked markdown source that
-resume-agent can ingest in `project` mode. Every claim must be verifiable from
+resume-tailor-harness can ingest in `project` mode. Every claim must be verifiable from
 the repository's code, documentation, tests, or git history.
 
 ## What survives ingestion
@@ -119,7 +119,7 @@ fallback match key.
 Write `<repo-name>-dossier.md` at the repository root, or at the location the
 user requests. For a monorepo, write `<project-slug>-dossier.md` per project.
 Start at byte zero with this frontmatter — `repo_url` is the stable identity
-resume-agent uses to supersede an auto-harvested GitHub source:
+resume-tailor-harness uses to supersede an auto-harvested GitHub source:
 
 ```yaml
 ---
@@ -218,15 +218,15 @@ and only if you could discuss it in an interview.
 Tell the user to run:
 
 ```text
-resume-agent profile add <repo-name>-dossier.md
-resume-agent profile build
+resume-tailor-harness profile add <repo-name>-dossier.md
+resume-tailor-harness profile build
 ```
 
 The `repo_url` frontmatter makes the upload a project source and lets it replace
 the shallower auto-harvested document for that repository.
 
 Committing dossiers to the repository root also works without the manual
-`profile add`: `resume-agent profile sync-github` discovers root files named
+`profile add`: `resume-tailor-harness profile sync-github` discovers root files named
 `*dossier*.md` (up to 5 per repository, 30 KB each), validates their
 `repo_url` frontmatter, and ingests each as its own project source, replacing
 the auto-harvested README document. A file pointing at a different repository

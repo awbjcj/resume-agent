@@ -2,13 +2,13 @@ import textwrap
 
 import pytest
 
-from resume_agent.discovery.connectors.config import (
+from resume_tailor_harness.discovery.connectors.config import (
     ConnectorsConfig,
     load_connectors_config,
 )
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.registry import CONNECTOR_SPECS
-from resume_agent.services import sources as svc
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.registry import CONNECTOR_SPECS
+from resume_tailor_harness.services import sources as svc
 
 
 def _write(tmp_path, body: str) -> str:
@@ -327,7 +327,7 @@ def _fake_public_resolver(monkeypatch):
 
 
 def test_add_scrape_target_writes_scrape_section(tmp_path, monkeypatch):
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
@@ -350,7 +350,7 @@ def test_add_scrape_target_writes_scrape_section(tmp_path, monkeypatch):
 
 
 def test_add_scrape_target_refuses_browserless_and_unsafe_urls(tmp_path, monkeypatch):
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     path = str(tmp_path / "connectors.yaml")
     _fake_public_resolver(monkeypatch)
@@ -379,7 +379,7 @@ def test_add_scrape_target_refuses_browserless_and_unsafe_urls(tmp_path, monkeyp
 
 
 def test_add_scrape_target_duplicate_refused(tmp_path, monkeypatch):
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)

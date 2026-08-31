@@ -39,15 +39,15 @@ IMPLEMENTATION REQUIREMENTS
 - Do not add O*NET, ESCO, new categories, proficiency, or graph matching in this slice.
 
 LIKELY FILES
-- src/resume_agent/taxonomy/custody.py
-- src/resume_agent/taxonomy/clusters.py
-- src/resume_agent/taxonomy/corrections.py
-- src/resume_agent/taxonomy/state.py
-- src/resume_agent/profile/matrix.py
-- src/resume_agent/services/profile_build.py
-- src/resume_agent/services/match_gap.py
-- src/resume_agent/services/tailoring.py
-- src/resume_agent/tailor/service.py
+- src/resume_tailor_harness/taxonomy/custody.py
+- src/resume_tailor_harness/taxonomy/clusters.py
+- src/resume_tailor_harness/taxonomy/corrections.py
+- src/resume_tailor_harness/taxonomy/state.py
+- src/resume_tailor_harness/profile/matrix.py
+- src/resume_tailor_harness/services/profile_build.py
+- src/resume_tailor_harness/services/match_gap.py
+- src/resume_tailor_harness/services/tailoring.py
+- src/resume_tailor_harness/tailor/service.py
 - relevant persistence/model files discovered during inspection
 
 TESTS

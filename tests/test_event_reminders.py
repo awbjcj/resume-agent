@@ -2,13 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.reminders import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.reminders import (
     DEADLINE_KIND,
     INTERVIEW_KIND,
     create_event_reminders,
 )
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 

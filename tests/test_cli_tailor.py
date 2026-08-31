@@ -2,10 +2,10 @@ from typing import cast
 
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.repository import get_job
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.repository import get_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 runner = CliRunner()
 
@@ -58,7 +58,7 @@ def test_tailor_processes_a_job(tmp_path, monkeypatch):
         facts_path=None,
         reporter=None,
     ):
-        from resume_agent.tailor.service import TailorOutcome
+        from resume_tailor_harness.tailor.service import TailorOutcome
 
         return TailorOutcome(
             versions=cast(

@@ -1,5 +1,5 @@
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services.jobs_import import import_jobs_file
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services.jobs_import import import_jobs_file
 
 CSV = (
     "title,company,url,location,jd_text,posted_at\n"

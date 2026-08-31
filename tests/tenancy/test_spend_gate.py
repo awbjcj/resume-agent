@@ -14,24 +14,24 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.orm import Session
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.costs import seed_llm_rates
-from resume_agent.tenancy.limits import BudgetExceededError, CostRateUnavailableError
-from resume_agent.tenancy.quotas import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.costs import seed_llm_rates
+from resume_tailor_harness.tenancy.limits import BudgetExceededError, CostRateUnavailableError
+from resume_tailor_harness.tenancy.quotas import (
     CostQuotaExceededError,
     GlobalCostQuotaExceededError,
     charge_shared_cost,
     ensure_quota_account,
 )
-from resume_agent.tenancy.spend import SpendGate
-from resume_agent.tenancy.system_db import (
+from resume_tailor_harness.tenancy.spend import SpendGate
+from resume_tailor_harness.tenancy.system_db import (
     UsageEvent,
     User,
     init_system_db,
     make_system_engine,
 )
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 NOW = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
 MODEL = "claude-sonnet-5"

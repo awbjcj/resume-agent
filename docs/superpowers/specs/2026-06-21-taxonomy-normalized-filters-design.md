@@ -71,7 +71,7 @@ Consequences:
 
 ## 4. Architecture
 
-### 4.1 New pure package — `src/resume_agent/taxonomy/`
+### 4.1 New pure package — `src/resume_tailor_harness/taxonomy/`
 
 All modules are pure (no Streamlit, no live network/LLM) and unit-tested in isolation.
 
@@ -118,7 +118,7 @@ The repo's `data/` directory is **gitignored** (`.gitignore:18`), so it holds on
 runtime state. Bundled *static reference* that must ship with the package lives **inside
 the package** instead, loaded via `importlib.resources`.
 
-- **`src/resume_agent/taxonomy/data/sic_codes.json`** — bundled, tracked, shipped:
+- **`src/resume_tailor_harness/taxonomy/data/sic_codes.json`** — bundled, tracked, shipped:
   the 2-digit Major Groups with labels and their Division. Source: SEC SIC list rolled
   up to 2-digit. Loaded via `importlib.resources`.
 - **USPS-state and ISO-country maps** — bundled as module constants in `location.py`
@@ -173,8 +173,8 @@ the package** instead, loaded via `importlib.resources`.
   `reextract`): for each **shortlisted** job, re-run the upgraded fit agent, write
   `sic_major` + `location` into `criteria_json` (does **not** change `fit_score`/`status`),
   then `refresh_aliases`. Returns count.
-- CLI surface: `resume-agent discover --rescore`, mirroring the existing
-  `resume-agent discover --reextract` backfill style.
+- CLI surface: `resume-tailor-harness discover --rescore`, mirroring the existing
+  `resume-tailor-harness discover --reextract` backfill style.
 
 ### 4.6 Data access (`tracking/queries.py`)
 
@@ -285,7 +285,7 @@ Pure modules carry the weight:
 
 ## 8. Build sequence (for the implementation plan)
 
-1. `taxonomy/sic.py` + bundled `src/resume_agent/taxonomy/data/sic_codes.json` (+ tests).
+1. `taxonomy/sic.py` + bundled `src/resume_tailor_harness/taxonomy/data/sic_codes.json` (+ tests).
 2. `taxonomy/skills.py` — splitter + alias load/apply/merge/refresh (+ tests).
 3. `taxonomy/location.py` — ISO/USPS/is_us normalization (+ tests).
 4. `taxonomy/company_size.py` — snap (+ tests).

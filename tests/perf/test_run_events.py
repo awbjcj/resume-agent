@@ -13,8 +13,8 @@ import json
 import time
 from types import SimpleNamespace
 
-from resume_agent.api.runs.notify import StreamNotifier
-from resume_agent.api.runs.sse import run_events
+from resume_tailor_harness.api.runs.notify import StreamNotifier
+from resume_tailor_harness.api.runs.sse import run_events
 
 POLL = 0.5
 

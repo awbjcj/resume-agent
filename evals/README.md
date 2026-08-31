@@ -104,7 +104,7 @@ migrated ATS.
 ## Production health, not synthetic cases
 
 ```bash
-uv run python scripts/tailor_health.py data/users/<id>/resume_agent.db
+uv run python scripts/tailor_health.py data/users/<id>/resume_tailor_harness.db
 ```
 
 Opens the DB read-only and reports score distribution, unscored rounds, which

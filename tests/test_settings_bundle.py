@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-import resume_agent.services.settings_bundle as settings_bundle
-from resume_agent.config import Settings
-from resume_agent.services.settings_bundle import (
+import resume_tailor_harness.services.settings_bundle as settings_bundle
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.services.settings_bundle import (
     BUNDLE_VERSION,
     MANIFEST_NAME,
     InvalidBundleError,
@@ -17,8 +17,8 @@ from resume_agent.services.settings_bundle import (
     read_bundle_manifest,
     validate_member,
 )
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def workspace(tmp_path):

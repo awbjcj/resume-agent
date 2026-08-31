@@ -1,8 +1,8 @@
 import pytest
 from textual.widgets import Button, Checkbox, Footer, Input, Select, TextArea
 
-from resume_agent.setup.app import SetupApp
-from resume_agent.setup.screens import (
+from resume_tailor_harness.setup.app import SetupApp
+from resume_tailor_harness.setup.screens import (
     ConfirmScreen,
     ConnectorsScreen,
     HandoffScreen,
@@ -10,7 +10,7 @@ from resume_agent.setup.screens import (
     SearchScreen,
     SecretsScreen,
 )
-from resume_agent.setup.state import WizardState
+from resume_tailor_harness.setup.state import WizardState
 
 
 def _press(screen, btn_id):
@@ -168,7 +168,7 @@ def test_load_existing_state_survives_corrupt_config(tmp_path):
     ValidationError) propagated out of the constructor and the wizard never
     started — exactly when a user runs setup to repair that config.
     """
-    from resume_agent.setup.writer import load_existing_state
+    from resume_tailor_harness.setup.writer import load_existing_state
 
     cfg = tmp_path / "config"
     cfg.mkdir()

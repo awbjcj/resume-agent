@@ -1,7 +1,7 @@
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.queries import job_detail_row
-from resume_agent.tracking.repository import save_application
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.queries import job_detail_row
+from resume_tailor_harness.tracking.repository import save_application
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 
 
 def _session():

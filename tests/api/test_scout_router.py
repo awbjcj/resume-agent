@@ -3,9 +3,9 @@ import time
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import scout as scout_router
-from resume_agent.discovery.scout_store import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import scout as scout_router
+from resume_tailor_harness.discovery.scout_store import (
     ScoutProposal,
     ScoutTurnRecord,
     SourcePayload,
@@ -85,7 +85,7 @@ def test_start_preallocates_session_metadata_and_launches_stream(monkeypatch, tm
     client = client_for(tmp_path)
     lookups = []
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     def run_start(_reporter, **kwargs):
         lookups.append(kwargs["company_intelligence_lookup"])
@@ -110,7 +110,7 @@ def test_start_preallocates_session_metadata_and_launches_stream(monkeypatch, tm
 def test_detail_list_message_and_end_metadata(monkeypatch, tmp_path):
     client = client_for(tmp_path)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     monkeypatch.setattr(scout_router, "run_message_turn", lambda reporter, **kwargs: {})
     monkeypatch.setattr(scout_router, "run_recap_turn", lambda reporter, **kwargs: {})

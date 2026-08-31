@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import CoverLetter, Job
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import CoverLetter, Job
 
 
 def _client():

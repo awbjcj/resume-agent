@@ -1,14 +1,14 @@
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import ReviewCritique
-from resume_agent.models.evidence_portfolio import EvidencePortfolio
-from resume_agent.services.agents import TailorBundle
-from resume_agent.services.revision import revise_resume_version
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.models.evidence_portfolio import EvidencePortfolio
+from resume_tailor_harness.services.agents import TailorBundle
+from resume_tailor_harness.services.revision import revise_resume_version
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 
 class _Result:
@@ -61,10 +61,10 @@ def test_revise_resume_version_persists_lineage_and_fact_flag(monkeypatch):
     init_db(engine)
     exports = []
     monkeypatch.setattr(
-        "resume_agent.services.revision.load_facts", lambda path: _facts()
+        "resume_tailor_harness.services.revision.load_facts", lambda path: _facts()
     )
     monkeypatch.setattr(
-        "resume_agent.services.revision.export_job_artifacts",
+        "resume_tailor_harness.services.revision.export_job_artifacts",
         lambda session, job_id: exports.append(job_id),
     )
 
@@ -115,10 +115,10 @@ def test_revise_resume_version_records_gate_roster_on_re_review(monkeypatch, tmp
     engine = make_engine("sqlite://")
     init_db(engine)
     monkeypatch.setattr(
-        "resume_agent.services.revision.load_facts", lambda path: _facts()
+        "resume_tailor_harness.services.revision.load_facts", lambda path: _facts()
     )
     monkeypatch.setattr(
-        "resume_agent.services.revision.export_job_artifacts",
+        "resume_tailor_harness.services.revision.export_job_artifacts",
         lambda session, job_id: None,
     )
     review_path = tmp_path / "review.yaml"

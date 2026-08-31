@@ -22,7 +22,7 @@ the writer produces. These two symptoms are what remains.
 ## Evidence
 
 `scripts/tailor_health.py` against the workspace database
-(`data/users/1398ad91b2b2/resume_agent.db`, 77 versions / 26 jobs,
+(`data/users/1398ad91b2b2/resume_tailor_harness.db`, 77 versions / 26 jobs,
 2026-07-16 → 07-20):
 
 | metric | value |

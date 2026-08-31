@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.discovery.scout import ScoutProposalDraft, SourceDraft
-from resume_agent.discovery.scout_models import Citation
-from resume_agent.discovery.scout_store import ScoutProposal, SourcePayload, TermPayload
+from resume_tailor_harness.discovery.scout import ScoutProposalDraft, SourceDraft
+from resume_tailor_harness.discovery.scout_models import Citation
+from resume_tailor_harness.discovery.scout_store import ScoutProposal, SourcePayload, TermPayload
 
 
 def test_scout_enrichment_defaults_are_backward_compatible():

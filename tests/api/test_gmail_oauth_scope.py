@@ -16,10 +16,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.routers.gmail import _build_flow, _exchange_token
-from resume_agent.config import Settings
-from resume_agent.gmail import auth as gmail_auth
-from resume_agent.gmail.errors import GmailScopeMissing
+from resume_tailor_harness.api.routers.gmail import _build_flow, _exchange_token
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.gmail import auth as gmail_auth
+from resume_tailor_harness.gmail.errors import GmailScopeMissing
 
 IDENTITY_SCOPES = [
     "openid",
@@ -116,8 +116,8 @@ def test_exchange_rejects_a_grant_without_gmail_access():
 
 def _callback_outcome(tmp_path, monkeypatch, granted: list[str]):
     """Drive the whole callback with a real Flow over a stubbed token endpoint."""
-    from resume_agent.api.app import create_app
-    from resume_agent.api.routers import gmail as gmail_router
+    from resume_tailor_harness.api.app import create_app
+    from resume_tailor_harness.api.routers import gmail as gmail_router
 
     monkeypatch.setattr(
         gmail_router,

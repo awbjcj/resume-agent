@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from resume_agent.api.schemas.match_gap import (
+from resume_tailor_harness.api.schemas.match_gap import (
     CategoryOut,
     DemandEdgeOut,
     DomainOut,
@@ -9,7 +9,7 @@ from resume_agent.api.schemas.match_gap import (
     SkillNodeOut,
     SuggestionStatusOut,
 )
-from resume_agent.tracking.match_gap import DemandEdge, DomainNode, SkillNode
+from resume_tailor_harness.tracking.match_gap import DemandEdge, DomainNode, SkillNode
 
 
 def test_skill_node_out_camelizes_stable_identity_and_counts():

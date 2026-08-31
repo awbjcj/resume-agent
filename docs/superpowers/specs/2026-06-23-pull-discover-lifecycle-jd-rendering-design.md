@@ -104,7 +104,7 @@ fixes:
 New thin orchestrator: `refresh()` = `pull_jobs()` → `discover_jobs()` over the
 newly-added raw rows → one combined report: `+N pulled · M shortlisted · K rejected`.
 
-- CLI: `resume-agent refresh`.
+- CLI: `resume-tailor-harness refresh`.
 - API/web: a **Refresh** action (one Run + SSE, identical plumbing to existing
   long-running ops via `RunManager`); a Refresh button in the web `RunActions`.
 - `pull`, `discover`, and `reprocess` remain as standalone power commands.

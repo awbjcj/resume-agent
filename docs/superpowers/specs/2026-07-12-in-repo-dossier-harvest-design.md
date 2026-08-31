@@ -12,7 +12,7 @@ into one virtual doc per repo, and the project extraction schema
 
 1. A dossier produced by the `project-dossier` skill and committed to its repo
    is invisible to the harvest — it must be manually uploaded via
-   `resume-agent profile add`.
+   `resume-tailor-harness profile add`.
 2. A monorepo containing several distinct projects is flattened into a single
    Project fact.
 
@@ -100,7 +100,7 @@ preserve all cached docs, exactly as today.
   the same `repo_url` (the repo's canonical URL) and its own `# Project:`
   section describing exactly one project.
 - The handoff note mentions that committing dossiers to the repo root lets
-  `resume-agent profile sync-github` pick them up automatically — manual
+  `resume-tailor-harness profile sync-github` pick them up automatically — manual
   `profile add` remains the way to override.
 
 ## Out of scope

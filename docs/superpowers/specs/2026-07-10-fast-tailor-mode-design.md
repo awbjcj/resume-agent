@@ -119,7 +119,7 @@ rounds, fewer serial stages, and faster models on the long-output writer calls
 
 ## 3. Surfaces
 
-- **CLI:** `resume-agent tailor --deep` swaps the default config path to
+- **CLI:** `resume-tailor-harness tailor --deep` swaps the default config path to
   `config/review_deep.yaml`; an explicit `--review <path>` still wins.
 - **API:** `TailorRunParams` gains `deep: bool = False` (camelCase `deep` on
   the wire); the runs router maps it to the deep path before calling

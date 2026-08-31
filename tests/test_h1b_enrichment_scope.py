@@ -2,17 +2,17 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session
 
-from resume_agent.config import Settings
-from resume_agent.db import init_db, make_engine
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.h1b.cache import load_company_evidence
-from resume_agent.h1b.models import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.h1b.cache import load_company_evidence
+from resume_tailor_harness.h1b.models import (
     HISTORICAL_ONLY_CAVEAT,
     H1BEnrichmentReport,
     H1BSponsorshipEvidence,
 )
-from resume_agent.services.discovery import run_h1b_enrichment
-from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
+from resume_tailor_harness.services.discovery import run_h1b_enrichment
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence, Job, JobStatus
 
 
 def _evidence(company: str) -> H1BSponsorshipEvidence:
@@ -63,7 +63,7 @@ class RecordingEnricher:
 
     async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport:
         self.seen.extend(companies)
-        from resume_agent.taxonomy.industries import normalize_company
+        from resume_tailor_harness.taxonomy.industries import normalize_company
 
         return H1BEnrichmentReport(
             by_company={
@@ -98,7 +98,7 @@ def test_research_widens_beyond_silent_jobs(monkeypatch):
     config = SearchConfig(sponsorship_required=True)
     enricher = RecordingEnricher()
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(_env_file=None),  # type: ignore[call-arg]
     )
     with Session(engine) as session:
@@ -113,7 +113,7 @@ def test_returned_scoring_map_stays_silent_only(monkeypatch):
     engine = _engine()
     config = SearchConfig(sponsorship_required=True)
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(_env_file=None),  # type: ignore[call-arg]
     )
     with Session(engine) as session:
@@ -146,7 +146,7 @@ def test_fresh_cache_hits_still_reach_the_scorer(monkeypatch):
     config = SearchConfig(sponsorship_required=True)
     enricher = RecordingEnricher()
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(_env_file=None),  # type: ignore[call-arg]
     )
 
@@ -175,7 +175,7 @@ def test_fresh_cache_hits_still_reach_the_scorer(monkeypatch):
 def test_fresh_cache_hits_still_reach_the_scorer_without_enricher(monkeypatch):
     """Disabling the enricher must not discard usable fresh cache evidence."""
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(
             _env_file=None,  # type: ignore[call-arg]
             h1b_enrich_max_companies_per_run=50,
@@ -208,7 +208,7 @@ def test_per_run_cap_takes_the_companies_with_the_most_jobs(monkeypatch):
     enricher = RecordingEnricher()
 
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(
             _env_file=None,  # type: ignore[call-arg]
             h1b_enrich_max_companies_per_run=1,
@@ -232,7 +232,7 @@ def test_per_run_cap_breaks_frequency_ties_by_normalized_name(monkeypatch):
     enricher = RecordingEnricher()
 
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(
             _env_file=None,  # type: ignore[call-arg]
             h1b_enrich_max_companies_per_run=1,
@@ -254,7 +254,7 @@ def test_expired_cache_deferred_by_cap_stays_out_of_scorer_map(monkeypatch):
     enricher = RecordingEnricher()
 
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(
             _env_file=None,  # type: ignore[call-arg]
             h1b_enrich_max_companies_per_run=1,
@@ -283,7 +283,7 @@ def test_zero_cap_researches_every_uncached_company(monkeypatch):
     enricher = RecordingEnricher()
 
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(
             _env_file=None,  # type: ignore[call-arg]
             h1b_enrich_max_companies_per_run=0,

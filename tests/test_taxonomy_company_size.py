@@ -1,4 +1,4 @@
-from resume_agent.taxonomy import company_size
+from resume_tailor_harness.taxonomy import company_size
 
 
 def test_snap_canonical_passthrough():

@@ -1,4 +1,4 @@
-from resume_agent.models.job import (
+from resume_tailor_harness.models.job import (
     EmploymentType,
     JobCriteria,
     SalaryRange,

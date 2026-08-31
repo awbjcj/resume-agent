@@ -64,7 +64,7 @@ from two directions. Declaring it once is the spine of this design.
 
 ### The section registry
 
-New module `src/resume_agent/settings_sections.py` — the single enumeration.
+New module `src/resume_tailor_harness/settings_sections.py` — the single enumeration.
 
 ```python
 @dataclass(frozen=True)
@@ -103,7 +103,7 @@ they represent accumulated judgement rather than a one-time configuration.
 
 This table is an **allowlist**, not a denylist, and that distinction is
 load-bearing. It now spans the workspace root, whose immediate neighbours
-include `secrets.env`, `gmail_token.json`, `resume_agent.db`, and — per
+include `secrets.env`, `gmail_token.json`, `resume_tailor_harness.db`, and — per
 `gmail/auth.py` — `config/gmail_credentials.json`, an OAuth client secret. A
 denylist would ship any of those the moment someone adds a file nobody
 remembered to exclude. Allowlists fail closed, and the twelve rows above are the
@@ -155,7 +155,7 @@ showing the old shape until the next `profile build`. The confirm dialog says so
 
 ### The bundle
 
-New service `src/resume_agent/services/settings_bundle.py`. Archive layout —
+New service `src/resume_tailor_harness/services/settings_bundle.py`. Archive layout —
 arcnames are config-relative, plus a manifest at the root:
 
 ```
@@ -226,8 +226,8 @@ discipline of `import_data_root`:
 
 ### API
 
-Routes live in a new `src/resume_agent/api/routers/settings.py`, with schemas in
-`src/resume_agent/api/schemas/settings.py`. All schemas are `CamelModel` subclasses, so the wire format is camelCase.
+Routes live in a new `src/resume_tailor_harness/api/routers/settings.py`, with schemas in
+`src/resume_tailor_harness/api/schemas/settings.py`. All schemas are `CamelModel` subclasses, so the wire format is camelCase.
 Regenerate `contracts/openapi.json` and `contracts/ts/api.ts` with
 `bash scripts/gen_ts_client.sh`; `tests/api/test_openapi_contract.py` is the
 drift gate.
@@ -340,7 +340,7 @@ and legacy mode.
 - Export → import round-trip is the identity, including the three `data/`
   ledgers.
 - `gmail_credentials.json`, `secrets.env`, `gmail_token.json`, and
-  `resume_agent.db` never appear in an export.
+  `resume_tailor_harness.db` never appear in an export.
 - A bundle _containing_ any of them is ignored on import, not obeyed.
 - Path traversal is rejected.
 - Unparseable YAML or JSON is rejected with every live file byte-identical

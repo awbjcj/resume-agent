@@ -1,14 +1,14 @@
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.smartrecruiters import (
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.smartrecruiters import (
     apply_detail,
     fetch_smartrecruiters,
     list_params,
     parse_postings,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURES = Path(__file__).parent / "fixtures" / "smartrecruiters"
 
@@ -107,7 +107,7 @@ def test_smartrecruiters_fetch_wires_list_to_detail(monkeypatch):
         calls.append((url, params))
         return Response(list_payload if params is not None else detail_payload)
 
-    import resume_agent.discovery.connectors.smartrecruiters as connector
+    import resume_tailor_harness.discovery.connectors.smartrecruiters as connector
 
     monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_smartrecruiters(
@@ -136,7 +136,7 @@ def test_smartrecruiters_known_url_skips_detail_request(monkeypatch):
         calls.append(url)
         return Response()
 
-    import resume_agent.discovery.connectors.smartrecruiters as connector
+    import resume_tailor_harness.discovery.connectors.smartrecruiters as connector
 
     monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_smartrecruiters(

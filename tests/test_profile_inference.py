@@ -1,7 +1,7 @@
 import pytest
 
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
-from resume_agent.profile.inference import (
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.profile.inference import (
     InferredSkill,
     InferredSkills,
     apply_inferred,

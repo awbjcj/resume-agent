@@ -259,7 +259,7 @@ Precedence for a job's `company`:
 ### Backfill the long tail
 
 - Jobs no longer present on a board never re-pull. New CLI command:
-  `resume-agent fix-company-names [--dry-run]`.
+  `resume-tailor-harness fix-company-names [--dry-run]`.
 - Walks configured source units, maps token → label/resolved name, and
   updates rows whose company matches the token (same dedup-key recompute
   and skip-on-collision rules; conflicts are **reported** per pair so

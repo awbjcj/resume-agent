@@ -1,7 +1,7 @@
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services.cover_letters import resolve_cover_letter_targets
-from resume_agent.services.tailoring import resolve_targets
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services.cover_letters import resolve_cover_letter_targets
+from resume_tailor_harness.services.tailoring import resolve_targets
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _seed_jobs(tmp_path):

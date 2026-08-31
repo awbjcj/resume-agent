@@ -88,7 +88,7 @@ def test_usage_totals_cache_fields_default_zero():
 ```python
 # tests/eval/test_report.py  (append; reuse the module's _result helper)
 from evals.report import render_report
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 def test_report_shows_cache_token_aggregates():
@@ -151,10 +151,10 @@ git commit -m "Surfaces Anthropic cache read/write tokens in the eval report"
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py` (`Settings`: add `prompt_cache_enabled`)
-- Modify: `src/resume_agent/llm_runner.py` (`build_model`: add `cache_system_prompt` param)
-- Modify: `src/resume_agent/tailor/agents.py` (tailor-family builders request caching)
-- Modify: `src/resume_agent/tailor/match_plan.py`, `evals/judge.py` (same one-line change)
+- Modify: `src/resume_tailor_harness/config.py` (`Settings`: add `prompt_cache_enabled`)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (`build_model`: add `cache_system_prompt` param)
+- Modify: `src/resume_tailor_harness/tailor/agents.py` (tailor-family builders request caching)
+- Modify: `src/resume_tailor_harness/tailor/match_plan.py`, `evals/judge.py` (same one-line change)
 - Test: `tests/test_llm_runner.py` (append), `tests/test_tailor_agents.py` (append)
 
 **Interfaces:**
@@ -166,7 +166,7 @@ git commit -m "Surfaces Anthropic cache read/write tokens in the eval report"
 
 ```python
 # tests/test_llm_runner.py  (append)
-from resume_agent.llm_runner import build_model
+from resume_tailor_harness.llm_runner import build_model
 
 
 def test_build_model_sets_cache_system_prompt_for_anthropic():
@@ -187,8 +187,8 @@ def test_build_model_other_provider_ignores_cache_flag():
 
 ```python
 # tests/test_tailor_agents.py  (append)
-from resume_agent.config import get_settings
-from resume_agent.tailor.agents import build_tailor_agent
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.tailor.agents import build_tailor_agent
 
 
 def test_tailor_agent_caches_system_prompt_when_enabled(monkeypatch):
@@ -197,7 +197,7 @@ def test_tailor_agent_caches_system_prompt_when_enabled(monkeypatch):
     assert getattr(agent._agent.model, "cache_system_prompt") is True
 ```
 
-(If `get_settings()` returns a cached singleton that `monkeypatch.setattr` can't patch per-attribute, instead set the env var the setting reads, or patch `resume_agent.tailor.agents.get_settings` to return a stub with `prompt_cache_enabled=True`. Match the pattern used elsewhere in `tests/` for overriding settings.)
+(If `get_settings()` returns a cached singleton that `monkeypatch.setattr` can't patch per-attribute, instead set the env var the setting reads, or patch `resume_tailor_harness.tailor.agents.get_settings` to return a stub with `prompt_cache_enabled=True`. Match the pattern used elsewhere in `tests/` for overriding settings.)
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -206,13 +206,13 @@ Expected: FAIL — `build_model() got an unexpected keyword argument 'cache_syst
 
 - [ ] **Step 3: Write the implementation**
 
-Add the setting to `Settings` in `src/resume_agent/config.py` (near the other LLM settings):
+Add the setting to `Settings` in `src/resume_tailor_harness/config.py` (near the other LLM settings):
 
 ```python
     prompt_cache_enabled: bool = True  # cache static system prompts on Anthropic (transparent)
 ```
 
-Extend `build_model` in `src/resume_agent/llm_runner.py` (lines 173–196):
+Extend `build_model` in `src/resume_tailor_harness/llm_runner.py` (lines 173–196):
 
 ```python
 def build_model(
@@ -242,7 +242,7 @@ def build_model(
     return Claude(id=model, api_key=key, cache_system_prompt=cache_system_prompt)
 ```
 
-In `src/resume_agent/tailor/agents.py`, add a small flag reader and pass it from every tailor-family builder:
+In `src/resume_tailor_harness/tailor/agents.py`, add a small flag reader and pass it from every tailor-family builder:
 
 ```python
 def _prompt_cache() -> bool:
@@ -255,13 +255,13 @@ Then in each of `build_tailor_agent`, `build_reviser_agent`, `build_revision_age
     model = build_model(model_id or model_for_tier("premium"), cache_system_prompt=_prompt_cache())
 ```
 
-Apply the identical change in `src/resume_agent/tailor/match_plan.py` (`build_match_plan_agent`) and `evals/judge.py` (`build_judge_agent`):
+Apply the identical change in `src/resume_tailor_harness/tailor/match_plan.py` (`build_match_plan_agent`) and `evals/judge.py` (`build_judge_agent`):
 
 ```python
     model = build_model(model_id or model_for_tier("premium"), cache_system_prompt=get_settings().prompt_cache_enabled)
 ```
 
-(`evals/judge.py` already imports nothing from `config`; add `from resume_agent.config import get_settings`.)
+(`evals/judge.py` already imports nothing from `config`; add `from resume_tailor_harness.config import get_settings`.)
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -286,7 +286,7 @@ Expected: all green.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/config.py src/resume_agent/llm_runner.py src/resume_agent/tailor/agents.py src/resume_agent/tailor/match_plan.py evals/judge.py tests/test_llm_runner.py tests/test_tailor_agents.py
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/llm_runner.py src/resume_tailor_harness/tailor/agents.py src/resume_tailor_harness/tailor/match_plan.py evals/judge.py tests/test_llm_runner.py tests/test_tailor_agents.py
 git commit -m "Enables Anthropic system-prompt caching for tailor-family agents"
 ```
 
@@ -296,8 +296,8 @@ git commit -m "Enables Anthropic system-prompt caching for tailor-family agents"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/review_config.py` (`ReviewConfig`: add `early_stop_on_regression`)
-- Modify: `src/resume_agent/tailor/workflow.py` (both loops)
+- Modify: `src/resume_tailor_harness/tailor/review_config.py` (`ReviewConfig`: add `early_stop_on_regression`)
+- Modify: `src/resume_tailor_harness/tailor/workflow.py` (both loops)
 - Test: `tests/test_tailor_workflow.py` (append)
 
 **Interfaces:**
@@ -309,12 +309,12 @@ git commit -m "Enables Anthropic system-prompt caching for tailor-family agents"
 
 ```python
 # tests/test_tailor_workflow.py  (append; reuse the module's fake Result/Tailor helpers)
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.workflow import run_tailor_review
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.workflow import run_tailor_review
 
 
 class _Res:
@@ -373,13 +373,13 @@ Expected: FAIL — `ReviewConfig() got an unexpected keyword argument 'early_sto
 
 - [ ] **Step 3: Write the implementation**
 
-Add the flag to `ReviewConfig` in `src/resume_agent/tailor/review_config.py`:
+Add the flag to `ReviewConfig` in `src/resume_tailor_harness/tailor/review_config.py`:
 
 ```python
     early_stop_on_regression: bool = False  # cost lever; safe — Phase 1 still surfaces the best round
 ```
 
-In `src/resume_agent/tailor/workflow.py`, add the early-stop guard to **both** loops, immediately after the existing `if verdict.passed or round_num == config.max_rounds: break`. Sync (`run_tailor_review`, after line 56):
+In `src/resume_tailor_harness/tailor/workflow.py`, add the early-stop guard to **both** loops, immediately after the existing `if verdict.passed or round_num == config.max_rounds: break`. Sync (`run_tailor_review`, after line 56):
 
 ```python
         rounds.append(TailorRound(round_num=round_num, content=content, verdict=verdict))
@@ -428,7 +428,7 @@ make eval                                                            # baseline
 Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 
 ```bash
-git add src/resume_agent/tailor/review_config.py src/resume_agent/tailor/workflow.py config/review.early_stop.yaml tests/test_tailor_workflow.py
+git add src/resume_tailor_harness/tailor/review_config.py src/resume_tailor_harness/tailor/workflow.py config/review.early_stop.yaml tests/test_tailor_workflow.py
 git commit -m "Adds default-off regression early-stop cost lever"
 ```
 
@@ -474,6 +474,6 @@ agno's `cache_system_prompt` caches only the system prompt. The larger stable pr
 
 ## Notes for the implementer
 
-- This phase **does** change `src/resume_agent/tailor/` (unlike Phases 0–1) — that is expected; it is gated on Phases 1 and 2 being merged so quality is settled first.
+- This phase **does** change `src/resume_tailor_harness/tailor/` (unlike Phases 0–1) — that is expected; it is gated on Phases 1 and 2 being merged so quality is settled first.
 - Cache caveat: `cache_read_tokens > 0` is the only proof the cache took effect. A `0` reading means the cached prefix is below Anthropic's minimum — the lever is still safe, just inert; pursue the JD/profile-prefix lever instead.
 - Do not flip any eval-gated default (`early_stop_on_regression`, and later `escalation_enabled`/`skip_passed_enabled`) without a recorded run showing the band held. Eight stochastic cases are directional, not proof — confirm across repeated timestamped runs.

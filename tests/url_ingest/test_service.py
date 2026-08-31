@@ -1,6 +1,6 @@
-from resume_agent.discovery.url_ingest import service
-from resume_agent.discovery.url_ingest.models import ExtractedJob, PageContent
-from resume_agent.discovery.url_ingest.service import read_linkedin_posting
+from resume_tailor_harness.discovery.url_ingest import service
+from resume_tailor_harness.discovery.url_ingest.models import ExtractedJob, PageContent
+from resume_tailor_harness.discovery.url_ingest.service import read_linkedin_posting
 
 
 def _patch_fetch(monkeypatch, html, final_url):
@@ -127,7 +127,7 @@ def test_recognized_ats_without_a_reader_falls_back_to_llm(monkeypatch):
         "<html><body><p>Some role.</p></body></html>",
         "https://jobs.example.com/acme/abc-123",
     )
-    from resume_agent.discovery.connectors.detect import AtsTarget
+    from resume_tailor_harness.discovery.connectors.detect import AtsTarget
 
     monkeypatch.setattr(
         service,

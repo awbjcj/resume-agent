@@ -1,4 +1,4 @@
-from resume_agent.setup.env_writer import format_env, merge_env, parse_env
+from resume_tailor_harness.setup.env_writer import format_env, merge_env, parse_env
 
 
 def test_parse_env_ignores_comments_and_blanks():

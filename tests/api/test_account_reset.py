@@ -5,12 +5,12 @@ from sqlalchemy.orm import Session
 from sqlmodel import Session as WorkspaceSession
 from sqlmodel import select
 
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
-from resume_agent.db import init_db, make_engine
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import provision_workspace, workspace_paths
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import provision_workspace, workspace_paths
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _login(client, username="owner", password="owner-password"):

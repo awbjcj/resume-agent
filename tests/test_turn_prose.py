@@ -1,5 +1,5 @@
-from resume_agent.sessions.stream import TextDelta
-from resume_agent.sessions.turns import DELIMITER, ProseEmitter
+from resume_tailor_harness.sessions.stream import TextDelta
+from resume_tailor_harness.sessions.turns import DELIMITER, ProseEmitter
 
 
 class _Recorder:

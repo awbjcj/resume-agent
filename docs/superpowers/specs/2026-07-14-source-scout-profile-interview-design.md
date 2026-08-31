@@ -74,7 +74,7 @@ Recorded as ADR 0005 (read-only agent tools, deterministic writes).
 
 `POST /api/sources/discover` `{ prompt }` → `202` with a Run (new kind
 `source-discovery`), executed by `RunManager` like pull/tailor. CLI:
-`resume-agent scout "<prompt>" [--add]` (a `sources discover` subcommand would
+`resume-tailor-harness scout "<prompt>" [--add]` (a `sources discover` subcommand would
 collide with the existing `sources` command in typer).
 
 The worker has three phases, streamed over the existing run SSE:
@@ -160,7 +160,7 @@ explicit per-row web choice (or a manual `provider="scrape"` add).
 ### Flow
 
 `POST /api/profile/interview` → `202` with a Run (new kind
-`profile-interview`). CLI: `resume-agent profile interview` (one round in the
+`profile-interview`). CLI: `resume-tailor-harness profile interview` (one round in the
 terminal: print questions, read answers, save notes, trigger build).
 
 **1. Context assembly (deterministic).**

@@ -2,8 +2,8 @@ from pathlib import Path
 
 from evals.schema import load_cases, load_profile
 from evals.textscan import term_present
-from resume_agent.models.profile import Bullet
-from resume_agent.tailor.provenance import index_facts
+from resume_tailor_harness.models.profile import Bullet
+from resume_tailor_harness.tailor.provenance import index_facts
 
 CASES = Path("evals/cases")
 PROFILES = Path("evals/profiles")

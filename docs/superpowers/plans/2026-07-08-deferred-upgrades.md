@@ -50,13 +50,13 @@ code was written:
 
 | Path                                                         | Role                                                    |
 | ------------------------------------------------------------ | ------------------------------------------------------- |
-| `src/resume_agent/tracking/dedup.py`                         | + `locations_compatible` pure helper (Task 1)           |
-| `src/resume_agent/tracking/repository.py`                    | `find_existing` gains `location` param + guard (Task 2) |
-| `src/resume_agent/discovery/ingest.py`                       | `save_or_upgrade` passes `incoming.location` (Task 2)   |
+| `src/resume_tailor_harness/tracking/dedup.py`                         | + `locations_compatible` pure helper (Task 1)           |
+| `src/resume_tailor_harness/tracking/repository.py`                    | `find_existing` gains `location` param + guard (Task 2) |
+| `src/resume_tailor_harness/discovery/ingest.py`                       | `save_or_upgrade` passes `incoming.location` (Task 2)   |
 | `docs/adr/0001-dedup-key-plus-location-guard.md`             | New ADR (Task 2)                                        |
-| `src/resume_agent/services/discovery.py`                     | + `scrape_linkedin_jobs` (Task 3)                       |
-| `src/resume_agent/cli.py`                                    | `scrape_cmd` delegates to the service (Task 3)          |
-| `src/resume_agent/api/routers/runs.py`                       | + `POST /sources/linkedin/scrape` (Task 3)              |
+| `src/resume_tailor_harness/services/discovery.py`                     | + `scrape_linkedin_jobs` (Task 3)                       |
+| `src/resume_tailor_harness/cli.py`                                    | `scrape_cmd` delegates to the service (Task 3)          |
+| `src/resume_tailor_harness/api/routers/runs.py`                       | + `POST /sources/linkedin/scrape` (Task 3)              |
 | `evals/schema.py`                                            | `EvalCase.target` discriminator (Task 4)                |
 | `evals/textscan.py`                                          | + `cover_letter_text`, `terms_hit` (Task 4)             |
 | `evals/judge.py`                                             | + CL judge compose/hash/builder (Task 4)                |
@@ -72,7 +72,7 @@ code was written:
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/dedup.py`
+- Modify: `src/resume_tailor_harness/tracking/dedup.py`
 - Test: `tests/test_tracking_dedup.py` (append)
 
 **Interfaces:**
@@ -82,10 +82,10 @@ code was written:
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `tests/test_tracking_dedup.py` (add the import to the existing import block from `resume_agent.tracking.dedup`):
+Append to `tests/test_tracking_dedup.py` (add the import to the existing import block from `resume_tailor_harness.tracking.dedup`):
 
 ```python
-from resume_agent.tracking.dedup import locations_compatible
+from resume_tailor_harness.tracking.dedup import locations_compatible
 
 
 def test_locations_blank_either_side_is_wildcard():
@@ -118,7 +118,7 @@ Expected: FAIL with `ImportError: cannot import name 'locations_compatible'`
 
 - [ ] **Step 3: Implement the helper**
 
-Add to `src/resume_agent/tracking/dedup.py` (after `compute_dedup_key`):
+Add to `src/resume_tailor_harness/tracking/dedup.py` (after `compute_dedup_key`):
 
 ```python
 def _city_tokens(location: str) -> frozenset[str]:
@@ -150,8 +150,8 @@ Expected: PASS (all, including the pre-existing tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/tracking/dedup.py tests/test_tracking_dedup.py
-git add src/resume_agent/tracking/dedup.py tests/test_tracking_dedup.py
+ruff check src/resume_tailor_harness/tracking/dedup.py tests/test_tracking_dedup.py
+git add src/resume_tailor_harness/tracking/dedup.py tests/test_tracking_dedup.py
 git commit -m "feat: add locations_compatible city-token guard helper"
 ```
 
@@ -161,8 +161,8 @@ git commit -m "feat: add locations_compatible city-token guard helper"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py:53-92` (`find_existing`)
-- Modify: `src/resume_agent/discovery/ingest.py:72-78` (the one caller)
+- Modify: `src/resume_tailor_harness/tracking/repository.py:53-92` (`find_existing`)
+- Modify: `src/resume_tailor_harness/discovery/ingest.py:72-78` (the one caller)
 - Create: `docs/adr/0001-dedup-key-plus-location-guard.md`
 - Modify: `CLAUDE.md` (Known design notes bullet)
 - Test: `tests/test_discovery_ingest.py` (append)
@@ -283,7 +283,7 @@ the behavior the guard must not break.
 - [ ] **Step 3: Rewrite `find_existing` with the guard**
 
 Replace the whole `find_existing` function in
-`src/resume_agent/tracking/repository.py` with:
+`src/resume_tailor_harness/tracking/repository.py` with:
 
 ```python
 def find_existing(
@@ -346,14 +346,14 @@ def find_existing(
 ```
 
 Update the imports at the top of `repository.py`: add `locations_compatible`
-to the existing `from resume_agent.tracking.dedup import ...` line (it already
+to the existing `from resume_tailor_harness.tracking.dedup import ...` line (it already
 imports `compute_content_fingerprint`), and add `Iterable` to the `typing`
 import (or `from collections.abc import Iterable` if the file has no `typing`
 import of it yet — match the file's existing style).
 
 - [ ] **Step 4: Pass the location through from ingest**
 
-In `src/resume_agent/discovery/ingest.py`, `save_or_upgrade` (around line 72),
+In `src/resume_tailor_harness/discovery/ingest.py`, `save_or_upgrade` (around line 72),
 add the location argument:
 
 ```python
@@ -438,7 +438,7 @@ Run: `.venv/Scripts/python.exe -m pytest` and `ruff check`
 Expected: all green.
 
 ```bash
-git add src/resume_agent/tracking/repository.py src/resume_agent/discovery/ingest.py \
+git add src/resume_tailor_harness/tracking/repository.py src/resume_tailor_harness/discovery/ingest.py \
         tests/test_discovery_ingest.py docs/adr/0001-dedup-key-plus-location-guard.md CLAUDE.md
 git commit -m "feat: guard dedupe matching with location compatibility (ADR 0001)"
 ```
@@ -449,9 +449,9 @@ git commit -m "feat: guard dedupe matching with location compatibility (ADR 0001
 
 **Files:**
 
-- Modify: `src/resume_agent/services/discovery.py` (add `scrape_linkedin_jobs`)
-- Modify: `src/resume_agent/cli.py:359-379` (`scrape_cmd` delegates)
-- Modify: `src/resume_agent/api/routers/runs.py` (endpoint + readiness check)
+- Modify: `src/resume_tailor_harness/services/discovery.py` (add `scrape_linkedin_jobs`)
+- Modify: `src/resume_tailor_harness/cli.py:359-379` (`scrape_cmd` delegates)
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (endpoint + readiness check)
 - Modify: `CLAUDE.md` (stale deferred line)
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (regenerated)
 - Test: `tests/api/test_runs_launch.py` (append), `tests/test_cli_scrape.py` (retarget monkeypatches)
@@ -521,11 +521,11 @@ Expected: the two new tests FAIL (404 route not found / AttributeError on
 
 - [ ] **Step 3: Add the service function**
 
-In `src/resume_agent/services/discovery.py`, add to the existing import block:
+In `src/resume_tailor_harness/services/discovery.py`, add to the existing import block:
 
 ```python
-from resume_agent.discovery.ingest import add_job, ingest_jobs
-from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
+from resume_tailor_harness.discovery.ingest import add_job, ingest_jobs
+from resume_tailor_harness.discovery.scraper.linkedin import build_linkedin_scraper
 ```
 
 (the `add_job` import already exists — extend that line rather than duplicating
@@ -557,10 +557,10 @@ def scrape_linkedin_jobs(
 
 - [ ] **Step 4: Add the endpoint**
 
-In `src/resume_agent/api/routers/runs.py`, extend the
-`from resume_agent.services.discovery import (...)` block with
+In `src/resume_tailor_harness/api/routers/runs.py`, extend the
+`from resume_tailor_harness.services.discovery import (...)` block with
 `scrape_linkedin_jobs`, add `from pathlib import Path` and
-`from resume_agent.config import get_settings` to the imports, then add after
+`from resume_tailor_harness.config import get_settings` to the imports, then add after
 `launch_gmail_sync`:
 
 ```python
@@ -584,7 +584,7 @@ def launch_linkedin_scrape(request: Request, mgr: RunManager = Depends(get_run_m
             409,
             "LINKEDIN_NOT_CONFIGURED",
             "LinkedIn needs a session: set linkedin_email/linkedin_password under "
-            "Settings → API keys, or log in once by running `resume-agent scrape` locally.",
+            "Settings → API keys, or log in once by running `resume-tailor-harness scrape` locally.",
         )
     engine = _engine(request)
 
@@ -605,7 +605,7 @@ Expected: PASS
 
 - [ ] **Step 6: Delegate the CLI command to the service**
 
-Replace the body of `scrape_cmd` in `src/resume_agent/cli.py` with:
+Replace the body of `scrape_cmd` in `src/resume_tailor_harness/cli.py` with:
 
 ```python
 @app.command("scrape")
@@ -629,9 +629,9 @@ def scrape_cmd(
 ```
 
 Add `scrape_linkedin_jobs` to cli.py's existing
-`from resume_agent.services.discovery import (...)` block. Then delete any
+`from resume_tailor_harness.services.discovery import (...)` block. Then delete any
 imports `ruff check` now flags as unused (F401) — at minimum
-`build_linkedin_scraper` from `resume_agent.discovery.scraper.linkedin`;
+`build_linkedin_scraper` from `resume_tailor_harness.discovery.scraper.linkedin`;
 `load_search_config`/`ingest_jobs` only if no other command still uses them.
 
 - [ ] **Step 7: Retarget the CLI scrape tests**
@@ -641,7 +641,7 @@ imports `ruff check` now flags as unused (F401) — at minimum
 Change both tests' monkeypatch targets (fakes stay identical):
 
 ```python
-from resume_agent.services import discovery as discovery_service
+from resume_tailor_harness.services import discovery as discovery_service
 
 # in test_scrape_command_ingests_via_connector and
 # test_scrape_command_reports_failed_postings, replace the two setattr lines with:
@@ -681,8 +681,8 @@ Run: `.venv/Scripts/python.exe -m pytest` and `ruff check`
 Expected: all green.
 
 ```bash
-git add src/resume_agent/services/discovery.py src/resume_agent/cli.py \
-        src/resume_agent/api/routers/runs.py tests/api/test_runs_launch.py \
+git add src/resume_tailor_harness/services/discovery.py src/resume_tailor_harness/cli.py \
+        src/resume_tailor_harness/api/routers/runs.py tests/api/test_runs_launch.py \
         tests/test_cli_scrape.py contracts/openapi.json contracts/ts/api.ts CLAUDE.md
 git commit -m "feat: expose LinkedIn scrape as a run over HTTP"
 ```
@@ -701,7 +701,7 @@ git commit -m "feat: expose LinkedIn scrape as a run over HTTP"
 
 **Interfaces:**
 
-- Consumes: `CoverLetterContent`/`CoverLetterParagraph` (`resume_agent/models/cover_letter.py`), `ProfileFacts`, existing `term_present`, `Trap`, `JudgeVerdict`, `build_model`, `model_for_tier`
+- Consumes: `CoverLetterContent`/`CoverLetterParagraph` (`resume_tailor_harness/models/cover_letter.py`), `ProfileFacts`, existing `term_present`, `Trap`, `JudgeVerdict`, `build_model`, `model_for_tier`
 - Produces: `EvalCase.target: Literal["resume", "cover_letter"] = "resume"`; `cover_letter_text(content: CoverLetterContent) -> str` (normalized, casefolded); `terms_hit(text: str, traps: list[Trap]) -> list[str]`; `compose_cl_judge_input(content: CoverLetterContent, profile: ProfileFacts, jd_text: str, rubric: list[str], style_guide: str | None = None) -> str`; `cl_judge_prompt_hash() -> str`; `build_cl_judge_agent(model_id: str | None = None) -> Runner` — all consumed by Task 5
 
 - [ ] **Step 1: Write the failing tests**
@@ -730,8 +730,8 @@ Append to `tests/eval/test_textscan.py`:
 ```python
 from evals.schema import Trap
 from evals.textscan import cover_letter_text, terms_hit
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact
 
 
 def _trap(*terms: str) -> Trap:
@@ -781,8 +781,8 @@ Append to `tests/eval/test_judge.py`:
 
 ```python
 from evals.judge import cl_judge_prompt_hash, compose_cl_judge_input
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
 
 
 def test_compose_cl_judge_input_sections():
@@ -839,7 +839,7 @@ In `evals/run_eval.py` `main()`, right after `cases = load_cases(args.cases)`:
 - [ ] **Step 5: Add the textscan helpers**
 
 In `evals/textscan.py`, add the import
-`from resume_agent.models.cover_letter import CoverLetterContent`, then add:
+`from resume_tailor_harness.models.cover_letter import CoverLetterContent`, then add:
 
 ```python
 def cover_letter_text(content: CoverLetterContent) -> str:
@@ -878,8 +878,8 @@ old loop exactly (the old body is in git if needed).
 - [ ] **Step 6: Add the CL judge pieces**
 
 In `evals/judge.py`, add the imports
-`from resume_agent.models.cover_letter import CoverLetterContent` and
-`from resume_agent.models.profile import ProfileFacts`, then add after the
+`from resume_tailor_harness.models.cover_letter import CoverLetterContent` and
+`from resume_tailor_harness.models.profile import ProfileFacts`, then add after the
 existing `build_judge_agent`:
 
 ```python
@@ -1143,8 +1143,8 @@ from types import SimpleNamespace
 from evals.cl_runner import run_cl_case
 from evals.judge import DimensionScore, JudgeVerdict
 from evals.schema import load_case
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 class _StubRunner:
@@ -1241,16 +1241,16 @@ from evals.judge import JudgeVerdict, compose_cl_judge_input, validate_judge_ver
 from evals.schema import EvalCase
 from evals.textscan import cover_letter_text, terms_hit
 from evals.usage import MeteredRunner, UsageCollector, UsageTotals
-from resume_agent.cover_letter.drafting import (
+from resume_tailor_harness.cover_letter.drafting import (
     compose_cover_letter_input,
     compose_revise_input,
     draft_cover_letter,
     revise_cover_letter,
 )
-from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
-from resume_agent.llm_runner import Runner
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 @dataclass
@@ -1349,8 +1349,8 @@ import evals.run_cl_eval as run_cl_eval
 from evals.cl_runner import CLCaseResult
 from evals.judge import JudgeVerdict
 from evals.usage import UsageTotals
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import Contact
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import Contact
 
 
 def _write_case(case_dir: Path, case_id: str, target: str) -> None:
@@ -1445,12 +1445,12 @@ from pathlib import Path
 from evals.cl_runner import CLCaseResult, run_cl_case
 from evals.judge import build_cl_judge_agent, cl_judge_prompt_hash
 from evals.schema import load_cases, load_profile
-from resume_agent.cover_letter.agents import (
+from resume_tailor_harness.cover_letter.agents import (
     build_cover_letter_agent,
     build_cover_letter_reviser_agent,
 )
-from resume_agent.tailor.agents import model_for_tier
-from resume_agent.tailor.style_guide import load_style_guide
+from resume_tailor_harness.tailor.agents import model_for_tier
+from resume_tailor_harness.tailor.style_guide import load_style_guide
 
 
 def result_dict(result: CLCaseResult) -> dict:
@@ -1598,7 +1598,7 @@ git commit -m "feat: add measure-only cover-letter eval runner, CLI, and seed ca
 - Create: `evals/reports/2026-07-cl-baseline.json`
 - Create/Modify: `evals/RESULTS.md`
 - Modify: per `docs/superpowers/plans/2026-07-02-craft-prompt-enrichment.md` Task 5 (after-run artifacts, possible `config/review.yaml.example` flip)
-- Modify: `C:\Users\24216\.claude\projects\D--Fun-resume-agent\memory\deferred-upgrades-spec.md`, `...\memory\agent-quality-roadmap.md`
+- Modify: `C:\Users\24216\.claude\projects\D--Fun-resume-tailor-harness\memory\deferred-upgrades-spec.md`, `...\memory\agent-quality-roadmap.md`
 
 **Interfaces:**
 
@@ -1660,7 +1660,7 @@ same for its artifacts.)
 
 - [ ] **Step 5: Update memory**
 
-Update `C:\Users\24216\.claude\projects\D--Fun-resume-agent\memory\deferred-upgrades-spec.md`:
+Update `C:\Users\24216\.claude\projects\D--Fun-resume-tailor-harness\memory\deferred-upgrades-spec.md`:
 mark all four items implemented with the deciding commit hashes, and record the
 craft decision (ship/iterate/revert + whether match-plan flipped default-on).
 Update `...\memory\agent-quality-roadmap.md`: craft enrichment is no longer

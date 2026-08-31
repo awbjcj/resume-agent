@@ -7844,15 +7844,15 @@
     "en": "Resume",
     "zh-CN": "简历"
   },
-  "Resume Agent": {
-    "key": "ui_510bad2126a7",
-    "en": "Resume Agent",
-    "zh-CN": "Resume Agent"
+  "Résumé Tailor Harness": {
+    "key": "ui_a9535a6d3f05",
+    "en": "Résumé Tailor Harness",
+    "zh-CN": "Résumé Tailor Harness"
   },
-  "Resume Agent · First-run setup": {
-    "key": "ui_d6b00f6d6a79",
-    "en": "Resume Agent · First-run setup",
-    "zh-CN": "Resume Agent · 首次运行设置"
+  "Résumé Tailor Harness · First-run setup": {
+    "key": "ui_39486d338cd3",
+    "en": "Résumé Tailor Harness · First-run setup",
+    "zh-CN": "Résumé Tailor Harness · 首次运行设置"
   },
   "Resume document": {
     "key": "ui_9cac888763ac",

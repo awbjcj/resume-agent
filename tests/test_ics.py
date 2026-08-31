@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from resume_agent.calendar.ics import CalendarEntry, render_calendar
+from resume_tailor_harness.calendar.ics import CalendarEntry, render_calendar
 
 START = datetime(2026, 3, 9, 19, 0, tzinfo=timezone.utc)
 STAMP = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
@@ -8,7 +8,7 @@ STAMP = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 
 def _entry(**over) -> CalendarEntry:
     values = {
-        "uid": "event-1@resume-agent",
+        "uid": "event-1@resume-tailor-harness",
         "summary": "Technical round — Acme",
         "start": START,
         "end": datetime(2026, 3, 9, 20, 0, tzinfo=timezone.utc),
@@ -28,7 +28,7 @@ def test_calendar_uses_crlf_fixed_stamp_and_stable_uid() -> None:
     assert out.startswith("BEGIN:VCALENDAR\r\n")
     assert "\n" not in out.replace("\r\n", "")
     assert "DTSTAMP:20260301T120000Z" in out
-    assert "UID:event-1@resume-agent" in out
+    assert "UID:event-1@resume-tailor-harness" in out
 
 
 def test_timed_utc_event_has_end_and_alarm() -> None:

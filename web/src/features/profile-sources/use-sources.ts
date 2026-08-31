@@ -8,7 +8,7 @@ import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 
 export type ProfileSource =
-  components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+  components["schemas"]["resume_tailor_harness__api__schemas__profile__SourceOut"];
 export type NoteInput = components["schemas"]["NoteIn"];
 export type UrlInput = components["schemas"]["UrlIn"];
 

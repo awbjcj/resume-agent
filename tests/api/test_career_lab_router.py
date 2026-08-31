@@ -5,11 +5,11 @@ from typing import Literal
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
-from resume_agent.career_skills.registry import CareerSkillRegistry
-from resume_agent.career_lab.models import CareerLabArtifactMeta
-from resume_agent.services import career_lab as service
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta
+from resume_tailor_harness.career_skills.registry import CareerSkillRegistry
+from resume_tailor_harness.career_lab.models import CareerLabArtifactMeta
+from resume_tailor_harness.services import career_lab as service
 
 
 class _Response:
@@ -54,7 +54,7 @@ class _Router:
     )
 
     def run(self, _prompt):
-        from resume_agent.career_lab.models import CareerLabRoute
+        from resume_tailor_harness.career_lab.models import CareerLabRoute
 
         return _Response(
             CareerLabRoute(
@@ -102,7 +102,7 @@ def test_skill_capability_contract(tmp_path):
 
 def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key",
+        "resume_tailor_harness.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
     )
     monkeypatch.setattr(
@@ -176,7 +176,7 @@ def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
 
 
 def test_start_uses_keys_from_the_effective_app_settings(monkeypatch, tmp_path):
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     env = tmp_path / "app.env"
     env.write_text(
@@ -186,7 +186,7 @@ def test_start_uses_keys_from_the_effective_app_settings(monkeypatch, tmp_path):
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        "resume_agent.config.env_settings",
+        "resume_tailor_harness.config.env_settings",
         lambda: Settings(_env_file=None),  # type: ignore[call-arg]
     )
     monkeypatch.setattr(
@@ -219,8 +219,8 @@ def test_start_uses_keys_from_the_effective_app_settings(monkeypatch, tmp_path):
 
 
 def _seed_job(app, company: str) -> int:
-    from resume_agent.db import get_session
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.db import get_session
+    from resume_tailor_harness.tracking.tables import Job
 
     with get_session(app.state.engine) as session:
         job = Job(
@@ -246,7 +246,7 @@ def _start_for_job(client, job_id: int | None):
 def test_sessions_anchor_to_a_job_and_scope_the_active_conflict(monkeypatch, tmp_path):
     """Two jobs may each hold an open thread; one job may not hold two."""
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key",
+        "resume_tailor_harness.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
     )
     monkeypatch.setattr(
@@ -299,7 +299,7 @@ def test_sessions_anchor_to_a_job_and_scope_the_active_conflict(monkeypatch, tmp
 
 def test_deleting_a_job_removes_its_career_lab_threads(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key",
+        "resume_tailor_harness.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
     )
     monkeypatch.setattr(
@@ -328,8 +328,8 @@ def _write_session(
     status: Literal["active", "ended"] = "active",
     job_id=None,
 ):
-    from resume_agent.career_lab.models import CareerLabSession
-    from resume_agent.career_lab.store import store
+    from resume_tailor_harness.career_lab.models import CareerLabSession
+    from resume_tailor_harness.career_lab.store import store
 
     root.mkdir(parents=True, exist_ok=True)
     store.write(
@@ -439,7 +439,7 @@ def test_ambiguous_route_starts_a_session_with_a_clarifying_question(
     monkeypatch, tmp_path
 ):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key",
+        "resume_tailor_harness.llm_runner.resolve_api_key",
         lambda _model, **_kwargs: "key",
     )
     monkeypatch.setattr(service, "build_router_agent", lambda **_kwargs: _Router())

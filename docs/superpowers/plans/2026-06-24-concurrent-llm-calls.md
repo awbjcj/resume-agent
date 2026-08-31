@@ -28,7 +28,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py:16-31` (Settings fields)
+- Modify: `src/resume_tailor_harness/config.py:16-31` (Settings fields)
 - Test: `tests/test_config.py` (create if absent)
 
 - [ ] **Step 1: Write the failing test**
@@ -42,7 +42,7 @@ import pytest
 def test_concurrency_settings_defaults(monkeypatch):
     for key in ("LLM_CONCURRENCY", "LLM_RETRIES", "LLM_RETRY_DELAY"):
         monkeypatch.delenv(key, raising=False)
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     s = Settings()
     assert s.llm_concurrency == 8
@@ -53,7 +53,7 @@ def test_concurrency_settings_defaults(monkeypatch):
 def test_concurrency_settings_reject_invalid_values(monkeypatch):
     from pydantic import ValidationError
 
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     for key in ("LLM_CONCURRENCY", "LLM_RETRIES", "LLM_RETRY_DELAY"):
         monkeypatch.delenv(key, raising=False)
@@ -81,7 +81,7 @@ or missing validation fields.
 
 - [ ] **Step 3: Add the fields**
 
-In `src/resume_agent/config.py`, add the import:
+In `src/resume_tailor_harness/config.py`, add the import:
 
 ```python
 from pydantic import Field
@@ -105,7 +105,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/config.py tests/test_config.py
+git add src/resume_tailor_harness/config.py tests/test_config.py
 git commit -m "feat: add llm_concurrency and retry settings"
 ```
 
@@ -115,7 +115,7 @@ git commit -m "feat: add llm_concurrency and retry settings"
 
 **Files:**
 
-- Create: `src/resume_agent/concurrency.py`
+- Create: `src/resume_tailor_harness/concurrency.py`
 - Test: `tests/test_concurrency.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -125,7 +125,7 @@ Create `tests/test_concurrency.py`:
 ```python
 import asyncio
 
-from resume_agent.concurrency import Result, gather_isolated
+from resume_tailor_harness.concurrency import Result, gather_isolated
 
 
 def test_gather_isolated_preserves_order_and_isolates_errors():
@@ -166,11 +166,11 @@ def test_result_defaults():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_concurrency.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.concurrency'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.concurrency'`.
 
 - [ ] **Step 3: Write the module**
 
-Create `src/resume_agent/concurrency.py`:
+Create `src/resume_tailor_harness/concurrency.py`:
 
 ```python
 """Error-isolated concurrent fan-out for LLM calls.
@@ -178,7 +178,7 @@ Create `src/resume_agent/concurrency.py`:
 asyncio (not threads) so the single event-loop thread can mutate the SQLModel
 Session before/after the fan-out without locks — only the leaf network calls run
 concurrently. Concurrency is bounded by the semaphore the caller threads into the
-leaf calls (see ``resume_agent.llm_runner.acall``); this helper imposes no limit
+leaf calls (see ``resume_tailor_harness.llm_runner.acall``); this helper imposes no limit
 of its own, so nested fan-out (tailor jobs x reviewer panel) cannot deadlock on
 permits held by its own parents.
 """
@@ -242,7 +242,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/concurrency.py tests/test_concurrency.py
+git add src/resume_tailor_harness/concurrency.py tests/test_concurrency.py
 git commit -m "feat: add gather_isolated concurrent fan-out helper"
 ```
 
@@ -252,7 +252,7 @@ git commit -m "feat: add gather_isolated concurrent fan-out helper"
 
 **Files:**
 
-- Modify: `src/resume_agent/llm_runner.py:1-19` (imports + Runner + AgentRunner), append `acall` + `retry_kwargs`
+- Modify: `src/resume_tailor_harness/llm_runner.py:1-19` (imports + Runner + AgentRunner), append `acall` + `retry_kwargs`
 - Test: `tests/test_llm_runner.py` (append)
 
 - [ ] **Step 1: Write the failing tests**
@@ -263,7 +263,7 @@ Append to `tests/test_llm_runner.py`:
 def test_agent_runner_arun_delegates():
     import asyncio
 
-    from resume_agent.llm_runner import AgentRunner
+    from resume_tailor_harness.llm_runner import AgentRunner
 
     class _AsyncAgent:
         async def arun(self, prompt):
@@ -276,8 +276,8 @@ def test_agent_runner_arun_delegates():
 def test_acall_respects_semaphore_limit():
     import asyncio
 
-    from resume_agent.concurrency import gather_isolated
-    from resume_agent.llm_runner import acall
+    from resume_tailor_harness.concurrency import gather_isolated
+    from resume_tailor_harness.llm_runner import acall
 
     state = {"now": 0, "max": 0}
 
@@ -310,8 +310,8 @@ def test_acall_respects_semaphore_limit():
 def test_retry_kwargs_reads_settings(monkeypatch):
     monkeypatch.setenv("LLM_RETRIES", "5")
     monkeypatch.setenv("LLM_RETRY_DELAY", "3")
-    from resume_agent.config import get_settings
-    from resume_agent.llm_runner import retry_kwargs
+    from resume_tailor_harness.config import get_settings
+    from resume_tailor_harness.llm_runner import retry_kwargs
 
     get_settings.cache_clear()
     try:
@@ -331,13 +331,13 @@ Expected: FAIL — `AttributeError`/`ImportError` for `arun` / `acall` / `retry_
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/llm_runner.py`, replace the top of the file (lines 1-19) with:
+In `src/resume_tailor_harness/llm_runner.py`, replace the top of the file (lines 1-19) with:
 
 ```python
 import asyncio
 from typing import Any, Protocol
 
-from resume_agent.config import get_settings
+from resume_tailor_harness.config import get_settings
 
 
 class Runner(Protocol):
@@ -361,7 +361,7 @@ class AgentRunner:
         return await self._agent.arun(prompt)
 ```
 
-Then append at the end of `src/resume_agent/llm_runner.py`:
+Then append at the end of `src/resume_tailor_harness/llm_runner.py`:
 
 ```python
 async def acall(agent: Runner, prompt: str, *, sem: asyncio.Semaphore) -> Any:
@@ -392,7 +392,7 @@ Expected: PASS (all, including the existing provider tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/llm_runner.py tests/test_llm_runner.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner.py
 git commit -m "feat: add Runner.arun, acall semaphore leaf, retry_kwargs"
 ```
 
@@ -402,12 +402,12 @@ git commit -m "feat: add Runner.arun, acall semaphore leaf, retry_kwargs"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/extract.py:22-33`
-- Modify: `src/resume_agent/discovery/fit.py:40-51`
-- Modify: `src/resume_agent/discovery/relevance.py:30-44`
-- Modify: `src/resume_agent/discovery/url_ingest/llm.py:15-26`
-- Modify: `src/resume_agent/cover_letter/agents.py:21-44`
-- Modify: `src/resume_agent/tailor/agents.py:57-97`
+- Modify: `src/resume_tailor_harness/discovery/extract.py:22-33`
+- Modify: `src/resume_tailor_harness/discovery/fit.py:40-51`
+- Modify: `src/resume_tailor_harness/discovery/relevance.py:30-44`
+- Modify: `src/resume_tailor_harness/discovery/url_ingest/llm.py:15-26`
+- Modify: `src/resume_tailor_harness/cover_letter/agents.py:21-44`
+- Modify: `src/resume_tailor_harness/tailor/agents.py:57-97`
 - Test: `tests/test_discovery_extract.py` (append)
 
 - [ ] **Step 1: Write the failing test**
@@ -417,7 +417,7 @@ Append to `tests/test_discovery_extract.py`:
 ```python
 def test_build_extract_agent_carries_retry_config(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    from resume_agent.config import get_settings
+    from resume_tailor_harness.config import get_settings
 
     get_settings.cache_clear()
     try:
@@ -439,10 +439,10 @@ Expected: FAIL — `assert 0 == 2` (agno default `retries=0`).
 
 In every builder below, add the import and spread `**retry_kwargs()` into the `Agent(...)` call (after `use_json_mode=...`).
 
-`src/resume_agent/discovery/extract.py` — change the import line:
+`src/resume_tailor_harness/discovery/extract.py` — change the import line:
 
 ```python
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
+from resume_tailor_harness.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
 
 and the `Agent(...)`:
@@ -458,36 +458,36 @@ and the `Agent(...)`:
         )
 ```
 
-`src/resume_agent/discovery/fit.py` — import:
+`src/resume_tailor_harness/discovery/fit.py` — import:
 
 ```python
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
+from resume_tailor_harness.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
 
 and add `**retry_kwargs(),` after `use_json_mode=use_json_mode_for(model),` in `build_fit_agent`.
 
-`src/resume_agent/discovery/relevance.py` — import (add `retry_kwargs` to the existing multi-line import) and add `**retry_kwargs(),` after `use_json_mode=use_json_mode_for(model),` inside the `Agent(...)` in `build_relevance_agent` (the branch after the `if not resolve_api_key(...)` guard).
+`src/resume_tailor_harness/discovery/relevance.py` — import (add `retry_kwargs` to the existing multi-line import) and add `**retry_kwargs(),` after `use_json_mode=use_json_mode_for(model),` inside the `Agent(...)` in `build_relevance_agent` (the branch after the `if not resolve_api_key(...)` guard).
 
-`src/resume_agent/discovery/url_ingest/llm.py` — import:
+`src/resume_tailor_harness/discovery/url_ingest/llm.py` — import:
 
 ```python
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
+from resume_tailor_harness.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
 
 and add `**retry_kwargs(),` in `build_url_extract_agent`'s `Agent(...)`.
 
-`src/resume_agent/cover_letter/agents.py` — import:
+`src/resume_tailor_harness/cover_letter/agents.py` — import:
 
 ```python
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
+from resume_tailor_harness.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
 
 and add `**retry_kwargs(),` in **both** `build_cover_letter_agent` and `build_cover_letter_reviser_agent`.
 
-`src/resume_agent/tailor/agents.py` — import:
+`src/resume_tailor_harness/tailor/agents.py` — import:
 
 ```python
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
+from resume_tailor_harness.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
 
 and add `**retry_kwargs(),` in **all three** of `build_tailor_agent`, `build_reviser_agent`, `build_reviewer_agent`.
@@ -500,7 +500,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/extract.py src/resume_agent/discovery/fit.py src/resume_agent/discovery/relevance.py src/resume_agent/discovery/url_ingest/llm.py src/resume_agent/cover_letter/agents.py src/resume_agent/tailor/agents.py tests/test_discovery_extract.py
+git add src/resume_tailor_harness/discovery/extract.py src/resume_tailor_harness/discovery/fit.py src/resume_tailor_harness/discovery/relevance.py src/resume_tailor_harness/discovery/url_ingest/llm.py src/resume_tailor_harness/cover_letter/agents.py src/resume_tailor_harness/tailor/agents.py tests/test_discovery_extract.py
 git commit -m "feat: configure agno retry/backoff on every agent builder"
 ```
 
@@ -510,9 +510,9 @@ git commit -m "feat: configure agno retry/backoff on every agent builder"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/extract.py` (append `aextract_job_criteria`)
-- Modify: `src/resume_agent/discovery/fit.py` (append `ascore_fit`)
-- Modify: `src/resume_agent/discovery/relevance.py` (append `ajudge_relevance`)
+- Modify: `src/resume_tailor_harness/discovery/extract.py` (append `aextract_job_criteria`)
+- Modify: `src/resume_tailor_harness/discovery/fit.py` (append `ascore_fit`)
+- Modify: `src/resume_tailor_harness/discovery/relevance.py` (append `ajudge_relevance`)
 - Test: `tests/test_discovery_extract.py`, `tests/test_discovery_fit.py`, `tests/test_discovery_relevance.py` (append)
 
 - [ ] **Step 1: Write the failing tests**
@@ -523,7 +523,7 @@ Append to `tests/test_discovery_extract.py`:
 def test_aextract_job_criteria_uses_arun_and_semaphore():
     import asyncio
 
-    from resume_agent.discovery.extract import aextract_job_criteria
+    from resume_tailor_harness.discovery.extract import aextract_job_criteria
 
     class _AsyncAgent:
         def run(self, prompt):
@@ -550,7 +550,7 @@ Append to `tests/test_discovery_fit.py` (mirror its existing fake style; `FitSco
 def test_ascore_fit_uses_arun():
     import asyncio
 
-    from resume_agent.discovery.fit import FitScore, ascore_fit
+    from resume_tailor_harness.discovery.fit import FitScore, ascore_fit
 
     class _AsyncAgent:
         def run(self, prompt):
@@ -572,7 +572,7 @@ Append to `tests/test_discovery_relevance.py`:
 def test_ajudge_relevance_uses_arun():
     import asyncio
 
-    from resume_agent.discovery.relevance import RelevanceVerdict, ajudge_relevance
+    from resume_tailor_harness.discovery.relevance import RelevanceVerdict, ajudge_relevance
 
     class _AsyncAgent:
         def run(self, prompt):
@@ -597,7 +597,7 @@ Expected: FAIL — names not defined.
 
 - [ ] **Step 3: Implement the siblings**
 
-`src/resume_agent/discovery/extract.py` — add `import asyncio` at top and `acall` to the `llm_runner` import, then append:
+`src/resume_tailor_harness/discovery/extract.py` — add `import asyncio` at top and `acall` to the `llm_runner` import, then append:
 
 ```python
 async def aextract_job_criteria(
@@ -610,7 +610,7 @@ async def aextract_job_criteria(
     return extracted.to_criteria()
 ```
 
-`src/resume_agent/discovery/fit.py` — add `import asyncio` and `acall` to the import, then append:
+`src/resume_tailor_harness/discovery/fit.py` — add `import asyncio` and `acall` to the import, then append:
 
 ```python
 async def ascore_fit(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> FitScore:
@@ -621,7 +621,7 @@ async def ascore_fit(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) 
     return fit
 ```
 
-`src/resume_agent/discovery/relevance.py` — add `import asyncio` and `acall` to the import, then append:
+`src/resume_tailor_harness/discovery/relevance.py` — add `import asyncio` and `acall` to the import, then append:
 
 ```python
 async def ajudge_relevance(
@@ -642,7 +642,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/extract.py src/resume_agent/discovery/fit.py src/resume_agent/discovery/relevance.py tests/test_discovery_extract.py tests/test_discovery_fit.py tests/test_discovery_relevance.py
+git add src/resume_tailor_harness/discovery/extract.py src/resume_tailor_harness/discovery/fit.py src/resume_tailor_harness/discovery/relevance.py tests/test_discovery_extract.py tests/test_discovery_fit.py tests/test_discovery_relevance.py
 git commit -m "feat: add async siblings for extract/score/relevance"
 ```
 
@@ -652,7 +652,7 @@ git commit -m "feat: add async siblings for extract/score/relevance"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py` (imports + `run_extract`, `run_score`, `run_relevance`)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py` (imports + `run_extract`, `run_score`, `run_relevance`)
 - Test: `tests/test_discovery_pipeline.py` (add `arun` to existing fakes; add concurrency tests)
 
 - [ ] **Step 1: Add `arun` to the existing pipeline fakes**
@@ -677,7 +677,7 @@ def test_run_extract_runs_concurrently_and_isolates_failures(monkeypatch):
     import time
 
     monkeypatch.setenv("LLM_CONCURRENCY", "8")
-    from resume_agent.config import get_settings
+    from resume_tailor_harness.config import get_settings
 
     get_settings.cache_clear()
 
@@ -721,7 +721,7 @@ Expected: FAIL — currently serial, so `elapsed` ≈ 0.25s, `assert elapsed < 0
 
 - [ ] **Step 4: Rewrite the three phases**
 
-In `src/resume_agent/discovery/pipeline.py`, update the imports at the top:
+In `src/resume_tailor_harness/discovery/pipeline.py`, update the imports at the top:
 
 ```python
 import asyncio
@@ -729,12 +729,12 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.concurrency import gather_isolated
-from resume_agent.config import get_settings
-from resume_agent.discovery.extract import Runner, aextract_job_criteria, extract_job_criteria  # noqa: F401
-from resume_agent.discovery.filter import apply_filters
-from resume_agent.discovery.fit import FitScore, ascore_fit, compose_fit_input, score_fit  # noqa: F401
-from resume_agent.discovery.relevance import ajudge_relevance, judge_relevance  # noqa: F401
+from resume_tailor_harness.concurrency import gather_isolated
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.extract import Runner, aextract_job_criteria, extract_job_criteria  # noqa: F401
+from resume_tailor_harness.discovery.filter import apply_filters
+from resume_tailor_harness.discovery.fit import FitScore, ascore_fit, compose_fit_input, score_fit  # noqa: F401
+from resume_tailor_harness.discovery.relevance import ajudge_relevance, judge_relevance  # noqa: F401
 ```
 
 (Keep the remaining existing imports unchanged.)
@@ -886,7 +886,7 @@ Expected: PASS (existing tests + the new concurrency test).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "feat: run discovery relevance/extract/score concurrently"
 ```
 
@@ -896,9 +896,9 @@ git commit -m "feat: run discovery relevance/extract/score concurrently"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/tailoring.py` (append `atailor`, `arevise`)
-- Modify: `src/resume_agent/tailor/panel.py` (extract `_panel_inputs`; add `areview_one`, `arun_panel`)
-- Modify: `src/resume_agent/tailor/workflow.py` (append `arun_tailor_review`)
+- Modify: `src/resume_tailor_harness/tailor/tailoring.py` (append `atailor`, `arevise`)
+- Modify: `src/resume_tailor_harness/tailor/panel.py` (extract `_panel_inputs`; add `areview_one`, `arun_panel`)
+- Modify: `src/resume_tailor_harness/tailor/workflow.py` (append `arun_tailor_review`)
 - Test: `tests/test_tailor_panel.py`, `tests/test_tailor_workflow.py` (append)
 
 - [ ] **Step 1: Write the failing tests**
@@ -910,7 +910,7 @@ def test_arun_panel_runs_reviewers_concurrently_in_order():
     import asyncio
     import time
 
-    from resume_agent.tailor.panel import arun_panel
+    from resume_tailor_harness.tailor.panel import arun_panel
 
     config = ReviewConfig(
         reviewers=[ReviewerSpec(name="a"), ReviewerSpec(name="b"), ReviewerSpec(name="c")]
@@ -945,7 +945,7 @@ def test_arun_panel_settles_reviewers_before_raising():
 
     import pytest
 
-    from resume_agent.tailor.panel import arun_panel
+    from resume_tailor_harness.tailor.panel import arun_panel
 
     config = ReviewConfig(reviewers=[ReviewerSpec(name="boom"), ReviewerSpec(name="slow")])
     events: list[str] = []
@@ -983,12 +983,12 @@ Append to `tests/test_tailor_workflow.py` (it already constructs `JobCriteria`, 
 def test_arun_tailor_review_passes_with_async_agents():
     import asyncio
 
-    from resume_agent.models.job import JobCriteria
-    from resume_agent.models.profile import Contact, ProfileFacts
-    from resume_agent.models.resume import ResumeContent
-    from resume_agent.models.review import ReviewCritique
-    from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-    from resume_agent.tailor.workflow import arun_tailor_review
+    from resume_tailor_harness.models.job import JobCriteria
+    from resume_tailor_harness.models.profile import Contact, ProfileFacts
+    from resume_tailor_harness.models.resume import ResumeContent
+    from resume_tailor_harness.models.review import ReviewCritique
+    from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+    from resume_tailor_harness.tailor.workflow import arun_tailor_review
 
     class _Result:
         def __init__(self, content):
@@ -1032,7 +1032,7 @@ Expected: FAIL — `arun_panel` / `arun_tailor_review` not defined.
 
 - [ ] **Step 3: Implement async tailor leaf calls**
 
-In `src/resume_agent/tailor/tailoring.py`, add `import asyncio` at the top and `acall` to the `llm_runner` import (`from resume_agent.llm_runner import Runner, acall`), then append:
+In `src/resume_tailor_harness/tailor/tailoring.py`, add `import asyncio` at the top and `acall` to the `llm_runner` import (`from resume_tailor_harness.llm_runner import Runner, acall`), then append:
 
 ```python
 async def atailor(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ResumeContent:
@@ -1053,7 +1053,7 @@ async def arevise(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> 
 
 - [ ] **Step 4: Implement the panel changes**
 
-Rewrite `src/resume_agent/tailor/panel.py`. Add `import asyncio` at the top and `acall` to the `llm_runner` import. Add `_panel_inputs`, refactor `run_panel` to use it, and add the async pair. Replace `run_panel` (lines ~48-65) with:
+Rewrite `src/resume_tailor_harness/tailor/panel.py`. Add `import asyncio` at the top and `acall` to the `llm_runner` import. Add `_panel_inputs`, refactor `run_panel` to use it, and add the async pair. Replace `run_panel` (lines ~48-65) with:
 
 ```python
 def _panel_inputs(
@@ -1131,11 +1131,11 @@ async def arun_panel(
 
 - [ ] **Step 5: Implement the async workflow**
 
-In `src/resume_agent/tailor/workflow.py`, update the imports to add the async siblings:
+In `src/resume_tailor_harness/tailor/workflow.py`, update the imports to add the async siblings:
 
 ```python
-from resume_agent.tailor.panel import arun_panel, run_panel
-from resume_agent.tailor.tailoring import (
+from resume_tailor_harness.tailor.panel import arun_panel, run_panel
+from resume_tailor_harness.tailor.tailoring import (
     atailor,
     arevise,
     compose_revise_input,
@@ -1199,7 +1199,7 @@ Expected: PASS (existing sync tests + new async tests).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tailor/tailoring.py src/resume_agent/tailor/panel.py src/resume_agent/tailor/workflow.py tests/test_tailor_panel.py tests/test_tailor_workflow.py
+git add src/resume_tailor_harness/tailor/tailoring.py src/resume_tailor_harness/tailor/panel.py src/resume_tailor_harness/tailor/workflow.py tests/test_tailor_panel.py tests/test_tailor_workflow.py
 git commit -m "feat: add async tailor leaf calls, concurrent panel, async workflow"
 ```
 
@@ -1209,7 +1209,7 @@ git commit -m "feat: add async tailor leaf calls, concurrent panel, async workfl
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/service.py` (split persist; rewrite `tailor_job`, `tailor_jobs`)
+- Modify: `src/resume_tailor_harness/tailor/service.py` (split persist; rewrite `tailor_job`, `tailor_jobs`)
 - Test: `tests/test_tailor_service.py` (add `arun` to fakes; add concurrency + isolation tests)
 
 - [ ] **Step 1: Add `arun` to the existing service fakes**
@@ -1231,7 +1231,7 @@ def test_tailor_jobs_runs_jobs_concurrently(monkeypatch):
     import time
 
     monkeypatch.setenv("LLM_CONCURRENCY", "8")
-    from resume_agent.config import get_settings
+    from resume_tailor_harness.config import get_settings
 
     get_settings.cache_clear()
 
@@ -1363,7 +1363,7 @@ Expected: FAIL — `_SlowContent.run`/`_Boom.run` raise `NotImplementedError` be
 
 - [ ] **Step 4: Rewrite the service**
 
-Replace the whole body of `src/resume_agent/tailor/service.py` with:
+Replace the whole body of `src/resume_tailor_harness/tailor/service.py` with:
 
 ```python
 import asyncio
@@ -1371,16 +1371,16 @@ from collections.abc import Mapping, Sequence
 
 from sqlmodel import Session
 
-from resume_agent.concurrency import gather_isolated
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import Runner
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.progress import ProgressReporter
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.workflow import TailorRound, arun_tailor_review
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.concurrency import gather_isolated
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.workflow import TailorRound, arun_tailor_review
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def _persist_rounds(
@@ -1484,7 +1484,7 @@ Expected: PASS (existing + new concurrency/isolation tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/service.py tests/test_tailor_service.py
+git add src/resume_tailor_harness/tailor/service.py tests/test_tailor_service.py
 git commit -m "feat: run tailor jobs and panels concurrently under one cap"
 ```
 
@@ -1503,9 +1503,9 @@ In `tests/test_services_discovery.py`, replace the `extract = type(...)` / `fit 
 
 ```python
 def _bundle():
-    from resume_agent.discovery.fit import FitScore
-    from resume_agent.models.job import JobCriteriaExtract, SponsorshipSignal
-    from resume_agent.services.agents import DiscoveryBundle
+    from resume_tailor_harness.discovery.fit import FitScore
+    from resume_tailor_harness.models.job import JobCriteriaExtract, SponsorshipSignal
+    from resume_tailor_harness.services.agents import DiscoveryBundle
 
     def _criteria():
         return JobCriteriaExtract.model_validate(dict(
@@ -1586,7 +1586,7 @@ with:
 In `CLAUDE.md`, add a row to the "Hot paths" table:
 
 ```markdown
-| `src/resume_agent/concurrency.py` | `gather_isolated` — ordered, error-isolated async fan-out |
+| `src/resume_tailor_harness/concurrency.py` | `gather_isolated` — ordered, error-isolated async fan-out |
 ```
 
 - [ ] **Step 3: Verify docs only, then commit**

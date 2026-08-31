@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.deploy import prepare_data_root
+from resume_tailor_harness.deploy import prepare_data_root
 
 
 def _require_symlinks(tmp_path: Path) -> None:

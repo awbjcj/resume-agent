@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from resume_agent.tenancy.local import rebase_cli_path
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
-from resume_agent.cli import _tenant_cli_path
+from resume_tailor_harness.tenancy.local import rebase_cli_path
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.cli import _tenant_cli_path
 
 
 def test_rebase_cli_path_maps_only_known_defaults():

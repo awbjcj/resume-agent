@@ -58,9 +58,9 @@ returns HTML containing `<script>AF_initDataCallback({key: 'ds:1', hash: '2', da
 
 | Path | Role |
 | ---- | ---- |
-| `src/resume_agent/discovery/connectors/google.py` | Rewritten: blob extraction + row parsing + paging fetch |
-| `src/resume_agent/discovery/connectors/tesla.py` | Rewritten: `TeslaPortal` browser seam + portal-backed fetch |
-| `src/resume_agent/discovery/connectors/companies.py` | `concurrent_fetch` becomes a property |
+| `src/resume_tailor_harness/discovery/connectors/google.py` | Rewritten: blob extraction + row parsing + paging fetch |
+| `src/resume_tailor_harness/discovery/connectors/tesla.py` | Rewritten: `TeslaPortal` browser seam + portal-backed fetch |
+| `src/resume_tailor_harness/discovery/connectors/companies.py` | `concurrent_fetch` becomes a property |
 | `tests/test_connector_google.py` | Rewritten for the blob format |
 | `tests/test_connector_tesla.py` | Rewritten for the portal seam |
 | `tests/fixtures/google/results.html` | Minimized live-shaped Google callback |
@@ -74,7 +74,7 @@ returns HTML containing `<script>AF_initDataCallback({key: 'ds:1', hash: '2', da
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/google.py` (full rewrite)
+- Modify: `src/resume_tailor_harness/discovery/connectors/google.py` (full rewrite)
 - Test: `tests/test_connector_google.py` (full rewrite)
 
 **Interfaces:**
@@ -90,9 +90,9 @@ Replace the whole of `tests/test_connector_google.py` with:
 import json
 from datetime import timezone
 
-import resume_agent.discovery.connectors.google as google
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.google as google
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("google")
 
@@ -220,7 +220,7 @@ Expected: FAIL — `AttributeError: module ... has no attribute 'extract_job_row
 
 - [ ] **Step 3: Rewrite google.py**
 
-Replace the whole of `src/resume_agent/discovery/connectors/google.py` with:
+Replace the whole of `src/resume_tailor_harness/discovery/connectors/google.py` with:
 
 ```python
 """Google Careers via the public results page's embedded AF_initDataCallback
@@ -235,15 +235,15 @@ from datetime import datetime, timezone
 
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob, SkipSeen
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob, SkipSeen
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.text import html_to_markdown, primary_search_term
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _RESULTS_URL = "https://www.google.com/about/careers/applications/jobs/results"
 _MAX_PAGES = 20
 _HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) resume-agent",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) resume-tailor-harness",
 }
 
 _BLOB = re.compile(r"AF_initDataCallback\((\{.*?\})\);", re.S)
@@ -369,8 +369,8 @@ Expected: PASS — `fetch_google`'s signature is unchanged.
 - [ ] **Step 6: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/discovery/connectors/google.py tests/test_connector_google.py
-git add src/resume_agent/discovery/connectors/google.py tests/test_connector_google.py
+ruff check src/resume_tailor_harness/discovery/connectors/google.py tests/test_connector_google.py
+git add src/resume_tailor_harness/discovery/connectors/google.py tests/test_connector_google.py
 git commit -m "Rebuilds the Google connector on the careers results page blobs"
 ```
 
@@ -380,7 +380,7 @@ git commit -m "Rebuilds the Google connector on the careers results page blobs"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/tesla.py` (full rewrite)
+- Modify: `src/resume_tailor_harness/discovery/connectors/tesla.py` (full rewrite)
 - Test: `tests/test_connector_tesla.py` (full rewrite)
 
 **Interfaces:**
@@ -395,9 +395,9 @@ Replace the whole of `tests/test_connector_tesla.py` with:
 ```python
 from contextlib import nullcontext
 
-import resume_agent.discovery.connectors.tesla as tesla
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.tesla as tesla
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("tesla")
 STATE = {"listings": [
@@ -485,7 +485,7 @@ Expected: the parse tests PASS (unchanged code paths), every `fetch_tesla` test 
 
 - [ ] **Step 3: Rewrite tesla.py**
 
-Replace the whole of `src/resume_agent/discovery/connectors/tesla.py` with:
+Replace the whole of `src/resume_tailor_harness/discovery/connectors/tesla.py` with:
 
 ```python
 """Tesla careers via the shared visible browser. The cua-api endpoints are
@@ -498,12 +498,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.connectors.base import RawJob, SkipSeen
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.connectors.text import html_to_markdown
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.connectors.base import RawJob, SkipSeen
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.harvest import harvest_detailed
+from resume_tailor_harness.discovery.connectors.text import html_to_markdown
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _SEARCH_URL = "https://www.tesla.com/careers/search/?site=US"
 _STATE_MARKER = "cua-api/apps/careers/state"
@@ -610,14 +610,14 @@ Expected: PASS (all 6)
 
 - [ ] **Step 5: Confirm no eager playwright import**
 
-Run: `.venv/Scripts/python.exe -c "import sys; import resume_agent.discovery.connectors.tesla; assert 'playwright' not in sys.modules, 'playwright imported eagerly'; print('lazy OK')"`
+Run: `.venv/Scripts/python.exe -c "import sys; import resume_tailor_harness.discovery.connectors.tesla; assert 'playwright' not in sys.modules, 'playwright imported eagerly'; print('lazy OK')"`
 Expected: `lazy OK`
 
 - [ ] **Step 6: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/discovery/connectors/tesla.py tests/test_connector_tesla.py
-git add src/resume_agent/discovery/connectors/tesla.py tests/test_connector_tesla.py
+ruff check src/resume_tailor_harness/discovery/connectors/tesla.py tests/test_connector_tesla.py
+git add src/resume_tailor_harness/discovery/connectors/tesla.py tests/test_connector_tesla.py
 git commit -m "Drives the Tesla connector through a visible browser portal"
 ```
 
@@ -627,7 +627,7 @@ git commit -m "Drives the Tesla connector through a visible browser portal"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/companies.py:149` (`concurrent_fetch` class attribute → property)
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py:149` (`concurrent_fetch` class attribute → property)
 - Test: `tests/test_connector_companies.py` (append; locate via `grep -l CompaniesConnector tests/*.py` if named differently)
 
 **Interfaces:**
@@ -655,7 +655,7 @@ def test_companies_serializes_when_tesla_is_aboard():
     assert connector.concurrent_fetch is False
 ```
 
-(`CompaniesConnector` is already imported by the existing tests in that file; if not, add `from resume_agent.discovery.connectors.companies import CompaniesConnector`.)
+(`CompaniesConnector` is already imported by the existing tests in that file; if not, add `from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector`.)
 
 - [ ] **Step 2: Run tests to verify one fails**
 
@@ -664,8 +664,8 @@ Expected: the greenhouse-only test PASSES (class attribute is `True`); the Tesla
 
 - [ ] **Step 3: Implement the property**
 
-In `src/resume_agent/discovery/connectors/companies.py`, extend the detect import
-(line 12) to `from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, identify_host`, then replace the class attribute line `concurrent_fetch = True` inside `CompaniesConnector` with:
+In `src/resume_tailor_harness/discovery/connectors/companies.py`, extend the detect import
+(line 12) to `from resume_tailor_harness.discovery.connectors.detect import AtsTarget, detect_ats, identify_host`, then replace the class attribute line `concurrent_fetch = True` inside `CompaniesConnector` with:
 
 ```python
     @property
@@ -688,8 +688,8 @@ Expected: PASS
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/discovery/connectors/companies.py tests/test_connector_companies.py
-git add src/resume_agent/discovery/connectors/companies.py tests/test_connector_companies.py
+ruff check src/resume_tailor_harness/discovery/connectors/companies.py tests/test_connector_companies.py
+git add src/resume_tailor_harness/discovery/connectors/companies.py tests/test_connector_companies.py
 git commit -m "Serializes companies pulls that include the Tesla browser portal"
 ```
 
@@ -723,8 +723,8 @@ In `CLAUDE.md` → "Known design notes", replace the bullet starting
 
 In the CLAUDE.md hot-paths table, update the two rows:
 
-- `src/resume_agent/discovery/connectors/tesla.py` → role: `Tesla browser portal: state capture + same-origin detail fetches`
-- `src/resume_agent/discovery/connectors/google.py` → role: `Google Careers results-page blob parser (list-only)`
+- `src/resume_tailor_harness/discovery/connectors/tesla.py` → role: `Tesla browser portal: state capture + same-origin detail fetches`
+- `src/resume_tailor_harness/discovery/connectors/google.py` → role: `Google Careers results-page blob parser (list-only)`
 
 - [ ] **Step 3: Full suite, lint, commit**
 
@@ -743,7 +743,7 @@ git commit -m "Documents the rebuilt Google and Tesla portal connectors"
 - [ ] `.venv/Scripts/python.exe -m pytest -q` — full suite PASS
 - [ ] `ruff check` — clean
 - [ ] `git diff main --stat -- contracts/` — empty
-- [ ] **Manual live smoke (optional, network + window):** `resume-agent pull --source <a companies source containing the Google or Tesla URL> --limit 5` — Google rows arrive with full JDs; Tesla pops one window and yields detailed rows
+- [ ] **Manual live smoke (optional, network + window):** `resume-tailor-harness pull --source <a companies source containing the Google or Tesla URL> --limit 5` — Google rows arrive with full JDs; Tesla pops one window and yields detailed rows
 - [ ] Use the repository code-review-and-quality and code-simplification passes before merging
 
 ## Self-review notes (already applied)

@@ -1,19 +1,19 @@
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     ProfileFacts,
     Project,
 )
-from resume_agent.profile.depth import (
+from resume_tailor_harness.profile.depth import (
     SUPPLY_TARGET,
     depth_topics,
     evidence_owners,
     owner_depth,
     planned_owners,
 )
-from resume_agent.tailor.length import format_depth_plan
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.tailor.length import format_depth_plan
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def _bullets(count: int, *, prefix: str = "bullet") -> list[Bullet]:

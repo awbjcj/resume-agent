@@ -1,32 +1,136 @@
-# Resume Agent
+# Résumé Tailor Harness
 
-[![CI](https://github.com/awbjcj/resume-agent/actions/workflows/ci-main.yml/badge.svg)](https://github.com/awbjcj/resume-agent/actions/workflows/ci-main.yml)
+[![CI](https://github.com/awbjcj/resume-tailor-harness/actions/workflows/ci-main.yml/badge.svg)](https://github.com/awbjcj/resume-tailor-harness/actions/workflows/ci-main.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-A local-first command-line and web job-hunt pipeline that can also run as a
-hosted multi-user service. Point it at your own resume and API keys, and it
-pulls job posts from multiple sources (job-board connectors, LinkedIn, or
-hand-pasted), scores them against a **fact-locked** profile of your real
-experience, helps you tailor a resume through a panel of reviewer agents,
-drafts a matching cover letter, renders both to PDF, and tracks every
-application in a workspace-scoped SQLite database.
+An **agent harness** for the whole job application, built on one rule: a model may
+draft, reframe, and critique, but it is never the last authority on what reaches
+a document. Point it at your own resume and API keys, and it pulls job posts from
+multiple sources (job-board connectors, LinkedIn, or hand-pasted), scores them
+against a **fact-locked** profile of your real experience, tailors a resume
+through a panel of reviewer agents, drafts a matching cover letter, renders both
+to PDF, and tracks every application in a workspace-scoped SQLite database — as a
+CLI, a local web app, or a hosted multi-user service.
 
 The guiding rule is **fact-lock**: every bullet on a tailored resume must trace
 back to a fact you actually provided. The agents rewrite and reframe; they never
-invent.
+invent. That is not a request in a prompt — it is a gate in the control flow, and
+[The harness](#the-harness) is how it is enforced.
 
 _Screenshots below are from a throwaway demo workspace with invented companies
 and jobs — not a real job search._
 
 ---
 
+## The harness
+
+Most of this repository is not "call a model and print the answer." It is the
+machinery that makes the answer trustworthy, repeatable, and affordable — six
+pieces that turn an open-ended writing task into a controllable one.
+
+### 1. Fact-lock is a gate, not an instruction
+
+Your resume and repositories are extracted into a **closed-schema** evidence
+profile (`data/profile/facts.json`): every fact carries an id, and the extraction
+schemas refuse fields they do not define, so a project source cannot quietly emit
+employment or education history.
+
+Every tailoring round is then judged by **three deterministic gates** that run
+in-process, with no model involved:
+
+| Gate               | Blocks the round when a draft…                              |
+| ------------------ | ------------------------------------------------------------- |
+| `provenance`       | cites a fact id that does not resolve to a real fact         |
+| `skill-naming`     | claims a skill your profile does not establish               |
+| `numeric-evidence` | states a number your evidence does not support               |
+
+Those three names are **reserved** — configuring a reviewer with one of them is a
+startup error, so editing the roster can never shadow a gate. Gates and LLM
+critiques then flow through a *single* verdict constructor
+(`tailor/verdict.py::aggregate`), so "what makes a round pass" has exactly one
+definition, and any failed gate blocks the round no matter how well it scored.
+
+Cover letters are guarded by the same deterministic provenance gate rather than
+by a reviewer panel.
+
+### 2. Skill-concentrated tailoring
+
+A task agent here is not a free-floating prompt. It is a stable **agent family**
+— job analysis, resume authoring, resume review, cover letter, interview, career
+lab, internal profile, sponsorship research — plus **exactly one** approved
+procedure.
+
+Those procedures are local `SKILL.md` files resolved through a root-confined,
+**SHA-256-verified registry** (`career_skills/registry.py`) against the pinned
+manifest in `skills-lock.json`. The model never chooses a path: it names a
+capability, and the registry returns one immutable `SkillRef` (name, version,
+digest, family). If the file was edited, symlinked, or points outside the skill
+root, that capability is **disabled** rather than silently served altered text.
+The resolved ref is persisted with every artifact and turn it influenced, so any
+output can be traced back to the exact bytes of the procedure that produced it.
+
+### 3. Bounded, read-only tool loops
+
+Where agents use tools — Source Scout, Profile Coach, sponsorship research,
+Career Lab — every tool inside the loop is **read-only** (search, probe,
+inspect). Writes happen *after* the loop, through deterministic services, behind
+your approval, and anything a tool "verified" is re-verified outside the loop
+before it is presented as validated. Scout *proposes* sources; Coach *drafts*
+notes you edit before saving; Career Lab output is draft-only by construction —
+it cannot apply, upload, send, or update your profile.
+
+### 4. Least-privilege prompting
+
+Reviewer context is scoped like a permission, not padded for convenience:
+
+- **Gate reviewers** see the draft, the job description, and *only the profile
+  facts that draft actually cites*.
+- **Advisory reviewers** (style, impact, formatting) see no raw profile at all.
+- Every third-party job description is wrapped in explicit untrusted-content
+  delimiters, so a JD carrying "ignore your instructions" is data, not policy.
+- A critique claiming the wrong reviewer identity is rejected, and a merged
+  advisory panel must cover exactly its configured roster — no dropped or
+  duplicated reviewers.
+
+### 5. Cost control expressed as control flow
+
+The reviewer panel is the expensive part, so the harness spends it carefully:
+
+- Mechanically provable gates run **before** the paid panel, so a citation error
+  reaches the reviser in the round it was made instead of costing a premium
+  fact-check round to rediscover.
+- A round that failed **only** on provenance earns a **free retry** that does not
+  consume one of the `max_rounds` quality passes — a cheap slip is not charged as
+  a quality failure.
+- Each revision builds from the **best gate-clean round**, not merely the latest,
+  so one bad revision cannot become the base for the next.
+- A scored regression stops the loop early instead of paying for another round.
+- Three model tiers (`CHEAP_MODEL`, `MID_MODEL`, `PREMIUM_MODEL`) are each
+  **provider-prefixed**, so cheap extraction can run on Gemini while the writer
+  stays on Claude — and an unused provider's SDK is never imported.
+
+### 6. Durable runs and custody
+
+Long operations are background **runs** with a durable event log: Server-Sent
+Events are resumable, cancellation is cooperative, and terminal outcomes land in
+an idempotent history, so a dropped browser connection cannot erase a result. In
+hosted mode each user gets an isolated workspace — their own database, corpus,
+secrets, and renders — and every user-influenced fetch goes through a
+DNS-rebinding-resistant egress gateway that validates each redirect and pins the
+address it validated.
+
+---
+
 ## How it works
 
-Jobs flow through a funnel. Each stage has one command that advances it, and two
-points where _you_ (not the agent) make the call.
+Jobs flow through a funnel. Each stage has one command that advances it, two
+points where _you_ (not the agent) make the call, and — at the two stages that
+produce a document — the deterministic gates from
+[The harness](#1-fact-lock-is-a-gate-not-an-instruction) standing between a draft
+and a saved artifact.
 
 ```
               ┌─ pull ───┐
@@ -138,12 +242,12 @@ but retains your named data volume.
 To build and run the image without Compose:
 
 ```bash
-docker build -t resume-agent .
-docker run --name resume-agent --init --restart unless-stopped \
+docker build -t resume-tailor-harness .
+docker run --name resume-tailor-harness --init --restart unless-stopped \
   -e APP_MODE=local \
   -p 127.0.0.1:8000:8000 \
-  -v resume-agent-data:/app/data \
-  resume-agent
+  -v resume-tailor-harness-data:/app/data \
+  resume-tailor-harness
 ```
 
 PowerShell accepts the same command with backticks instead of backslashes, or
@@ -160,7 +264,7 @@ dependencies and creates missing local config files without overwriting edits:
 
 ```bash
 uv run --no-project scripts/bootstrap.py
-uv run resume-agent setup                 # optional guided configuration
+uv run resume-tailor-harness setup                 # optional guided configuration
 uv run python scripts/dev.py              # API + frontend; Ctrl+C stops both
 ```
 
@@ -169,12 +273,34 @@ Prompt, and POSIX shells. If you use `make`, `make setup` and `make dev` are
 short aliases. Pass `--browser` to the bootstrap command only when you need
 browser-backed job sources such as LinkedIn.
 
-`resume-agent setup` walks through secrets, search criteria, and connectors and
+`resume-tailor-harness setup` walks through secrets, search criteria, and connectors and
 writes `.env` plus `config/*.yaml`. You can instead edit the files created from
 the checked-in examples.
 
 Everything else (the SQLite database, the `output/` and `data/` folders) is
 created automatically on first run.
+
+---
+
+## What the harness makes feasible
+
+Tailoring one resume well is the hard part; applying to fifty is the tiring part.
+Because every surface below is built on the same harness — same fact-locked
+profile, same verified skill registry, same read-only tool loops, same durable
+run substrate — the work that usually makes a job hunt collapse under its own
+weight becomes tractable:
+
+| Surface                  | What it removes from the job hunt                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| **Profile Coach**        | Evidence you never wrote down. Interviews you one question at a time and drafts only what you said. |
+| **Mock interviews**      | Rehearsing blind. Practises against a *specific* tailored role and scores the debrief.            |
+| **Career Lab**           | Negotiation prep, pivots, portfolio write-ups — 35 approved procedures, output stays a draft.     |
+| **Match-gap**            | Guessing what to learn next. Ranks the skills your target jobs demand and your profile lacks.     |
+| **Sponsorship evidence** | Applying blind to visa-hostile employers, using historical filings as a signal — never a promise. |
+| **Company intelligence** | Unprepared interviews. A cited employer brief, refreshed only when you ask.                       |
+| **Application timeline** | Losing track. Every round, outcome, and deadline in one dataset, exportable as CSV or calendar.    |
+| **Gmail sync**           | Manual status chasing. Reads your inbox and *proposes* status moves you approve.                  |
+| **Analytics**            | Repeating what does not work. Shows which sources and fit bands actually convert.                 |
 
 ### Career coaching: Profile Coach, Mock interviews, and Career Lab
 
@@ -203,7 +329,7 @@ cannot apply, upload, send, or update a profile.
 ![Career Lab — one verified skill at a time, output stays a draft](docs/screenshots/career-lab.png)
 
 ```bash
-uv run resume-agent career-lab "Prepare negotiation points" \
+uv run resume-tailor-harness career-lab "Prepare negotiation points" \
   --skill salary-negotiation-prep --offer-application-id 7
 ```
 
@@ -247,26 +373,30 @@ The notifications menu keeps durable success/failure/cancellation history for
 background runs, and the Dashboard summarizes practice-score trends and open
 source failures alongside the action queues.
 
+---
+
+## Deployment and integrations
+
 ### Hosted multi-user server
 
-`resume-agent serve` is an auth-free local application by default: it binds to
+`resume-tailor-harness serve` is an auth-free local application by default: it binds to
 loopback, reuses the existing administrator workspace (or creates a `local`
 workspace on first boot), and does not require account credentials. To expose a
 server or enable multiple users, opt into hosted mode and seed the first
 administrator before its first boot:
 
 ```bash
-uv run resume-agent serve --mode hosted --host 0.0.0.0
+uv run resume-tailor-harness serve --mode hosted --host 0.0.0.0
 ```
 
 ```env
 AUTH_USERNAME=owner
-AUTH_PASSWORD_HASH=<output of `uv run resume-agent hash-password`>
+AUTH_PASSWORD_HASH=<output of `uv run resume-tailor-harness hash-password`>
 SESSION_SECRET=<long random value>
 ```
 
 After signing in, create a single-use invite on the **Admin** page or with
-`resume-agent admin invite`. Members register at `/register`; each receives a
+`resume-tailor-harness admin invite`. Members register at `/register`; each receives a
 separate database, profile corpus, configuration, secrets, output, and run
 history. Administrators manage recurring USD-cost allowances, durable credits,
 effective-dated LLM rates, active-job caps, and concurrent-run caps. Token usage
@@ -311,7 +441,7 @@ _type_ of client you create depends on how you run the app:
 1. Create an OAuth client ID of type _Web application_ (the same Cloud console
    project as above is fine). Add an **authorized redirect URI** of
    `<your-domain>/api/gmail/callback` — e.g. `http://localhost:8000/api/gmail/callback`
-   for local `resume-agent serve`, or your Railway domain for a cloud deploy
+   for local `resume-tailor-harness serve`, or your Railway domain for a cloud deploy
    (see [Deploying to Railway](docs/deploy-railway.md#gmail-oauth-optional)).
 2. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` in `.env` (or
    as platform environment variables on Railway). This is the **platform
@@ -330,7 +460,7 @@ rejects sign-in for anyone not on that list.
 Skip this entirely if you'd rather track statuses by hand in the web app —
 everything else works without it.
 
-All commands below are shown as `uv run resume-agent …`. If you'd rather not
+All commands below are shown as `uv run resume-tailor-harness …`. If you'd rather not
 prefix every call, activate the venv first (`source .venv/bin/activate`, or
 `.venv\Scripts\Activate.ps1` on Windows) and drop the `uv run`.
 
@@ -340,40 +470,40 @@ prefix every call, activate the venv first (`source .venv/bin/activate`, or
 
 ```bash
 # 1. Build your fact-lock profile from your resume (+ optional GitHub)
-uv run resume-agent profile build
+uv run resume-tailor-harness profile build
 
 # 2. Get some jobs into the pipeline (pick one)
-uv run resume-agent pull --limit 10            # job-board connectors, or…
-uv run resume-agent scrape --limit 10          # LinkedIn, or…
-uv run resume-agent addjob --company "Acme" --title "Backend Engineer" --jd-file jd.txt
+uv run resume-tailor-harness pull --limit 10            # job-board connectors, or…
+uv run resume-tailor-harness scrape --limit 10          # LinkedIn, or…
+uv run resume-tailor-harness addjob --company "Acme" --title "Backend Engineer" --jd-file jd.txt
 
 # 3. Score them against your profile and your search criteria
-uv run resume-agent discover
-uv run resume-agent match-gap                 # optional: see missing high-demand skills
+uv run resume-tailor-harness discover
+uv run resume-tailor-harness match-gap                 # optional: see missing high-demand skills
 
 # 4. Review the shortlist and approve the keepers in the web app
 make dev                                # http://localhost:5173
 
 # 5. Tailor every approved job, and draft matching cover letters
-uv run resume-agent tailor --approved
-uv run resume-agent cover-letter --approved
+uv run resume-tailor-harness tailor --approved
+uv run resume-tailor-harness cover-letter --approved
 
 # 6. Render a specific resume version to PDF (id shown in the web app)
-uv run resume-agent render 12
+uv run resume-tailor-harness render 12
 
 # 7. Track submissions back in the web app
 make dev                                # http://localhost:5173
 
 # 8. Later, let Gmail propose status updates (review first, then apply)
-uv run resume-agent sync-status               # lists proposals only
-uv run resume-agent sync-status --apply        # applies them
+uv run resume-tailor-harness sync-status               # lists proposals only
+uv run resume-tailor-harness sync-status --apply        # applies them
 ```
 
 ---
 
 ## Command reference
 
-Run `uv run resume-agent --help` for the full list, or `… <command> --help` for
+Run `uv run resume-tailor-harness --help` for the full list, or `… <command> --help` for
 any single command. Every command accepts `--db-url` to point at a different
 database (handy for testing).
 
@@ -383,7 +513,7 @@ Reads your resume (and GitHub, if configured) into `data/profile/facts.json`.
 This file is the **ground truth** every later step is allowed to draw from.
 
 ```bash
-uv run resume-agent profile build [--sources config/profile_sources.yaml] [--out data/profile/facts.json] [--refresh]
+uv run resume-tailor-harness profile build [--sources config/profile_sources.yaml] [--out data/profile/facts.json] [--refresh]
 ```
 
 `--refresh` rebuilds the file and **discards any manual edits** — otherwise the
@@ -394,7 +524,7 @@ command refuses to overwrite an existing `facts.json`.
 The job description is read from `--jd-file`, or from stdin if you omit it.
 
 ```bash
-uv run resume-agent addjob --company "Acme" --title "Backend Engineer" --url "https://…" --jd-file jd.txt
+uv run resume-tailor-harness addjob --company "Acme" --title "Backend Engineer" --url "https://…" --jd-file jd.txt
 ```
 
 Duplicates (same URL or identical JD text) are detected and skipped.
@@ -407,7 +537,7 @@ by hand _once_. The session is saved to `.linkedin_profile/` and reused after
 that.
 
 ```bash
-uv run resume-agent scrape [--search config/search.yaml] [--limit 25]
+uv run resume-tailor-harness scrape [--search config/search.yaml] [--limit 25]
 ```
 
 `--limit` caps how many postings are processed this run (be a polite scraper).
@@ -431,7 +561,7 @@ which boards/sources to hit come from `connectors.yaml`.
 | `companies`  | Careers URLs in `connectors.yaml` — auto-detects Greenhouse, Lever, Ashby, Workday, Tesla, Google |
 
 ```bash
-uv run resume-agent pull [--connectors config/connectors.yaml] [--search config/search.yaml] [--limit 25]
+uv run resume-tailor-harness pull [--connectors config/connectors.yaml] [--search config/search.yaml] [--limit 25]
 ```
 
 `--limit` caps postings **per connector** this run. If `config/connectors.yaml`
@@ -443,7 +573,7 @@ Shows each connector's last run: when it ran, how many jobs it added, and the
 last error (if any). A quick health check after `pull`.
 
 ```bash
-uv run resume-agent sources
+uv run resume-tailor-harness sources
 ```
 
 ### `discover` — extract, filter, and score
@@ -453,7 +583,7 @@ criteria, drops anything failing your hard filters, and assigns each survivor a
 0–100 fit score with a rationale → `shortlisted`.
 
 ```bash
-uv run resume-agent discover [--search config/search.yaml] [--facts data/profile/facts.json]
+uv run resume-tailor-harness discover [--search config/search.yaml] [--facts data/profile/facts.json]
 ```
 
 ### `match-gap` — target-job skills your profile does not show
@@ -467,9 +597,9 @@ This is read-only: it never edits `facts.json`. The same view is at
 ![Match-gap — skills your target jobs demand that your profile doesn't show](docs/screenshots/match-gap.png)
 
 ```bash
-uv run resume-agent match-gap                 # aggregate, most-demanded first
-uv run resume-agent match-gap --job-id 7      # gaps for one target job
-uv run resume-agent match-gap --llm           # optional synonym pass, e.g. k8s/Kubernetes
+uv run resume-tailor-harness match-gap                 # aggregate, most-demanded first
+uv run resume-tailor-harness match-gap --job-id 7      # gaps for one target job
+uv run resume-tailor-harness match-gap --llm           # optional synonym pass, e.g. k8s/Kubernetes
 ```
 
 ### `approve` — the cost gate (CLI alternative to the web app)
@@ -477,20 +607,24 @@ uv run resume-agent match-gap --llm           # optional synonym pass, e.g. k8s/
 Marks a shortlisted job `approved` so it's eligible for tailoring.
 
 ```bash
-uv run resume-agent approve 7
+uv run resume-tailor-harness approve 7
 ```
 
 ### `tailor` — draft + review loop
 
 Tailors one job (`--job-id`) or every approved job (`--approved`). Each round is
-saved as a `ResumeVersion`; the reviewer panel runs until a draft passes or
-`max_rounds` is hit. The **fact-check** reviewer is a hard gate. Optional
+saved as a `ResumeVersion` and judged by the three deterministic gates plus the
+reviewer panel; the loop revises until a draft passes or `max_rounds` quality
+passes are spent. The **fact-check** reviewer is a hard gate, and so are
+`provenance`, `skill-naming`, and `numeric-evidence` — a round that fails *only*
+on provenance earns a free retry that does not spend a quality pass. Optional
 `config/style_guide.md` prose is appended beneath the fixed fact-lock rules for
-the writer, reviser, and reviewers.
+the writer, reviser, and reviewers; it governs how resumes are written, never
+what is claimed. See [The harness](#the-harness) for the full control flow.
 
 ```bash
-uv run resume-agent tailor --approved
-uv run resume-agent tailor --job-id 7
+uv run resume-tailor-harness tailor --approved
+uv run resume-tailor-harness tailor --job-id 7
 ```
 
 ### `cover-letter` — draft a fact-locked cover letter
@@ -503,8 +637,8 @@ paragraph cites real fact ids and loops a reviser until the draft is clean (or
 than `tailor`, so there's no reviewer panel — just the gate.
 
 ```bash
-uv run resume-agent cover-letter --approved
-uv run resume-agent cover-letter --job-id 7
+uv run resume-tailor-harness cover-letter --approved
+uv run resume-tailor-harness cover-letter --job-id 7
 ```
 
 ### `render` — version → PDF
@@ -514,7 +648,7 @@ Renders a stored resume version (by id) through the Typst template into
 earlier PDF.
 
 ```bash
-uv run resume-agent render 12 [--config config/render.yaml]
+uv run resume-tailor-harness render 12 [--config config/render.yaml]
 ```
 
 ### Web app — visual boards
@@ -549,9 +683,9 @@ offer) with deterministic rules plus an optional cheap-LLM fallback, and
 CLI, Desktop-app path).
 
 ```bash
-uv run resume-agent sync-status                 # list proposals only
-uv run resume-agent sync-status --apply         # apply them
-uv run resume-agent sync-status --max-results 100
+uv run resume-tailor-harness sync-status                 # list proposals only
+uv run resume-tailor-harness sync-status --apply         # apply them
+uv run resume-tailor-harness sync-status --max-results 100
 ```
 
 ---
@@ -562,8 +696,8 @@ The same pipeline is exposed over HTTP for the React frontend (and any API
 client):
 
 ```bash
-uv run resume-agent serve                       # http://127.0.0.1:8000
-uv run resume-agent serve --mode hosted --host 0.0.0.0 --port 8080
+uv run resume-tailor-harness serve                       # http://127.0.0.1:8000
+uv run resume-tailor-harness serve --mode hosted --host 0.0.0.0 --port 8080
 ```
 
 The default local mode skips account authentication and always activates the
@@ -674,7 +808,7 @@ silently re-based).
 
 | Path                                                  | Contents                                                                                                                                                        |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data/resume_agent.db`                                | All jobs, resume versions, cover letters, and applications (SQLite).                                                                                            |
+| `data/resume_tailor_harness.db`                                | All jobs, resume versions, cover letters, and applications (SQLite).                                                                                            |
 | `data/profile/facts.json`                             | Your fact-lock profile.                                                                                                                                         |
 | `data/connector_runs.json`                            | Per-connector run history that `sources` reads.                                                                                                                 |
 | `data/gmail_token.json`                               | Cached Gmail OAuth token for CLI/local-mode `sync-status` (git-ignored). The API/web app stores each user's token inside their own workspace instead.           |
@@ -728,10 +862,11 @@ Found a vulnerability? Please report it privately — see the
 [security policy](.github/SECURITY.md). Do not open a public issue for security
 reports.
 
-The repository root also carries a self-audit of the public multi-user
-deployment: `resume-agent-threat-model.md` (trust boundaries, attacker model,
-prioritized threat table) and `security_best_practices_report.md` (findings
-with severity, evidence, and fixes). See [ADR-0008](docs/adr/0008-egress-gateway-tenant-storage-canonical-origin.md)
+`docs/` also carries a self-audit of the public multi-user deployment:
+[`resume-tailor-harness-threat-model.md`](docs/resume-tailor-harness-threat-model.md)
+(trust boundaries, attacker model, prioritized threat table) and
+[`security_best_practices_report.md`](docs/security_best_practices_report.md)
+(findings with severity, evidence, and fixes). See [ADR-0008](docs/adr/0008-egress-gateway-tenant-storage-canonical-origin.md)
 for the architectural response already shipped (SSRF-safe outbound gateway,
 tenant-confined artifact downloads, configuration-only OAuth/cookie origin)
 and the P0/P1 items still open.

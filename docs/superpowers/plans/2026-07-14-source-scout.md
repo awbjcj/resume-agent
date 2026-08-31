@@ -73,13 +73,13 @@ These amendments are authoritative when a later code sketch conflicts with them.
 
 | File | Responsibility |
 | --- | --- |
-| `src/resume_agent/llm_runner.py` (modify) | `tool_kwargs()` — the one place agno tool-loop bounds live |
-| `src/resume_agent/discovery/source_scout.py` (create) | Scout schemas, `check_source` tool factory, research + formatter agent builders |
-| `src/resume_agent/services/sources.py` (modify) | `preview_source(limit=, browser=)` params; `provider="scrape"` branch in `preview_source`/`add_source` |
-| `src/resume_agent/api/schemas/sources.py` (modify) | `"scrape"` in `SourceProvider`; `DiscoverSourcesIn` |
-| `src/resume_agent/services/source_discovery.py` (create) | Context assembly, dedupe, worker `run_source_discovery` |
-| `src/resume_agent/api/routers/sources.py` (modify) | `POST /api/sources/discover` (202 + RunOut) |
-| `src/resume_agent/cli.py` (modify) | `resume-agent scout "<prompt>" [--add]` |
+| `src/resume_tailor_harness/llm_runner.py` (modify) | `tool_kwargs()` — the one place agno tool-loop bounds live |
+| `src/resume_tailor_harness/discovery/source_scout.py` (create) | Scout schemas, `check_source` tool factory, research + formatter agent builders |
+| `src/resume_tailor_harness/services/sources.py` (modify) | `preview_source(limit=, browser=)` params; `provider="scrape"` branch in `preview_source`/`add_source` |
+| `src/resume_tailor_harness/api/schemas/sources.py` (modify) | `"scrape"` in `SourceProvider`; `DiscoverSourcesIn` |
+| `src/resume_tailor_harness/services/source_discovery.py` (create) | Context assembly, dedupe, worker `run_source_discovery` |
+| `src/resume_tailor_harness/api/routers/sources.py` (modify) | `POST /api/sources/discover` (202 + RunOut) |
+| `src/resume_tailor_harness/cli.py` (modify) | `resume-tailor-harness scout "<prompt>" [--add]` |
 | `web/src/features/sources/use-discover.ts` + `DiscoverCompaniesDialog.tsx` (create) | Prompt → run tracking → candidate table → add-selected |
 
 ---
@@ -87,7 +87,7 @@ These amendments are authoritative when a later code sketch conflicts with them.
 ### Task 1: `tool_kwargs()` — shared agno tool-loop bound
 
 **Files:**
-- Modify: `src/resume_agent/llm_runner.py` (next to `retry_kwargs`, line ~325)
+- Modify: `src/resume_tailor_harness/llm_runner.py` (next to `retry_kwargs`, line ~325)
 - Test: `tests/test_llm_runner.py` (append)
 
 **Interfaces:**
@@ -97,7 +97,7 @@ These amendments are authoritative when a later code sketch conflicts with them.
 
 ```python
 def test_tool_kwargs_bounds_tool_loop():
-    from resume_agent.llm_runner import tool_kwargs
+    from resume_tailor_harness.llm_runner import tool_kwargs
 
     assert tool_kwargs() == {"tool_call_limit": 15}
 ```
@@ -127,7 +127,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/llm_runner.py tests/test_llm_runner.py
+git add src/resume_tailor_harness/llm_runner.py tests/test_llm_runner.py
 git commit -m "feat: add tool_kwargs() shared agno tool-loop bound"
 ```
 
@@ -136,7 +136,7 @@ git commit -m "feat: add tool_kwargs() shared agno tool-loop bound"
 ### Task 2: `preview_source` probe parameters (`limit`, `browser`)
 
 **Files:**
-- Modify: `src/resume_agent/services/sources.py:102-233` (`_preview_connector`, `preview_source`)
+- Modify: `src/resume_tailor_harness/services/sources.py:102-233` (`_preview_connector`, `preview_source`)
 - Test: `tests/test_sources_service.py` (append; if the file doesn't exist, find the existing tests for `preview_source` with `rg "preview_source" tests/` and append there)
 
 **Interfaces:**
@@ -146,14 +146,14 @@ git commit -m "feat: add tool_kwargs() shared agno tool-loop bound"
 
 ```python
 def test_preview_source_forwards_limit_and_disables_browser(monkeypatch):
-    from resume_agent.services import sources as svc
+    from resume_tailor_harness.services import sources as svc
 
     seen: dict = {}
 
     class FakeConnector:
         def fetch(self, search, limit=None, skip_seen=None):
             seen["limit"] = limit
-            from resume_agent.discovery.connectors.base import FetchResult
+            from resume_tailor_harness.discovery.connectors.base import FetchResult
 
             return FetchResult(jobs=[], failures={})
 
@@ -207,7 +207,7 @@ Expected: all PASS (existing preview tests unaffected — defaults preserved)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/sources.py tests/test_sources_service.py
+git add src/resume_tailor_harness/services/sources.py tests/test_sources_service.py
 git commit -m "feat: preview_source accepts probe limit and browser toggle"
 ```
 
@@ -216,8 +216,8 @@ git commit -m "feat: preview_source accepts probe limit and browser toggle"
 ### Task 3: `provider="scrape"` branch in preview/add
 
 **Files:**
-- Modify: `src/resume_agent/services/sources.py` (`preview_source`, `add_source`)
-- Modify: `src/resume_agent/api/schemas/sources.py:23-36` (`SourceProvider`)
+- Modify: `src/resume_tailor_harness/services/sources.py` (`preview_source`, `add_source`)
+- Modify: `src/resume_tailor_harness/api/schemas/sources.py:23-36` (`SourceProvider`)
 - Test: `tests/test_sources_service.py` (append)
 
 **Interfaces:**
@@ -228,8 +228,8 @@ git commit -m "feat: preview_source accepts probe limit and browser toggle"
 
 ```python
 def test_add_scrape_target_writes_scrape_section(tmp_path, monkeypatch):
-    from resume_agent.config import Settings
-    from resume_agent.services import sources as svc
+    from resume_tailor_harness.config import Settings
+    from resume_tailor_harness.services import sources as svc
 
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
@@ -243,7 +243,7 @@ def test_add_scrape_target_writes_scrape_section(tmp_path, monkeypatch):
     )
     assert view.kind == "scrape"
 
-    from resume_agent.discovery.connectors.config import load_connectors_config
+    from resume_tailor_harness.discovery.connectors.config import load_connectors_config
 
     config = load_connectors_config(str(connectors))
     assert config.scrape.enabled is True
@@ -253,8 +253,8 @@ def test_add_scrape_target_writes_scrape_section(tmp_path, monkeypatch):
 
 def test_add_scrape_target_refused_without_browser(tmp_path, monkeypatch):
     import pytest
-    from resume_agent.config import Settings
-    from resume_agent.services import sources as svc
+    from resume_tailor_harness.config import Settings
+    from resume_tailor_harness.services import sources as svc
 
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=False)
@@ -269,8 +269,8 @@ def test_add_scrape_target_refused_without_browser(tmp_path, monkeypatch):
 
 def test_add_scrape_target_duplicate_refused(tmp_path, monkeypatch):
     import pytest
-    from resume_agent.config import Settings
-    from resume_agent.services import sources as svc
+    from resume_tailor_harness.config import Settings
+    from resume_tailor_harness.services import sources as svc
 
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
@@ -296,7 +296,7 @@ Expected: FAIL — `SourceError: Unknown source provider 'scrape'`
 
 - [ ] **Step 3: Implement.** In `services/sources.py`:
 
-Add imports: `ScrapeTarget` to the existing `from resume_agent.discovery.connectors.config import (...)` block.
+Add imports: `ScrapeTarget` to the existing `from resume_tailor_harness.discovery.connectors.config import (...)` block.
 
 In `preview_source`, before the `_connection_url` call, add an early branch:
 
@@ -349,7 +349,7 @@ Expected: PASS, no regressions
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/sources.py src/resume_agent/api/schemas/sources.py tests/test_sources_service.py
+git add src/resume_tailor_harness/services/sources.py src/resume_tailor_harness/api/schemas/sources.py tests/test_sources_service.py
 git commit -m "feat: add provider=scrape branch to preview/add source"
 ```
 
@@ -358,7 +358,7 @@ git commit -m "feat: add provider=scrape branch to preview/add source"
 ### Task 4: Scout schemas, `check_source` tool, agent builders
 
 **Files:**
-- Create: `src/resume_agent/discovery/source_scout.py`
+- Create: `src/resume_tailor_harness/discovery/source_scout.py`
 - Test: `tests/test_source_scout.py` (create)
 
 **Interfaces:**
@@ -376,7 +376,7 @@ git commit -m "feat: add provider=scrape branch to preview/add source"
 ```python
 import json
 
-from resume_agent.discovery.source_scout import (
+from resume_tailor_harness.discovery.source_scout import (
     MAX_CANDIDATES,
     ScoutReport,
     make_check_source_tool,
@@ -384,8 +384,8 @@ from resume_agent.discovery.source_scout import (
 
 
 def test_check_source_tool_reports_probe_result(monkeypatch):
-    from resume_agent.discovery import source_scout
-    from resume_agent.services.sources import SourcePreview
+    from resume_tailor_harness.discovery import source_scout
+    from resume_tailor_harness.services.sources import SourcePreview
 
     seen: dict = {}
 
@@ -420,9 +420,9 @@ def test_scout_report_caps_are_constants():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_source_scout.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.source_scout'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.source_scout'`
 
-- [ ] **Step 3: Implement `src/resume_agent/discovery/source_scout.py`:**
+- [ ] **Step 3: Implement `src/resume_tailor_harness/discovery/source_scout.py`:**
 
 ```python
 """Source Scout agents: prompt -> web research -> ScoutReport (ADR 0005).
@@ -442,8 +442,8 @@ from typing import Literal
 from agno.agent import Agent
 from pydantic import Field
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
@@ -452,8 +452,8 @@ from resume_agent.llm_runner import (
     tool_kwargs,
     use_json_mode_for,
 )
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.services.sources import preview_source
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.services.sources import preview_source
 
 MAX_CANDIDATES = 12
 _PROBE_LIMIT = 5
@@ -562,7 +562,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/source_scout.py tests/test_source_scout.py
+git add src/resume_tailor_harness/discovery/source_scout.py tests/test_source_scout.py
 git commit -m "feat: add Source Scout agents and check_source probe tool"
 ```
 
@@ -571,7 +571,7 @@ git commit -m "feat: add Source Scout agents and check_source probe tool"
 ### Task 5: Discovery service — context, dedupe, worker
 
 **Files:**
-- Create: `src/resume_agent/services/source_discovery.py`
+- Create: `src/resume_tailor_harness/services/source_discovery.py`
 - Test: `tests/test_source_discovery.py` (create)
 
 **Interfaces:**
@@ -586,9 +586,9 @@ git commit -m "feat: add Source Scout agents and check_source probe tool"
 import asyncio
 from pathlib import Path
 
-from resume_agent.discovery.source_scout import ScoutCandidate, ScoutReport
-from resume_agent.services import source_discovery as svc
-from resume_agent.services.sources import SourcePreview
+from resume_tailor_harness.discovery.source_scout import ScoutCandidate, ScoutReport
+from resume_tailor_harness.services import source_discovery as svc
+from resume_tailor_harness.services.sources import SourcePreview
 
 
 class FakeReporter:
@@ -697,7 +697,7 @@ def test_empty_report_is_success_not_error(monkeypatch, tmp_path):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_source_discovery.py -v`
 Expected: FAIL — module not found
 
-- [ ] **Step 3: Implement `src/resume_agent/services/source_discovery.py`:**
+- [ ] **Step 3: Implement `src/resume_tailor_harness/services/source_discovery.py`:**
 
 ```python
 """Source Scout use-case: context assembly, agent run, deterministic re-validation.
@@ -713,23 +713,23 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from resume_agent.concurrency import gather_isolated
-from resume_agent.discovery.connectors.config import load_connectors_config
-from resume_agent.discovery.connectors.detect import identify_host
-from resume_agent.discovery.connectors.sources import list_source_views
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.discovery.source_scout import (
+from resume_tailor_harness.concurrency import gather_isolated
+from resume_tailor_harness.discovery.connectors.config import load_connectors_config
+from resume_tailor_harness.discovery.connectors.detect import identify_host
+from resume_tailor_harness.discovery.connectors.sources import list_source_views
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.discovery.source_scout import (
     MAX_CANDIDATES,
     ScoutReport,
     build_scout_formatter_agent,
     build_scout_research_agent,
     make_check_source_tool,
 )
-from resume_agent.llm_runner import Runner
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.store import load_facts
-from resume_agent.services.sources import preview_source
-from resume_agent.config import Settings
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.services.sources import preview_source
+from resume_tailor_harness.config import Settings
 
 _NO_ATS_MARKER = "Could not detect a known ATS"
 _TOP_SKILLS = 15
@@ -793,7 +793,7 @@ def _existing_keys(connectors_path: str) -> set[str]:
         keys.add(f"lever:{board.token}")
     for board in config.ashby.boards:
         keys.add(f"ashby:{board.token}")
-    from resume_agent.discovery.connectors.sources import NATIVE_URL_KINDS
+    from resume_tailor_harness.discovery.connectors.sources import NATIVE_URL_KINDS
 
     for kind in NATIVE_URL_KINDS:
         for board in getattr(config, kind).boards:
@@ -905,7 +905,7 @@ def run_source_discovery(
     return {"prompt": prompt, "candidates": rows}
 ```
 
-Note: `search.role_anchors` / `search.locations` — check the real attribute names on `SearchConfig` in `discovery/search_config.py` before finishing and adjust (`rg "role_anchors|locations" src/resume_agent/discovery/search_config.py`).
+Note: `search.role_anchors` / `search.locations` — check the real attribute names on `SearchConfig` in `discovery/search_config.py` before finishing and adjust (`rg "role_anchors|locations" src/resume_tailor_harness/discovery/search_config.py`).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -915,8 +915,8 @@ Expected: PASS
 - [ ] **Step 5: Run ruff and commit**
 
 ```bash
-ruff check src/resume_agent/services/source_discovery.py
-git add src/resume_agent/services/source_discovery.py tests/test_source_discovery.py
+ruff check src/resume_tailor_harness/services/source_discovery.py
+git add src/resume_tailor_harness/services/source_discovery.py tests/test_source_discovery.py
 git commit -m "feat: source discovery worker with dedupe and re-validation"
 ```
 
@@ -925,8 +925,8 @@ git commit -m "feat: source discovery worker with dedupe and re-validation"
 ### Task 6: API — `POST /api/sources/discover`
 
 **Files:**
-- Modify: `src/resume_agent/api/schemas/sources.py` (append `DiscoverSourcesIn`)
-- Modify: `src/resume_agent/api/routers/sources.py`
+- Modify: `src/resume_tailor_harness/api/schemas/sources.py` (append `DiscoverSourcesIn`)
+- Modify: `src/resume_tailor_harness/api/routers/sources.py`
 - Test: `tests/api/test_sources_router.py` (append)
 
 **Interfaces:**
@@ -937,7 +937,7 @@ git commit -m "feat: source discovery worker with dedupe and re-validation"
 
 ```python
 def test_discover_launches_run_and_stamps_result(monkeypatch):
-    from resume_agent.api.routers import sources as sources_router
+    from resume_tailor_harness.api.routers import sources as sources_router
 
     monkeypatch.setattr(
         sources_router, "resolve_api_key", lambda model_id: "sk-test"
@@ -970,7 +970,7 @@ def test_discover_launches_run_and_stamps_result(monkeypatch):
 
 
 def test_discover_refuses_without_llm_key(monkeypatch):
-    from resume_agent.api.routers import sources as sources_router
+    from resume_tailor_harness.api.routers import sources as sources_router
 
     monkeypatch.setattr(sources_router, "resolve_api_key", lambda model_id: "")
     client = _client()
@@ -997,18 +997,18 @@ In `api/routers/sources.py`, add imports and the route:
 ```python
 from fastapi import APIRouter, Depends, Request
 
-from resume_agent.api.deps import (
+from resume_tailor_harness.api.deps import (
     get_config_store,
     get_profile_dir,
     get_run_manager,
     get_settings_dep,
 )
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.api.schemas.sources import DiscoverSourcesIn
-from resume_agent.llm_runner import plan_search, resolve_api_key
-from resume_agent.services.source_discovery import run_source_discovery
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.api.schemas.sources import DiscoverSourcesIn
+from resume_tailor_harness.llm_runner import plan_search, resolve_api_key
+from resume_tailor_harness.services.source_discovery import run_source_discovery
 
 
 @router.post("/sources/discover", response_model=RunOut, status_code=202)
@@ -1063,21 +1063,21 @@ Re-run: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api contracts/ tests/api/test_sources_router.py
+git add src/resume_tailor_harness/api contracts/ tests/api/test_sources_router.py
 git commit -m "feat: POST /api/sources/discover launches source-discovery run"
 ```
 
 ---
 
-### Task 7: CLI — `resume-agent scout`
+### Task 7: CLI — `resume-tailor-harness scout`
 
 **Files:**
-- Modify: `src/resume_agent/cli.py` (new command after `sources_cmd`, line ~597)
+- Modify: `src/resume_tailor_harness/cli.py` (new command after `sources_cmd`, line ~597)
 - Test: `tests/test_cli.py` (append; follow that file's existing `CliRunner` pattern — check with `rg "CliRunner" tests/test_cli.py`)
 
 **Interfaces:**
 - Consumes: `run_source_discovery`, `add_source`, `SourceError`; the CLI's existing `DEFAULT_CONNECTORS`, `DEFAULT_SEARCH`, `_tenant_cli_path` helpers.
-- Produces: `resume-agent scout "<prompt>" [--add]` — prints the candidate table; `--add` adds every validated candidate via `add_source(url=...)`.
+- Produces: `resume-tailor-harness scout "<prompt>" [--add]` — prints the candidate table; `--add` adds every validated candidate via `add_source(url=...)`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1085,7 +1085,7 @@ git commit -m "feat: POST /api/sources/discover launches source-discovery run"
 def test_scout_command_prints_and_adds(monkeypatch, tmp_path):
     from typer.testing import CliRunner
 
-    from resume_agent import cli
+    from resume_tailor_harness import cli
 
     added = []
 
@@ -1119,10 +1119,10 @@ def test_scout_command_prints_and_adds(monkeypatch, tmp_path):
         }
 
     monkeypatch.setattr(
-        "resume_agent.services.source_discovery.run_source_discovery", fake_run
+        "resume_tailor_harness.services.source_discovery.run_source_discovery", fake_run
     )
     monkeypatch.setattr(
-        "resume_agent.services.sources.add_source",
+        "resume_tailor_harness.services.sources.add_source",
         lambda url=None, **kwargs: added.append(url) or None,
     )
 
@@ -1138,7 +1138,7 @@ def test_scout_command_prints_and_adds(monkeypatch, tmp_path):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli.py::test_scout_command_prints_and_adds -v`
 Expected: FAIL — `No such command 'scout'`
 
-- [ ] **Step 3: Implement** in `cli.py` (imports inside the function, matching the file's lazy-import style; `ProgressReporter` import follows existing usage — check `rg "ProgressReporter" src/resume_agent/cli.py` and reuse the CLI's existing progress pattern, else pass a minimal inline reporter):
+- [ ] **Step 3: Implement** in `cli.py` (imports inside the function, matching the file's lazy-import style; `ProgressReporter` import follows existing usage — check `rg "ProgressReporter" src/resume_tailor_harness/cli.py` and reuse the CLI's existing progress pattern, else pass a minimal inline reporter):
 
 ```python
 @app.command("scout")
@@ -1153,8 +1153,8 @@ def scout_cmd(
     ),
 ) -> None:
     """Discover and validate new company sources from a free-text prompt."""
-    from resume_agent.services.source_discovery import run_source_discovery
-    from resume_agent.services.sources import SourceError, add_source
+    from resume_tailor_harness.services.source_discovery import run_source_discovery
+    from resume_tailor_harness.services.sources import SourceError, add_source
 
     class _EchoReporter:
         def begin(self, total, label, **extra):
@@ -1201,8 +1201,8 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli.py
-git commit -m "feat: resume-agent scout command"
+git add src/resume_tailor_harness/cli.py tests/test_cli.py
+git commit -m "feat: resume-tailor-harness scout command"
 ```
 
 ---

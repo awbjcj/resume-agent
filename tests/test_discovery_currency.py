@@ -1,4 +1,4 @@
-from resume_agent.discovery import currency
+from resume_tailor_harness.discovery import currency
 
 
 def test_usd_rate_for_reads_and_caches_frankfurter_quote(monkeypatch):

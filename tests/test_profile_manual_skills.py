@@ -1,5 +1,5 @@
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.manual_skills import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.manual_skills import (
     ManualAliasEntry,
     ManualSkillEntry,
     ManualSkillsLedger,
@@ -9,7 +9,7 @@ from resume_agent.profile.manual_skills import (
     load_manual_skills,
     save_manual_skills,
 )
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 
 def _facts():

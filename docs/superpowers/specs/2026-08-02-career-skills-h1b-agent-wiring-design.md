@@ -459,7 +459,7 @@ Session creation and messages return `202 RunOut`; the existing run registry and
 stream endpoints provide active-run recovery. Job detail adds typed H-1B
 capability/evidence fields without exposing raw provider output.
 
-The CLI adds `resume-agent career-lab` with optional `--skill` and typed job,
+The CLI adds `resume-tailor-harness career-lab` with optional `--skill` and typed job,
 resume, and offer references. It follows the Scout command's interactive
 session lifecycle and streaming sink. The web adds `/career-lab`, using shared
 guided-workspace components with a skill picker, context selectors, responsive

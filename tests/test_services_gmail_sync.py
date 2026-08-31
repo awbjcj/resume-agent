@@ -3,12 +3,12 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.gmail.errors import GmailNotConnected
-from resume_agent.progress import ProgressReporter
-from resume_agent.services.gmail_sync import run_gmail_sync
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.gmail.errors import GmailNotConnected
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.services.gmail_sync import run_gmail_sync
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 class _FakeListing:

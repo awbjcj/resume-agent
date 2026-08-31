@@ -2210,7 +2210,7 @@ wheels = [
 ]
 
 [[package]]
-name = "resume-agent"
+name = "resume-tailor-harness"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

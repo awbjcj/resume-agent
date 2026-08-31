@@ -69,8 +69,8 @@ Admins are exempt from the **per-user allowance** and **not** exempt from the **
 
 | Path                                            | Responsibility                                                                                 |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `src/resume_agent/tenancy/spend.py`             | `SpendGate` — the one seam that resolves key selection + budget for a phase and settles usage. |
-| `src/resume_agent/discovery/connectors/http.py` | `BoardSession` — pooled, retrying, timeout-owning HTTP for configured board endpoints.         |
+| `src/resume_tailor_harness/tenancy/spend.py`             | `SpendGate` — the one seam that resolves key selection + budget for a phase and settles usage. |
+| `src/resume_tailor_harness/discovery/connectors/http.py` | `BoardSession` — pooled, retrying, timeout-owning HTTP for configured board endpoints.         |
 | `scripts/perf_harness.py`                       | Deterministic counters for DB queries, HTTP connections, and prompt tokens per phase.          |
 | `tests/tenancy/test_spend_gate.py`              | Gate resolution, phase reuse, invalidation on charge, admin exemption.                         |
 | `tests/test_board_session.py`                   | Connection reuse, retry, timeout, per-host politeness.                                         |
@@ -80,17 +80,17 @@ Admins are exempt from the **per-user allowance** and **not** exempt from the **
 
 | Path                                               | Change                                                                         |
 | -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `src/resume_agent/tenancy/quotas.py`               | Admin exclusion; `BEGIN DEFERRED` for read-only snapshots.                     |
-| `src/resume_agent/tenancy/limits.py`               | Admin exclusion; delegate to `SpendGate`.                                      |
-| `src/resume_agent/tenancy/costs.py`                | TTL cache for rate lookups.                                                    |
-| `src/resume_agent/tenancy/system_db.py`            | `ix_usage_events_own_key_ts`.                                                  |
-| `src/resume_agent/llm_runner.py`                   | Off-loop gate call; per-runner key resolution; `cache_system_prompt` plumbing. |
-| `src/resume_agent/h1b/service.py`                  | `expect_schema` at both sites; batched cache read/write.                       |
-| `src/resume_agent/h1b/mcp.py`                      | Connect/close asymmetry; bounded result returns instead of raising.            |
-| `src/resume_agent/discovery/connectors/*.py`       | Accept and use the shared `BoardSession`.                                      |
-| `src/resume_agent/discovery/connectors/harvest.py` | Bounded-concurrency detail fetch.                                              |
-| `src/resume_agent/discovery/fit.py`                | Profile into the cacheable system block.                                       |
-| `src/resume_agent/api/runs/sse.py`                 | Notifier-driven; file read off the loop.                                       |
+| `src/resume_tailor_harness/tenancy/quotas.py`               | Admin exclusion; `BEGIN DEFERRED` for read-only snapshots.                     |
+| `src/resume_tailor_harness/tenancy/limits.py`               | Admin exclusion; delegate to `SpendGate`.                                      |
+| `src/resume_tailor_harness/tenancy/costs.py`                | TTL cache for rate lookups.                                                    |
+| `src/resume_tailor_harness/tenancy/system_db.py`            | `ix_usage_events_own_key_ts`.                                                  |
+| `src/resume_tailor_harness/llm_runner.py`                   | Off-loop gate call; per-runner key resolution; `cache_system_prompt` plumbing. |
+| `src/resume_tailor_harness/h1b/service.py`                  | `expect_schema` at both sites; batched cache read/write.                       |
+| `src/resume_tailor_harness/h1b/mcp.py`                      | Connect/close asymmetry; bounded result returns instead of raising.            |
+| `src/resume_tailor_harness/discovery/connectors/*.py`       | Accept and use the shared `BoardSession`.                                      |
+| `src/resume_tailor_harness/discovery/connectors/harvest.py` | Bounded-concurrency detail fetch.                                              |
+| `src/resume_tailor_harness/discovery/fit.py`                | Profile into the cacheable system block.                                       |
+| `src/resume_tailor_harness/api/runs/sse.py`                 | Notifier-driven; file read off the loop.                                       |
 
 ---
 
@@ -293,7 +293,7 @@ W1-T1 is docs-only and can land any time, independent of W0.
 - **Adzuna's visible-browser enrichment.** Documented, deliberate, and browser-bound; concurrency there fights the anti-bot behaviour the current design exists to survive.
 - **Any change to fact-lock, provenance, the review roster, or `score_threshold`.** `CLAUDE.md` records those as unmeasured pending the eval arms in `evals/RESULTS.md`; changing them without running the evals would be exactly the guessing this plan is trying to remove.
 - **Replacing agno, or introducing a second agent framework.** Every finding here is inside the existing `build_model` / `AgentRunner` seam.
-- **Envelope-encrypting user provider keys, OAuth state browser-binding, CSRF tokens, sandboxing Typst/transcription.** Real and recorded in `resume-agent-threat-model.md`; they are a security workstream, not this one.
+- **Envelope-encrypting user provider keys, OAuth state browser-binding, CSRF tokens, sandboxing Typst/transcription.** Real and recorded in `resume-tailor-harness-threat-model.md`; they are a security workstream, not this one.
 - **A multi-agent redesign.** The single-agent loop has not failed a measured eval, so there is nothing to justify one.
 
 ---

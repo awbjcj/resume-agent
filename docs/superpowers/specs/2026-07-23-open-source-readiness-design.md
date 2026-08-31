@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-23
 **Status:** Approved (design), pending implementation plan
-**Goal:** Make `resume-agent` safe and feasible to publish as a public GitHub
+**Goal:** Make `resume-tailor-harness` safe and feasible to publish as a public GitHub
 repository: automated quality gates (CI/CD), a security pass, licensing, an
 open-source-ready README, and the community-health files a public project needs.
 
@@ -10,9 +10,9 @@ open-source-ready README, and the community-health files a public project needs.
 
 ## Context
 
-`resume-agent` is a ~25.5k-line Python + React application (FastAPI backend,
+`resume-tailor-harness` is a ~25.5k-line Python + React application (FastAPI backend,
 Vite/React frontend, one SQLite DB) currently in a **private** GitHub repo
-(`github.com/awbjcj/resume-agent`). It has **1,514 offline tests** but **no CI**,
+(`github.com/awbjcj/resume-tailor-harness`). It has **1,514 offline tests** but **no CI**,
 **no LICENSE**, and **no community-health files**.
 
 ### Pre-work security audit (already performed)
@@ -25,7 +25,7 @@ The riskiest part of open-sourcing — leaked secrets in git history — is **cl
 | `data/` (personal profile facts) tracked | ❌ Never tracked |
 | `workspace-*.tar.gz` tracked | ❌ Never tracked (`*.tar.gz` gitignored) |
 | Hardcoded API keys in tracked source | ❌ None found |
-| Personal identifiers in tracked files | Only `awbjcj` (public GitHub handle) in `resume-agent-dossier.md` — already public via the repo URL, not a leak |
+| Personal identifiers in tracked files | Only `awbjcj` (public GitHub handle) in `resume-tailor-harness-dossier.md` — already public via the repo URL, not a leak |
 | Real email addresses in tracked files | ❌ None |
 
 `.gitignore` already correctly excludes `.env`, `.env.*` (keeping

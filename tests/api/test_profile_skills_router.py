@@ -1,9 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.store import save_facts
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.store import save_facts
 
 
 @pytest.fixture()

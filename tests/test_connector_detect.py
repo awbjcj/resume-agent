@@ -1,5 +1,5 @@
-import resume_agent.discovery.connectors.detect as detect
-from resume_agent.discovery.connectors.detect import (
+import resume_tailor_harness.discovery.connectors.detect as detect
+from resume_tailor_harness.discovery.connectors.detect import (
     AtsInspection,
     AtsTarget,
     detect_ats,

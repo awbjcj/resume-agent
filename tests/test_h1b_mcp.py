@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.h1b.mcp import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.h1b.mcp import (
     H1B_INCLUDE_TOOLS,
     H1BResultTooLarge,
     build_h1b_tools,

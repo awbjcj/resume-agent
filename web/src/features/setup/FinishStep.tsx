@@ -61,7 +61,7 @@ export function FinishStep() {
           </Button>
         )}
         <Button onClick={() => {
-          localStorage.setItem("resume-agent-setup-dismissed", "1");
+          localStorage.setItem("resume-tailor-harness-setup-dismissed", "1");
           navigate("/");
         }}>
           Go to dashboard

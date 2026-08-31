@@ -1,14 +1,14 @@
 import httpx
 import pytest
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.harvest import (
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.harvest import (
     FetchResult,
     gate_and_limit,
     harvest,
     harvest_detailed,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _ANCHORED = SearchConfig(role_anchors=["engineer"])
 
@@ -254,7 +254,7 @@ def test_harvest_detailed_stops_at_limit():
 def test_detail_fetches_run_concurrently_per_host(monkeypatch):
     """The detail fetches are independent; serialising them was the whole cost."""
     import time
-    from resume_agent.config import Settings, env_settings
+    from resume_tailor_harness.config import Settings, env_settings
 
     delay = 0.05
     survivors = 20
@@ -280,7 +280,7 @@ def test_detail_fetches_run_concurrently_per_host(monkeypatch):
 
     env_settings.cache_clear()
     monkeypatch.setattr(
-        "resume_agent.config.get_settings",
+        "resume_tailor_harness.config.get_settings",
         lambda: Settings(_env_file=None, detail_fetch_concurrency=4),  # type: ignore[call-arg]
     )
 
@@ -301,7 +301,7 @@ def test_detail_fetches_run_concurrently_per_host(monkeypatch):
 
 def test_a_limit_still_bounds_how_many_details_are_fetched(monkeypatch):
     """Concurrency must not turn `limit=5` into "fetch every candidate first"."""
-    from resume_agent.config import Settings
+    from resume_tailor_harness.config import Settings
 
     calls: list[str] = []
 
@@ -324,7 +324,7 @@ def test_a_limit_still_bounds_how_many_details_are_fetched(monkeypatch):
         for i in range(20)
     ]
     monkeypatch.setattr(
-        "resume_agent.config.get_settings",
+        "resume_tailor_harness.config.get_settings",
         lambda: Settings(_env_file=None, detail_fetch_concurrency=4),  # type: ignore[call-arg]
     )
 

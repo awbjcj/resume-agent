@@ -38,13 +38,13 @@ On-disk storage paths, `manifest.json`, and bulk export are untouched.
 ### Task 1: Friendly filename helpers in `render/export.py`
 
 **Files:**
-- Modify: `src/resume_agent/render/export.py`
+- Modify: `src/resume_tailor_harness/render/export.py`
 - Test: `tests/test_render_export.py`
 
 **Interfaces:**
 - Produces: `resume_download_name(job: Job, version: ResumeVersion) -> str` and
   `cover_letter_download_name(job: Job, cover_letter: CoverLetter) -> str`, both
-  importable from `resume_agent.render.export`. Later tasks call these with a
+  importable from `resume_tailor_harness.render.export`. Later tasks call these with a
   `Job` (has `.company: str | None`, `.title: str | None`) and the matching
   `ResumeVersion`/`CoverLetter` (has `.id: int | None`).
 
@@ -52,7 +52,7 @@ On-disk storage paths, `manifest.json`, and bulk export are untouched.
 
 Add to `tests/test_render_export.py` (near `test_job_slug_and_version_filenames`,
 using the same imports already in that file — add `cover_letter_download_name`
-and `resume_download_name` to the existing `from resume_agent.render.export
+and `resume_download_name` to the existing `from resume_tailor_harness.render.export
 import (...)` block):
 
 ```python
@@ -103,7 +103,7 @@ Expected: FAIL — `ImportError: cannot import name 'resume_download_name'`
 
 - [x] **Step 3: Implement the helpers**
 
-In `src/resume_agent/render/export.py`, add after the existing `_origin` helper
+In `src/resume_tailor_harness/render/export.py`, add after the existing `_origin` helper
 (the module already `import re`s indirectly via `render/renderer.py`'s `_slug`,
 so add an explicit `import re` at the top of the file if not already present —
 check first; currently the file has no top-level `re` import, only via the
@@ -128,7 +128,7 @@ def cover_letter_download_name(job: Job, cover_letter: CoverLetter) -> str:
     return f"{company}-{title}-CoverLetter-v{cover_letter.id}.pdf"
 ```
 
-Add `import re` near the top of `src/resume_agent/render/export.py` (alongside
+Add `import re` near the top of `src/resume_tailor_harness/render/export.py` (alongside
 the existing `import json`) if it isn't already imported at module level.
 
 - [x] **Step 4: Run tests to verify they pass**
@@ -139,7 +139,7 @@ Expected: PASS (all tests in the file, including the pre-existing ones).
 - [x] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/render/export.py tests/test_render_export.py
+git add src/resume_tailor_harness/render/export.py tests/test_render_export.py
 git commit -m "feat(render): add friendly resume/cover-letter download filename helpers"
 ```
 
@@ -148,13 +148,13 @@ git commit -m "feat(render): add friendly resume/cover-letter download filename 
 ### Task 2: Use the friendly name in the resume PDF download route
 
 **Files:**
-- Modify: `src/resume_agent/api/routers/resumes.py`
+- Modify: `src/resume_tailor_harness/api/routers/resumes.py`
 - Test: `tests/api/test_job_detail.py`
 
 **Interfaces:**
 - Consumes: `resume_download_name(job, version) -> str` from Task 1
-  (`resume_agent.render.export`); `get_job(session, job_id) -> Job | None` from
-  `resume_agent.tracking.repository` (already imported project-wide, not yet in
+  (`resume_tailor_harness.render.export`); `get_job(session, job_id) -> Job | None` from
+  `resume_tailor_harness.tracking.repository` (already imported project-wide, not yet in
   this file).
 
 - [x] **Step 1: Write the failing test**
@@ -194,15 +194,15 @@ Expected: FAIL — assertion error, `content-disposition` still names
 
 - [x] **Step 3: Implement the route change**
 
-In `src/resume_agent/api/routers/resumes.py`, add the import and change
+In `src/resume_tailor_harness/api/routers/resumes.py`, add the import and change
 `download_pdf`:
 
 ```python
-from resume_agent.render.export import resume_download_name
-from resume_agent.tracking.repository import get_job, get_resume_version
+from resume_tailor_harness.render.export import resume_download_name
+from resume_tailor_harness.tracking.repository import get_job, get_resume_version
 ```
 
-(replace the existing `from resume_agent.tracking.repository import
+(replace the existing `from resume_tailor_harness.tracking.repository import
 get_resume_version` line with the combined import above, keeping alphabetical
 order alongside any other names already imported from that module in the
 file).
@@ -237,7 +237,7 @@ assert on filename and remain unaffected).
 - [x] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/resumes.py tests/api/test_job_detail.py
+git add src/resume_tailor_harness/api/routers/resumes.py tests/api/test_job_detail.py
 git commit -m "feat(api): friendly filename for resume PDF single-file download"
 ```
 
@@ -246,13 +246,13 @@ git commit -m "feat(api): friendly filename for resume PDF single-file download"
 ### Task 3: Use the friendly name in the cover-letter PDF download route
 
 **Files:**
-- Modify: `src/resume_agent/api/routers/cover_letters.py`
+- Modify: `src/resume_tailor_harness/api/routers/cover_letters.py`
 - Create: `tests/api/test_cover_letters_download.py`
 
 **Interfaces:**
 - Consumes: `cover_letter_download_name(job, cover_letter) -> str` from Task 1
-  (`resume_agent.render.export`); `get_job(session, job_id) -> Job | None` from
-  `resume_agent.tracking.repository`.
+  (`resume_tailor_harness.render.export`); `get_job(session, job_id) -> Job | None` from
+  `resume_tailor_harness.tracking.repository`.
 
 - [x] **Step 1: Write the failing tests**
 
@@ -261,9 +261,9 @@ Create `tests/api/test_cover_letters_download.py`:
 ```python
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import CoverLetter, Job
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import CoverLetter, Job
 
 
 def _client():
@@ -322,15 +322,15 @@ test FAILS on the `content-disposition` assertion (still names `ok.pdf`).
 
 - [x] **Step 3: Implement the route change**
 
-In `src/resume_agent/api/routers/cover_letters.py`, add the import and change
+In `src/resume_tailor_harness/api/routers/cover_letters.py`, add the import and change
 `download_cover_letter_pdf`:
 
 ```python
-from resume_agent.render.export import cover_letter_download_name
-from resume_agent.tracking.repository import get_cover_letter, get_job
+from resume_tailor_harness.render.export import cover_letter_download_name
+from resume_tailor_harness.tracking.repository import get_cover_letter, get_job
 ```
 
-(replace the existing `from resume_agent.tracking.repository import
+(replace the existing `from resume_tailor_harness.tracking.repository import
 get_cover_letter` line with the combined import above).
 
 ```python
@@ -371,6 +371,6 @@ Expected: PASS (no regressions elsewhere).
 - [x] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/cover_letters.py tests/api/test_cover_letters_download.py
+git add src/resume_tailor_harness/api/routers/cover_letters.py tests/api/test_cover_letters_download.py
 git commit -m "feat(api): friendly filename for cover-letter PDF single-file download"
 ```

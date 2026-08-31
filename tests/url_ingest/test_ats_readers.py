@@ -3,9 +3,9 @@ from pathlib import Path
 
 import httpx
 
-from resume_agent.discovery.connectors.detect import AtsTarget, identify_host
-from resume_agent.discovery.url_ingest import ats_readers
-from resume_agent.discovery.url_ingest.ats_readers import ATS_READERS, _from_json_ld
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget, identify_host
+from resume_tailor_harness.discovery.url_ingest import ats_readers
+from resume_tailor_harness.discovery.url_ingest.ats_readers import ATS_READERS, _from_json_ld
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 

@@ -6,8 +6,8 @@ from openai.types.responses import Response, ResponseStreamEvent
 import pytest
 from pydantic import BaseModel
 
-import resume_agent.llm_runner as llm_runner
-from resume_agent.llm_runner import (
+import resume_tailor_harness.llm_runner as llm_runner
+from resume_tailor_harness.llm_runner import (
     anthropic_version,
     anthropic_web_search_tool,
     build_model,
@@ -96,7 +96,7 @@ def test_deepseek_rides_the_responses_api_under_its_own_provider_name():
     # a subclass of the OpenAI Responses adapter that inherited provider="OpenAI"
     # would bill every DeepSeek call to the OpenAI budget, resolve the OpenAI key,
     # and report `openai:deepseek-...` from `_agent_model_id`.
-    from resume_agent.tenancy.costs import normalize_provider
+    from resume_tailor_harness.tenancy.costs import normalize_provider
 
     model = build_model("deepseek:deepseek-v4-flash", api_key="k")
     assert model.provider == "DeepSeek"

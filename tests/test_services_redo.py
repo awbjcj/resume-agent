@@ -1,11 +1,11 @@
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.services import redo
-from resume_agent.services.errors import StageFailure, list_error_records
-from resume_agent.tailor.service import TailorOutcome
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.services import redo
+from resume_tailor_harness.services.errors import StageFailure, list_error_records
+from resume_tailor_harness.tailor.service import TailorOutcome
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-# Resume Agent v1.5 — Quality + Lean-Cost — Implementation Plan
+# Résumé Tailor Harness v1.5 — Quality + Lean-Cost — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,7 +6,7 @@
 
 **Architecture:** Additive, surgical changes on the existing sync `Runner` pipeline. New behavior is concentrated in small, deep modules (`tailor/provenance.py`, `tailor/length.py`) that several callers reuse; the review panel gains a real seam (lean vs. evidence input per reviewer); the Typst template gains an ordering wrapper. No concurrency. New parameters are optional-with-defaults so existing tests stay green.
 
-**Tech Stack:** Python 3.13, Pydantic v2, SQLModel, Typst (`typst` pkg), `pypdf`, `pytest`, `uv`. Spec: `docs/superpowers/specs/2026-06-10-resume-agent-v1.5-design.md`.
+**Tech Stack:** Python 3.13, Pydantic v2, SQLModel, Typst (`typst` pkg), `pypdf`, `pytest`, `uv`. Spec: `docs/superpowers/specs/2026-06-10-resume-tailor-harness-v1.5-design.md`.
 
 **Conventions:**
 
@@ -21,20 +21,20 @@
 
 | File                                            | Responsibility                                                                                                                       | Change                                                                                                                                                   |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/resume_agent/models/resume.py`             | The structured, fact-locked resume the renderer consumes                                                                             | Add `Tailored{Publication,Certification,Award,Volunteer}`; add `publications/certifications/awards/languages/volunteer/section_order` to `ResumeContent` |
-| `src/resume_agent/tailor/provenance.py` _(new)_ | **Deep module:** the single place that indexes profile fact ids, finds referenced ids, checks them, and resolves the evidence subset | Create                                                                                                                                                   |
-| `src/resume_agent/tailor/length.py` _(new)_     | One-page budget formatting + deterministic resume size stats                                                                         | Create                                                                                                                                                   |
-| `src/resume_agent/tailor/review_config.py`      | Reviewer roster + thresholds                                                                                                         | Add optional `LengthBudget`                                                                                                                              |
-| `src/resume_agent/tailor/panel.py`              | Run reviewers; **seam:** compose input per reviewer (lean vs evidence)                                                               | Replace single shared input with per-reviewer composition                                                                                                |
-| `src/resume_agent/tailor/verdict.py`            | Aggregate critiques into a verdict                                                                                                   | Thread `provenance_passed` into the gate                                                                                                                 |
-| `src/resume_agent/tailor/workflow.py`           | The draft→gate→review→revise loop                                                                                                    | Run the deterministic provenance gate first; short-circuit broken provenance; pass the budget to tailor/reviser                                          |
-| `src/resume_agent/tailor/tailoring.py`          | Compose tailor/reviser prompts                                                                                                       | Add the optional budget line                                                                                                                             |
-| `src/resume_agent/profile/extractor.py`         | Resume-text → `ProfileFacts`                                                                                                         | Default to the mid model                                                                                                                                 |
-| `src/resume_agent/profile/merge.py`             | Combine resume + GitHub facts                                                                                                        | Dedupe GitHub projects against resume projects; enrich                                                                                                   |
-| `src/resume_agent/profile/validate.py` _(new)_  | Deterministic coverage report over `ProfileFacts` + raw text                                                                         | Create                                                                                                                                                   |
-| `src/resume_agent/profile/build.py`             | Orchestrate profile build                                                                                                            | Return the coverage report alongside facts                                                                                                               |
-| `src/resume_agent/cli.py`                       | `profile build` command                                                                                                              | Print the coverage report                                                                                                                                |
-| `src/resume_agent/discovery/pipeline.py`        | Discovery funnel stages                                                                                                              | Commit once per stage, not per row                                                                                                                       |
+| `src/resume_tailor_harness/models/resume.py`             | The structured, fact-locked resume the renderer consumes                                                                             | Add `Tailored{Publication,Certification,Award,Volunteer}`; add `publications/certifications/awards/languages/volunteer/section_order` to `ResumeContent` |
+| `src/resume_tailor_harness/tailor/provenance.py` _(new)_ | **Deep module:** the single place that indexes profile fact ids, finds referenced ids, checks them, and resolves the evidence subset | Create                                                                                                                                                   |
+| `src/resume_tailor_harness/tailor/length.py` _(new)_     | One-page budget formatting + deterministic resume size stats                                                                         | Create                                                                                                                                                   |
+| `src/resume_tailor_harness/tailor/review_config.py`      | Reviewer roster + thresholds                                                                                                         | Add optional `LengthBudget`                                                                                                                              |
+| `src/resume_tailor_harness/tailor/panel.py`              | Run reviewers; **seam:** compose input per reviewer (lean vs evidence)                                                               | Replace single shared input with per-reviewer composition                                                                                                |
+| `src/resume_tailor_harness/tailor/verdict.py`            | Aggregate critiques into a verdict                                                                                                   | Thread `provenance_passed` into the gate                                                                                                                 |
+| `src/resume_tailor_harness/tailor/workflow.py`           | The draft→gate→review→revise loop                                                                                                    | Run the deterministic provenance gate first; short-circuit broken provenance; pass the budget to tailor/reviser                                          |
+| `src/resume_tailor_harness/tailor/tailoring.py`          | Compose tailor/reviser prompts                                                                                                       | Add the optional budget line                                                                                                                             |
+| `src/resume_tailor_harness/profile/extractor.py`         | Resume-text → `ProfileFacts`                                                                                                         | Default to the mid model                                                                                                                                 |
+| `src/resume_tailor_harness/profile/merge.py`             | Combine resume + GitHub facts                                                                                                        | Dedupe GitHub projects against resume projects; enrich                                                                                                   |
+| `src/resume_tailor_harness/profile/validate.py` _(new)_  | Deterministic coverage report over `ProfileFacts` + raw text                                                                         | Create                                                                                                                                                   |
+| `src/resume_tailor_harness/profile/build.py`             | Orchestrate profile build                                                                                                            | Return the coverage report alongside facts                                                                                                               |
+| `src/resume_tailor_harness/cli.py`                       | `profile build` command                                                                                                              | Print the coverage report                                                                                                                                |
+| `src/resume_tailor_harness/discovery/pipeline.py`        | Discovery funnel stages                                                                                                              | Commit once per stage, not per row                                                                                                                       |
 | `templates/resume.typ`                          | PDF layout (LLM-free)                                                                                                                | Rework to hybrid layout; render new sections + enriched education; honor `section_order`                                                                 |
 | `config/review.yaml.example`                    | Reviewer config doc                                                                                                                  | Document `length_budget`                                                                                                                                 |
 
@@ -46,14 +46,14 @@ Test files mirror these under `tests/` (one per task below).
 
 **Files:**
 
-- Modify: `src/resume_agent/models/resume.py`
+- Modify: `src/resume_tailor_harness/models/resume.py`
 - Test: `tests/test_models_resume.py`
 
 - [ ] **Step 1: Write the failing tests** — append to `tests/test_models_resume.py`:
 
 ```python
-from resume_agent.models.profile import Language
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Language
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredAward,
     TailoredCertification,
@@ -97,12 +97,12 @@ def test_resume_content_carries_new_sections_round_trip():
 Run: `uv run pytest tests/test_models_resume.py -q`
 Expected: FAIL — `ImportError` / `cannot import name 'TailoredPublication'`.
 
-- [ ] **Step 3: Implement** — in `src/resume_agent/models/resume.py`, add the import and new models, and extend `ResumeContent`.
+- [ ] **Step 3: Implement** — in `src/resume_tailor_harness/models/resume.py`, add the import and new models, and extend `ResumeContent`.
 
 Change the import line at the top:
 
 ```python
-from resume_agent.models.profile import Contact, Education, Language
+from resume_tailor_harness.models.profile import Contact, Education, Language
 ```
 
 Add these classes after `TailoredProject`:
@@ -171,7 +171,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/resume.py tests/test_models_resume.py
+git add src/resume_tailor_harness/models/resume.py tests/test_models_resume.py
 git commit -m "feat(models): restore publications/certs/awards/languages/volunteer + section_order on ResumeContent"
 ```
 
@@ -183,13 +183,13 @@ git commit -m "feat(models): restore publications/certs/awards/languages/volunte
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/provenance.py`
+- Create: `src/resume_tailor_harness/tailor/provenance.py`
 - Test: `tests/test_tailor_provenance.py`
 
 - [ ] **Step 1: Write the failing test** — create `tests/test_tailor_provenance.py`:
 
 ```python
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -197,14 +197,14 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
     TailoredSkill,
 )
-from resume_agent.tailor.provenance import (
+from resume_tailor_harness.tailor.provenance import (
     ProvenanceReport,
     check_provenance,
     index_facts,
@@ -263,18 +263,18 @@ def test_check_provenance_flags_fabricated_id():
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `uv run pytest tests/test_tailor_provenance.py -q`
-Expected: FAIL — module `resume_agent.tailor.provenance` does not exist.
+Expected: FAIL — module `resume_tailor_harness.tailor.provenance` does not exist.
 
-- [ ] **Step 3: Implement** — create `src/resume_agent/tailor/provenance.py`:
+- [ ] **Step 3: Implement** — create `src/resume_tailor_harness/tailor/provenance.py`:
 
 ```python
 from typing import Any
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
 
 
 class ProvenanceReport(ExtensibleModel):
@@ -342,7 +342,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/provenance.py tests/test_tailor_provenance.py
+git add src/resume_tailor_harness/tailor/provenance.py tests/test_tailor_provenance.py
 git commit -m "feat(tailor): deterministic provenance index + check"
 ```
 
@@ -352,13 +352,13 @@ git commit -m "feat(tailor): deterministic provenance index + check"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/provenance.py`
+- Modify: `src/resume_tailor_harness/tailor/provenance.py`
 - Test: `tests/test_tailor_provenance.py`
 
 - [ ] **Step 1: Write the failing test** — append to `tests/test_tailor_provenance.py`:
 
 ```python
-from resume_agent.tailor.provenance import resolve_evidence
+from resume_tailor_harness.tailor.provenance import resolve_evidence
 
 
 def test_resolve_evidence_returns_only_referenced_facts():
@@ -376,7 +376,7 @@ def test_resolve_evidence_returns_only_referenced_facts():
 Run: `uv run pytest tests/test_tailor_provenance.py::test_resolve_evidence_returns_only_referenced_facts -q`
 Expected: FAIL — `cannot import name 'resolve_evidence'`.
 
-- [ ] **Step 3: Implement** — append to `src/resume_agent/tailor/provenance.py`:
+- [ ] **Step 3: Implement** — append to `src/resume_tailor_harness/tailor/provenance.py`:
 
 ```python
 def resolve_evidence(content: ResumeContent, facts: ProfileFacts) -> dict[str, Any]:
@@ -397,7 +397,7 @@ Expected: PASS (all provenance tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/provenance.py tests/test_tailor_provenance.py
+git add src/resume_tailor_harness/tailor/provenance.py tests/test_tailor_provenance.py
 git commit -m "feat(tailor): provenance-resolved evidence view for the fact-checker"
 ```
 
@@ -407,22 +407,22 @@ git commit -m "feat(tailor): provenance-resolved evidence view for the fact-chec
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/length.py`
-- Modify: `src/resume_agent/tailor/review_config.py`
+- Create: `src/resume_tailor_harness/tailor/length.py`
+- Modify: `src/resume_tailor_harness/tailor/review_config.py`
 - Test: `tests/test_tailor_length.py`
 
 - [ ] **Step 1: Write the failing test** — create `tests/test_tailor_length.py`:
 
 ```python
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
 )
-from resume_agent.tailor.length import format_budget, resume_stats
-from resume_agent.tailor.review_config import LengthBudget, ReviewConfig
+from resume_tailor_harness.tailor.length import format_budget, resume_stats
+from resume_tailor_harness.tailor.review_config import LengthBudget, ReviewConfig
 
 
 def test_length_budget_defaults_present_on_config():
@@ -462,7 +462,7 @@ def test_resume_stats_counts_experiences_projects_and_bullets():
 Run: `uv run pytest tests/test_tailor_length.py -q`
 Expected: FAIL — `LengthBudget` and module `tailor.length` do not exist.
 
-- [ ] **Step 3a: Implement config** — in `src/resume_agent/tailor/review_config.py`, add `LengthBudget` and wire it onto `ReviewConfig`:
+- [ ] **Step 3a: Implement config** — in `src/resume_tailor_harness/tailor/review_config.py`, add `LengthBudget` and wire it onto `ReviewConfig`:
 
 ```python
 class LengthBudget(ExtensibleModel):
@@ -480,11 +480,11 @@ class ReviewConfig(ExtensibleModel):
     length_budget: LengthBudget = Field(default_factory=LengthBudget)
 ```
 
-- [ ] **Step 3b: Implement length helpers** — create `src/resume_agent/tailor/length.py`:
+- [ ] **Step 3b: Implement length helpers** — create `src/resume_tailor_harness/tailor/length.py`:
 
 ```python
-from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def format_budget(budget: LengthBudget) -> str:
@@ -515,7 +515,7 @@ Expected: PASS (new tests pass; existing review_config tests unaffected).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/length.py src/resume_agent/tailor/review_config.py tests/test_tailor_length.py
+git add src/resume_tailor_harness/tailor/length.py src/resume_tailor_harness/tailor/review_config.py tests/test_tailor_length.py
 git commit -m "feat(tailor): length budget config + deterministic resume stats"
 ```
 
@@ -527,8 +527,8 @@ git commit -m "feat(tailor): length budget config + deterministic resume stats"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/panel.py`
-- Modify: `src/resume_agent/tailor/workflow.py` (call site only; full rewrite is Task 6)
+- Modify: `src/resume_tailor_harness/tailor/panel.py`
+- Modify: `src/resume_tailor_harness/tailor/workflow.py` (call site only; full rewrite is Task 6)
 - Test: `tests/test_tailor_panel.py`
 
 - [ ] **Step 1: Rewrite the test** — replace the whole body of `tests/test_tailor_panel.py`:
@@ -536,27 +536,27 @@ git commit -m "feat(tailor): length budget config + deterministic resume stats"
 ```python
 import pytest
 
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     ProfileFacts,
     Skill,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredSkill,
 )
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.panel import (
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.panel import (
     compose_evidence_review_input,
     compose_lean_review_input,
     review_one,
     run_panel,
 )
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 class _Result:
@@ -600,7 +600,7 @@ def test_lean_input_has_no_raw_profile():
 
 
 def test_evidence_input_carries_only_referenced_facts():
-    from resume_agent.tailor.provenance import resolve_evidence
+    from resume_tailor_harness.tailor.provenance import resolve_evidence
     evidence = resolve_evidence(_content(), _facts())
     text = compose_evidence_review_input(_content(), "Backend role", evidence)
     assert "b1" in text
@@ -637,20 +637,20 @@ def test_run_panel_routes_gate_to_evidence_and_others_to_lean():
 Run: `uv run pytest tests/test_tailor_panel.py -q`
 Expected: FAIL — `compose_lean_review_input` / `compose_evidence_review_input` do not exist; `run_panel` signature mismatch.
 
-- [ ] **Step 3: Implement** — replace the whole body of `src/resume_agent/tailor/panel.py`:
+- [ ] **Step 3: Implement** — replace the whole body of `src/resume_tailor_harness/tailor/panel.py`:
 
 ```python
 import json
 from collections.abc import Mapping
 from typing import Any
 
-from resume_agent.llm_runner import Runner
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.length import resume_stats
-from resume_agent.tailor.provenance import resolve_evidence
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.length import resume_stats
+from resume_tailor_harness.tailor.provenance import resolve_evidence
+from resume_tailor_harness.tailor.review_config import ReviewConfig
 
 
 def compose_lean_review_input(content: ResumeContent, jd_text: str, stats: str) -> str:
@@ -707,10 +707,10 @@ def run_panel(
     return critiques
 ```
 
-- [ ] **Step 4: Patch the workflow call site** — in `src/resume_agent/tailor/workflow.py`, the `run_panel(...)` call and the now-dead `compose_review_input` import will break. Update the import line:
+- [ ] **Step 4: Patch the workflow call site** — in `src/resume_tailor_harness/tailor/workflow.py`, the `run_panel(...)` call and the now-dead `compose_review_input` import will break. Update the import line:
 
 ```python
-from resume_agent.tailor.panel import run_panel
+from resume_tailor_harness.tailor.panel import run_panel
 ```
 
 and change the panel call inside the loop from:
@@ -737,7 +737,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/panel.py src/resume_agent/tailor/workflow.py tests/test_tailor_panel.py
+git add src/resume_tailor_harness/tailor/panel.py src/resume_tailor_harness/tailor/workflow.py tests/test_tailor_panel.py
 git commit -m "perf(tailor): per-reviewer payload trimming (lean vs evidence input)"
 ```
 
@@ -747,8 +747,8 @@ git commit -m "perf(tailor): per-reviewer payload trimming (lean vs evidence inp
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/verdict.py`
-- Modify: `src/resume_agent/tailor/workflow.py`
+- Modify: `src/resume_tailor_harness/tailor/verdict.py`
+- Modify: `src/resume_tailor_harness/tailor/workflow.py`
 - Test: `tests/test_tailor_verdict.py`, `tests/test_tailor_workflow.py`
 
 - [ ] **Step 1: Write the failing verdict test** — append to `tests/test_tailor_verdict.py`:
@@ -770,7 +770,7 @@ def test_provenance_failure_blocks_gate_even_if_reviewers_pass():
 Run: `uv run pytest tests/test_tailor_verdict.py::test_provenance_failure_blocks_gate_even_if_reviewers_pass -q`
 Expected: FAIL — `aggregate()` got an unexpected keyword argument `provenance_passed`.
 
-- [ ] **Step 3: Implement verdict change** — in `src/resume_agent/tailor/verdict.py`, change the `aggregate` signature and the gate computation:
+- [ ] **Step 3: Implement verdict change** — in `src/resume_tailor_harness/tailor/verdict.py`, change the `aggregate` signature and the gate computation:
 
 ```python
 def aggregate(
@@ -809,8 +809,8 @@ def aggregate(
 
 ```python
 def test_broken_provenance_short_circuits_panel():
-    from resume_agent.models.profile import Bullet, Experience
-    from resume_agent.models.resume import TailoredBullet, TailoredExperience
+    from resume_tailor_harness.models.profile import Bullet, Experience
+    from resume_tailor_harness.models.resume import TailoredBullet, TailoredExperience
 
     facts = ProfileFacts(
         contact=Contact(name="Ada"),
@@ -859,22 +859,22 @@ def test_broken_provenance_short_circuits_panel():
 Run: `uv run pytest tests/test_tailor_workflow.py -q`
 Expected: FAIL — no `"provenance"` synthetic critique yet (panel runs and the exploding reviewer raises, or gate logic missing).
 
-- [ ] **Step 6: Implement the workflow** — replace the whole body of `src/resume_agent/tailor/workflow.py`:
+- [ ] **Step 6: Implement the workflow** — replace the whole body of `src/resume_tailor_harness/tailor/workflow.py`:
 
 ```python
 from collections.abc import Mapping
 
-from resume_agent.llm_runner import Runner
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.tailor.panel import run_panel
-from resume_agent.tailor.provenance import ProvenanceReport, check_provenance
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.tailoring import compose_revise_input, compose_tailor_input, revise, tailor
-from resume_agent.tailor.verdict import PanelVerdict, aggregate
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.tailor.panel import run_panel
+from resume_tailor_harness.tailor.provenance import ProvenanceReport, check_provenance
+from resume_tailor_harness.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.tailoring import compose_revise_input, compose_tailor_input, revise, tailor
+from resume_tailor_harness.tailor.verdict import PanelVerdict, aggregate
 
 
 class TailorRound(ExtensibleModel):
@@ -940,7 +940,7 @@ Expected: PASS — the deterministic gate blocks the fabricated-id round without
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/tailor/verdict.py src/resume_agent/tailor/workflow.py tests/test_tailor_verdict.py tests/test_tailor_workflow.py
+git add src/resume_tailor_harness/tailor/verdict.py src/resume_tailor_harness/tailor/workflow.py tests/test_tailor_verdict.py tests/test_tailor_workflow.py
 git commit -m "feat(tailor): deterministic provenance pre-gate short-circuits the panel"
 ```
 
@@ -950,13 +950,13 @@ git commit -m "feat(tailor): deterministic provenance pre-gate short-circuits th
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/tailoring.py`
+- Modify: `src/resume_tailor_harness/tailor/tailoring.py`
 - Test: `tests/test_tailor_tailoring.py`
 
 - [ ] **Step 1: Write the failing test** — append to `tests/test_tailor_tailoring.py`:
 
 ```python
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.tailor.review_config import LengthBudget
 
 
 def test_compose_tailor_input_includes_budget_when_given():
@@ -977,13 +977,13 @@ def test_compose_revise_input_includes_budget_when_given():
 Run: `uv run pytest tests/test_tailor_tailoring.py -q`
 Expected: FAIL — `compose_tailor_input()` takes 3 positional args but 4 were given.
 
-- [ ] **Step 3: Implement** — in `src/resume_agent/tailor/tailoring.py`:
+- [ ] **Step 3: Implement** — in `src/resume_tailor_harness/tailor/tailoring.py`:
 
 Add the import at the top:
 
 ```python
-from resume_agent.tailor.length import format_budget
-from resume_agent.tailor.review_config import LengthBudget
+from resume_tailor_harness.tailor.length import format_budget
+from resume_tailor_harness.tailor.review_config import LengthBudget
 ```
 
 Change `compose_tailor_input` to accept an optional budget (keeps the old 3-arg call working):
@@ -1041,7 +1041,7 @@ def compose_revise_input(
     )
 ```
 
-- [ ] **Step 4: Thread the budget through the workflow** — in `src/resume_agent/tailor/workflow.py`, pass `config.length_budget` into the two `compose_*` calls. Change:
+- [ ] **Step 4: Thread the budget through the workflow** — in `src/resume_tailor_harness/tailor/workflow.py`, pass `config.length_budget` into the two `compose_*` calls. Change:
 
 ```python
     content = tailor(compose_tailor_input(jd_text, criteria, profile_facts), tailor_agent)
@@ -1080,7 +1080,7 @@ Expected: PASS (old 3-arg compose tests still work; the workflow now passes the 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/tailoring.py src/resume_agent/tailor/workflow.py tests/test_tailor_tailoring.py
+git add src/resume_tailor_harness/tailor/tailoring.py src/resume_tailor_harness/tailor/workflow.py tests/test_tailor_tailoring.py
 git commit -m "feat(tailor): one-page length budget in the tailor/reviser contract"
 ```
 
@@ -1090,7 +1090,7 @@ git commit -m "feat(tailor): one-page length budget in the tailor/reviser contra
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/extractor.py`
+- Modify: `src/resume_tailor_harness/profile/extractor.py`
 - Test: `tests/test_profile_extractor.py`
 
 - [ ] **Step 1: Write the failing test** — append to `tests/test_profile_extractor.py`:
@@ -1100,7 +1100,7 @@ def test_extractor_defaults_to_mid_tier(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     captured = {}
 
-    import resume_agent.profile.extractor as extractor_mod
+    import resume_tailor_harness.profile.extractor as extractor_mod
 
     class _FakeClaude:
         def __init__(self, id):
@@ -1122,7 +1122,7 @@ def test_extractor_defaults_to_mid_tier(monkeypatch):
 Run: `uv run pytest tests/test_profile_extractor.py::test_extractor_defaults_to_mid_tier -q`
 Expected: FAIL — `captured["id"]` equals the cheap model, not the mid model.
 
-- [ ] **Step 3: Implement** — in `src/resume_agent/profile/extractor.py`, change the one line in `build_extractor_agent`:
+- [ ] **Step 3: Implement** — in `src/resume_tailor_harness/profile/extractor.py`, change the one line in `build_extractor_agent`:
 
 ```python
     resolved = model_id or get_settings().mid_model
@@ -1136,7 +1136,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/extractor.py tests/test_profile_extractor.py
+git add src/resume_tailor_harness/profile/extractor.py tests/test_profile_extractor.py
 git commit -m "feat(profile): extract with the mid model for higher fidelity on dense resumes"
 ```
 
@@ -1146,7 +1146,7 @@ git commit -m "feat(profile): extract with the mid model for higher fidelity on 
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/merge.py`
+- Modify: `src/resume_tailor_harness/profile/merge.py`
 - Test: `tests/test_profile_merge.py`
 
 - [ ] **Step 1: Write the failing tests** — append to `tests/test_profile_merge.py`:
@@ -1155,16 +1155,16 @@ git commit -m "feat(profile): extract with the mid model for higher fidelity on 
 def test_merge_dedupes_github_project_by_normalized_name_and_enriches():
     resume_facts = ProfileFacts(
         contact=Contact(name="Ada"),
-        projects=[Project(name="Resume Agent", source=Source.resume)],  # no stars/repo_url yet
+        projects=[Project(name="Résumé Tailor Harness", source=Source.resume)],  # no stars/repo_url yet
     )
-    gh_projects = [Project(name="resume-agent", source=Source.github, stars=42, repo_url="https://github.com/ada/resume-agent")]
+    gh_projects = [Project(name="resume-tailor-harness", source=Source.github, stars=42, repo_url="https://github.com/ada/resume-tailor-harness")]
 
     merged = merge_facts(resume_facts, github_projects=gh_projects)
 
     names = [p.name for p in merged.projects]
-    assert names == ["Resume Agent"]  # the github duplicate is folded in, not appended
+    assert names == ["Résumé Tailor Harness"]  # the github duplicate is folded in, not appended
     assert merged.projects[0].stars == 42  # empty fields enriched from github
-    assert merged.projects[0].repo_url == "https://github.com/ada/resume-agent"
+    assert merged.projects[0].repo_url == "https://github.com/ada/resume-tailor-harness"
 
 
 def test_merge_keeps_distinct_github_project():
@@ -1179,14 +1179,14 @@ Keep the existing `test_merge_appends_github_projects_and_sets_profile` only if 
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `uv run pytest tests/test_profile_merge.py -q`
-Expected: FAIL — duplicate is appended (names == ["Resume Agent", "resume-agent"]).
+Expected: FAIL — duplicate is appended (names == ["Résumé Tailor Harness", "resume-tailor-harness"]).
 
-- [ ] **Step 3: Implement** — replace the body of `src/resume_agent/profile/merge.py`:
+- [ ] **Step 3: Implement** — replace the body of `src/resume_tailor_harness/profile/merge.py`:
 
 ```python
 import re
 
-from resume_agent.models.profile import GitHubProfile, ProfileFacts, Project
+from resume_tailor_harness.models.profile import GitHubProfile, ProfileFacts, Project
 
 # fields a resume project may be missing that GitHub can fill in
 _ENRICH_FIELDS = ("stars", "forks", "repo_url", "primary_language", "homepage_url", "last_updated")
@@ -1238,7 +1238,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/merge.py tests/test_profile_merge.py
+git add src/resume_tailor_harness/profile/merge.py tests/test_profile_merge.py
 git commit -m "feat(profile): dedupe GitHub projects against resume projects and enrich"
 ```
 
@@ -1248,22 +1248,22 @@ git commit -m "feat(profile): dedupe GitHub projects against resume projects and
 
 **Files:**
 
-- Create: `src/resume_agent/profile/validate.py`
-- Modify: `src/resume_agent/profile/build.py`
-- Modify: `src/resume_agent/cli.py`
+- Create: `src/resume_tailor_harness/profile/validate.py`
+- Modify: `src/resume_tailor_harness/profile/build.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_profile_validate.py`, `tests/test_cli_profile.py`
 
 - [ ] **Step 1: Write the failing validate test** — create `tests/test_profile_validate.py`:
 
 ```python
-from resume_agent.models.profile import Contact, Experience, ProfileFacts, Publication
-from resume_agent.profile.validate import validate_profile
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts, Publication
+from resume_tailor_harness.profile.validate import validate_profile
 
 
 def test_clean_profile_has_no_warnings():
     facts = ProfileFacts(
         contact=Contact(name="Ada"),
-        experience=[Experience(company="AE", title="Eng", bullets=[__import__("resume_agent.models.profile", fromlist=["Bullet"]).Bullet(text="X")])],
+        experience=[Experience(company="AE", title="Eng", bullets=[__import__("resume_tailor_harness.models.profile", fromlist=["Bullet"]).Bullet(text="X")])],
     )
     report = validate_profile(facts, raw_text="Ada, Engineer at AE")
     assert report.ok is True
@@ -1298,15 +1298,15 @@ def test_publications_present_when_extracted():
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `uv run pytest tests/test_profile_validate.py -q`
-Expected: FAIL — module `resume_agent.profile.validate` does not exist.
+Expected: FAIL — module `resume_tailor_harness.profile.validate` does not exist.
 
-- [ ] **Step 3: Implement validate** — create `src/resume_agent/profile/validate.py`:
+- [ ] **Step 3: Implement validate** — create `src/resume_tailor_harness/profile/validate.py`:
 
 ```python
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import ProfileFacts
 
 # (section keyword in the raw resume text, attribute on ProfileFacts) pairs we expect to co-occur
 _SECTION_CUES = (
@@ -1347,7 +1347,7 @@ def validate_profile(facts: ProfileFacts, raw_text: str) -> CoverageReport:
 Run: `uv run pytest tests/test_profile_validate.py -q`
 Expected: PASS.
 
-- [ ] **Step 5: Thread the report through `build_profile`** — change `src/resume_agent/profile/build.py` to also return the raw text so the CLI can validate. Update the return type to a tuple `(ProfileFacts, str)`:
+- [ ] **Step 5: Thread the report through `build_profile`** — change `src/resume_tailor_harness/profile/build.py` to also return the raw text so the CLI can validate. Update the return type to a tuple `(ProfileFacts, str)`:
 
 Change the signature and the two `return` statements:
 
@@ -1377,10 +1377,10 @@ def build_profile(
     return merge_facts(resume_facts, github_projects=projects, github_profile=gh_profile), text
 ```
 
-- [ ] **Step 6: Update the CLI** — in `src/resume_agent/cli.py`, add the import near the other profile imports:
+- [ ] **Step 6: Update the CLI** — in `src/resume_tailor_harness/cli.py`, add the import near the other profile imports:
 
 ```python
-from resume_agent.profile.validate import validate_profile
+from resume_tailor_harness.profile.validate import validate_profile
 ```
 
 and update `profile_build` to unpack the tuple and print warnings:
@@ -1420,7 +1420,7 @@ Expected: PASS. (`tests/test_profile_build.py` asserts on `build_profile`'s resu
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/profile/validate.py src/resume_agent/profile/build.py src/resume_agent/cli.py tests/test_profile_validate.py tests/test_cli_profile.py tests/test_profile_build.py
+git add src/resume_tailor_harness/profile/validate.py src/resume_tailor_harness/profile/build.py src/resume_tailor_harness/cli.py tests/test_profile_validate.py tests/test_cli_profile.py tests/test_profile_build.py
 git commit -m "feat(profile): deterministic coverage report surfaced by 'profile build'"
 ```
 
@@ -1438,8 +1438,8 @@ git commit -m "feat(profile): deterministic coverage report surfaced by 'profile
 ```python
 from pypdf import PdfReader
 
-from resume_agent.models.profile import Contact, Education, Language
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact, Education, Language
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredAward,
     TailoredBullet,
@@ -1447,7 +1447,7 @@ from resume_agent.models.resume import (
     TailoredExperience,
     TailoredPublication,
 )
-from resume_agent.render.renderer import render_pdf
+from resume_tailor_harness.render.renderer import render_pdf
 
 
 def _rich_content() -> ResumeContent:
@@ -1687,7 +1687,7 @@ git commit -m "feat(render): hybrid template — new sections, enriched educatio
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py`
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py`
 
 - [ ] **Step 1: Write the failing test** — append to `tests/test_discovery_pipeline.py`:
@@ -1719,7 +1719,7 @@ def test_discover_commits_once_per_stage(monkeypatch):
 Run: `uv run pytest tests/test_discovery_pipeline.py::test_discover_commits_once_per_stage -q`
 Expected: FAIL — current code commits once per job per stage (more than 3).
 
-- [ ] **Step 3: Implement** — in `src/resume_agent/discovery/pipeline.py`, stop calling `save_job` (which commits per row) inside the loops; `add` in the loop and `commit` once per stage. Replace the three stage functions:
+- [ ] **Step 3: Implement** — in `src/resume_tailor_harness/discovery/pipeline.py`, stop calling `save_job` (which commits per row) inside the loops; `add` in the loop and `commit` once per stage. Replace the three stage functions:
 
 ```python
 def run_extract(session: Session, agent: Runner) -> None:
@@ -1764,7 +1764,7 @@ Expected: PASS — both the existing funnel test and the commit-count test.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "perf(discovery): commit once per funnel stage instead of per row"
 ```
 

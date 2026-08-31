@@ -1,10 +1,10 @@
-# Resume Agent v2 — Application Analytics Implementation Plan
+# Résumé Tailor Harness v2 — Application Analytics Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Answer "which sources and which fit-score bands actually convert?" — a dashboard page showing application response / interview / offer rates sliced by **source** and by **fit-score band**, computed by pure functions over the existing `jobs` ⋈ `applications` data. No new tables, no LLM.
 
-**Architecture:** This is **Plan 6 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`), an independent leaf depending only on v1 tracking. All arithmetic lives in pure, fixture-tested functions (`source_stats`, `fit_band_stats`) returning a single `CohortStat` shape; the Streamlit page is a thin renderer over them. The **interface is the test surface** — counts and rates are asserted on seeded data with no Streamlit runtime.
+**Architecture:** This is **Plan 6 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-tailor-harness-v2-connectors-design.md`), an independent leaf depending only on v1 tracking. All arithmetic lives in pure, fixture-tested functions (`source_stats`, `fit_band_stats`) returning a single `CohortStat` shape; the Streamlit page is a thin renderer over them. The **interface is the test surface** — counts and rates are asserted on seeded data with no Streamlit runtime.
 
 **Tech Stack:** Python 3.13, uv, SQLModel, Streamlit, pytest. No new deps.
 
@@ -25,8 +25,8 @@
 ## File Structure
 
 ```
-src/resume_agent/tracking/analytics.py    # CREATE — CohortStat + source_stats + fit_band_stats
-src/resume_agent/dashboard/app.py         # MODIFY — render_analytics_page + radio entry
+src/resume_tailor_harness/tracking/analytics.py    # CREATE — CohortStat + source_stats + fit_band_stats
+src/resume_tailor_harness/dashboard/app.py         # MODIFY — render_analytics_page + radio entry
 tests/test_tracking_analytics.py          # CREATE
 tests/test_dashboard_analytics.py         # CREATE
 ```
@@ -37,7 +37,7 @@ tests/test_dashboard_analytics.py         # CREATE
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/analytics.py`
+- Create: `src/resume_tailor_harness/tracking/analytics.py`
 - Test: `tests/test_tracking_analytics.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -47,9 +47,9 @@ Create `tests/test_tracking_analytics.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.tracking.analytics import fit_band_stats, source_stats
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job
+from resume_tailor_harness.tracking.analytics import fit_band_stats, source_stats
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job
 
 
 def _session():
@@ -101,11 +101,11 @@ def test_empty_history_returns_empty():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_tracking_analytics.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.analytics'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.analytics'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tracking/analytics.py`:
+Create `src/resume_tailor_harness/tracking/analytics.py`:
 
 ```python
 from dataclasses import dataclass
@@ -113,7 +113,7 @@ from typing import Callable
 
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job
 
 _RESPONSE = {
     ApplicationStatus.interview.value,
@@ -206,7 +206,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/analytics.py tests/test_tracking_analytics.py
+git add src/resume_tailor_harness/tracking/analytics.py tests/test_tracking_analytics.py
 git commit -m "feat(analytics): source + fit-band conversion stats" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -216,7 +216,7 @@ git commit -m "feat(analytics): source + fit-band conversion stats" -m "Co-Autho
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/app.py`
+- Modify: `src/resume_tailor_harness/dashboard/app.py`
 - Test: `tests/test_dashboard_analytics.py`
 
 > Following the module's convention (all Streamlit calls inside functions so it imports cleanly), the page is a thin renderer over Task 1's pure stats. The test asserts the page is importable and that a pure row-builder produces the right table data; the visual layout is verified by running the dashboard.
@@ -228,9 +228,9 @@ Create `tests/test_dashboard_analytics.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.dashboard.app import analytics_table_rows, render_analytics_page
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job
+from resume_tailor_harness.dashboard.app import analytics_table_rows, render_analytics_page
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, Job
 
 
 def _session():
@@ -258,14 +258,14 @@ def test_analytics_table_rows_formats_counts_and_rates():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_dashboard_analytics.py -v`
-Expected: FAIL — `ImportError: cannot import name 'analytics_table_rows' from 'resume_agent.dashboard.app'`.
+Expected: FAIL — `ImportError: cannot import name 'analytics_table_rows' from 'resume_tailor_harness.dashboard.app'`.
 
 - [ ] **Step 3: Add the row-builder + page**
 
-In `src/resume_agent/dashboard/app.py`, add the import near the other tracking imports:
+In `src/resume_tailor_harness/dashboard/app.py`, add the import near the other tracking imports:
 
 ```python
-from resume_agent.tracking.analytics import fit_band_stats, source_stats
+from resume_tailor_harness.tracking.analytics import fit_band_stats, source_stats
 ```
 
 Add these functions before `def _engine():`:
@@ -317,7 +317,7 @@ def render_analytics_page(session) -> None:
 
 - [ ] **Step 4: Wire the page into the radio**
 
-In `src/resume_agent/dashboard/app.py`, inside `main()`, replace the page radio and routing:
+In `src/resume_tailor_harness/dashboard/app.py`, inside `main()`, replace the page radio and routing:
 
 ```python
         page = st.radio("View", ["Shortlist", "Pipeline board", "Analytics"], label_visibility="collapsed")
@@ -343,7 +343,7 @@ Expected: ALL pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/app.py tests/test_dashboard_analytics.py
+git add src/resume_tailor_harness/dashboard/app.py tests/test_dashboard_analytics.py
 git commit -m "feat(analytics): dashboard analytics page (source + fit-band)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -363,4 +363,4 @@ git commit -m "feat(analytics): dashboard analytics page (source + fit-band)" -m
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-agent-v2-application-analytics.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. This is the final v2 plan — with Plans 1–6 merged, v2 is complete: multi-source intake (`pull`/`sources`), cover letters, Gmail auto-status, and conversion analytics, all on the v1 spine.
+Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-tailor-harness-v2-application-analytics.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. This is the final v2 plan — with Plans 1–6 merged, v2 is complete: multi-source intake (`pull`/`sources`), cover letters, Gmail auto-status, and conversion analytics, all on the v1 spine.

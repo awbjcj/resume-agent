@@ -1,5 +1,5 @@
-from resume_agent.gmail.classify import classify_email
-from resume_agent.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.classify import classify_email
+from resume_tailor_harness.gmail.client import EmailMessage
 
 
 def _email(subject, snippet=""):

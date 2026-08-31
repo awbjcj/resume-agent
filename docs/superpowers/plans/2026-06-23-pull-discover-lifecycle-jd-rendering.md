@@ -53,19 +53,19 @@ Apply these corrections to the task snippets below where they differ:
 
 **Modify (backend):**
 
-- `src/resume_agent/tracking/dedup.py` — title abbreviations + `compute_content_fingerprint`
-- `src/resume_agent/tracking/tables.py` — two new `Job` columns
-- `src/resume_agent/tracking/migrate.py` — two new `ensure_*_column` helpers
-- `src/resume_agent/db.py` — wire the new migrations
-- `src/resume_agent/tracking/repository.py` — `find_existing` fingerprint fallback
-- `src/resume_agent/discovery/merge.py` — carry `content_fingerprint` in IncomingJob + text updates
-- `src/resume_agent/discovery/ingest.py` — pass fingerprint through `save_or_upgrade`
-- `src/resume_agent/discovery/pipeline.py` — `reject_category` writes; new `reprocess`; delete `reextract`/`backfill_rescore`
-- `src/resume_agent/services/discovery.py` — `reprocess_jobs`, `refresh_jobs`; delete `reextract_metadata`/`rescore_existing`
-- `src/resume_agent/cli.py` — drop `--reextract`/`--rescore`; add `reprocess` + `refresh` commands
-- `src/resume_agent/api/schemas/runs.py` — `ReprocessParams`, `RefreshParams`; trim `DiscoverParams`
-- `src/resume_agent/api/routers/runs.py` — trim discover dispatch; add `/reprocess`, `/refresh`
-- `src/resume_agent/discovery/connectors/text.py` — `html_to_markdown`
+- `src/resume_tailor_harness/tracking/dedup.py` — title abbreviations + `compute_content_fingerprint`
+- `src/resume_tailor_harness/tracking/tables.py` — two new `Job` columns
+- `src/resume_tailor_harness/tracking/migrate.py` — two new `ensure_*_column` helpers
+- `src/resume_tailor_harness/db.py` — wire the new migrations
+- `src/resume_tailor_harness/tracking/repository.py` — `find_existing` fingerprint fallback
+- `src/resume_tailor_harness/discovery/merge.py` — carry `content_fingerprint` in IncomingJob + text updates
+- `src/resume_tailor_harness/discovery/ingest.py` — pass fingerprint through `save_or_upgrade`
+- `src/resume_tailor_harness/discovery/pipeline.py` — `reject_category` writes; new `reprocess`; delete `reextract`/`backfill_rescore`
+- `src/resume_tailor_harness/services/discovery.py` — `reprocess_jobs`, `refresh_jobs`; delete `reextract_metadata`/`rescore_existing`
+- `src/resume_tailor_harness/cli.py` — drop `--reextract`/`--rescore`; add `reprocess` + `refresh` commands
+- `src/resume_tailor_harness/api/schemas/runs.py` — `ReprocessParams`, `RefreshParams`; trim `DiscoverParams`
+- `src/resume_tailor_harness/api/routers/runs.py` — trim discover dispatch; add `/reprocess`, `/refresh`
+- `src/resume_tailor_harness/discovery/connectors/text.py` — `html_to_markdown`
 - connectors: `greenhouse.py`, `lever.py`, `ashby.py`, `google.py`, `remoteok.py`, `tesla.py`, `workday.py`, `adzuna.py` — switch HTML payloads to `html_to_markdown`
 - `pyproject.toml` — add `markdownify`
 
@@ -87,7 +87,7 @@ Apply these corrections to the task snippets below where they differ:
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/dedup.py`
+- Modify: `src/resume_tailor_harness/tracking/dedup.py`
 - Test: `tests/test_tracking_dedup.py` (create if absent)
 
 - [ ] **Step 1: Write the failing test**
@@ -95,7 +95,7 @@ Apply these corrections to the task snippets below where they differ:
 Create/append `tests/test_tracking_dedup.py`:
 
 ```python
-from resume_agent.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
 
 
 def test_abbreviated_titles_collapse_to_same_key():
@@ -114,7 +114,7 @@ Expected: FAIL — "Sr SWE" normalizes to `swe`, not `software engineer`.
 
 - [ ] **Step 3: Implement abbreviation expansion**
 
-In `src/resume_agent/tracking/dedup.py`, add the map and apply it inside `_normalize_title`:
+In `src/resume_tailor_harness/tracking/dedup.py`, add the map and apply it inside `_normalize_title`:
 
 ```python
 # Conservative role-noun abbreviations expanded so cross-source title variants
@@ -148,7 +148,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/dedup.py tests/test_tracking_dedup.py
+git add src/resume_tailor_harness/tracking/dedup.py tests/test_tracking_dedup.py
 git commit -m "feat(dedup): expand role-noun abbreviations in title normalization"
 ```
 
@@ -158,7 +158,7 @@ git commit -m "feat(dedup): expand role-noun abbreviations in title normalizatio
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/dedup.py`
+- Modify: `src/resume_tailor_harness/tracking/dedup.py`
 - Test: `tests/test_tracking_dedup.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -166,7 +166,7 @@ git commit -m "feat(dedup): expand role-noun abbreviations in title normalizatio
 Append to `tests/test_tracking_dedup.py`:
 
 ```python
-from resume_agent.tracking.dedup import compute_content_fingerprint
+from resume_tailor_harness.tracking.dedup import compute_content_fingerprint
 
 
 def test_fingerprint_ignores_whitespace_and_case():
@@ -191,7 +191,7 @@ Expected: FAIL — `compute_content_fingerprint` undefined.
 
 - [ ] **Step 3: Implement the fingerprint**
 
-In `src/resume_agent/tracking/dedup.py`, add at top `import hashlib` (keep existing `import re`) and:
+In `src/resume_tailor_harness/tracking/dedup.py`, add at top `import hashlib` (keep existing `import re`) and:
 
 ```python
 _WHITESPACE = re.compile(r"\s+")
@@ -213,7 +213,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/dedup.py tests/test_tracking_dedup.py
+git add src/resume_tailor_harness/tracking/dedup.py tests/test_tracking_dedup.py
 git commit -m "feat(dedup): add content fingerprint helper for keyless dedup"
 ```
 
@@ -223,9 +223,9 @@ git commit -m "feat(dedup): add content fingerprint helper for keyless dedup"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py:52` (Job model)
-- Modify: `src/resume_agent/tracking/migrate.py`
-- Modify: `src/resume_agent/db.py:49-53`
+- Modify: `src/resume_tailor_harness/tracking/tables.py:52` (Job model)
+- Modify: `src/resume_tailor_harness/tracking/migrate.py`
+- Modify: `src/resume_tailor_harness/db.py:49-53`
 - Test: `tests/test_migrate_lifecycle.py` (create)
 
 - [ ] **Step 1: Write the failing test**
@@ -235,8 +235,8 @@ Create `tests/test_migrate_lifecycle.py`:
 ```python
 from sqlalchemy import text
 
-from resume_agent.db import make_engine
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.db import make_engine
+from resume_tailor_harness.tracking.migrate import (
     ensure_content_fingerprint_column,
     ensure_reject_category_column,
 )
@@ -287,7 +287,7 @@ Expected: FAIL — the `ensure_*` functions don't exist.
 
 - [ ] **Step 3: Add the columns to the model**
 
-In `src/resume_agent/tracking/tables.py`, in `class Job`, replace the `reject_reason` line with:
+In `src/resume_tailor_harness/tracking/tables.py`, in `class Job`, replace the `reject_reason` line with:
 
 ```python
     reject_reason: str | None = None
@@ -297,10 +297,10 @@ In `src/resume_agent/tracking/tables.py`, in `class Job`, replace the `reject_re
 
 - [ ] **Step 4: Add the migrations**
 
-In `src/resume_agent/tracking/migrate.py`, update the import and append two helpers:
+In `src/resume_tailor_harness/tracking/migrate.py`, update the import and append two helpers:
 
 ```python
-from resume_agent.tracking.dedup import compute_content_fingerprint, compute_dedup_key
+from resume_tailor_harness.tracking.dedup import compute_content_fingerprint, compute_dedup_key
 ```
 
 ```python
@@ -354,10 +354,10 @@ def ensure_content_fingerprint_column(engine: Engine) -> None:
 
 - [ ] **Step 5: Wire the migrations into init_db**
 
-In `src/resume_agent/db.py`, update the import block and `init_db`:
+In `src/resume_tailor_harness/db.py`, update the import block and `init_db`:
 
 ```python
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.tracking.migrate import (
     ensure_archived_at_column,
     ensure_content_fingerprint_column,
     ensure_dedup_key_column,
@@ -384,7 +384,7 @@ Expected: PASS, no lint errors.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_migrate_lifecycle.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_migrate_lifecycle.py
 git commit -m "feat(schema): add reject_category + content_fingerprint columns with backfill"
 ```
 
@@ -394,9 +394,9 @@ git commit -m "feat(schema): add reject_category + content_fingerprint columns w
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/merge.py:61-64,127-136`
-- Modify: `src/resume_agent/discovery/ingest.py:57,71-82`
-- Modify: `src/resume_agent/tracking/repository.py:49-63`
+- Modify: `src/resume_tailor_harness/discovery/merge.py:61-64,127-136`
+- Modify: `src/resume_tailor_harness/discovery/ingest.py:57,71-82`
+- Modify: `src/resume_tailor_harness/tracking/repository.py:49-63`
 - Test: `tests/test_discovery_ingest.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -405,9 +405,9 @@ Append to `tests/test_discovery_ingest.py` (it already has a `_session()` helper
 
 ```python
 def test_keyless_near_duplicate_collapses_via_fingerprint():
-    from resume_agent.discovery.ingest import add_job
-    from resume_agent.tracking.repository import jobs_by_status
-    from resume_agent.tracking.tables import JobStatus
+    from resume_tailor_harness.discovery.ingest import add_job
+    from resume_tailor_harness.tracking.repository import jobs_by_status
+    from resume_tailor_harness.tracking.tables import JobStatus
 
     with _session() as s:  # use the file's existing session helper
         first = add_job(s, source="remoteok", jd_text="Build great systems for us")
@@ -427,10 +427,10 @@ Expected: FAIL — the second keyless job is inserted as a new row (count == 2).
 
 - [ ] **Step 3: Carry the fingerprint on IncomingJob**
 
-In `src/resume_agent/discovery/merge.py`, update the import and add a property next to `dedup_key`:
+In `src/resume_tailor_harness/discovery/merge.py`, update the import and add a property next to `dedup_key`:
 
 ```python
-from resume_agent.tracking.dedup import compute_content_fingerprint, compute_dedup_key
+from resume_tailor_harness.tracking.dedup import compute_content_fingerprint, compute_dedup_key
 ```
 
 ```python
@@ -447,7 +447,7 @@ In `decide()`, every place that writes `updates["jd_text"] = incoming.jd_text` (
 
 - [ ] **Step 4: Add the fingerprint fallback to find_existing**
 
-In `src/resume_agent/tracking/repository.py`, replace `find_existing`:
+In `src/resume_tailor_harness/tracking/repository.py`, replace `find_existing`:
 
 ```python
 def find_existing(
@@ -479,7 +479,7 @@ def find_existing(
 
 - [ ] **Step 5: Pass the fingerprint through ingest + set it on insert**
 
-In `src/resume_agent/discovery/ingest.py`, in `save_or_upgrade` update the `find_existing` call:
+In `src/resume_tailor_harness/discovery/ingest.py`, in `save_or_upgrade` update the `find_existing` call:
 
 ```python
     existing = find_existing(
@@ -512,7 +512,7 @@ Expected: PASS
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/discovery/merge.py src/resume_agent/discovery/ingest.py src/resume_agent/tracking/repository.py tests/test_discovery_ingest.py
+git add src/resume_tailor_harness/discovery/merge.py src/resume_tailor_harness/discovery/ingest.py src/resume_tailor_harness/tracking/repository.py tests/test_discovery_ingest.py
 git commit -m "feat(dedup): collapse keyless near-duplicates via content fingerprint"
 ```
 
@@ -522,7 +522,7 @@ git commit -m "feat(dedup): collapse keyless near-duplicates via content fingerp
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py:57-67` (run_filter), `139-177` (run_relevance)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py:57-67` (run_filter), `139-177` (run_relevance)
 - Test: `tests/test_discovery_pipeline.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -549,7 +549,7 @@ Expected: FAIL — `reject_category` is `None`.
 
 - [ ] **Step 3: Set the category in run_filter**
 
-In `src/resume_agent/discovery/pipeline.py` `run_filter`, in the `else` branch:
+In `src/resume_tailor_harness/discovery/pipeline.py` `run_filter`, in the `else` branch:
 
 ```python
         else:
@@ -580,7 +580,7 @@ Expected: PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "feat(pipeline): tag rejections with reject_category (filtered|relevance)"
 ```
 
@@ -590,7 +590,7 @@ git commit -m "feat(pipeline): tag rejections with reject_category (filtered|rel
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py` (add `reprocess`, delete `reextract` + `backfill_rescore`)
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py` (add `reprocess`, delete `reextract` + `backfill_rescore`)
 - Test: `tests/test_discovery_pipeline.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -693,12 +693,12 @@ Expected: FAIL — `reprocess` undefined.
 
 - [ ] **Step 3: Implement `reprocess` and delete the dead backfills**
 
-In `src/resume_agent/discovery/pipeline.py`:
+In `src/resume_tailor_harness/discovery/pipeline.py`:
 
 1. Update imports to add `has_progress`:
 
 ```python
-from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
+from resume_tailor_harness.tracking.repository import has_progress, jobs_by_status, status_counts
 ```
 
 1. **Delete** the `reextract` function (lines ~180-195) and the `backfill_rescore` function (lines ~218-244), and the now-unused `_REEXTRACT_STATUSES` constant (lines ~24-32).
@@ -826,13 +826,13 @@ Expected: PASS. The old `test_reextract_*` and `test_backfill_rescore_*` tests w
 
 - [ ] **Step 5: Re-run + lint**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_discovery_pipeline.py -v && ruff check src/resume_agent/discovery/pipeline.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_discovery_pipeline.py -v && ruff check src/resume_tailor_harness/discovery/pipeline.py`
 Expected: PASS, no unused-import warnings.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "feat(pipeline): add scoped reprocess; remove dead reextract/backfill_rescore"
 ```
 
@@ -842,8 +842,8 @@ git commit -m "feat(pipeline): add scoped reprocess; remove dead reextract/backf
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/runner.py` (`run_pull` gains a `finish` flag)
-- Modify: `src/resume_agent/services/discovery.py` (`pull_jobs` forwards `finish`; delete `reextract_metadata`/`rescore_existing`; add `reprocess_jobs`, `refresh_jobs`, `RefreshReport`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/runner.py` (`run_pull` gains a `finish` flag)
+- Modify: `src/resume_tailor_harness/services/discovery.py` (`pull_jobs` forwards `finish`; delete `reextract_metadata`/`rescore_existing`; add `reprocess_jobs`, `refresh_jobs`, `RefreshReport`)
 - Test: `tests/test_services_discovery.py` (create if absent)
 
 - [ ] **Step 1: Write the failing test**
@@ -853,11 +853,11 @@ Create/append `tests/test_services_discovery.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.ingest import add_job
-from resume_agent.services.agents import DiscoveryBundle
-from resume_agent.services.discovery import reprocess_jobs
-from resume_agent.tracking.repository import jobs_by_status
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.services.agents import DiscoveryBundle
+from resume_tailor_harness.services.discovery import reprocess_jobs
+from resume_tailor_harness.tracking.repository import jobs_by_status
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 class _Result:
@@ -866,8 +866,8 @@ class _Result:
 
 
 def _bundle():
-    from resume_agent.models.job import JobCriteriaExtract, SponsorshipSignal
-    from resume_agent.discovery.fit import FitScore
+    from resume_tailor_harness.models.job import JobCriteriaExtract, SponsorshipSignal
+    from resume_tailor_harness.discovery.fit import FitScore
 
     extract = type("E", (), {"run": lambda self, p: _Result(JobCriteriaExtract.model_validate(dict(
         sponsorship_signal=SponsorshipSignal.offered, seniority=None, employment_type=None,
@@ -885,7 +885,7 @@ def test_reprocess_jobs_rescores_shortlisted(tmp_path):
     engine = create_engine("sqlite://")
     SQLModel.metadata.create_all(engine)
     with Session(engine) as s:
-        from resume_agent.tracking.repository import save_job
+        from resume_tailor_harness.tracking.repository import save_job
         save_job(s, Job(source="x", jd_text="jd", title="Eng",
                         status=JobStatus.shortlisted.value, fit_score=10, criteria_json={}))
         counts = reprocess_jobs(
@@ -898,9 +898,9 @@ def test_reprocess_jobs_rescores_shortlisted(tmp_path):
 
 def test_run_pull_finish_false_does_not_emit_done(tmp_path):
     # The refresh sub-step must NOT mark the run done, or the web SSE closes early.
-    from resume_agent.discovery.connectors.runner import run_pull
-    from resume_agent.discovery.search_config import SearchConfig
-    from resume_agent.progress import ProgressReporter, read_progress
+    from resume_tailor_harness.discovery.connectors.runner import run_pull
+    from resume_tailor_harness.discovery.search_config import SearchConfig
+    from resume_tailor_harness.progress import ProgressReporter, read_progress
 
     engine = create_engine("sqlite://")
     SQLModel.metadata.create_all(engine)
@@ -922,12 +922,12 @@ Expected: FAIL — `reprocess_jobs` undefined.
 
 - [ ] **Step 3: Implement the wrappers**
 
-In `src/resume_agent/services/discovery.py`:
+In `src/resume_tailor_harness/services/discovery.py`:
 
 1. Update the pipeline import:
 
 ```python
-from resume_agent.discovery.pipeline import discover, reprocess
+from resume_tailor_harness.discovery.pipeline import discover, reprocess
 ```
 
 1. **Delete** `reextract_metadata` and `rescore_existing` (lines ~112-152).
@@ -946,7 +946,7 @@ class RefreshReport:
 ```
 
 1. **Let pull run as a non-finishing sub-step of refresh.** `run_pull`
-   (`src/resume_agent/discovery/connectors/runner.py`) ends with
+   (`src/resume_tailor_harness/discovery/connectors/runner.py`) ends with
    `if reporter: reporter.done(added=added_total)`. That terminal `done` frame
    makes the web SSE watcher (`web/src/lib/runs/sse.ts`) close the run — so a
    shared reporter would mark `refresh` complete after pull, before discover.
@@ -1022,13 +1022,13 @@ def refresh_jobs(
 
 - [ ] **Step 4: Run tests + lint**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_services_discovery.py -v && ruff check src/resume_agent/services/discovery.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_services_discovery.py -v && ruff check src/resume_tailor_harness/services/discovery.py`
 Expected: PASS, no unused imports (the `backfill_rescore`/`reextract` imports are gone).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/discovery.py tests/test_services_discovery.py
+git add src/resume_tailor_harness/services/discovery.py tests/test_services_discovery.py
 git commit -m "feat(services): add reprocess_jobs + refresh_jobs; drop dead backfill wrappers"
 ```
 
@@ -1038,7 +1038,7 @@ git commit -m "feat(services): add reprocess_jobs + refresh_jobs; drop dead back
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py:14,25-31,159-204` and add two commands
+- Modify: `src/resume_tailor_harness/cli.py:14,25-31,159-204` and add two commands
 - Test: `tests/test_cli_discovery.py`
 
 - [ ] **Step 1: Update the CLI test**
@@ -1047,7 +1047,7 @@ In `tests/test_cli_discovery.py`, **delete** `test_discover_reextract_invokes_re
 
 ```python
 def test_reprocess_invokes_service(tmp_path, monkeypatch):
-    import resume_agent.cli as cli
+    import resume_tailor_harness.cli as cli
 
     captured = {}
 
@@ -1066,8 +1066,8 @@ def test_reprocess_invokes_service(tmp_path, monkeypatch):
 
 
 def test_refresh_invokes_service(tmp_path, monkeypatch):
-    import resume_agent.cli as cli
-    from resume_agent.services.discovery import RefreshReport
+    import resume_tailor_harness.cli as cli
+    from resume_tailor_harness.services.discovery import RefreshReport
 
     monkeypatch.setattr(Path, "exists", lambda self: True)
 
@@ -1092,13 +1092,13 @@ Expected: FAIL — commands don't exist; `reprocess_jobs`/`refresh_jobs` not imp
 
 - [ ] **Step 3: Update imports**
 
-In `src/resume_agent/cli.py`:
+In `src/resume_tailor_harness/cli.py`:
 
-- Line 14: **delete** `from resume_agent.discovery.pipeline import backfill_rescore, reextract`.
+- Line 14: **delete** `from resume_tailor_harness.discovery.pipeline import backfill_rescore, reextract`.
 - Lines 25-31: extend the services import:
 
 ```python
-from resume_agent.services.discovery import (
+from resume_tailor_harness.services.discovery import (
     UrlFetchError,
     add_job_from_text,
     add_job_from_url,
@@ -1185,13 +1185,13 @@ def refresh_cmd(
 
 - [ ] **Step 5: Run tests + lint**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_discovery.py -v && ruff check src/resume_agent/cli.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_discovery.py -v && ruff check src/resume_tailor_harness/cli.py`
 Expected: PASS, no unused-import errors (remove any flagged).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_discovery.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_discovery.py
 git commit -m "feat(cli): trim discover modes; add reprocess + refresh commands"
 ```
 
@@ -1201,8 +1201,8 @@ git commit -m "feat(cli): trim discover modes; add reprocess + refresh commands"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/runs.py`
-- Modify: `src/resume_agent/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py`
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
 - Test: `tests/api/test_runs.py` (or nearest existing run-endpoint test), `tests/api/test_openapi_contract.py`
 
@@ -1234,7 +1234,7 @@ Expected: FAIL — 404, endpoints don't exist.
 
 - [ ] **Step 3: Update schemas**
 
-In `src/resume_agent/api/schemas/runs.py`, replace `DiscoverParams` and add the two new ones:
+In `src/resume_tailor_harness/api/schemas/runs.py`, replace `DiscoverParams` and add the two new ones:
 
 ```python
 class DiscoverParams(CamelModel):
@@ -1252,12 +1252,12 @@ class RefreshParams(CamelModel):
 
 - [ ] **Step 4: Update the router**
 
-In `src/resume_agent/api/routers/runs.py`:
+In `src/resume_tailor_harness/api/routers/runs.py`:
 
 1. Update the services import:
 
 ```python
-from resume_agent.services.discovery import (
+from resume_tailor_harness.services.discovery import (
     add_job_from_url,
     discover_jobs,
     pull_jobs,
@@ -1347,7 +1347,7 @@ imports — if it's stale, Task 12's typecheck uses old paths and fails).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/runs.py src/resume_agent/api/routers/runs.py contracts/ web/src/lib/api/schema.ts tests/api/
+git add src/resume_tailor_harness/api/schemas/runs.py src/resume_tailor_harness/api/routers/runs.py contracts/ web/src/lib/api/schema.ts tests/api/
 git commit -m "feat(api): modeless discover; add reprocess + refresh run endpoints"
 ```
 
@@ -1358,7 +1358,7 @@ git commit -m "feat(api): modeless discover; add reprocess + refresh run endpoin
 **Files:**
 
 - Modify: `pyproject.toml:17` (add dependency)
-- Modify: `src/resume_agent/discovery/connectors/text.py:10-15`
+- Modify: `src/resume_tailor_harness/discovery/connectors/text.py:10-15`
 - Modify: connectors `greenhouse.py`, `lever.py`, `ashby.py`, `google.py`, `remoteok.py`, `tesla.py`, `workday.py`, `adzuna.py`
 - Test: `tests/test_connectors_text.py`
 
@@ -1380,7 +1380,7 @@ Append to `tests/test_connectors_text.py`:
 
 ```python
 def test_html_to_markdown_preserves_lists_and_headings():
-    from resume_agent.discovery.connectors.text import html_to_markdown
+    from resume_tailor_harness.discovery.connectors.text import html_to_markdown
 
     html = "<h2>Responsibilities</h2><ul><li>Build APIs</li><li>Ship features</li></ul>"
     md = html_to_markdown(html)
@@ -1390,13 +1390,13 @@ def test_html_to_markdown_preserves_lists_and_headings():
 
 
 def test_html_to_markdown_passes_plain_text_through():
-    from resume_agent.discovery.connectors.text import html_to_markdown
+    from resume_tailor_harness.discovery.connectors.text import html_to_markdown
 
     assert html_to_markdown("Just plain text").strip() == "Just plain text"
 
 
 def test_html_to_markdown_empty():
-    from resume_agent.discovery.connectors.text import html_to_markdown
+    from resume_tailor_harness.discovery.connectors.text import html_to_markdown
 
     assert html_to_markdown("") == ""
 ```
@@ -1408,7 +1408,7 @@ Expected: FAIL — `html_to_markdown` undefined.
 
 - [ ] **Step 4: Implement html_to_markdown**
 
-In `src/resume_agent/discovery/connectors/text.py`, add the import to the
+In `src/resume_tailor_harness/discovery/connectors/text.py`, add the import to the
 **top-of-file import block** (next to the existing `import html` / BeautifulSoup
 imports — NOT mid-file, which trips Ruff E402):
 
@@ -1445,7 +1445,7 @@ In each connector, change the import and the call site from `html_to_text` to `h
 - `workday.py:9,66`: `row.jd_text = html_to_markdown(info.get("jobDescription", ""))`
 - `adzuna.py:11,74,101`: `descriptions.append(html_to_markdown(raw))` and `candidates.append(_clean_lines(html_to_markdown(html)))`
 
-Leave `html_to_text` defined (still used by `tests/test_connectors_text.py` and the url_ingest module has its own copy). Update each connector's import line to `from resume_agent.discovery.connectors.text import html_to_markdown` (keep `is_materially_richer`, `primary_search_term` etc. where also imported).
+Leave `html_to_text` defined (still used by `tests/test_connectors_text.py` and the url_ingest module has its own copy). Update each connector's import line to `from resume_tailor_harness.discovery.connectors.text import html_to_markdown` (keep `is_materially_richer`, `primary_search_term` etc. where also imported).
 
 > For `adzuna.py`, verify `_clean_lines` still behaves on markdown (it strips/joins
 > lines); markdown bullets are line-prefixed `-`, which `_clean_lines` should leave
@@ -1460,7 +1460,7 @@ Expected: PASS (fix any connector test that asserted old plain-text output).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/discovery/connectors/ tests/test_connectors_text.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/discovery/connectors/ tests/test_connectors_text.py
 git commit -m "feat(connectors): store JD as markdown via html_to_markdown at ingest"
 ```
 
@@ -1964,7 +1964,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -v`
 Expected: PASS (contracts regenerated and committed in Task 9).
 
 - [ ] **Manual smoke (optional, needs API keys + connectors.yaml):**
-      `resume-agent refresh --limit 5` → expect `+N pulled. Status counts: {...}`;
+      `resume-tailor-harness refresh --limit 5` → expect `+N pulled. Status counts: {...}`;
       open a job in the dashboard → JD renders with headings/bullets; the optional skill
       group reads "Nice-to-have".
 

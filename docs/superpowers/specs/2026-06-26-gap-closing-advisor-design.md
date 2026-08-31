@@ -285,15 +285,15 @@ SuggestionEnvelope { suggestion: SuggestionOut | null, stale: bool }
 
 | Path | Change |
 |------|--------|
-| `src/resume_agent/llm_runner.py` | `build_search_equipped(model_id, mode)` + native/tool strategy; OpenAI Responses variant. |
-| `src/resume_agent/config.py` (Settings) | Validated `search_mode`, `github_token`, `advisor_model`. |
+| `src/resume_tailor_harness/llm_runner.py` | `build_search_equipped(model_id, mode)` + native/tool strategy; OpenAI Responses variant. |
+| `src/resume_tailor_harness/config.py` (Settings) | Validated `search_mode`, `github_token`, `advisor_model`. |
 | `pyproject.toml`, `uv.lock` | Declare the keyless DDGS search-tool dependency. |
-| `src/resume_agent/suggestions/agents.py` | **New.** `build_search_agent()`, `build_formatter_agent()`, `SuggestionDraft` + nested models. |
-| `src/resume_agent/github/repos.py` | **New.** `verify_repo`, `RepoMeta`, URL parser. |
-| `src/resume_agent/services/suggestions.py` | **New.** `generate_suggestion` + context assembly + fingerprint. |
-| `src/resume_agent/tracking/tables.py` | **Add** `SkillSuggestion` table + migration. |
-| `src/resume_agent/api/schemas/suggestions.py` | **New.** camelCase suggestion schemas. |
-| `src/resume_agent/api/routers/suggestions.py` | **New.** POST generate (Run) + GET cached. |
+| `src/resume_tailor_harness/suggestions/agents.py` | **New.** `build_search_agent()`, `build_formatter_agent()`, `SuggestionDraft` + nested models. |
+| `src/resume_tailor_harness/github/repos.py` | **New.** `verify_repo`, `RepoMeta`, URL parser. |
+| `src/resume_tailor_harness/services/suggestions.py` | **New.** `generate_suggestion` + context assembly + fingerprint. |
+| `src/resume_tailor_harness/tracking/tables.py` | **Add** `SkillSuggestion` table + migration. |
+| `src/resume_tailor_harness/api/schemas/suggestions.py` | **New.** camelCase suggestion schemas. |
+| `src/resume_tailor_harness/api/routers/suggestions.py` | **New.** POST generate (Run) + GET cached. |
 | `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` | Regenerated. |
 | `web/src/features/match-gap/use-suggestion.ts`, `SuggestionPanel.tsx` | **New.** |
 | `web/src/features/match-gap/SkillDrawer.tsx` | **Modify** to host the suggestion section + theme learning-path entry. |

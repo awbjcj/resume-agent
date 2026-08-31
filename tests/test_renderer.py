@@ -1,14 +1,14 @@
 from pypdf import PdfReader
 
-from resume_agent.models.profile import Contact, Education
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact, Education
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
     TailoredSkill,
 )
-from resume_agent.render.renderer import output_filename, render_pdf
+from resume_tailor_harness.render.renderer import output_filename, render_pdf
 
 
 def test_output_filename_slugifies():

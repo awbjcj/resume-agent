@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- **Observation-respecting:** zero behavior change to `src/resume_agent/tailor/`. All rounds still persist; the loop is untouched.
+- **Observation-respecting:** zero behavior change to `src/resume_tailor_harness/tailor/`. All rounds still persist; the loop is untouched.
 - **No schema migration:** `needs_attention` / `regressed` are computed read-side from existing columns (`ResumeVersion.fact_check_passed`, `review_score`, `round`, `id`). No new DB columns.
 - Tests run **offline** with no API key/network (`.venv/Scripts/python.exe -m pytest`); the read side has no LLM calls.
 - **Wire format is camelCase.** Pydantic schemas are the contract source of truth; DTO→schema is a `model_validate(row)` projection. After any schema change, regenerate `contracts/openapi.json` + `contracts/ts/api.ts` via `bash scripts/gen_ts_client.sh`; `tests/api/test_openapi_contract.py` is the drift gate.
@@ -33,7 +33,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py` (add after `latest_rendered_resume_version`, ~line 175)
+- Modify: `src/resume_tailor_harness/tracking/repository.py` (add after `latest_rendered_resume_version`, ~line 175)
 - Test: `tests/test_applications_repository.py` (append)
 
 **Interfaces:**
@@ -48,8 +48,8 @@
 
 ```python
 # tests/test_applications_repository.py  (append; reuse the existing _session helper)
-from resume_agent.tracking.repository import best_resume_version, pick_best, save_resume_version
-from resume_agent.tracking.tables import ResumeVersion
+from resume_tailor_harness.tracking.repository import best_resume_version, pick_best, save_resume_version
+from resume_tailor_harness.tracking.tables import ResumeVersion
 
 
 def _rv(round_num: int, score: int | None, passed: bool, version_id: int) -> ResumeVersion:
@@ -104,12 +104,12 @@ def test_best_resume_version_reads_rows():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_applications_repository.py -v -k pick_best`
-Expected: FAIL — `ImportError: cannot import name 'pick_best' from 'resume_agent.tracking.repository'`
+Expected: FAIL — `ImportError: cannot import name 'pick_best' from 'resume_tailor_harness.tracking.repository'`
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/tracking/repository.py
+# src/resume_tailor_harness/tracking/repository.py
 # add near the top with the other imports:
 from dataclasses import dataclass
 
@@ -167,7 +167,7 @@ Expected: PASS (6 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_applications_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_applications_repository.py
 git commit -m "Adds best_resume_version read-side selector"
 ```
 
@@ -177,7 +177,7 @@ git commit -m "Adds best_resume_version read-side selector"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py` (`PipelineRow` dataclass ~line 113; `pipeline_rows` ~line 282; imports ~line 13)
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (`PipelineRow` dataclass ~line 113; `pipeline_rows` ~line 282; imports ~line 13)
 - Test: `tests/test_tracking_queries.py` (append)
 
 **Interfaces:**
@@ -189,9 +189,9 @@ git commit -m "Adds best_resume_version read-side selector"
 
 ```python
 # tests/test_tracking_queries.py  (append)
-from resume_agent.tracking.queries import pipeline_rows
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.tracking.queries import pipeline_rows
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 def test_pipeline_row_surfaces_best_gate_passing_round(session):
@@ -227,10 +227,10 @@ Expected: FAIL — `AttributeError: 'PipelineRow' object has no attribute 'regre
 
 - [ ] **Step 3: Write the implementation**
 
-In `src/resume_agent/tracking/queries.py`, extend the import block (lines 13–20) to add `best_resume_version`:
+In `src/resume_tailor_harness/tracking/queries.py`, extend the import block (lines 13–20) to add `best_resume_version`:
 
 ```python
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     best_resume_version,
     cover_letters_for_job,
@@ -308,7 +308,7 @@ Expected: PASS (2 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/queries.py tests/test_tracking_queries.py
+git add src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py
 git commit -m "Surfaces best gate-passing round on the pipeline board"
 ```
 
@@ -318,7 +318,7 @@ git commit -m "Surfaces best gate-passing round on the pipeline board"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py` (`JobDetailRow` dataclass ~line 62; `job_detail_row` ~line 229)
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (`JobDetailRow` dataclass ~line 62; `job_detail_row` ~line 229)
 - Test: `tests/test_tracking_queries.py` (append)
 
 **Interfaces:**
@@ -330,7 +330,7 @@ git commit -m "Surfaces best gate-passing round on the pipeline board"
 
 ```python
 # tests/test_tracking_queries.py  (append)
-from resume_agent.tracking.queries import job_detail_row
+from resume_tailor_harness.tracking.queries import job_detail_row
 
 
 def test_job_detail_marks_best_version_and_attention(session):
@@ -399,7 +399,7 @@ Expected: PASS (all queries tests, including the two new)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/queries.py tests/test_tracking_queries.py
+git add src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py
 git commit -m "Marks best resume version and attention on job detail"
 ```
 
@@ -409,7 +409,7 @@ git commit -m "Marks best resume version and attention on job detail"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/jobs.py` (`PipelineItem` ~line 40; `JobDetail` ~line 107)
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py` (`PipelineItem` ~line 40; `JobDetail` ~line 107)
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
 - Test: `tests/api/test_openapi_contract.py` (drift gate — already exists)
 
@@ -422,7 +422,7 @@ git commit -m "Marks best resume version and attention on job detail"
 
 ```python
 # tests/api/test_jobs_schema_flags.py  (new)
-from resume_agent.api.schemas.jobs import JobDetail, PipelineItem
+from resume_tailor_harness.api.schemas.jobs import JobDetail, PipelineItem
 
 
 def test_pipeline_item_exposes_attention_flags_camelcase():
@@ -459,7 +459,7 @@ Expected: FAIL — `ValidationError`/missing fields (`needs_attention` not a fie
 
 - [ ] **Step 3: Add the schema fields**
 
-In `src/resume_agent/api/schemas/jobs.py`, append to `PipelineItem` (after `has_progress`, line 54):
+In `src/resume_tailor_harness/api/schemas/jobs.py`, append to `PipelineItem` (after `has_progress`, line 54):
 
 ```python
 class PipelineItem(CamelModel):
@@ -511,7 +511,7 @@ Expected: all green.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/jobs.py contracts/openapi.json contracts/ts/api.ts tests/api/test_jobs_schema_flags.py
+git add src/resume_tailor_harness/api/schemas/jobs.py contracts/openapi.json contracts/ts/api.ts tests/api/test_jobs_schema_flags.py
 git commit -m "Exposes best-version and attention flags on the jobs API contract"
 ```
 
@@ -534,5 +534,5 @@ git commit -m "Exposes best-version and attention flags on the jobs API contract
 
 ## Notes for the implementer
 
-- This phase has **no** LLM calls and touches **no** file under `src/resume_agent/tailor/`. If a step seems to need a loop change, stop — that is out of scope.
+- This phase has **no** LLM calls and touches **no** file under `src/resume_tailor_harness/tailor/`. If a step seems to need a loop change, stop — that is out of scope.
 - Verify against the recorded Phase 0 baseline: after this lands, no eval case should surface a `fact_check_passed=False` resume as its default, and the report's regression rate is unchanged (Phase 1 _reports_, it does not _reduce_).

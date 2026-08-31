@@ -1,6 +1,6 @@
 import pytest
 
-from resume_agent.discovery.relevance import (
+from resume_tailor_harness.discovery.relevance import (
     RelevanceVerdict,
     compose_relevance_input,
     judge_relevance,
@@ -38,7 +38,7 @@ def test_judge_relevance_returns_verdict():
 def test_ajudge_relevance_uses_arun():
     import asyncio
 
-    from resume_agent.discovery.relevance import ajudge_relevance
+    from resume_tailor_harness.discovery.relevance import ajudge_relevance
 
     class _AsyncAgent:
         def run(self, prompt):
@@ -59,7 +59,7 @@ def test_judge_relevance_type_guard():
 
 
 def test_build_relevance_agent_returns_none_without_api_key(monkeypatch):
-    from resume_agent.discovery import relevance as mod
+    from resume_tailor_harness.discovery import relevance as mod
 
     class _Settings:
         cheap_model = "cheap"

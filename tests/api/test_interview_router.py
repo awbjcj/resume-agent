@@ -8,9 +8,9 @@ from typing import Any, cast
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.interview.store import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.interview.store import (
     InterviewContext,
     InterviewDebrief,
     InterviewStyle,
@@ -20,15 +20,15 @@ from resume_agent.interview.store import (
     create_session,
     end_with_debrief,
 )
-from resume_agent.interview.agent import (
+from resume_tailor_harness.interview.agent import (
     DebriefTurn,
     InterviewTurn,
     NewPlanItem,
     OpeningInterview,
     ReviewItem,
 )
-from resume_agent.services import mock_interview as service
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.services import mock_interview as service
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 
 class FakeRunner:
@@ -92,7 +92,7 @@ def _wait(client, run_id):
 
 def _fake_agents(monkeypatch):
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     monkeypatch.setattr(
         service, "build_interviewer_agent", lambda style: FakeRunner(["notes"])
@@ -144,7 +144,7 @@ def _fake_agents(monkeypatch):
 def test_start_requires_known_job(monkeypatch, tmp_path):
     client = _client(tmp_path)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     with client:
         response = client.post(
@@ -157,7 +157,7 @@ def test_start_requires_known_job(monkeypatch, tmp_path):
 def test_start_rejects_version_from_other_job(monkeypatch, tmp_path):
     client = _client(tmp_path)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     with client:
         job_id, _ = _seed(client)
@@ -172,7 +172,7 @@ def test_start_rejects_version_from_other_job(monkeypatch, tmp_path):
 def test_start_rejects_job_without_jd(monkeypatch, tmp_path):
     client = _client(tmp_path)
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     with client:
         job_id, version_id = _seed(client, jd_text="")
@@ -373,7 +373,7 @@ def test_interview_audio_availability_and_protected_turn_delivery(
     monkeypatch, tmp_path
 ):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.speech_available", lambda: True)
+    monkeypatch.setattr("resume_tailor_harness.llm_runner.speech_available", lambda: True)
     with client:
         assert client.get("/api/interview/audio/availability").json() == {
             "available": True

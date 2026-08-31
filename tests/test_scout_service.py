@@ -5,9 +5,9 @@ from typing import Literal, cast
 
 import pytest
 
-from resume_agent.api.schemas.config import SearchConfigDoc
-from resume_agent.discovery.scout import ScoutTurnDraft
-from resume_agent.discovery.scout_store import (
+from resume_tailor_harness.api.schemas.config import SearchConfigDoc
+from resume_tailor_harness.discovery.scout import ScoutTurnDraft
+from resume_tailor_harness.discovery.scout_store import (
     ScoutProposal,
     ScoutTurnRecord,
     SourcePayload,
@@ -16,19 +16,19 @@ from resume_agent.discovery.scout_store import (
     end_session,
     load_session,
 )
-from resume_agent.discovery.source_resolution.models import (
+from resume_tailor_harness.discovery.source_resolution.models import (
     CompanySourceResolution,
     ResolutionStatus,
     SourceEvidence,
 )
-from resume_agent.discovery.source_resolution.resolver import resolution_cache_key
-from resume_agent.discovery.source_resolution.search import SearchCoverage
-from resume_agent.services import scout as service
-from resume_agent.services.config_store import YamlConfigStore
-from resume_agent.services.scout_intelligence import (
+from resume_tailor_harness.discovery.source_resolution.resolver import resolution_cache_key
+from resume_tailor_harness.discovery.source_resolution.search import SearchCoverage
+from resume_tailor_harness.services import scout as service
+from resume_tailor_harness.services.config_store import YamlConfigStore
+from resume_tailor_harness.services.scout_intelligence import (
     ScoutCompanyIntelligenceSnapshot,
 )
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.sessions.stream import (
     Completed,
     TextDelta,
     ToolCompleted,

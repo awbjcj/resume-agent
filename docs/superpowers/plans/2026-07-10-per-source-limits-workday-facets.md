@@ -46,19 +46,19 @@
 
 | Path | Role |
 | ---- | ---- |
-| `src/resume_agent/discovery/connectors/config.py` | `limit` on unit models + singleton sections |
-| `src/resume_agent/discovery/connectors/harvest.py` | per-unit gate/cap via `unit_limit` |
-| `src/resume_agent/discovery/connectors/greenhouse.py`, `lever.py` | pass `unit_limit` |
-| `src/resume_agent/discovery/connectors/companies.py` | entries become `CompanyUrl`; per-URL limit |
-| `src/resume_agent/discovery/connectors/remoteok.py`, `adzuna.py` | `configured_limit` |
-| `src/resume_agent/discovery/scraper/linkedin.py`, `dashboard.py` | configured/per-target limits |
-| `src/resume_agent/discovery/connectors/registry.py` | pass entries + section limits |
-| `src/resume_agent/discovery/connectors/workday.py` | facet resolve + cache + faceted paging |
-| `src/resume_agent/discovery/connectors/sources.py` | `SourceView.limit` + scrape projections |
-| `src/resume_agent/services/sources.py` | atomic source patch + limit validation |
-| `src/resume_agent/api/schemas/sources.py`, `api/routers/sources.py` | PATCH `{enabled?, limit?}` |
+| `src/resume_tailor_harness/discovery/connectors/config.py` | `limit` on unit models + singleton sections |
+| `src/resume_tailor_harness/discovery/connectors/harvest.py` | per-unit gate/cap via `unit_limit` |
+| `src/resume_tailor_harness/discovery/connectors/greenhouse.py`, `lever.py` | pass `unit_limit` |
+| `src/resume_tailor_harness/discovery/connectors/companies.py` | entries become `CompanyUrl`; per-URL limit |
+| `src/resume_tailor_harness/discovery/connectors/remoteok.py`, `adzuna.py` | `configured_limit` |
+| `src/resume_tailor_harness/discovery/scraper/linkedin.py`, `dashboard.py` | configured/per-target limits |
+| `src/resume_tailor_harness/discovery/connectors/registry.py` | pass entries + section limits |
+| `src/resume_tailor_harness/discovery/connectors/workday.py` | facet resolve + cache + faceted paging |
+| `src/resume_tailor_harness/discovery/connectors/sources.py` | `SourceView.limit` + scrape projections |
+| `src/resume_tailor_harness/services/sources.py` | atomic source patch + limit validation |
+| `src/resume_tailor_harness/api/schemas/sources.py`, `api/routers/sources.py` | PATCH `{enabled?, limit?}` |
 | `web/src/features/sources/*` | limit input per source row |
-| `src/resume_agent/cli.py:331,386` | `--limit` help text |
+| `src/resume_tailor_harness/cli.py:331,386` | `--limit` help text |
 
 ---
 
@@ -66,7 +66,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/config.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/config.py`
 - Test: `tests/test_connectors_config.py` (create if absent; if config tests already live elsewhere — `grep -rl load_connectors_config tests/*.py` — append there)
 
 **Interfaces:**
@@ -80,7 +80,7 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.discovery.connectors.config import (
+from resume_tailor_harness.discovery.connectors.config import (
     CompaniesConfig,
     CompanyUrl,
     ConnectorsConfig,
@@ -121,7 +121,7 @@ Expected: FAIL — `ValidationError`/`AttributeError` on `limit`
 
 - [ ] **Step 3: Add the fields**
 
-In `src/resume_agent/discovery/connectors/config.py`, add to **each** of
+In `src/resume_tailor_harness/discovery/connectors/config.py`, add to **each** of
 `GreenhouseBoard`, `LeverBoard`, `CompanyUrl`, `ScrapeTarget`,
 `RemoteOKConfig`, `AdzunaConfig`, `LinkedInConfig` (one line each, after their
 last existing field):
@@ -141,7 +141,7 @@ Expected: PASS — the field is additive.
 
 ```bash
 ruff check
-git add src/resume_agent/discovery/connectors/config.py tests/test_connectors_config.py
+git add src/resume_tailor_harness/discovery/connectors/config.py tests/test_connectors_config.py
 git commit -m "Adds an optional per-unit limit to connector config models"
 ```
 
@@ -151,8 +151,8 @@ git commit -m "Adds an optional per-unit limit to connector config models"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/harvest.py:45-74` (`harvest`)
-- Test: `tests/test_connector_harvest.py` (append; locate with `grep -rl "from resume_agent.discovery.connectors.harvest" tests/*.py` if named differently)
+- Modify: `src/resume_tailor_harness/discovery/connectors/harvest.py:45-74` (`harvest`)
+- Test: `tests/test_connector_harvest.py` (append; locate with `grep -rl "from resume_tailor_harness.discovery.connectors.harvest" tests/*.py` if named differently)
 
 **Interfaces:**
 
@@ -278,7 +278,7 @@ Expected: new tests PASS. **If a pre-existing test pinned the union cap** (asser
 
 ```bash
 ruff check
-git add src/resume_agent/discovery/connectors/harvest.py tests/test_connector_harvest.py
+git add src/resume_tailor_harness/discovery/connectors/harvest.py tests/test_connector_harvest.py
 git commit -m "Caps harvest per unit instead of on the union"
 ```
 
@@ -288,11 +288,11 @@ git commit -m "Caps harvest per unit instead of on the union"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/greenhouse.py:57-73` (`fetch`)
-- Modify: `src/resume_agent/discovery/connectors/lever.py` (`LeverConnector.fetch` — same edit shape)
-- Modify: `src/resume_agent/discovery/connectors/companies.py` (entries become `CompanyUrl`)
-- Modify: `src/resume_agent/discovery/connectors/registry.py:65` (companies payload)
-- Modify: `src/resume_agent/services/sources.py:84` (preview call, coercion covers it — verify only)
+- Modify: `src/resume_tailor_harness/discovery/connectors/greenhouse.py:57-73` (`fetch`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/lever.py` (`LeverConnector.fetch` — same edit shape)
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py` (entries become `CompanyUrl`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py:65` (companies payload)
+- Modify: `src/resume_tailor_harness/services/sources.py:84` (preview call, coercion covers it — verify only)
 - Test: `tests/test_connector_companies.py`, `tests/test_connector_greenhouse.py` (append)
 
 **Interfaces:**
@@ -335,7 +335,7 @@ def test_companies_coerces_strings_and_carries_limits():
     assert connector.urls[1].limit == 3
 ```
 
-(add `from resume_agent.discovery.connectors.config import CompanyUrl, GreenhouseBoard` to the respective import blocks as needed.)
+(add `from resume_tailor_harness.discovery.connectors.config import CompanyUrl, GreenhouseBoard` to the respective import blocks as needed.)
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -356,7 +356,7 @@ Make the identical edit in `lever.py`'s `LeverConnector.fetch` harvest call.
 
 In `companies.py`:
 
-1. Add `from resume_agent.discovery.connectors.config import CompanyUrl` to the imports.
+1. Add `from resume_tailor_harness.discovery.connectors.config import CompanyUrl` to the imports.
 2. Replace `__init__` and `fetch`/`_produce` of `CompaniesConnector`:
 
 ```python
@@ -431,8 +431,8 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/discovery/connectors/greenhouse.py src/resume_agent/discovery/connectors/lever.py \
-        src/resume_agent/discovery/connectors/companies.py src/resume_agent/discovery/connectors/registry.py \
+git add src/resume_tailor_harness/discovery/connectors/greenhouse.py src/resume_tailor_harness/discovery/connectors/lever.py \
+        src/resume_tailor_harness/discovery/connectors/companies.py src/resume_tailor_harness/discovery/connectors/registry.py \
         tests/test_connector_companies.py tests/test_connector_greenhouse.py
 git commit -m "Wires per-unit limits through greenhouse, lever, and companies"
 ```
@@ -443,9 +443,9 @@ git commit -m "Wires per-unit limits through greenhouse, lever, and companies"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/remoteok.py`, `adzuna.py`
-- Modify: `src/resume_agent/discovery/scraper/linkedin.py` (builder + fetch head), `dashboard.py:285-` (per-target budget)
-- Modify: `src/resume_agent/discovery/connectors/registry.py` (pass section limits)
+- Modify: `src/resume_tailor_harness/discovery/connectors/remoteok.py`, `adzuna.py`
+- Modify: `src/resume_tailor_harness/discovery/scraper/linkedin.py` (builder + fetch head), `dashboard.py:285-` (per-target budget)
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py` (pass section limits)
 - Test: `tests/test_connector_remoteok.py`, `tests/scraper/test_dashboard.py` (append)
 
 **Interfaces:**
@@ -572,9 +572,9 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
 Expected: green.
 
 ```bash
-git add src/resume_agent/discovery/connectors/remoteok.py src/resume_agent/discovery/connectors/adzuna.py \
-        src/resume_agent/discovery/scraper/linkedin.py src/resume_agent/discovery/scraper/dashboard.py \
-        src/resume_agent/discovery/connectors/registry.py src/resume_agent/cli.py tests
+git add src/resume_tailor_harness/discovery/connectors/remoteok.py src/resume_tailor_harness/discovery/connectors/adzuna.py \
+        src/resume_tailor_harness/discovery/scraper/linkedin.py src/resume_tailor_harness/discovery/scraper/dashboard.py \
+        src/resume_tailor_harness/discovery/connectors/registry.py src/resume_tailor_harness/cli.py tests
 git commit -m "Resolves configured limits for singleton connectors and scrape targets"
 ```
 
@@ -584,10 +584,10 @@ git commit -m "Resolves configured limits for singleton connectors and scrape ta
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/sources.py` (`SourceView.limit` + projections)
-- Modify: `src/resume_agent/services/sources.py` (+ `set_source_limit`, `_apply_limit`)
-- Modify: `src/resume_agent/api/schemas/sources.py` (`SourceOut.limit`, `SourcePatchIn`)
-- Modify: `src/resume_agent/api/routers/sources.py` (PATCH route body)
+- Modify: `src/resume_tailor_harness/discovery/connectors/sources.py` (`SourceView.limit` + projections)
+- Modify: `src/resume_tailor_harness/services/sources.py` (+ `set_source_limit`, `_apply_limit`)
+- Modify: `src/resume_tailor_harness/api/schemas/sources.py` (`SourceOut.limit`, `SourcePatchIn`)
+- Modify: `src/resume_tailor_harness/api/routers/sources.py` (PATCH route body)
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` (regenerated)
 - Test: `tests/api/test_sources_router.py`, `tests/test_services_sources.py` (append)
 
@@ -750,8 +750,8 @@ Expected: PASS including `tests/api/test_openapi_contract.py`.
 
 ```bash
 ruff check
-git add src/resume_agent/discovery/connectors/sources.py src/resume_agent/services/sources.py \
-        src/resume_agent/api/schemas/sources.py src/resume_agent/api/routers/sources.py \
+git add src/resume_tailor_harness/discovery/connectors/sources.py src/resume_tailor_harness/services/sources.py \
+        src/resume_tailor_harness/api/schemas/sources.py src/resume_tailor_harness/api/routers/sources.py \
         contracts tests
 git commit -m "Exposes per-source limits through the Source Manager API"
 ```
@@ -866,7 +866,7 @@ git commit -m "Adds a per-source pull limit input to the Source Manager"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/workday.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/workday.py`
 - Test: `tests/test_connector_workday.py` (append)
 
 **Interfaces:**
@@ -1164,7 +1164,7 @@ Also append to the "Known design notes" the limit contract:
 ```bash
 .venv/Scripts/python.exe -m pytest -q
 ruff check
-git add src/resume_agent/discovery/connectors/workday.py tests/test_connector_workday.py CLAUDE.md
+git add src/resume_tailor_harness/discovery/connectors/workday.py tests/test_connector_workday.py CLAUDE.md
 git commit -m "Applies cached tenant location facets to Workday pulls"
 ```
 

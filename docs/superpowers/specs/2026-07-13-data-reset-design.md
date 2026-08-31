@@ -27,7 +27,7 @@ whole account), and workspace import (replace with an uploaded archive).
 
 ## Service
 
-New module `src/resume_agent/services/reset.py`, following the `prune.py`
+New module `src/resume_tailor_harness/services/reset.py`, following the `prune.py`
 use-case pattern:
 
 ```python
@@ -110,7 +110,7 @@ Rules:
 
 ## CLI
 
-`resume-agent reset --scope jobs|profile|all [--yes]`:
+`resume-tailor-harness reset --scope jobs|profile|all [--yes]`:
 
 - Without `--yes`, prints what the scope will delete — current row counts per
   table (plain `SELECT COUNT(*)` before any deletion; no separate preview

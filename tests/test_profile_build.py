@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -11,11 +11,11 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
-from resume_agent.profile.build import build_corpus_profile, build_profile
-from resume_agent.profile.aspect_classifier import AspectAssignment, AspectAssignments
-from resume_agent.profile.corpus import add_source
-from resume_agent.profile.inference import InferredSkill, InferredSkills
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.profile.build import build_corpus_profile, build_profile
+from resume_tailor_harness.profile.aspect_classifier import AspectAssignment, AspectAssignments
+from resume_tailor_harness.profile.corpus import add_source
+from resume_tailor_harness.profile.inference import InferredSkill, InferredSkills
+from resume_tailor_harness.profile.synthesis import (
     ClaimVerdict,
     ClaimVerdicts,
     SynthesizedClaim,
@@ -130,7 +130,7 @@ def test_build_profile_closes_the_github_client_it_creates(tmp_path, monkeypatch
             self.closed = True
 
     github = OwnedGitHub()
-    monkeypatch.setattr("resume_agent.profile.build.GitHubClient", lambda: github)
+    monkeypatch.setattr("resume_tailor_harness.profile.build.GitHubClient", lambda: github)
 
     build_profile(
         resume_path=resume,
@@ -370,7 +370,7 @@ class _DeadGitHub:
 
 
 def test_build_includes_project_fragments_and_degrades_github_failures(tmp_path):
-    from resume_agent.profile.project_extractor import ProjectDocFacts
+    from resume_tailor_harness.profile.project_extractor import ProjectDocFacts
 
     profile_dir = tmp_path / "profile"
     resume = tmp_path / "resume.txt"

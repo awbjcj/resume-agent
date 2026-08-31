@@ -3,10 +3,10 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 
 def _login(client, username="owner", password="owner-password"):

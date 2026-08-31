@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.sessions.stream import Completed, Failed, Settled, TextDelta
-from resume_agent.sessions.turns import DELIMITER, StreamFailed, persona_output
+from resume_tailor_harness.sessions.stream import Completed, Failed, Settled, TextDelta
+from resume_tailor_harness.sessions.turns import DELIMITER, StreamFailed, persona_output
 
 
 class _Sink:

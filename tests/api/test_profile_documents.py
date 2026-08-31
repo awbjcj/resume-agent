@@ -5,8 +5,8 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.services.profile_documents import DocumentStore
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.services.profile_documents import DocumentStore
 
 
 @pytest.fixture()

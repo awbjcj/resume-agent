@@ -164,7 +164,7 @@ export function AppLayout() {
               </div>
               <div className="min-w-0">
                 <div className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-primary">
-                  Resume Agent
+                  Résumé Tailor Harness
                 </div>
                 <div className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.025em]">
                   {t("shell.commandCenter")}
@@ -250,7 +250,7 @@ export function AppLayout() {
                 <Sparkles className="size-4" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold leading-tight">Resume Agent</div>
+                <div className="truncate text-sm font-semibold leading-tight">Résumé Tailor Harness</div>
                 <div className="truncate text-[0.68rem] text-muted-foreground">{t("shell.commandCenter")}</div>
               </div>
             </div>

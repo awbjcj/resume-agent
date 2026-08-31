@@ -2,15 +2,15 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.connectors.adzuna import (
+from resume_tailor_harness.discovery.connectors.adzuna import (
     AdzunaConnector,
     enrich_adzuna_job,
     enrich_adzuna_jobs,
     parse_adzuna,
 )
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.discovery.url_ingest.models import PageContent
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.url_ingest.models import PageContent
 
 FIXTURE = json.loads(
     (Path(__file__).parent / "fixtures" / "adzuna" / "search.json").read_text()
@@ -101,7 +101,7 @@ def test_connector_skips_known_before_enrichment_and_then_applies_limit(monkeypa
         rendered.extend(job.url for job in jobs)
         return jobs, {}
 
-    import resume_agent.discovery.connectors.adzuna as mod
+    import resume_tailor_harness.discovery.connectors.adzuna as mod
 
     monkeypatch.setattr(mod, "enrich_adzuna_jobs", fake_enrich)
     result = connector.fetch(
@@ -131,7 +131,7 @@ def test_adzuna_builds_targeted_params():
 
         return _R()
 
-    import resume_agent.discovery.connectors.adzuna as mod
+    import resume_tailor_harness.discovery.connectors.adzuna as mod
 
     orig = mod.board.get
     mod.board.get = fake_get
@@ -269,7 +269,7 @@ def test_enrich_jobs_batch_renders_once_and_enriches(monkeypatch):
         calls["urls"] = list(urls)
         return {"https://www.adzuna.com/jobs/1": page}
 
-    import resume_agent.discovery.connectors.adzuna as mod
+    import resume_tailor_harness.discovery.connectors.adzuna as mod
 
     monkeypatch.setattr(mod, "render_pages", fake_render_pages)
     jobs = [
@@ -293,7 +293,7 @@ def test_enrich_jobs_falls_back_to_snippets_when_browser_unavailable(monkeypatch
     def boom(urls):
         raise RuntimeError("no browser")
 
-    import resume_agent.discovery.connectors.adzuna as mod
+    import resume_tailor_harness.discovery.connectors.adzuna as mod
 
     monkeypatch.setattr(mod, "render_pages", boom)
     jobs = [_raw()]

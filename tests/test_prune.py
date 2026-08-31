@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.tracking.prune import (
+from resume_tailor_harness.tracking.prune import (
     PruneRow,
     expire_candidates,
     is_zero_progress,
@@ -8,8 +8,8 @@ from resume_agent.tracking.prune import (
     prune_reason_counts,
     prune_skipped,
 )
-from resume_agent.tracking.prune_config import PruneConfig
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.tracking.prune_config import PruneConfig
+from resume_tailor_harness.tracking.tables import JobStatus
 
 NOW = datetime(2026, 6, 20, tzinfo=timezone.utc)
 

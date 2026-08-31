@@ -12,8 +12,8 @@ from typing import Self
 import httpx
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.mail.mailer import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.mail.mailer import (
     RESEND_ENDPOINT,
     MailDeliveryError,
     NullMailer,
@@ -84,7 +84,7 @@ def test_failed_send_logs_the_smtp_cause(
     mailer = SmtpMailer(make_settings())
 
     with (
-        caplog.at_level(logging.WARNING, logger="resume_agent.mail.mailer"),
+        caplog.at_level(logging.WARNING, logger="resume_tailor_harness.mail.mailer"),
         pytest.raises(MailDeliveryError),
     ):
         mailer.send(to="user@example.com", subject="Verify", body="code")
@@ -104,7 +104,7 @@ def test_failed_send_never_logs_the_password(
     mailer = SmtpMailer(make_settings())
 
     with (
-        caplog.at_level(logging.DEBUG, logger="resume_agent.mail.mailer"),
+        caplog.at_level(logging.DEBUG, logger="resume_tailor_harness.mail.mailer"),
         pytest.raises(MailDeliveryError) as caught,
     ):
         mailer.send(to="user@example.com", subject="Verify", body="code")
@@ -134,7 +134,7 @@ def test_successful_send_logs_nothing(
     monkeypatch.setattr(smtplib, "SMTP", FakeSMTP())
     mailer = SmtpMailer(make_settings())
 
-    with caplog.at_level(logging.WARNING, logger="resume_agent.mail.mailer"):
+    with caplog.at_level(logging.WARNING, logger="resume_tailor_harness.mail.mailer"):
         mailer.send(to="user@example.com", subject="Verify", body="code")
 
     assert caplog.text == ""
@@ -240,7 +240,7 @@ def test_resend_rejection_logs_the_api_detail(caplog: pytest.LogCaptureFixture) 
     mailer = ResendMailer(make_resend_settings(), client=resend_client(reject_handler))
 
     with (
-        caplog.at_level(logging.WARNING, logger="resume_agent.mail.mailer"),
+        caplog.at_level(logging.WARNING, logger="resume_tailor_harness.mail.mailer"),
         pytest.raises(MailDeliveryError) as caught,
     ):
         mailer.send(to="user@example.com", subject="Verify", body="code")
@@ -256,7 +256,7 @@ def test_resend_failure_never_logs_the_api_key(
     mailer = ResendMailer(make_resend_settings(), client=resend_client(reject_handler))
 
     with (
-        caplog.at_level(logging.DEBUG, logger="resume_agent.mail.mailer"),
+        caplog.at_level(logging.DEBUG, logger="resume_tailor_harness.mail.mailer"),
         pytest.raises(MailDeliveryError) as caught,
     ):
         mailer.send(to="user@example.com", subject="Verify", body="code")
@@ -282,7 +282,7 @@ def test_resend_successful_send_logs_nothing(
 ) -> None:
     mailer = ResendMailer(make_resend_settings(), client=resend_client(ok_handler))
 
-    with caplog.at_level(logging.WARNING, logger="resume_agent.mail.mailer"):
+    with caplog.at_level(logging.WARNING, logger="resume_tailor_harness.mail.mailer"):
         mailer.send(to="user@example.com", subject="Verify", body="code")
 
     assert caplog.text == ""

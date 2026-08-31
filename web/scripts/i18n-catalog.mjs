@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(root, "src");
 const catalogPath = path.join(sourceRoot, "i18n", "auto-catalog.json");
 const dynamicZhCNPath = path.join(sourceRoot, "i18n", "dynamic-zh-CN.json");
-const backendSourceRoot = path.resolve(root, "..", "src", "resume_agent");
+const backendSourceRoot = path.resolve(root, "..", "src", "resume_tailor_harness");
 const runtimeCatalogPaths = {
   en: path.join(sourceRoot, "i18n", "auto-en.json"),
   "zh-CN": path.join(sourceRoot, "i18n", "auto-zh-CN.json"),
@@ -311,7 +311,7 @@ const UNCHANGED_ZH_CN_SOURCES = new Set([
   "Personio",
   "portfolio, flagship-project",
   "Recruitee",
-  "Resume Agent",
+  "Résumé Tailor Harness",
   "SmartRecruiters",
   "wd5",
   "Webex",

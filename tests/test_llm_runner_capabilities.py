@@ -1,4 +1,4 @@
-from resume_agent.llm_runner import ProviderCapabilities, provider_capabilities
+from resume_tailor_harness.llm_runner import ProviderCapabilities, provider_capabilities
 
 
 def test_known_model_capabilities_are_model_gated():

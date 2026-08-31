@@ -4,12 +4,12 @@ from pathlib import Path
 
 import httpx
 
-from resume_agent.discovery.connectors.config import LeverBoard
-from resume_agent.discovery.connectors.lever import (
+from resume_tailor_harness.discovery.connectors.config import LeverBoard
+from resume_tailor_harness.discovery.connectors.lever import (
     LeverConnector,
     parse_lever,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURE = json.loads(
     (Path(__file__).parent / "fixtures" / "lever" / "postings.json").read_text()
@@ -83,7 +83,7 @@ def test_connector_isolates_failing_board_and_records_it():
 
 
 def test_get_board_delegates_to_module_fetcher(monkeypatch):
-    import resume_agent.discovery.connectors.lever as lever
+    import resume_tailor_harness.discovery.connectors.lever as lever
 
     called = {}
 
@@ -116,7 +116,7 @@ def test_lever_never_pushes_location_even_when_configured(monkeypatch):
         captured["params"] = params
         return Response()
 
-    import resume_agent.discovery.connectors.lever as lever
+    import resume_tailor_harness.discovery.connectors.lever as lever
 
     monkeypatch.setattr(lever.board, "get", fake_get)
     LeverConnector([LeverBoard(token="acme")]).fetch(SearchConfig(locations=["Remote"]))

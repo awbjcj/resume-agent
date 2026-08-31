@@ -40,7 +40,7 @@ describe("GettingStartedChecklist", () => {
     mocks.journey.mockReturnValue({ ...incomplete, complete: true });
     expect(renderChecklist().container).toBeEmptyDOMElement();
 
-    localStorage.setItem("resume-agent-getting-started-dismissed", "1");
+    localStorage.setItem("resume-tailor-harness-getting-started-dismissed", "1");
     mocks.journey.mockReturnValue(incomplete);
     expect(renderChecklist().container).toBeEmptyDOMElement();
   });
@@ -69,6 +69,6 @@ describe("GettingStartedChecklist", () => {
     renderChecklist();
     await userEvent.click(screen.getByRole("button", { name: /dismiss getting started/i }));
     expect(screen.queryByText("Getting started")).not.toBeInTheDocument();
-    expect(localStorage.getItem("resume-agent-getting-started-dismissed")).toBe("1");
+    expect(localStorage.getItem("resume-tailor-harness-getting-started-dismissed")).toBe("1");
   });
 });

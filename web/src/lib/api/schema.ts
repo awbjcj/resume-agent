@@ -8792,12 +8792,12 @@ export interface components {
             email: string;
         };
         /** ResetPasswordRequest */
-        resume_agent__api__schemas__admin_users__ResetPasswordRequest: {
+        resume_tailor_harness__api__schemas__admin_users__ResetPasswordRequest: {
             /** Password */
             password: string;
         };
         /** ResetPasswordRequest */
-        resume_agent__api__schemas__auth_email__ResetPasswordRequest: {
+        resume_tailor_harness__api__schemas__auth_email__ResetPasswordRequest: {
             /** Code */
             code: string;
             /**
@@ -8809,14 +8809,14 @@ export interface components {
             newPassword: string;
         };
         /** AddSkillIn */
-        resume_agent__api__schemas__profile__AddSkillIn: {
+        resume_tailor_harness__api__schemas__profile__AddSkillIn: {
             /** Category */
             category?: ("hard" | "soft" | "domain") | null;
             /** Name */
             name: string;
         };
         /** SourceOut */
-        resume_agent__api__schemas__profile__SourceOut: {
+        resume_tailor_harness__api__schemas__profile__SourceOut: {
             /** Addedat */
             addedAt: string;
             /** Anchor */
@@ -8842,7 +8842,7 @@ export interface components {
             primary: boolean;
         };
         /** SourceOut */
-        resume_agent__api__schemas__sources__SourceOut: {
+        resume_tailor_harness__api__schemas__sources__SourceOut: {
             /** Detail */
             detail: string;
             /** Displayname */
@@ -8861,7 +8861,7 @@ export interface components {
             type: string;
         };
         /** AddSkillIn */
-        resume_agent__api__schemas__taxonomy__AddSkillIn: {
+        resume_tailor_harness__api__schemas__taxonomy__AddSkillIn: {
             /** Domainid */
             domainId?: string | null;
             newDomain?: components["schemas"]["NewDomainIn"] | null;
@@ -10228,7 +10228,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["resume_agent__api__schemas__admin_users__ResetPasswordRequest"];
+                "application/json": components["schemas"]["resume_tailor_harness__api__schemas__admin_users__ResetPasswordRequest"];
             };
         };
         responses: {
@@ -10663,7 +10663,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["resume_agent__api__schemas__auth_email__ResetPasswordRequest"];
+                "application/json": components["schemas"]["resume_tailor_harness__api__schemas__auth_email__ResetPasswordRequest"];
             };
         };
         responses: {
@@ -14857,7 +14857,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["resume_agent__api__schemas__profile__AddSkillIn"];
+                "application/json": components["schemas"]["resume_tailor_harness__api__schemas__profile__AddSkillIn"];
             };
         };
         responses: {
@@ -15034,7 +15034,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"][];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__profile__SourceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -15069,7 +15069,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__profile__SourceOut"];
                 };
             };
             /** @description Validation Error */
@@ -15104,7 +15104,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__profile__SourceOut"];
                 };
             };
             /** @description Validation Error */
@@ -15139,7 +15139,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__profile__SourceOut"];
                 };
             };
             /** @description Validation Error */
@@ -15209,7 +15209,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__profile__SourceOut"];
                 };
             };
             /** @description Validation Error */
@@ -16783,7 +16783,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"][];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__sources__SourceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -16818,7 +16818,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__sources__SourceOut"];
                 };
             };
             /** @description Validation Error */
@@ -16952,7 +16952,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"];
+                    "application/json": components["schemas"]["resume_tailor_harness__api__schemas__sources__SourceOut"];
                 };
             };
             /** @description Validation Error */
@@ -17225,7 +17225,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["resume_agent__api__schemas__taxonomy__AddSkillIn"];
+                "application/json": components["schemas"]["resume_tailor_harness__api__schemas__taxonomy__AddSkillIn"];
             };
         };
         responses: {

@@ -1,5 +1,5 @@
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact
 
 
 def test_cover_letter_content_roundtrips():

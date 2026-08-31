@@ -3,16 +3,16 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.h1b import service as h1b_service
-from resume_agent.h1b.models import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.h1b import service as h1b_service
+from resume_tailor_harness.h1b.models import (
     H1B_AGENT_UNAVAILABLE_REASON,
     HISTORICAL_ONLY_CAVEAT,
     H1BEnrichmentReport,
     H1BSponsorshipEvidence,
 )
-from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence, Job, JobStatus
 
 
 class InlineExecutor(Executor):

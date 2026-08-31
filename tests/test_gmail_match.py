@@ -1,6 +1,6 @@
-from resume_agent.gmail.client import EmailMessage
-from resume_agent.gmail.match import match_email_to_application
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.gmail.client import EmailMessage
+from resume_tailor_harness.gmail.match import match_email_to_application
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _job(id_, company):

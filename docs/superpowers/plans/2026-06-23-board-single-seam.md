@@ -16,15 +16,15 @@
 
 | File                                                                                      | Responsibility                                                                                               | Action |
 | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------ |
-| `src/resume_agent/tracking/queries.py`                                                    | `JobDetailRow` dataclass + `job_detail_row()` assembling it (reuses `_shortlist_row`)                        | Modify |
-| `src/resume_agent/services/board.py`                                                      | `get_job_detail()` wraps `job_detail_row` (loads facts like `job_detail_facets`)                             | Modify |
-| `src/resume_agent/api/routers/jobs.py`                                                    | Collapse `_job_detail` (32–75) to `board.get_job_detail` + `JobDetail.model_validate`                        | Modify |
-| `src/resume_agent/dashboard/pages.py`                                                     | Mutations → `board.set_stage`/`set_archived`/`delete`/`upsert_application`; drop repository mutation imports | Modify |
+| `src/resume_tailor_harness/tracking/queries.py`                                                    | `JobDetailRow` dataclass + `job_detail_row()` assembling it (reuses `_shortlist_row`)                        | Modify |
+| `src/resume_tailor_harness/services/board.py`                                                      | `get_job_detail()` wraps `job_detail_row` (loads facts like `job_detail_facets`)                             | Modify |
+| `src/resume_tailor_harness/api/routers/jobs.py`                                                    | Collapse `_job_detail` (32–75) to `board.get_job_detail` + `JobDetail.model_validate`                        | Modify |
+| `src/resume_tailor_harness/dashboard/pages.py`                                                     | Mutations → `board.set_stage`/`set_archived`/`delete`/`upsert_application`; drop repository mutation imports | Modify |
 | `tests/test_job_detail_row.py`                                                            | Unit test for the read-model assembly                                                                        | Create |
 | `tests/api/test_job_detail.py`                                                            | API test: detail shape unchanged through the new path                                                        | Extend |
 | `tests/test_dashboard_seam.py`                                                            | Fitness test: dashboard imports no mutation funcs from `tracking.repository`                                 | Create |
-| `src/resume_agent/services/prune.py`                                                      | `prune()` use-case: load config, merge sparse overrides, dispatch preview/run                                | Create |
-| `src/resume_agent/cli.py:445-482` · `api/routers/prune.py` · `dashboard/pages.py:744-773` | Call `services.prune`; drop the duplicated override-merge                                                    | Modify |
+| `src/resume_tailor_harness/services/prune.py`                                                      | `prune()` use-case: load config, merge sparse overrides, dispatch preview/run                                | Create |
+| `src/resume_tailor_harness/cli.py:445-482` · `api/routers/prune.py` · `dashboard/pages.py:744-773` | Call `services.prune`; drop the duplicated override-merge                                                    | Modify |
 | `tests/test_services_prune.py`                                                            | Unit test for the prune use-case (override merge + dispatch)                                                 | Create |
 
 ---
@@ -33,7 +33,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py` (add after `ShortlistRow`, ~line 60; and a builder near `job_facets`, ~line 199)
+- Modify: `src/resume_tailor_harness/tracking/queries.py` (add after `ShortlistRow`, ~line 60; and a builder near `job_facets`, ~line 199)
 - Test: `tests/test_job_detail_row.py`
 
 `JobDetailRow` is flat and field-named to match the `JobDetail` schema exactly (note `id`, not `job_id`), so `JobDetail.model_validate(row)` projects it in one line. The facet half reuses `_shortlist_row` (no re-derivation); the detail half adds the job's own columns plus sub-resources.
@@ -41,10 +41,10 @@
 - [ ] **Step 1: Write the failing test**
 
 ```python
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.queries import job_detail_row
-from resume_agent.tracking.repository import save_application
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.queries import job_detail_row
+from resume_tailor_harness.tracking.repository import save_application
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 
 
 def _session():
@@ -92,7 +92,7 @@ Expected: FAIL with `ImportError: cannot import name 'job_detail_row'`.
 
 - [ ] **Step 3: Add `JobDetailRow` + `job_detail_row`**
 
-In `src/resume_agent/tracking/queries.py`, add the dataclass after `ShortlistRow` (after line 60):
+In `src/resume_tailor_harness/tracking/queries.py`, add the dataclass after `ShortlistRow` (after line 60):
 
 ```python
 @dataclass
@@ -194,7 +194,7 @@ def job_detail_row(
     )
 ```
 
-Add `resume_versions_for_job` to the existing `from resume_agent.tracking.repository import (...)` block at the top of `queries.py` (it already imports `application_for_job`, `has_progress`).
+Add `resume_versions_for_job` to the existing `from resume_tailor_harness.tracking.repository import (...)` block at the top of `queries.py` (it already imports `application_for_job`, `has_progress`).
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -204,8 +204,8 @@ Expected: PASS (both tests).
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-ruff check src/resume_agent/tracking/queries.py tests/test_job_detail_row.py
-git add src/resume_agent/tracking/queries.py tests/test_job_detail_row.py
+ruff check src/resume_tailor_harness/tracking/queries.py tests/test_job_detail_row.py
+git add src/resume_tailor_harness/tracking/queries.py tests/test_job_detail_row.py
 git commit -m "feat(queries): add JobDetailRow read-model for the detail view"
 ```
 
@@ -215,8 +215,8 @@ git commit -m "feat(queries): add JobDetailRow read-model for the detail view"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/board.py`
-- Modify: `src/resume_agent/api/routers/jobs.py:32-75,78-128`
+- Modify: `src/resume_tailor_harness/services/board.py`
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py:32-75,78-128`
 - Test: `tests/api/test_job_detail.py`
 
 - [ ] **Step 1: Write the failing API test**
@@ -224,10 +224,10 @@ git commit -m "feat(queries): add JobDetailRow read-model for the detail view"
 ```python
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.tracking.repository import save_application
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.repository import save_application
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 
 
 def _client():
@@ -279,7 +279,7 @@ Expected: PASS (the old `_job_detail` already returns this shape). This test is 
 
 - [ ] **Step 3: Add `board.get_job_detail`**
 
-In `src/resume_agent/services/board.py`, add after `job_detail_facets` (line 69), and add `job_detail_row` to the `from resume_agent.tracking.queries import (...)` block:
+In `src/resume_tailor_harness/services/board.py`, add after `job_detail_facets` (line 69), and add `job_detail_row` to the `from resume_tailor_harness.tracking.queries import (...)` block:
 
 ```python
 def get_job_detail(
@@ -296,7 +296,7 @@ def get_job_detail(
 
 - [ ] **Step 4: Collapse the router**
 
-In `src/resume_agent/api/routers/jobs.py`, replace `_job_detail` (lines 32–75) with a thin response helper, and update the imports (drop `application_for_job`, `resume_versions_for_job`, the per-field schema imports that are no longer hand-used; keep `get_job` for the mutation guards):
+In `src/resume_tailor_harness/api/routers/jobs.py`, replace `_job_detail` (lines 32–75) with a thin response helper, and update the imports (drop `application_for_job`, `resume_versions_for_job`, the per-field schema imports that are no longer hand-used; keep `get_job` for the mutation guards):
 
 ```python
 def _job_detail_response(session: Session, job_id: int) -> JobDetail:
@@ -324,8 +324,8 @@ Expected: PASS. The `JobDetail` schema is unchanged, so OpenAPI does not drift.
 - [ ] **Step 6: Lint + commit**
 
 ```bash
-ruff check src/resume_agent/services/board.py src/resume_agent/api/routers/jobs.py
-git add src/resume_agent/services/board.py src/resume_agent/api/routers/jobs.py tests/api/test_job_detail.py
+ruff check src/resume_tailor_harness/services/board.py src/resume_tailor_harness/api/routers/jobs.py
+git add src/resume_tailor_harness/services/board.py src/resume_tailor_harness/api/routers/jobs.py tests/api/test_job_detail.py
 git commit -m "refactor(api): project JobDetail via board.get_job_detail in one model_validate"
 ```
 
@@ -335,7 +335,7 @@ git commit -m "refactor(api): project JobDetail via board.get_job_detail in one 
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/pages.py:49-60,313-322,430-435,452-460,663,718,725,739`
+- Modify: `src/resume_tailor_harness/dashboard/pages.py:49-60,313-322,430-435,452-460,663,718,725,739`
 - Test: `tests/test_dashboard_seam.py`
 
 All seven mutation sites already have their policy wrapper in `board`. Delete is already UI-gated on `has_progress` (`row.has_progress` at 464, `all_deletable(...)` at 730), so routing it through `board.delete` is behavior-preserving.
@@ -343,7 +343,7 @@ All seven mutation sites already have their policy wrapper in `board`. Delete is
 - [ ] **Step 1: Write the failing fitness test**
 
 ```python
-from resume_agent.dashboard import pages
+from resume_tailor_harness.dashboard import pages
 
 # `from tracking.repository import save_job` would bind pages.save_job; after the
 # refactor the dashboard owns no mutation policy, so none of these may be present.
@@ -365,7 +365,7 @@ Expected: FAIL — all six names currently leak.
 
 - [ ] **Step 3: Replace the mutation sites with `board` calls**
 
-Add `from resume_agent.services import board` to `pages.py` imports. Then:
+Add `from resume_tailor_harness.services import board` to `pages.py` imports. Then:
 
 Approve button (313–322):
 
@@ -400,20 +400,20 @@ Delete bulk (739) → `board.delete(session, jid)`.
 
 - [ ] **Step 4: Drop the now-dead imports + helpers**
 
-Remove `save_job`, `archive_job`, `restore_job`, `delete_job`, `save_application`, `update_application_status` from the `from resume_agent.tracking.repository import (...)` block (49–60). Keep `application_for_job`, `get_job`, `prune_preview`, `prune_run` (still used for reads/Candidate D). If `_new_application` and the `Application` import are now unused, delete them. Let `ruff` confirm.
+Remove `save_job`, `archive_job`, `restore_job`, `delete_job`, `save_application`, `update_application_status` from the `from resume_tailor_harness.tracking.repository import (...)` block (49–60). Keep `application_for_job`, `get_job`, `prune_preview`, `prune_run` (still used for reads/Candidate D). If `_new_application` and the `Application` import are now unused, delete them. Let `ruff` confirm.
 
 - [ ] **Step 5: Run the fitness test, dashboard tests, and lint**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_dashboard_seam.py tests/test_dashboard_app.py tests/test_cli_dashboard.py -v`
 Expected: PASS (fitness test green; existing dashboard tests unchanged — behavior preserved).
 
-Run: `ruff check src/resume_agent/dashboard/pages.py`
+Run: `ruff check src/resume_tailor_harness/dashboard/pages.py`
 Expected: no errors (catches any leftover unused import).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/pages.py tests/test_dashboard_seam.py
+git add src/resume_tailor_harness/dashboard/pages.py tests/test_dashboard_seam.py
 git commit -m "refactor(dashboard): route mutations through the board seam"
 ```
 
@@ -423,10 +423,10 @@ git commit -m "refactor(dashboard): route mutations through the board seam"
 
 **Files:**
 
-- Create: `src/resume_agent/services/prune.py`
-- Modify: `src/resume_agent/cli.py:453-482`
-- Modify: `src/resume_agent/api/routers/prune.py`
-- Modify: `src/resume_agent/dashboard/pages.py:744-773`
+- Create: `src/resume_tailor_harness/services/prune.py`
+- Modify: `src/resume_tailor_harness/cli.py:453-482`
+- Modify: `src/resume_tailor_harness/api/routers/prune.py`
+- Modify: `src/resume_tailor_harness/dashboard/pages.py:744-773`
 - Test: `tests/test_services_prune.py`
 
 The config-load + sparse override-merge + preview/run dispatch is duplicated across all three adapters (byte-identical between CLI and API). One use-case owns it. The dashboard still calls `load_prune_config` for one thing only — seeding its number-input defaults — which is a pure read, not the duplicated logic.
@@ -434,9 +434,9 @@ The config-load + sparse override-merge + preview/run dispatch is duplicated acr
 - [ ] **Step 1: Write the failing test**
 
 ```python
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services.prune import prune
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services.prune import prune
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():
@@ -474,7 +474,7 @@ def test_prune_override_beats_config(tmp_path):
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_prune.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.services.prune'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.services.prune'`.
 
 - [ ] **Step 3: Write the use-case**
 
@@ -485,9 +485,9 @@ from __future__ import annotations
 
 from sqlmodel import Session
 
-from resume_agent.tracking.prune import PruneReport
-from resume_agent.tracking.prune_config import load_prune_config
-from resume_agent.tracking.repository import prune_preview, prune_run
+from resume_tailor_harness.tracking.prune import PruneReport
+from resume_tailor_harness.tracking.prune_config import load_prune_config
+from resume_tailor_harness.tracking.repository import prune_preview, prune_run
 
 DEFAULT_PRUNE_CONFIG = "config/prune.yaml"
 
@@ -524,7 +524,7 @@ Expected: PASS (both tests).
 
 - [ ] **Step 5: Point the CLI at the use-case**
 
-In `src/resume_agent/cli.py`, replace the body of the prune command (453–482) — the `load_prune_config` + override-dict + `model_copy` + `prune_preview`/`prune_run` block — with:
+In `src/resume_tailor_harness/cli.py`, replace the body of the prune command (453–482) — the `load_prune_config` + override-dict + `model_copy` + `prune_preview`/`prune_run` block — with:
 
 ```python
     with get_session(_engine(db_url)) as session:
@@ -546,11 +546,11 @@ In `src/resume_agent/cli.py`, replace the body of the prune command (453–482) 
         )
 ```
 
-Update the CLI imports: add `from resume_agent.services.prune import prune as run_prune`; remove `load_prune_config` and `prune_preview`/`prune_run` from their import lines if no longer used elsewhere in `cli.py` (let `ruff` confirm). The alias is required because the Typer command function is already named `prune`.
+Update the CLI imports: add `from resume_tailor_harness.services.prune import prune as run_prune`; remove `load_prune_config` and `prune_preview`/`prune_run` from their import lines if no longer used elsewhere in `cli.py` (let `ruff` confirm). The alias is required because the Typer command function is already named `prune`.
 
 - [ ] **Step 6: Point the API at the use-case**
 
-Replace the body of `src/resume_agent/api/routers/prune.py`'s `prune` endpoint (the `load_prune_config` + override-dict + dispatch, lines 19–29) with:
+Replace the body of `src/resume_tailor_harness/api/routers/prune.py`'s `prune` endpoint (the `load_prune_config` + override-dict + dispatch, lines 19–29) with:
 
 ```python
 @router.post("/prune", response_model=PruneReportOut)
@@ -562,11 +562,11 @@ def prune_endpoint(body: PruneOverrides, session: Session = Depends(get_session)
     return PruneReportOut.model_validate(report)
 ```
 
-Update imports: add `from resume_agent.services.prune import prune`; drop `load_prune_config`, `prune_preview`, `prune_run`. (Rename the handler to `prune_endpoint` so it does not shadow the imported `prune`.)
+Update imports: add `from resume_tailor_harness.services.prune import prune`; drop `load_prune_config`, `prune_preview`, `prune_run`. (Rename the handler to `prune_endpoint` so it does not shadow the imported `prune`.)
 
 - [ ] **Step 7: Point the dashboard at the use-case (keep config load for widget defaults)**
 
-In `src/resume_agent/dashboard/pages.py`, `_render_prune_panel` keeps `config = load_prune_config(_PRUNE_CONFIG_PATH)` to seed the inputs, but the preview/run calls go through the use-case:
+In `src/resume_tailor_harness/dashboard/pages.py`, `_render_prune_panel` keeps `config = load_prune_config(_PRUNE_CONFIG_PATH)` to seed the inputs, but the preview/run calls go through the use-case:
 
 ```python
 def _render_prune_panel(session) -> None:
@@ -598,20 +598,20 @@ def _confirm_prune(session, fit: int, stale: int, retain: int) -> None:
         st.rerun()
 ```
 
-Add `from resume_agent.services.prune import prune` to the imports; remove `prune_preview` and `prune_run` from the `tracking.repository` import block. Keep `load_prune_config`.
+Add `from resume_tailor_harness.services.prune import prune` to the imports; remove `prune_preview` and `prune_run` from the `tracking.repository` import block. Keep `load_prune_config`.
 
 - [ ] **Step 8: Run prune tests across all three adapters + lint**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_prune.py tests/test_cli_prune.py tests/api/test_prune_render.py -v`
 Expected: PASS (adapter behavior preserved — same report text/shape).
 
-Run: `ruff check src/resume_agent/services/prune.py src/resume_agent/cli.py src/resume_agent/api/routers/prune.py src/resume_agent/dashboard/pages.py`
+Run: `ruff check src/resume_tailor_harness/services/prune.py src/resume_tailor_harness/cli.py src/resume_tailor_harness/api/routers/prune.py src/resume_tailor_harness/dashboard/pages.py`
 Expected: no errors (catches any leftover unused import).
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/services/prune.py src/resume_agent/cli.py src/resume_agent/api/routers/prune.py src/resume_agent/dashboard/pages.py tests/test_services_prune.py
+git add src/resume_tailor_harness/services/prune.py src/resume_tailor_harness/cli.py src/resume_tailor_harness/api/routers/prune.py src/resume_tailor_harness/dashboard/pages.py tests/test_services_prune.py
 git commit -m "refactor(prune): lift config override-merge into services.prune use-case"
 ```
 

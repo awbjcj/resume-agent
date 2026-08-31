@@ -179,7 +179,7 @@ class StreamSink(Protocol):
 | Implementation      | Used by                           | Behavior                                             |
 | ------------------- | --------------------------------- | ---------------------------------------------------- |
 | `RunStreamSink`     | API run workers                   | Appends ndjson to `data/runs/{run_id}.stream.ndjson` |
-| `ConsoleStreamSink` | `resume-agent profile coach`      | Prints text deltas and tool chips to stdout          |
+| `ConsoleStreamSink` | `resume-tailor-harness profile coach`      | Prints text deltas and tool chips to stdout          |
 | `NullSink`          | tests, non-conversational callers | Discards                                             |
 
 `RunStreamSink` resolves its path through `RunManager`'s registered root for the
@@ -353,7 +353,7 @@ Only the transcript region is swapped for `<ChatThread>`.
 
 ## CLI
 
-`resume-agent profile coach` calls the service functions synchronously with no
+`resume-tailor-harness profile coach` calls the service functions synchronously with no
 run and no reporter. The service functions take an optional `sink: StreamSink`
 parameter; the API passes `RunStreamSink`, the CLI passes `ConsoleStreamSink`.
 Both clients therefore exercise the **same** code path through a turn, so the CLI

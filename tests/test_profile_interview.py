@@ -1,4 +1,4 @@
-from resume_agent.profile.interview import (
+from resume_tailor_harness.profile.interview import (
     InterviewQuestion,
     InterviewRound,
     append_round,
@@ -32,8 +32,8 @@ def test_legacy_history_round_trip_supports_anti_repeat_context(tmp_path):
 
 
 def test_corpus_tools_are_read_only_capped_and_never_raise(tmp_path):
-    from resume_agent.profile import interview
-    from resume_agent.profile.corpus import add_source
+    from resume_tailor_harness.profile import interview
+    from resume_tailor_harness.profile.corpus import add_source
 
     source = tmp_path / "resume.md"
     source.write_text("# Resume\n" + "x" * 30_000, encoding="utf-8")

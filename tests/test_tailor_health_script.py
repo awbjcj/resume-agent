@@ -13,7 +13,7 @@ _SPEC.loader.exec_module(tailor_health)
 
 
 def _db(tmp_path: Path, rounds: list[list[dict]] | list[dict]) -> Path:
-    path = tmp_path / "resume_agent.db"
+    path = tmp_path / "resume_tailor_harness.db"
     connection = sqlite3.connect(path)
     connection.execute(
         "create table resume_versions (id integer, job_id integer, round integer, "

@@ -1,22 +1,22 @@
 from types import SimpleNamespace
 from typing import cast
 
-from resume_agent.services.match_gap import (
+from resume_tailor_harness.services.match_gap import (
     maintain_taxonomy,
     undo_taxonomy_maintenance,
 )
-from resume_agent.taxonomy.clusters import (
+from resume_tailor_harness.taxonomy.clusters import (
     ClusterMap,
     load_cluster_map,
     save_cluster_map,
 )
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
-from resume_agent.taxonomy.embeddings import EmbeddingUnavailable
-from resume_agent.taxonomy.state import load_taxonomy_state, snapshot_before_maintenance
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.taxonomy.embeddings import EmbeddingUnavailable
+from resume_tailor_harness.taxonomy.state import load_taxonomy_state, snapshot_before_maintenance
+from resume_tailor_harness.tracking.canonicalize import (
     TaxonomyMaintenanceAction,
     TaxonomyMaintenancePlan,
 )

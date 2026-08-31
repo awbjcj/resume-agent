@@ -4,11 +4,11 @@ import httpx
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.services import redo
-from resume_agent.tracking.dedup import compute_dedup_key
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.services import redo
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @pytest.fixture

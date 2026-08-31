@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.tailor.review_config import (
+from resume_tailor_harness.tailor.review_config import (
     ReviewConfig,
     ReviewerSpec,
     load_review_config,

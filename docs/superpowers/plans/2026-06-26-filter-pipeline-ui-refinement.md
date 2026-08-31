@@ -653,7 +653,7 @@ Expected: Vitest exits 0, TypeScript/Vite build exits 0, ESLint exits 0.
 Start the API and Vite app in separate terminals:
 
 ```bash
-uv run resume-agent serve --host 127.0.0.1 --port 8000
+uv run resume-tailor-harness serve --host 127.0.0.1 --port 8000
 npm --prefix web run dev -- --host 127.0.0.1 --port 5173
 ```
 

@@ -4,14 +4,14 @@ from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import Error as PlaywrightError
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.scraper.linkedin import (
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.scraper.linkedin import (
     _FEED_URL,
     LinkedInScraper,
     _playwright_failure_reason,
     _search_url,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURES = Path(__file__).parent / "fixtures" / "linkedin"
 

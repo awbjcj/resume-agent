@@ -3,16 +3,16 @@ from dataclasses import asdict
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.service import tailor_job, tailor_jobs
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.snapshot import EffectiveTaxonomy
-from resume_agent.tracking.repository import resume_versions_for_job, save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.service import tailor_job, tailor_jobs
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.snapshot import EffectiveTaxonomy
+from resume_tailor_harness.tracking.repository import resume_versions_for_job, save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 class _Result:
@@ -143,7 +143,7 @@ def test_tailor_job_persists_the_frozen_fallback_portfolio():
 
 
 def test_tailor_jobs_reports_progress_and_returns_per_job(tmp_path):
-    from resume_agent.progress import ProgressReporter, read_progress
+    from resume_tailor_harness.progress import ProgressReporter, read_progress
 
     config = ReviewConfig(
         max_rounds=1,
@@ -184,7 +184,7 @@ def test_tailor_jobs_runs_jobs_concurrently(monkeypatch):
     import time
 
     monkeypatch.setenv("LLM_CONCURRENCY", "8")
-    from resume_agent.config import env_settings
+    from resume_tailor_harness.config import env_settings
 
     env_settings.cache_clear()
 

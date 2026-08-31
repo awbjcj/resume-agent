@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.profile.coach import CoachTurn, DraftNote, NewTopic, OpeningTurn
-from resume_agent.profile.coach_store import load_session, mutate_session
-from resume_agent.services.profile_coach import (
+from resume_tailor_harness.profile.coach import CoachTurn, DraftNote, NewTopic, OpeningTurn
+from resume_tailor_harness.profile.coach_store import load_session, mutate_session
+from resume_tailor_harness.services.profile_coach import (
     approve_draft,
     discard_draft,
     run_build_with_impact,
@@ -17,7 +17,7 @@ from resume_agent.services.profile_coach import (
     session_view,
     sessions_view,
 )
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.sessions.stream import (
     Completed,
     Failed,
     Notice,
@@ -112,7 +112,7 @@ def _open(profile_dir):
 
 
 def _seed_primary(profile_dir):
-    from resume_agent.profile.corpus import add_source
+    from resume_tailor_harness.profile.corpus import add_source
 
     source = profile_dir.parent / "resume.txt"
     source.write_text("Resume body", encoding="utf-8")
@@ -164,8 +164,8 @@ def test_opening_and_message_turn_create_durable_views(tmp_path):
 
 
 def test_opening_turn_seeds_measured_depth_topics_before_model_topics(tmp_path):
-    from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-    from resume_agent.profile.store import save_facts
+    from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+    from resume_tailor_harness.profile.store import save_facts
 
     _seed_primary(tmp_path)
     save_facts(
@@ -197,7 +197,7 @@ def test_opening_turn_seeds_measured_depth_topics_before_model_topics(tmp_path):
 
 
 def test_session_view_exposes_owner_id_in_camel_case(tmp_path):
-    from resume_agent.profile.coach_store import (
+    from resume_tailor_harness.profile.coach_store import (
         CoachTopic,
         CoachTurnRecord,
         create_session,
@@ -346,7 +346,7 @@ def test_stream_checks_cancellation_before_each_visible_event(tmp_path):
 def test_stream_disabled_uses_blocking_formatter_message(tmp_path, monkeypatch):
     sid = _open(tmp_path)["sessionId"]
     monkeypatch.setattr(
-        "resume_agent.sessions.turns.get_settings",
+        "resume_tailor_harness.sessions.turns.get_settings",
         lambda: SimpleNamespace(stream_enabled=False),
     )
     sink = RecordingSink()
@@ -513,20 +513,20 @@ def test_approval_requires_quote_and_is_exactly_once_under_concurrency(tmp_path)
     with ThreadPoolExecutor(max_workers=2) as pool:
         outcomes = list(pool.map(lambda _: approve(), range(2)))
     assert sum(not outcome.startswith("draft already") for outcome in outcomes) == 1
-    from resume_agent.profile.corpus import load_manifest
+    from resume_tailor_harness.profile.corpus import load_manifest
 
     assert len(load_manifest(profile_dir).docs) == 2
 
 
 def test_approving_a_seeded_topic_writes_a_pinned_synthesis_note(tmp_path):
-    from resume_agent.profile.coach_store import (
+    from resume_tailor_harness.profile.coach_store import (
         CoachDraftNote,
         CoachTopic,
         CoachTurnRecord,
         apply_turn_delta,
         create_session,
     )
-    from resume_agent.profile.corpus import load_manifest
+    from resume_tailor_harness.profile.corpus import load_manifest
 
     profile_dir = tmp_path / "profile"
     _seed_primary(profile_dir)
@@ -645,7 +645,7 @@ def test_discard_recap_and_late_approval(tmp_path):
 
 def test_build_with_impact_records_errors(tmp_path, monkeypatch):
     profile_dir, sid = _drafted_session(tmp_path)
-    import resume_agent.services.profile_coach as service
+    import resume_tailor_harness.services.profile_coach as service
 
     monkeypatch.setattr(
         service, "run_corpus_build", lambda reporter, **kwargs: {"experiences": 1}

@@ -11,7 +11,7 @@ from evals.metrics import (
     total_bullets,
 )
 from evals.runner import CaseResult
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.review_config import ReviewConfig
 
 
 def _surfaced_record(result: CaseResult) -> RoundRecord:

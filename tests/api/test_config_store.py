@@ -2,14 +2,14 @@
 
 import pytest
 
-from resume_agent.api.schemas.config import (
+from resume_tailor_harness.api.schemas.config import (
     DOMAIN_SCHEMAS,
     PruneConfigDoc,
     SearchConfigDoc,
     StyleGuideDoc,
 )
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.services.config_store import YamlConfigStore
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.services.config_store import YamlConfigStore
 
 
 @pytest.fixture()

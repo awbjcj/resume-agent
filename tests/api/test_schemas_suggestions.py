@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import AnyHttpUrl, TypeAdapter, ValidationError
 
-from resume_agent.api.schemas.suggestions import (
+from resume_tailor_harness.api.schemas.suggestions import (
     ProjectOut,
     RepoOut,
     ResourceOut,

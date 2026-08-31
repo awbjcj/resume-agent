@@ -1,8 +1,8 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.ingest import add_job
-from resume_agent.tracking.repository import get_cover_letter, save_cover_letter
-from resume_agent.tracking.tables import CoverLetter
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.tracking.repository import get_cover_letter, save_cover_letter
+from resume_tailor_harness.tracking.tables import CoverLetter
 
 
 def _session():

@@ -4,7 +4,7 @@
 
 **Goal:** Distill craft knowledge from six resume-writing skill playbooks into role-targeted agent instructions, gated by before/after eval runs.
 
-**Architecture:** A new pure-data module `src/resume_agent/tailor/craft.py` holds per-role instruction blocks. `tailor/agents.py` and `tailor/match_plan.py` append them _after_ the integrity (fact-lock) instructions and _before_ the user style guide. Four new craft-focused eval cases land first so the (never-yet-run) baseline covers them; the ship decision compares baseline vs. after reports from `evals/run_eval`.
+**Architecture:** A new pure-data module `src/resume_tailor_harness/tailor/craft.py` holds per-role instruction blocks. `tailor/agents.py` and `tailor/match_plan.py` append them _after_ the integrity (fact-lock) instructions and _before_ the user style guide. Four new craft-focused eval cases land first so the (never-yet-run) baseline covers them; the ship decision compares baseline vs. after reports from `evals/run_eval`.
 
 **Tech Stack:** Python 3.12, pydantic, agno agents, pytest (offline, all agents faked), existing `evals/` harness.
 
@@ -602,7 +602,7 @@ git commit -m "chore: record baseline eval runs (match-plan off/on) and judge an
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/craft.py`
+- Create: `src/resume_tailor_harness/tailor/craft.py`
 - Create: `tests/test_tailor_craft.py`
 
 **Interfaces:**
@@ -617,7 +617,7 @@ git commit -m "chore: record baseline eval runs (match-plan off/on) and judge an
 ```python
 """Craft blocks: fact-lock-safe wording and per-role targeting."""
 
-from resume_agent.tailor.craft import CRAFT_MATCH_PLAN, CRAFT_REVIEWERS, CRAFT_WRITER
+from resume_tailor_harness.tailor.craft import CRAFT_MATCH_PLAN, CRAFT_REVIEWERS, CRAFT_WRITER
 
 FABRICATION_FRAGMENTS = [
     "estimat",
@@ -662,11 +662,11 @@ def test_fact_check_gate_has_no_craft_block():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_craft.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.tailor.craft'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.craft'`.
 
 - [ ] **Step 3: Write the module**
 
-`src/resume_agent/tailor/craft.py`:
+`src/resume_tailor_harness/tailor/craft.py`:
 
 ```python
 """Role-targeted craft guidance distilled from resume-writing playbooks.
@@ -751,7 +751,7 @@ Run: `ruff check`
 Expected: clean.
 
 ```bash
-git add src/resume_agent/tailor/craft.py tests/test_tailor_craft.py
+git add src/resume_tailor_harness/tailor/craft.py tests/test_tailor_craft.py
 git commit -m "feat: add role-targeted craft instruction blocks"
 ```
 
@@ -761,13 +761,13 @@ git commit -m "feat: add role-targeted craft instruction blocks"
 
 **Files:**
 
-- Modify: `src/resume_agent/tailor/agents.py` (import craft; add `_writer_instructions`; touch three call sites)
-- Modify: `src/resume_agent/tailor/match_plan.py` (import craft; add `_plan_instructions`; one call site)
+- Modify: `src/resume_tailor_harness/tailor/agents.py` (import craft; add `_writer_instructions`; touch three call sites)
+- Modify: `src/resume_tailor_harness/tailor/match_plan.py` (import craft; add `_plan_instructions`; one call site)
 - Modify: `tests/test_tailor_craft.py` (append wiring tests)
 
 **Interfaces:**
 
-- Consumes: `CRAFT_WRITER`, `CRAFT_MATCH_PLAN`, `CRAFT_REVIEWERS` from Task 3; existing `compose_instructions(base, style_guide)` and `STYLE_GUIDE_HEADER` from `resume_agent.tailor.style_guide`.
+- Consumes: `CRAFT_WRITER`, `CRAFT_MATCH_PLAN`, `CRAFT_REVIEWERS` from Task 3; existing `compose_instructions(base, style_guide)` and `STYLE_GUIDE_HEADER` from `resume_tailor_harness.tailor.style_guide`.
 - Produces: `_writer_instructions(base: list[str]) -> list[str]` in `agents.py`; `_plan_instructions() -> list[str]` in `match_plan.py`. The revision agent and fact-check reviewer compositions are unchanged.
 
 - [ ] **Step 1: Write the failing wiring tests**
@@ -775,15 +775,15 @@ git commit -m "feat: add role-targeted craft instruction blocks"
 In `tests/test_tailor_craft.py`, add these imports to the **top of the file** (merged into the existing import block — ruff's default E402 rejects mid-file imports), then append the test functions below the existing ones:
 
 ```python
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.tailor.agents import (
     _REVISER_INSTRUCTIONS,
     _REVISION_INSTRUCTIONS,
     _TAILOR_INSTRUCTIONS,
     _reviewer_instructions,
     _writer_instructions,
 )
-from resume_agent.tailor.match_plan import _MATCH_PLAN_INSTRUCTIONS, _plan_instructions
-from resume_agent.tailor.style_guide import STYLE_GUIDE_HEADER, compose_instructions
+from resume_tailor_harness.tailor.match_plan import _MATCH_PLAN_INSTRUCTIONS, _plan_instructions
+from resume_tailor_harness.tailor.style_guide import STYLE_GUIDE_HEADER, compose_instructions
 
 
 def test_writer_instructions_keep_integrity_first():
@@ -829,10 +829,10 @@ Expected: new tests FAIL with `ImportError: cannot import name '_writer_instruct
 
 - [ ] **Step 3: Wire `agents.py`**
 
-In `src/resume_agent/tailor/agents.py`, add the import (alongside the existing `style_guide` import):
+In `src/resume_tailor_harness/tailor/agents.py`, add the import (alongside the existing `style_guide` import):
 
 ```python
-from resume_agent.tailor.craft import CRAFT_REVIEWERS, CRAFT_WRITER
+from resume_tailor_harness.tailor.craft import CRAFT_REVIEWERS, CRAFT_WRITER
 ```
 
 Add below `_REVISION_INSTRUCTIONS` (the revision agent is deliberately NOT routed through this helper — it applies one user edit and must not rewrite for craft):
@@ -876,10 +876,10 @@ Leave `build_revision_agent` exactly as it is.
 
 - [ ] **Step 4: Wire `match_plan.py`**
 
-In `src/resume_agent/tailor/match_plan.py`, add the import:
+In `src/resume_tailor_harness/tailor/match_plan.py`, add the import:
 
 ```python
-from resume_agent.tailor.craft import CRAFT_MATCH_PLAN
+from resume_tailor_harness.tailor.craft import CRAFT_MATCH_PLAN
 ```
 
 Add below `_MATCH_PLAN_INSTRUCTIONS`:
@@ -907,7 +907,7 @@ Expected: full suite PASS (contract tests in `tests/test_agent_prompt_contracts.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tailor/agents.py src/resume_agent/tailor/match_plan.py tests/test_tailor_craft.py
+git add src/resume_tailor_harness/tailor/agents.py src/resume_tailor_harness/tailor/match_plan.py tests/test_tailor_craft.py
 git commit -m "feat: compose craft blocks into writer, reviewer, and match-plan prompts"
 ```
 
@@ -975,4 +975,4 @@ git add evals/RESULTS.md
 git commit -m "chore: record craft-enrichment eval results and ship decision"
 ```
 
-Then update `C:\Users\24216\.claude\projects\D--Fun-resume-agent\memory\agent-quality-roadmap.md`: baseline is now recorded, judge anchored (or not), craft enrichment shipped/iterating/reverted, match-plan default decision.
+Then update `C:\Users\24216\.claude\projects\D--Fun-resume-tailor-harness\memory\agent-quality-roadmap.md`: baseline is now recorded, judge anchored (or not), craft enrichment shipped/iterating/reverted, match-plan default decision.

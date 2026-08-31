@@ -1,11 +1,11 @@
 # Environment configuration
 
-`resume-agent` loads process settings from environment variables and then from
+`resume-tailor-harness` loads process settings from environment variables and then from
 the repository-root `.env` file. Copy `.env.example` to `.env` for local use;
 hosted deployments should set the same names in the platform environment.
 
 This page is the complete reference for the environment-backed fields in
-`resume_agent.config.Settings`. Blank values mean that the integration or
+`resume_tailor_harness.config.Settings`. Blank values mean that the integration or
 override is disabled. Boolean values accept the normal Pydantic settings forms,
 including `true` and `false`. Restart the API and workers after changing a
 setting because process settings are cached.
@@ -68,7 +68,7 @@ one route's key with the other route's endpoint.
 
 | Variable | Default | Accepted values and purpose |
 | --- | --- | --- |
-| `DB_URL` | `sqlite:///data/resume_agent.db` | SQLAlchemy database URL. The supported Railway topology uses one SQLite replica and one persistent volume. |
+| `DB_URL` | `sqlite:///data/resume_tailor_harness.db` | SQLAlchemy database URL. The supported Railway topology uses one SQLite replica and one persistent volume. |
 | `APP_MODE` | `auto` in Docker | Container runtime mode: `local`, `hosted`, or `auto`. Outside the container, use the `serve --mode` option. |
 | `API_TOKEN` | empty | Optional bearer token for scripts in hosted mode. Local mode ignores API/account authentication. |
 | `BROWSER_ENABLED` | `true` | Enables browser-backed connectors. The Docker image sets this to `false`. |
@@ -83,7 +83,7 @@ one route's key with the other route's endpoint.
 | Variable | Default | Accepted values and purpose |
 | --- | --- | --- |
 | `AUTH_USERNAME` | empty | Bootstrap administrator username in hosted mode. |
-| `AUTH_PASSWORD_HASH` | empty | Bootstrap administrator password hash produced by `resume-agent hash-password`. |
+| `AUTH_PASSWORD_HASH` | empty | Bootstrap administrator password hash produced by `resume-tailor-harness hash-password`. |
 | `SESSION_SECRET` | empty | Secret used to sign hosted sessions; use a long random value. |
 | `AUTH_EMAIL` | empty | Optional verified email assigned to the bootstrap administrator. |
 | `APP_BASE_URL` | empty | Canonical public origin used for OAuth callbacks and email links. Use HTTPS in production. |

@@ -93,14 +93,14 @@ vocabulary constant.
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/vocabulary.py`
-- Modify: `src/resume_agent/taxonomy/groups.py` (delete its `SKILL_GROUPS` literal, re-export from vocabulary)
-- Modify: `src/resume_agent/profile/group_corrections.py` (apply legacy remap in `load_group_corrections`)
+- Create: `src/resume_tailor_harness/taxonomy/vocabulary.py`
+- Modify: `src/resume_tailor_harness/taxonomy/groups.py` (delete its `SKILL_GROUPS` literal, re-export from vocabulary)
+- Modify: `src/resume_tailor_harness/profile/group_corrections.py` (apply legacy remap in `load_group_corrections`)
 - Test: `tests/test_taxonomy_vocabulary.py` (new), `tests/test_group_corrections.py` (extend)
 
 **Interfaces:**
 
-- Produces: `resume_agent.taxonomy.vocabulary.SKILL_GROUPS: dict[str, str]` (20 slugs → labels, authored in display order: 14 hard, 5 soft, then `other`), `SOFT_CATEGORY_SLUGS: frozenset[str]`, `category_kind(slug: str) -> Literal["hard", "soft"]`, `LEGACY_GROUP_REMAP: dict[str, str]`. `resume_agent.taxonomy.groups.SKILL_GROUPS` keeps working for every existing importer (re-export).
+- Produces: `resume_tailor_harness.taxonomy.vocabulary.SKILL_GROUPS: dict[str, str]` (20 slugs → labels, authored in display order: 14 hard, 5 soft, then `other`), `SOFT_CATEGORY_SLUGS: frozenset[str]`, `category_kind(slug: str) -> Literal["hard", "soft"]`, `LEGACY_GROUP_REMAP: dict[str, str]`. `resume_tailor_harness.taxonomy.groups.SKILL_GROUPS` keeps working for every existing importer (re-export).
 - Consumes: nothing new. `vocabulary.py` must have **zero** heavy imports (no agno, no config) — Tasks 2 and 4 import it from low-level modules.
 
 - [ ] **Step 1: Write the failing tests**
@@ -110,7 +110,7 @@ Create `tests/test_taxonomy_vocabulary.py`:
 ```python
 """Fixed category vocabulary invariants."""
 
-from resume_agent.taxonomy.vocabulary import (
+from resume_tailor_harness.taxonomy.vocabulary import (
     LEGACY_GROUP_REMAP,
     SKILL_GROUPS,
     SOFT_CATEGORY_SLUGS,
@@ -144,7 +144,7 @@ def test_legacy_remap_targets_live_slugs_and_sources_are_dead():
 
 
 def test_groups_module_reexports_vocabulary():
-    from resume_agent.taxonomy import groups
+    from resume_tailor_harness.taxonomy import groups
 
     assert groups.SKILL_GROUPS is SKILL_GROUPS
 ```
@@ -175,9 +175,9 @@ def test_load_remaps_legacy_slugs_and_drops_dead_ones(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_vocabulary.py tests/test_group_corrections.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.taxonomy.vocabulary'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.taxonomy.vocabulary'`
 
-- [ ] **Step 3: Create `src/resume_agent/taxonomy/vocabulary.py`**
+- [ ] **Step 3: Create `src/resume_tailor_harness/taxonomy/vocabulary.py`**
 
 ```python
 """Fixed shared category vocabulary — the constellation's immutable top level.
@@ -242,10 +242,10 @@ def category_kind(slug: str) -> Literal["hard", "soft"]:
 
 - [ ] **Step 4: Re-export from `groups.py` and remap in `group_corrections.py`**
 
-In `src/resume_agent/taxonomy/groups.py` delete the `SKILL_GROUPS = { ... 13 entries ... }` literal and replace with:
+In `src/resume_tailor_harness/taxonomy/groups.py` delete the `SKILL_GROUPS = { ... 13 entries ... }` literal and replace with:
 
 ```python
-from resume_agent.taxonomy.vocabulary import SKILL_GROUPS as SKILL_GROUPS
+from resume_tailor_harness.taxonomy.vocabulary import SKILL_GROUPS as SKILL_GROUPS
 ```
 
 Also make the classifier instructions derive from the vocabulary — replace the hardcoded slug enumeration in `_GROUP_INSTRUCTIONS` (the second list entry) with:
@@ -258,10 +258,10 @@ _GROUP_INSTRUCTIONS = [
 ]
 ```
 
-In `src/resume_agent/profile/group_corrections.py`, import the remap and apply it inside `load_group_corrections` — replace the loop body:
+In `src/resume_tailor_harness/profile/group_corrections.py`, import the remap and apply it inside `load_group_corrections` — replace the loop body:
 
 ```python
-from resume_agent.taxonomy.vocabulary import LEGACY_GROUP_REMAP
+from resume_tailor_harness.taxonomy.vocabulary import LEGACY_GROUP_REMAP
 
     clean: dict[str, GroupCorrection] = {}
     for raw_token, entry in ledger.corrections.items():
@@ -297,7 +297,7 @@ Run: `ruff check` → Expected: clean.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/vocabulary.py src/resume_agent/taxonomy/groups.py src/resume_agent/profile/group_corrections.py tests/
+git add src/resume_tailor_harness/taxonomy/vocabulary.py src/resume_tailor_harness/taxonomy/groups.py src/resume_tailor_harness/profile/group_corrections.py tests/
 git commit -m "feat(taxonomy): fixed 20-slug shared category vocabulary + legacy group remap"
 ```
 
@@ -307,18 +307,18 @@ git commit -m "feat(taxonomy): fixed 20-slug shared category vocabulary + legacy
 
 **Files:**
 
-- Modify: `src/resume_agent/taxonomy/clusters.py` (field renames + `category_of` + sanitize/merge/prune)
-- Modify: `src/resume_agent/taxonomy/classification.py` (rename field accesses only — behavior unchanged)
-- Modify: `src/resume_agent/tracking/match_gap.py:192-193,196,245,252,280-301,347-380` (rename `cluster_map.theme_of/theme_label` accesses; keep `SkillNode.theme_id` and `ThemeNode` names for now — the wire flip is Task 5)
-- Modify: `src/resume_agent/profile/matrix.py:132-172,211-216` (`effective_cluster_map` + adjacency accesses; carry `category_of` through)
-- Modify: `src/resume_agent/profile/coach.py:234`, `src/resume_agent/cli.py:842` (`.theme_of` → `.domain_of`)
-- Modify: `src/resume_agent/services/match_gap.py` (`final.theme_label` → `final.domain_label`; import rename)
+- Modify: `src/resume_tailor_harness/taxonomy/clusters.py` (field renames + `category_of` + sanitize/merge/prune)
+- Modify: `src/resume_tailor_harness/taxonomy/classification.py` (rename field accesses only — behavior unchanged)
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py:192-193,196,245,252,280-301,347-380` (rename `cluster_map.theme_of/theme_label` accesses; keep `SkillNode.theme_id` and `ThemeNode` names for now — the wire flip is Task 5)
+- Modify: `src/resume_tailor_harness/profile/matrix.py:132-172,211-216` (`effective_cluster_map` + adjacency accesses; carry `category_of` through)
+- Modify: `src/resume_tailor_harness/profile/coach.py:234`, `src/resume_tailor_harness/cli.py:842` (`.theme_of` → `.domain_of`)
+- Modify: `src/resume_tailor_harness/services/match_gap.py` (`final.theme_label` → `final.domain_label`; import rename)
 - Test: `tests/test_taxonomy_clusters.py` (extend + rename)
 
 **Interfaces:**
 
 - Produces: `ClusterMap(aliases, domain_of, domain_label, category_of)`; JSON keys `"domain_of"`, `"domain_label"`, `"category_of"` (legacy `"theme_of"`/`"theme_label"` silently ignored on load); `slugify_domain(label) -> str` (was `slugify_theme`); `allocate_domain_ids(*, existing_labels, proposed_labels) -> dict[str, str]` (was `allocate_theme_ids`); `_canonicalize_domain_keys` (was `_canonicalize_theme_keys`); `_flatten_aliases` unchanged and still importable (Task 4 reuses it).
-- Consumes: `resume_agent.taxonomy.vocabulary.SKILL_GROUPS` (Task 1).
+- Consumes: `resume_tailor_harness.taxonomy.vocabulary.SKILL_GROUPS` (Task 1).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -406,7 +406,7 @@ Expected: FAIL — `TypeError: ClusterMap.__init__() got an unexpected keyword a
 Apply these changes (unchanged code omitted — `_validated_map`, `_flatten_aliases`, and the atomic save body stay exactly as they are):
 
 ```python
-from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
+from resume_tailor_harness.taxonomy.vocabulary import SKILL_GROUPS
 
 
 @dataclass
@@ -550,11 +550,11 @@ Rename `slugify_theme` → `slugify_domain` and `allocate_theme_ids` → `alloca
 
 These are attribute/import renames only — no behavior change. After each file, the meaning is identical:
 
-1. `src/resume_agent/taxonomy/classification.py`: import `allocate_domain_ids`; every `existing.theme_of` → `existing.domain_of`, `existing.theme_label` → `existing.domain_label`, `cmap.theme_of/theme_label` in `_existing_theme_context` likewise; the `ClusterMap(aliases=..., theme_of=..., theme_label=...)` constructions at the end become `domain_of=`/`domain_label=` (leave `category_of` unset — Task 3 fills it). Keep the phase literal `"theme"` and `_ThemeIntent`/`_project_themes` names for now (Task 3 renames them with the behavior change).
-2. `src/resume_agent/tracking/match_gap.py`: locals `theme_of = cluster_map.theme_of` → `domain_of = cluster_map.domain_of`, `theme_label = cluster_map.theme_label` → `domain_label = cluster_map.domain_label`, and the reads at lines 245, 252, 347-349, 380. Keep the dataclass field `SkillNode.theme_id`, class `ThemeNode`, and `DemandGraph.themes` untouched in this task.
-3. `src/resume_agent/profile/matrix.py`: in `effective_cluster_map` the rebuilt map becomes `ClusterMap(aliases=..., domain_of=theme_of_local_renamed, domain_label=dict(cluster_map.domain_label), category_of=dict(cluster_map.category_of))`; the serialization dict at lines 171-172 uses keys `"domain_of"`/`"domain_label"` plus `"category_of": cluster_map.category_of`; adjacency reads at 211-216 use `.domain_of`.
-4. `src/resume_agent/profile/coach.py:234` and `src/resume_agent/cli.py:842`: `.theme_of` → `.domain_of`.
-5. `src/resume_agent/services/match_gap.py`: import becomes `slugify_domain as slugify_domain`; `"themes": len(final.theme_label)` → `"themes": len(final.domain_label)` (result-key rename happens in Task 3).
+1. `src/resume_tailor_harness/taxonomy/classification.py`: import `allocate_domain_ids`; every `existing.theme_of` → `existing.domain_of`, `existing.theme_label` → `existing.domain_label`, `cmap.theme_of/theme_label` in `_existing_theme_context` likewise; the `ClusterMap(aliases=..., theme_of=..., theme_label=...)` constructions at the end become `domain_of=`/`domain_label=` (leave `category_of` unset — Task 3 fills it). Keep the phase literal `"theme"` and `_ThemeIntent`/`_project_themes` names for now (Task 3 renames them with the behavior change).
+2. `src/resume_tailor_harness/tracking/match_gap.py`: locals `theme_of = cluster_map.theme_of` → `domain_of = cluster_map.domain_of`, `theme_label = cluster_map.theme_label` → `domain_label = cluster_map.domain_label`, and the reads at lines 245, 252, 347-349, 380. Keep the dataclass field `SkillNode.theme_id`, class `ThemeNode`, and `DemandGraph.themes` untouched in this task.
+3. `src/resume_tailor_harness/profile/matrix.py`: in `effective_cluster_map` the rebuilt map becomes `ClusterMap(aliases=..., domain_of=theme_of_local_renamed, domain_label=dict(cluster_map.domain_label), category_of=dict(cluster_map.category_of))`; the serialization dict at lines 171-172 uses keys `"domain_of"`/`"domain_label"` plus `"category_of": cluster_map.category_of`; adjacency reads at 211-216 use `.domain_of`.
+4. `src/resume_tailor_harness/profile/coach.py:234` and `src/resume_tailor_harness/cli.py:842`: `.theme_of` → `.domain_of`.
+5. `src/resume_tailor_harness/services/match_gap.py`: import becomes `slugify_domain as slugify_domain`; `"themes": len(final.theme_label)` → `"themes": len(final.domain_label)` (result-key rename happens in Task 3).
 
 Verify nothing is left: `rg "theme_of|theme_label|slugify_theme|allocate_theme_ids" src/` → Expected: no hits.
 
@@ -576,10 +576,10 @@ git commit -m "refactor(taxonomy): ClusterMap domain layer with category_of; leg
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py` (add `domains_per_category_cap` beside `cluster_batch_size`)
-- Modify: `src/resume_agent/tracking/canonicalize.py` (domain output models + instructions)
-- Modify: `src/resume_agent/taxonomy/classification.py` (category context, `_project_domains`, cap enforcement, `category_of` additions)
-- Modify: `src/resume_agent/services/match_gap.py` (pass cap; rename result keys)
+- Modify: `src/resume_tailor_harness/config.py` (add `domains_per_category_cap` beside `cluster_batch_size`)
+- Modify: `src/resume_tailor_harness/tracking/canonicalize.py` (domain output models + instructions)
+- Modify: `src/resume_tailor_harness/taxonomy/classification.py` (category context, `_project_domains`, cap enforcement, `category_of` additions)
+- Modify: `src/resume_tailor_harness/services/match_gap.py` (pass cap; rename result keys)
 - Test: `tests/test_taxonomy_classification.py` (extend), `tests/test_services_match_gap.py` (result keys)
 
 **Interfaces:**
@@ -589,7 +589,7 @@ git commit -m "refactor(taxonomy): ClusterMap domain layer with category_of; leg
 
 - [ ] **Step 1: Add the setting**
 
-In `src/resume_agent/config.py`, directly under `cluster_batch_size`:
+In `src/resume_tailor_harness/config.py`, directly under `cluster_batch_size`:
 
 ```python
     domains_per_category_cap: int = Field(default=12, ge=3, le=15)
@@ -727,8 +727,8 @@ class IncrementalSkillDomains(ExtensibleModel):
 Replace `_ThemeIntent`, `_ThemeBatchResult`, `_project_themes`, `_existing_theme_context` with:
 
 ```python
-from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.taxonomy.vocabulary import SKILL_GROUPS
+from resume_tailor_harness.tracking.canonicalize import (
     IncrementalDomainGroup,
     IncrementalSkillDomains,
     SkillClusters,
@@ -917,7 +917,7 @@ git commit -m "feat(taxonomy): category-aware domain classification with determi
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/corrections.py`
+- Create: `src/resume_tailor_harness/taxonomy/corrections.py`
 - Test: `tests/test_taxonomy_corrections.py` (new)
 
 **Interfaces:**
@@ -940,8 +940,8 @@ Create `tests/test_taxonomy_corrections.py`:
 
 import json
 
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     apply_taxonomy_corrections,
     added_canonical_tokens,
@@ -1060,9 +1060,9 @@ def test_added_and_removed_canonical_helpers():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_corrections.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.taxonomy.corrections'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.taxonomy.corrections'`
 
-- [ ] **Step 3: Create `src/resume_agent/taxonomy/corrections.py`**
+- [ ] **Step 3: Create `src/resume_tailor_harness/taxonomy/corrections.py`**
 
 ```python
 """User-authored taxonomy corrections replayed over every cluster-map load.
@@ -1082,10 +1082,10 @@ from threading import Lock
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.taxonomy.clusters import ClusterMap, _flatten_aliases
-from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, _flatten_aliases
+from resume_tailor_harness.taxonomy.vocabulary import SKILL_GROUPS
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 _SAVE_LOCK = Lock()
 
@@ -1286,7 +1286,7 @@ Expected: PASS (all).
 Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → Expected: clean.
 
 ```bash
-git add src/resume_agent/taxonomy/corrections.py tests/test_taxonomy_corrections.py
+git add src/resume_tailor_harness/taxonomy/corrections.py tests/test_taxonomy_corrections.py
 git commit -m "feat(taxonomy): user corrections ledger with pure idempotent replay"
 ```
 
@@ -1298,11 +1298,11 @@ This is the contract cut-over. It is mechanical but wide; the UI stays functiona
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/match_gap.py` (SkillNode.domain_id, DomainNode, CategoryNode, corrections-aware graph)
-- Modify: `src/resume_agent/api/schemas/match_gap.py` (DomainOut, CategoryOut, domain_id, kind literal)
-- Modify: `src/resume_agent/api/schemas/suggestions.py` (kind literals `"skill" | "domain"`)
-- Modify: `src/resume_agent/services/suggestions.py` (SuggestionKind, domain branch, legacy purge)
-- Modify: `src/resume_agent/api/routers/match_gap.py` (corrections at read time; extract `build_match_gap_payload`)
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py` (SkillNode.domain_id, DomainNode, CategoryNode, corrections-aware graph)
+- Modify: `src/resume_tailor_harness/api/schemas/match_gap.py` (DomainOut, CategoryOut, domain_id, kind literal)
+- Modify: `src/resume_tailor_harness/api/schemas/suggestions.py` (kind literals `"skill" | "domain"`)
+- Modify: `src/resume_tailor_harness/services/suggestions.py` (SuggestionKind, domain branch, legacy purge)
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py` (corrections at read time; extract `build_match_gap_payload`)
 - Modify: `web/src` mechanical renames (`aggregate.ts`, `MatchGapContainer.tsx`, `SkillMap.tsx`, `skill-map-layout.ts`, `RankedList.tsx`, `SkillModal.tsx`, `SelectionTray.tsx`, `use-suggestion.ts`, `use-suggestion-runs.ts`, `lib/runs/store.ts`) + their tests
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` via `bash scripts/gen_ts_client.sh`
 - Test: `tests/test_tracking_match_gap.py`, `tests/api/test_schemas_match_gap.py`, `tests/api/test_match_gap.py`, `tests/test_services_suggestions.py` (or the file that covers `services/suggestions.py` — find with `rg -l "resolve_suggestion_context" tests/`), `tests/api/test_openapi_contract.py`
@@ -1388,7 +1388,7 @@ class CategoryNode:
 - `build_demand_graph` gains keyword `corrections: TaxonomyCorrections | None = None`. At the top:
 
 ```python
-    from resume_agent.taxonomy.corrections import (
+    from resume_tailor_harness.taxonomy.corrections import (
         TaxonomyCorrections,
         added_canonical_tokens,
         removed_canonical_tokens,
@@ -1424,7 +1424,7 @@ class CategoryNode:
 
 - [ ] **Step 4: Flip the wire schemas**
 
-`src/resume_agent/api/schemas/match_gap.py`:
+`src/resume_tailor_harness/api/schemas/match_gap.py`:
 
 ```python
 class SkillNodeOut(CamelModel):
@@ -1469,7 +1469,7 @@ class MatchGapOut(CamelModel):
     suggestion_statuses: list[SuggestionStatusOut] = Field(default_factory=list)
 ```
 
-`src/resume_agent/api/schemas/suggestions.py`: every `Literal["skill", "theme"]` → `Literal["skill", "domain"]` (4 occurrences: `SuggestionOut`, `SuggestionTarget`, `SuggestionRunAcceptedOut`, `SuggestionRunNotFoundOut`).
+`src/resume_tailor_harness/api/schemas/suggestions.py`: every `Literal["skill", "theme"]` → `Literal["skill", "domain"]` (4 occurrences: `SuggestionOut`, `SuggestionTarget`, `SuggestionRunAcceptedOut`, `SuggestionRunNotFoundOut`).
 
 - [ ] **Step 5: Update `services/suggestions.py`**
 
@@ -1495,10 +1495,10 @@ Call it as the first line of `suggestion_statuses(...)`.
 
 - [ ] **Step 6: Corrections at read time + payload helper in the router**
 
-In `src/resume_agent/api/routers/match_gap.py` replace the body of `get_match_gap` with a module-level helper (the taxonomy router imports it in Task 7):
+In `src/resume_tailor_harness/api/routers/match_gap.py` replace the body of `get_match_gap` with a module-level helper (the taxonomy router imports it in Task 7):
 
 ```python
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.taxonomy.corrections import (
     apply_taxonomy_corrections,
     corrections_file_path,
     load_taxonomy_corrections,
@@ -1537,10 +1537,10 @@ def get_match_gap(session: Session = Depends(get_session)):
     return build_match_gap_payload(session)
 ```
 
-Also in the `refresh-clusters` worker (`work` function), after `prune` inside `services/match_gap.refresh_clusters` — apply corrections before save. In `src/resume_agent/services/match_gap.py`:
+Also in the `refresh-clusters` worker (`work` function), after `prune` inside `services/match_gap.refresh_clusters` — apply corrections before save. In `src/resume_tailor_harness/services/match_gap.py`:
 
 ```python
-        from resume_agent.taxonomy.corrections import (
+        from resume_tailor_harness.taxonomy.corrections import (
             apply_taxonomy_corrections,
             corrections_file_path,
             load_taxonomy_corrections,
@@ -1552,7 +1552,7 @@ Also in the `refresh-clusters` worker (`work` function), after `prune` inside `s
         )
 ```
 
-(`resolve_tenant_path` import from `resume_agent.tenancy.paths`.)
+(`resolve_tenant_path` import from `resume_tailor_harness.tenancy.paths`.)
 
 - [ ] **Step 7: Regenerate contracts**
 
@@ -1603,7 +1603,7 @@ git commit -m "feat(match-gap): domain/category wire contract with corrections-a
 
 **Files:**
 
-- Create: `src/resume_agent/services/taxonomy.py`
+- Create: `src/resume_tailor_harness/services/taxonomy.py`
 - Test: `tests/test_services_taxonomy.py` (new)
 
 **Interfaces:**
@@ -1654,7 +1654,7 @@ def test_new_domain_writes_all_three_intents_atomically(tmp_path):
 
 and an id-collision test (existing domain `ui-toolkits` in the map → allocation yields `ui-toolkits-2`).
 
-- [ ] **Step 2: Run to verify failure** — `ModuleNotFoundError: resume_agent.services.taxonomy`.
+- [ ] **Step 2: Run to verify failure** — `ModuleNotFoundError: resume_tailor_harness.services.taxonomy`.
 
 - [ ] **Step 3: Implement `services/taxonomy.py`**
 
@@ -1668,21 +1668,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from resume_agent.taxonomy.clusters import (
+from resume_tailor_harness.taxonomy.clusters import (
     ClusterMap,
     _flatten_aliases,
     load_cluster_map,
     slugify_domain,
 )
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     apply_taxonomy_corrections,
     load_taxonomy_corrections,
     sanitize_taxonomy_corrections,
     save_taxonomy_corrections,
 )
-from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.taxonomy.vocabulary import SKILL_GROUPS
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 
 class UnknownDomainError(ValueError): ...
@@ -1786,7 +1786,7 @@ Note: `sanitize_taxonomy_corrections` must be importable — it is defined publi
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/taxonomy.py tests/test_services_taxonomy.py
+git add src/resume_tailor_harness/services/taxonomy.py tests/test_services_taxonomy.py
 git commit -m "feat(taxonomy): edit-service use-cases writing the corrections ledger"
 ```
 
@@ -1796,9 +1796,9 @@ git commit -m "feat(taxonomy): edit-service use-cases writing the corrections le
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/taxonomy.py`
-- Create: `src/resume_agent/api/routers/taxonomy.py`
-- Modify: `src/resume_agent/api/app.py` (register router with the guarded prefix, next to `match_gap_router` at line ~227)
+- Create: `src/resume_tailor_harness/api/schemas/taxonomy.py`
+- Create: `src/resume_tailor_harness/api/routers/taxonomy.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register router with the guarded prefix, next to `match_gap_router` at line ~227)
 - Regenerate: contracts via `bash scripts/gen_ts_client.sh`
 - Test: `tests/api/test_taxonomy_router.py` (new)
 
@@ -1865,7 +1865,7 @@ Plus: rename (PATCH label), change category (PATCH category), merge (source disa
 
 - [ ] **Step 3: Implement schemas**
 
-`src/resume_agent/api/schemas/taxonomy.py`:
+`src/resume_tailor_harness/api/schemas/taxonomy.py`:
 
 ```python
 """Taxonomy edit request bodies."""
@@ -1874,7 +1874,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class NewDomainIn(CamelModel):
@@ -1909,7 +1909,7 @@ class AliasIn(CamelModel):
 
 - [ ] **Step 4: Implement the router**
 
-`src/resume_agent/api/routers/taxonomy.py`:
+`src/resume_tailor_harness/api/routers/taxonomy.py`:
 
 ```python
 """Synchronous taxonomy edits: validate, write one ledger intent, return the map."""
@@ -1921,11 +1921,11 @@ from contextlib import contextmanager
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.api.routers.match_gap import build_match_gap_payload
-from resume_agent.api.schemas.match_gap import MatchGapOut
-from resume_agent.api.schemas.taxonomy import (
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.routers.match_gap import build_match_gap_payload
+from resume_tailor_harness.api.schemas.match_gap import MatchGapOut
+from resume_tailor_harness.api.schemas.taxonomy import (
     AddSkillIn,
     AliasIn,
     DomainMergeIn,
@@ -1933,9 +1933,9 @@ from resume_agent.api.schemas.taxonomy import (
     MoveSkillIn,
     NewDomainIn,
 )
-from resume_agent.services import taxonomy as svc
-from resume_agent.taxonomy.corrections import corrections_file_path
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_tailor_harness.services import taxonomy as svc
+from resume_tailor_harness.taxonomy.corrections import corrections_file_path
+from resume_tailor_harness.tenancy.paths import resolve_tenant_path
 
 router = APIRouter()
 
@@ -2044,7 +2044,7 @@ def add_alias(body: AliasIn, session: Session = Depends(get_session)):
     return build_match_gap_payload(session)
 ```
 
-Register in `src/resume_agent/api/app.py` next to the match-gap router (add the import beside the other router imports):
+Register in `src/resume_tailor_harness/api/app.py` next to the match-gap router (add the import beside the other router imports):
 
 ```python
     app.include_router(taxonomy_router.router, prefix="/api", dependencies=guarded)

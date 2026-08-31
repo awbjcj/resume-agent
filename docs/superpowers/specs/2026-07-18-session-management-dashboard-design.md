@@ -59,7 +59,7 @@ records for failed runs and failing sources.
 
 ## 1. Session lifecycle (stores)
 
-### Interview store (`src/resume_agent/interview/store.py`)
+### Interview store (`src/resume_tailor_harness/interview/store.py`)
 
 - `InterviewSession` gains `archived_at: str | None = None` — a soft-hide flag
   orthogonal to `status`, mirroring `Job.archived_at`.
@@ -79,7 +79,7 @@ records for failed runs and failing sources.
   per app, which is what enables parallel interviews. The global
   `llm_concurrency` semaphore still bounds total LLM load.
 
-### Coach store (`src/resume_agent/profile/coach_store.py`)
+### Coach store (`src/resume_tailor_harness/profile/coach_store.py`)
 
 - Same `archived_at` field and archive/unarchive/delete mutations, same
   ended-only archive rule.

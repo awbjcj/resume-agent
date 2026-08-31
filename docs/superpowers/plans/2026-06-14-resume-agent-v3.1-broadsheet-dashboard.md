@@ -14,13 +14,13 @@
 
 | File                                  | Responsibility                                                                                                                                                                                       |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/resume_agent/dashboard/ui.py`    | NEW. `THEME_CSS`, palette constants, `column_count`, `status_badge`, `fit_block`, `masthead`, `metric_row`, `empty_state`, table-styling helper.                                                     |
-| `src/resume_agent/dashboard/pages.py` | NEW. `render_shortlist_page`, `render_pipeline_page`, `render_analytics_page`, `render_match_gap_page`, `analytics_table_rows`, `match_gap_table_rows`, `_render_pipeline_card`, `_new_application`. |
-| `src/resume_agent/dashboard/app.py`   | SLIMMED. `main()`, sidebar nav, `_engine()`, and re-exports of the public API.                                                                                                                       |
+| `src/resume_tailor_harness/dashboard/ui.py`    | NEW. `THEME_CSS`, palette constants, `column_count`, `status_badge`, `fit_block`, `masthead`, `metric_row`, `empty_state`, table-styling helper.                                                     |
+| `src/resume_tailor_harness/dashboard/pages.py` | NEW. `render_shortlist_page`, `render_pipeline_page`, `render_analytics_page`, `render_match_gap_page`, `analytics_table_rows`, `match_gap_table_rows`, `_render_pipeline_card`, `_new_application`. |
+| `src/resume_tailor_harness/dashboard/app.py`   | SLIMMED. `main()`, sidebar nav, `_engine()`, and re-exports of the public API.                                                                                                                       |
 | `.streamlit/config.toml`              | MODIFIED. Light Broadsheet palette.                                                                                                                                                                  |
 | `tests/test_dashboard_ui.py`          | NEW. `column_count` + moved-helper unit tests.                                                                                                                                                       |
 
-**Re-export contract:** `app.py` must expose `status_badge`, `fit_block`, `analytics_table_rows`, `match_gap_table_rows`, `render_shortlist_page`, `render_pipeline_page`, `render_analytics_page`, `render_match_gap_page`, `main`. Existing tests (`test_dashboard_app.py`, `test_dashboard_analytics.py`, `test_dashboard_match_gap.py`) import these names from `resume_agent.dashboard.app` and must not be edited.
+**Re-export contract:** `app.py` must expose `status_badge`, `fit_block`, `analytics_table_rows`, `match_gap_table_rows`, `render_shortlist_page`, `render_pipeline_page`, `render_analytics_page`, `render_match_gap_page`, `main`. Existing tests (`test_dashboard_app.py`, `test_dashboard_analytics.py`, `test_dashboard_match_gap.py`) import these names from `resume_tailor_harness.dashboard.app` and must not be edited.
 
 ---
 
@@ -28,14 +28,14 @@
 
 **Files:**
 
-- Create: `src/resume_agent/dashboard/ui.py`
+- Create: `src/resume_tailor_harness/dashboard/ui.py`
 - Test: `tests/test_dashboard_ui.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_dashboard_ui.py
-from resume_agent.dashboard.ui import column_count
+from resume_tailor_harness.dashboard.ui import column_count
 
 
 def test_column_count_caps_at_max_on_4k():
@@ -56,12 +56,12 @@ def test_column_count_floor_is_one():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_dashboard_ui.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.dashboard.ui'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.dashboard.ui'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/dashboard/ui.py
+# src/resume_tailor_harness/dashboard/ui.py
 """Broadsheet design system: theme CSS, palette, and pure HTML helpers.
 
 All functions here are pure (no Streamlit calls at import or call time) so the
@@ -84,7 +84,7 @@ Expected: PASS (3 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/ui.py tests/test_dashboard_ui.py
+git add src/resume_tailor_harness/dashboard/ui.py tests/test_dashboard_ui.py
 git commit -m "feat(dashboard): add column_count pure helper + ui.py scaffold"
 ```
 
@@ -96,14 +96,14 @@ Move `status_badge`, `fit_block`, `_masthead`→`masthead`, `_metric_row`→`met
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/ui.py`
+- Modify: `src/resume_tailor_harness/dashboard/ui.py`
 - Test: `tests/test_dashboard_ui.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_dashboard_ui.py  (append)
-from resume_agent.dashboard.ui import fit_block, status_badge
+from resume_tailor_harness.dashboard.ui import fit_block, status_badge
 
 
 def test_status_badge_returns_html_for_known_status():
@@ -127,7 +127,7 @@ Expected: FAIL with `ImportError: cannot import name 'status_badge'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add to `src/resume_agent/dashboard/ui.py` (above `column_count`):
+Add to `src/resume_tailor_harness/dashboard/ui.py` (above `column_count`):
 
 ```python
 # ── Broadsheet palette ───────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ Expected: PASS (5 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/ui.py tests/test_dashboard_ui.py
+git add src/resume_tailor_harness/dashboard/ui.py tests/test_dashboard_ui.py
 git commit -m "feat(dashboard): move palette + HTML helpers into ui.py (light palette)"
 ```
 
@@ -237,20 +237,20 @@ Move the four `render_*` functions plus `analytics_table_rows`, `match_gap_table
 
 **Files:**
 
-- Create: `src/resume_agent/dashboard/pages.py`
+- Create: `src/resume_tailor_harness/dashboard/pages.py`
 - Test: existing `tests/test_dashboard_analytics.py`, `tests/test_dashboard_match_gap.py` (via re-export in Task 4)
 
 - [ ] **Step 1: Create `pages.py` with the moved renderers**
 
 ```python
-# src/resume_agent/dashboard/pages.py
+# src/resume_tailor_harness/dashboard/pages.py
 """The four dashboard pages — thin compositions over ui.py primitives."""
 
 from pathlib import Path
 
 import streamlit as st
 
-from resume_agent.dashboard.ui import (
+from resume_tailor_harness.dashboard.ui import (
     AMBER,
     empty_state,
     fit_block,
@@ -258,18 +258,18 @@ from resume_agent.dashboard.ui import (
     metric_row,
     status_badge,
 )
-from resume_agent.profile.store import load_facts
-from resume_agent.tracking.analytics import fit_band_stats, source_stats
-from resume_agent.tracking.match_gap import MatchGapReport, match_gap
-from resume_agent.tracking.queries import PipelineRow, pipeline_rows, shortlist_rows
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.tracking.analytics import fit_band_stats, source_stats
+from resume_tailor_harness.tracking.match_gap import MatchGapReport, match_gap
+from resume_tailor_harness.tracking.queries import PipelineRow, pipeline_rows, shortlist_rows
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     get_job,
     save_application,
     save_job,
     update_application_status,
 )
-from resume_agent.tracking.tables import Application, ApplicationStatus, JobStatus
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, JobStatus
 
 _STATUS_ORDER = [s.value for s in JobStatus]
 _FACTS_PATH = "data/profile/facts.json"
@@ -324,7 +324,7 @@ def render_shortlist_page(session) -> None:
         empty_state(
             "◇",
             "Nothing shortlisted yet",
-            "Run <code>resume-agent discover</code> to score jobs and surface the keepers here.",
+            "Run <code>resume-tailor-harness discover</code> to score jobs and surface the keepers here.",
         )
         return
 
@@ -422,7 +422,7 @@ def render_pipeline_page(session) -> None:
         empty_state(
             "◇",
             "No jobs in the pipeline",
-            "Start with <code>resume-agent addjob</code> or <code>resume-agent scrape</code>.",
+            "Start with <code>resume-tailor-harness addjob</code> or <code>resume-tailor-harness scrape</code>.",
         )
         return
 
@@ -483,7 +483,7 @@ def render_match_gap_page(session) -> None:
         empty_state(
             "◇",
             "No profile yet",
-            "Run <code>resume-agent profile build</code> to create your fact-lock profile first.",
+            "Run <code>resume-tailor-harness profile build</code> to create your fact-lock profile first.",
         )
         return
 
@@ -505,13 +505,13 @@ def render_match_gap_page(session) -> None:
 
 - [ ] **Step 2: Verify the module imports**
 
-Run: `uv run python -c "import resume_agent.dashboard.pages"`
+Run: `uv run python -c "import resume_tailor_harness.dashboard.pages"`
 Expected: no output, exit 0.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/pages.py
+git add src/resume_tailor_harness/dashboard/pages.py
 git commit -m "feat(dashboard): extract page renderers into pages.py"
 ```
 
@@ -523,13 +523,13 @@ Rewrite `app.py` to: load `THEME_CSS` from `ui.py`, render the sidebar nav, rout
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/app.py` (full rewrite)
-- Modify: `src/resume_agent/dashboard/ui.py` (add `THEME_CSS = ""` placeholder so the import resolves)
+- Modify: `src/resume_tailor_harness/dashboard/app.py` (full rewrite)
+- Modify: `src/resume_tailor_harness/dashboard/ui.py` (add `THEME_CSS = ""` placeholder so the import resolves)
 - Test: `tests/test_dashboard_app.py`, `tests/test_dashboard_analytics.py`, `tests/test_dashboard_match_gap.py` (unchanged)
 
 - [ ] **Step 1: Add a placeholder `THEME_CSS` to `ui.py`**
 
-At the top of `src/resume_agent/dashboard/ui.py`, below the docstring:
+At the top of `src/resume_tailor_harness/dashboard/ui.py`, below the docstring:
 
 ```python
 THEME_CSS = "<style></style>"  # filled in Task 5
@@ -538,7 +538,7 @@ THEME_CSS = "<style></style>"  # filled in Task 5
 - [ ] **Step 2: Rewrite `app.py`**
 
 ```python
-# src/resume_agent/dashboard/app.py
+# src/resume_tailor_harness/dashboard/app.py
 """Broadsheet — a light editorial control-room for the job hunt.
 
 Thin shell: theme injection, sidebar nav, and page routing only. The design
@@ -548,14 +548,14 @@ re-exported here so callers (and tests) can import them from this module.
 
 import streamlit as st
 
-from resume_agent.config import get_settings
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.dashboard.ui import (  # noqa: F401  (re-exported)
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.dashboard.ui import (  # noqa: F401  (re-exported)
     THEME_CSS,
     fit_block,
     status_badge,
 )
-from resume_agent.dashboard.pages import (  # noqa: F401  (re-exported)
+from resume_tailor_harness.dashboard.pages import (  # noqa: F401  (re-exported)
     analytics_table_rows,
     match_gap_table_rows,
     render_analytics_page,
@@ -572,12 +572,12 @@ def _engine():
 
 
 def main() -> None:
-    st.set_page_config(page_title="Resume Agent — Broadsheet", page_icon="▤", layout="wide")
+    st.set_page_config(page_title="Résumé Tailor Harness — Broadsheet", page_icon="▤", layout="wide")
     st.markdown(THEME_CSS, unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown(
-            '<div class="masthead-kicker">Resume Agent</div>'
+            '<div class="masthead-kicker">Résumé Tailor Harness</div>'
             '<div class="nameplate">The Broadsheet</div>',
             unsafe_allow_html=True,
         )
@@ -611,7 +611,7 @@ Expected: PASS (all existing dashboard tests + the new ui tests). The `AppTest.f
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/app.py src/resume_agent/dashboard/ui.py
+git add src/resume_tailor_harness/dashboard/app.py src/resume_tailor_harness/dashboard/ui.py
 git commit -m "refactor(dashboard): slim app.py to router + re-exports"
 ```
 
@@ -623,13 +623,13 @@ Replace the placeholder `THEME_CSS` with the full Broadsheet stylesheet: Newsrea
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/ui.py` (replace `THEME_CSS`)
+- Modify: `src/resume_tailor_harness/dashboard/ui.py` (replace `THEME_CSS`)
 - Test: `tests/test_dashboard_app.py` (the `AppTest` smoke test re-run)
 
 - [ ] **Step 1: Replace `THEME_CSS`**
 
 ```python
-# src/resume_agent/dashboard/ui.py  — replace the THEME_CSS placeholder
+# src/resume_tailor_harness/dashboard/ui.py  — replace the THEME_CSS placeholder
 THEME_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
@@ -741,7 +741,7 @@ Expected: PASS — `AppTest` renders the themed app with no exception.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/ui.py
+git add src/resume_tailor_harness/dashboard/ui.py
 git commit -m "feat(dashboard): Broadsheet light identity + responsive 4K grid CSS"
 ```
 
@@ -756,7 +756,7 @@ git commit -m "feat(dashboard): Broadsheet light identity + responsive 4K grid C
 - [ ] **Step 1: Replace the theme block**
 
 ```toml
-# "Broadsheet" — light editorial control-room theme for Resume Agent.
+# "Broadsheet" — light editorial control-room theme for Résumé Tailor Harness.
 [theme]
 base = "light"
 primaryColor = "#8c2f1f"
@@ -771,7 +771,7 @@ headless = true
 
 - [ ] **Step 2: Verify it parses by launching headlessly for 3 seconds (manual)**
 
-Run: `uv run resume-agent dashboard` then stop it (Ctrl-C). Expected: Streamlit starts with no theme-parse warning.
+Run: `uv run resume-tailor-harness dashboard` then stop it (Ctrl-C). Expected: Streamlit starts with no theme-parse warning.
 
 - [ ] **Step 3: Commit**
 
@@ -790,7 +790,7 @@ This task has no automated test (CSS rendering is out of unit-test scope per the
 
 - [ ] **Step 1: Seed a little data and launch**
 
-Run: `uv run resume-agent dashboard`
+Run: `uv run resume-tailor-harness dashboard`
 Open the local URL in a browser maximized on the 32″ 4K display (or emulate ~2560px width via the browser devtools responsive mode).
 
 - [ ] **Step 2: Verify the checklist**
@@ -806,7 +806,7 @@ Confirm visually:
 - [ ] **Step 3: Run the full suite once more**
 
 Run: `uv run pytest -q`
-Expected: PASS (no regressions across the repo). Run `uv run ruff check src/resume_agent/dashboard` — expected: clean.
+Expected: PASS (no regressions across the repo). Run `uv run ruff check src/resume_tailor_harness/dashboard` — expected: clean.
 
 - [ ] **Step 4: Commit any final tweaks**
 

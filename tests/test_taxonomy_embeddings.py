@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.embeddings import (
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.embeddings import (
     EmbeddingUnavailable,
     OpenAIEmbeddingProvider,
     _LexicalCorpus,
@@ -265,9 +265,9 @@ def test_openai_embedding_provider_records_usage_through_direct_usage_seam(
 ):
     import openai
 
-    import resume_agent.llm_runner as llm_runner
-    import resume_agent.tenancy.limits as limits
-    import resume_agent.tenancy.usage as usage
+    import resume_tailor_harness.llm_runner as llm_runner
+    import resume_tailor_harness.tenancy.limits as limits
+    import resume_tailor_harness.tenancy.usage as usage
 
     class _Embeddings:
         def create(self, **_kwargs):

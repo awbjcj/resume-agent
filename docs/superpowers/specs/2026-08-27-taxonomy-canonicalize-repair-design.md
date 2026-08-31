@@ -210,7 +210,7 @@ behaviour.
 
 ### Change 5 — Documentation
 
-Update `src/resume_agent/taxonomy/CLAUDE.md`:
+Update `src/resume_tailor_harness/taxonomy/CLAUDE.md`:
 
 - The canonicalize pass now repairs, then files an identity canonical, and a
   canonicalize-phase failure is no longer permanent backlog.

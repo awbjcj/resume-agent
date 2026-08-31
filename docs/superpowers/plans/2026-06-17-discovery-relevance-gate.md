@@ -10,8 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-17-discovery-relevance-gate-design.md`
 
-**Test command:** `cd D:/Fun/resume-agent && .venv/Scripts/python -m pytest tests/ -q`
-**Lint:** `cd D:/Fun/resume-agent && .venv/Scripts/python -m ruff check`
+**Test command:** `cd D:/Fun/resume-tailor-harness && .venv/Scripts/python -m pytest tests/ -q`
+**Lint:** `cd D:/Fun/resume-tailor-harness && .venv/Scripts/python -m ruff check`
 
 ---
 
@@ -19,17 +19,17 @@
 
 | File                                                                          | Responsibility                                                                                                                       | Action        |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| `src/resume_agent/discovery/search_config.py`                                 | New `role_anchors`, `exclude_terms`, `target_role`, shared `distance`/`max_days_old`, `experience_levels`, `employment_types` fields | Modify        |
+| `src/resume_tailor_harness/discovery/search_config.py`                                 | New `role_anchors`, `exclude_terms`, `target_role`, shared `distance`/`max_days_old`, `experience_levels`, `employment_types` fields | Modify        |
 | `config/search.yaml.example`                                                  | Document the new fields with sensible defaults                                                                                       | Modify        |
-| `src/resume_agent/discovery/connectors/text.py`                               | `relevance_gate` (title-anchored, word-boundary); keep `filter_by_search` as fallback                                                | Modify        |
-| `src/resume_agent/discovery/connectors/{greenhouse,lever,adzuna,remoteok}.py` | Call `relevance_gate`; record `self.filtered`                                                                                        | Modify        |
-| `src/resume_agent/discovery/connectors/adzuna.py`                             | Targeted server-side query                                                                                                           | Modify        |
-| `src/resume_agent/discovery/connectors/runner.py`                             | Surface `filtered` count in telemetry note                                                                                           | Modify        |
-| `src/resume_agent/discovery/relevance.py`                                     | `build_relevance_agent`, `judge_relevance` (haiku gate)                                                                              | Create        |
-| `src/resume_agent/discovery/pipeline.py`                                      | `run_relevance` stage; call it inside `discover`                                                                                     | Modify        |
-| `src/resume_agent/cli.py`                                                     | Build + thread the relevance agent into `discover`                                                                                   | Modify        |
-| `src/resume_agent/discovery/scraper/geo.py`                                   | `resolve_geo_id` (login-free LinkedIn typeahead) + cache                                                                             | Create        |
-| `src/resume_agent/discovery/scraper/linkedin.py`                              | `_search_url` emits `f_*`/`geoId`/`distance`/`sortBy` from config                                                                    | Modify        |
+| `src/resume_tailor_harness/discovery/connectors/text.py`                               | `relevance_gate` (title-anchored, word-boundary); keep `filter_by_search` as fallback                                                | Modify        |
+| `src/resume_tailor_harness/discovery/connectors/{greenhouse,lever,adzuna,remoteok}.py` | Call `relevance_gate`; record `self.filtered`                                                                                        | Modify        |
+| `src/resume_tailor_harness/discovery/connectors/adzuna.py`                             | Targeted server-side query                                                                                                           | Modify        |
+| `src/resume_tailor_harness/discovery/connectors/runner.py`                             | Surface `filtered` count in telemetry note                                                                                           | Modify        |
+| `src/resume_tailor_harness/discovery/relevance.py`                                     | `build_relevance_agent`, `judge_relevance` (haiku gate)                                                                              | Create        |
+| `src/resume_tailor_harness/discovery/pipeline.py`                                      | `run_relevance` stage; call it inside `discover`                                                                                     | Modify        |
+| `src/resume_tailor_harness/cli.py`                                                     | Build + thread the relevance agent into `discover`                                                                                   | Modify        |
+| `src/resume_tailor_harness/discovery/scraper/geo.py`                                   | `resolve_geo_id` (login-free LinkedIn typeahead) + cache                                                                             | Create        |
+| `src/resume_tailor_harness/discovery/scraper/linkedin.py`                              | `_search_url` emits `f_*`/`geoId`/`distance`/`sortBy` from config                                                                    | Modify        |
 | `tests/fixtures/relevance/*.json`                                             | Labeled golden corpus                                                                                                                | Create        |
 | `tests/...`                                                                   | One test file per module above                                                                                                       | Create/Modify |
 
@@ -39,7 +39,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/search_config.py`
+- Modify: `src/resume_tailor_harness/discovery/search_config.py`
 - Modify: `config/search.yaml.example`
 - Test: `tests/test_search_config.py`
 
@@ -48,7 +48,7 @@
 Add to `tests/test_search_config.py` (match the file's existing load/validate helpers; if it loads from a temp YAML, mirror that):
 
 ```python
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_relevance_fields_default_empty_and_optional():
@@ -88,7 +88,7 @@ Expected: FAIL — `SearchConfig` has no attribute `role_anchors`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/search_config.py`, extend the model:
+In `src/resume_tailor_harness/discovery/search_config.py`, extend the model:
 
 ```python
 class SearchConfig(ExtensibleModel):
@@ -164,7 +164,7 @@ employment_types: # full_time | contract | part_time | temporary | internship
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/search_config.py config/search.yaml.example tests/test_search_config.py
+git add src/resume_tailor_harness/discovery/search_config.py config/search.yaml.example tests/test_search_config.py
 git commit -m "feat(discovery): add relevance-gate config fields to SearchConfig"
 ```
 
@@ -174,7 +174,7 @@ git commit -m "feat(discovery): add relevance-gate config fields to SearchConfig
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/text.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/text.py`
 - Test: `tests/test_connectors_text.py`
 
 The gate keeps a job iff its **title** contains ≥1 `role_anchor` (whole word) AND no
@@ -189,9 +189,9 @@ data hiccup doesn't drop a real role.
 Add to `tests/test_connectors_text.py`:
 
 ```python
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import relevance_gate
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.text import relevance_gate
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _job(title, jd="some description"):
@@ -256,7 +256,7 @@ Expected: FAIL — `cannot import name 'relevance_gate'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/connectors/text.py`, add (keep `filter_by_search` intact):
+In `src/resume_tailor_harness/discovery/connectors/text.py`, add (keep `filter_by_search` intact):
 
 ```python
 import re
@@ -298,7 +298,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/text.py tests/test_connectors_text.py
+git add src/resume_tailor_harness/discovery/connectors/text.py tests/test_connectors_text.py
 git commit -m "feat(discovery): add title-anchored relevance_gate with word-boundary matching"
 ```
 
@@ -308,8 +308,8 @@ git commit -m "feat(discovery): add title-anchored relevance_gate with word-boun
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/greenhouse.py`, `lever.py`, `adzuna.py`, `remoteok.py`
-- Modify: `src/resume_agent/discovery/connectors/runner.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/greenhouse.py`, `lever.py`, `adzuna.py`, `remoteok.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/runner.py`
 - Test: `tests/test_connector_greenhouse.py`, `tests/test_connectors_runner.py`
 
 Each connector swaps `filter_by_search(...)` → `relevance_gate(...)` and records how many it
@@ -321,9 +321,9 @@ that to its telemetry note.
 Add to `tests/test_connector_greenhouse.py`:
 
 ```python
-from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
-from resume_agent.discovery.connectors.config import GreenhouseBoard
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.greenhouse import GreenhouseConnector
+from resume_tailor_harness.discovery.connectors.config import GreenhouseBoard
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_greenhouse_gate_drops_offtarget_and_records_count(monkeypatch):
@@ -351,7 +351,7 @@ initialise `self.filtered = 0` in `__init__`, reset it at the start of each `fet
 the filter line:
 
 ```python
-from resume_agent.discovery.connectors.text import relevance_gate, html_to_text
+from resume_tailor_harness.discovery.connectors.text import relevance_gate, html_to_text
 # __init__: self.filtered = 0
 # fetch start, next to self.failures reset: self.filtered = 0
         before = len(jobs)
@@ -378,12 +378,12 @@ def test_runner_note_includes_filtered_count(tmp_path, session_factory):
     tele = tmp_path / "runs.json"
     with session_factory() as s:
         run_pull(s, [_Conn()], SearchConfig(), tele)
-    from resume_agent.discovery.connectors.telemetry import read_runs
+    from resume_tailor_harness.discovery.connectors.telemetry import read_runs
     note = read_runs(tele)["fake"]["error"] or ""
     assert "filtered 7" in note
 ```
 
-(Match the file's existing fixtures/imports; add `from resume_agent.discovery.search_config import SearchConfig` and `from resume_agent.discovery.connectors.runner import run_pull` if absent.)
+(Match the file's existing fixtures/imports; add `from resume_tailor_harness.discovery.search_config import SearchConfig` and `from resume_tailor_harness.discovery.connectors.runner import run_pull` if absent.)
 
 - [ ] **Step 5: Run it to verify it fails**
 
@@ -392,7 +392,7 @@ Expected: FAIL — note has no "filtered" text.
 
 - [ ] **Step 6: Update the runner note**
 
-In `src/resume_agent/discovery/connectors/runner.py`, fold the filtered count into the note:
+In `src/resume_tailor_harness/discovery/connectors/runner.py`, fold the filtered count into the note:
 
 ```python
 def _run_note(connector: Connector, count: int) -> str | None:
@@ -421,7 +421,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/ tests/test_connector_greenhouse.py tests/test_connector_lever.py tests/test_connector_adzuna.py tests/test_connector_remoteok.py tests/test_connectors_runner.py
+git add src/resume_tailor_harness/discovery/connectors/ tests/test_connector_greenhouse.py tests/test_connector_lever.py tests/test_connector_adzuna.py tests/test_connector_remoteok.py tests/test_connectors_runner.py
 git commit -m "feat(connectors): route fetch through relevance_gate and report filtered count"
 ```
 
@@ -431,7 +431,7 @@ git commit -m "feat(connectors): route fetch through relevance_gate and report f
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/adzuna.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/adzuna.py`
 - Test: `tests/test_connector_adzuna.py`
 
 Replace the all-terms `what` blob with a narrowed query: `what_or` of role phrases
@@ -455,7 +455,7 @@ def test_adzuna_builds_targeted_params():
             def json(self): return {"results": []}
         return _R()
 
-    import resume_agent.discovery.connectors.adzuna as mod
+    import resume_tailor_harness.discovery.connectors.adzuna as mod
     orig = mod.httpx.get
     mod.httpx.get = fake_get
     try:
@@ -484,7 +484,7 @@ def test_adzuna_builds_targeted_params():
     assert "what" not in p  # no blob
 ```
 
-(Add `from resume_agent.discovery.search_config import SearchConfig` and `from resume_agent.discovery.connectors.adzuna import AdzunaConnector` if absent.)
+(Add `from resume_tailor_harness.discovery.search_config import SearchConfig` and `from resume_tailor_harness.discovery.connectors.adzuna import AdzunaConnector` if absent.)
 
 - [ ] **Step 2: Run it to verify it fails**
 
@@ -530,7 +530,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
+git add src/resume_tailor_harness/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
 git commit -m "feat(adzuna): push a targeted server-side query instead of an all-terms blob"
 ```
 
@@ -540,7 +540,7 @@ git commit -m "feat(adzuna): push a targeted server-side query instead of an all
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/relevance.py`
+- Create: `src/resume_tailor_harness/discovery/relevance.py`
 - Test: `tests/test_discovery_relevance.py` (create)
 
 Mirrors `extract.py`/`fit.py`: an Agno agent with a small output schema, plus a pure
@@ -552,7 +552,7 @@ Mirrors `extract.py`/`fit.py`: an Agno agent with a small output schema, plus a 
 Create `tests/test_discovery_relevance.py`:
 
 ```python
-from resume_agent.discovery.relevance import RelevanceVerdict, compose_relevance_input, judge_relevance
+from resume_tailor_harness.discovery.relevance import RelevanceVerdict, compose_relevance_input, judge_relevance
 
 
 class _Result:
@@ -583,7 +583,7 @@ def test_judge_relevance_type_guard():
 
 
 def test_build_relevance_agent_returns_none_without_api_key(monkeypatch):
-    from resume_agent.discovery import relevance as mod
+    from resume_tailor_harness.discovery import relevance as mod
 
     class _Settings:
         anthropic_api_key = ""
@@ -600,7 +600,7 @@ Expected: FAIL — module does not exist.
 
 - [ ] **Step 3: Write the module**
 
-Create `src/resume_agent/discovery/relevance.py`:
+Create `src/resume_tailor_harness/discovery/relevance.py`:
 
 ```python
 from agno.agent import Agent
@@ -608,8 +608,8 @@ from agno.models.anthropic import Claude
 from pydantic import ConfigDict
 from pydantic import BaseModel
 
-from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.llm_runner import AgentRunner, Runner
 
 _SNIPPET_CHARS = 500
 
@@ -668,7 +668,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/relevance.py tests/test_discovery_relevance.py
+git add src/resume_tailor_harness/discovery/relevance.py tests/test_discovery_relevance.py
 git commit -m "feat(discovery): add haiku relevance-gate agent and judge_relevance"
 ```
 
@@ -678,7 +678,7 @@ git commit -m "feat(discovery): add haiku relevance-gate agent and judge_relevan
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py`
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py`
 
 `run_relevance` runs over `raw` jobs: keep ⇒ stay `raw`; reject ⇒ `status=rejected`,
@@ -691,11 +691,11 @@ swallowed (the job is kept). It is inserted at the **front** of `discover`, befo
 Add to `tests/test_discovery_pipeline.py` (reuse the file's fake-agent + session helpers):
 
 ```python
-from resume_agent.discovery.pipeline import run_relevance
-from resume_agent.discovery.relevance import RelevanceVerdict
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.tracking.repository import save_job, jobs_by_status
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.pipeline import run_relevance
+from resume_tailor_harness.discovery.relevance import RelevanceVerdict
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.tracking.repository import save_job, jobs_by_status
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 class _V:
@@ -763,10 +763,10 @@ Expected: FAIL — `cannot import name 'run_relevance'`.
 
 - [ ] **Step 3: Write the stage + wire into `discover`**
 
-In `src/resume_agent/discovery/pipeline.py`:
+In `src/resume_tailor_harness/discovery/pipeline.py`:
 
 ```python
-from resume_agent.discovery.relevance import judge_relevance
+from resume_tailor_harness.discovery.relevance import judge_relevance
 
 
 def _relevance_target(config: SearchConfig) -> str | None:
@@ -833,7 +833,7 @@ Expected: PASS (new + existing — `relevance_agent` defaults to `None`, so old 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py tests/test_discovery_pipeline.py
+git add src/resume_tailor_harness/discovery/pipeline.py tests/test_discovery_pipeline.py
 git commit -m "feat(discovery): add fail-open run_relevance stage ahead of extraction"
 ```
 
@@ -843,7 +843,7 @@ git commit -m "feat(discovery): add fail-open run_relevance stage ahead of extra
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Create: `tests/fixtures/relevance/labeled.json`
 - Create/Modify: `tests/test_relevance_corpus.py`, `tests/test_cli_discovery.py`
 
@@ -859,8 +859,8 @@ def test_discover_builds_and_passes_relevance_agent(monkeypatch, tmp_path):
         seen["relevance_agent"] = relevance_agent
         return {"shortlisted": 0}
 
-    monkeypatch.setattr("resume_agent.cli.discover", fake_discover)
-    monkeypatch.setattr("resume_agent.cli.build_relevance_agent", lambda: "RELV")
+    monkeypatch.setattr("resume_tailor_harness.cli.discover", fake_discover)
+    monkeypatch.setattr("resume_tailor_harness.cli.build_relevance_agent", lambda: "RELV")
     # ... build search.yaml + facts.json via the file's existing helpers ...
     result = runner.invoke(app, ["discover", "--search", str(search_path),
                                  "--facts", str(facts_path), "--db-url", "sqlite://"])
@@ -875,10 +875,10 @@ Expected: FAIL — `build_relevance_agent` not imported / not passed.
 
 - [ ] **Step 3: Wire the CLI**
 
-In `src/resume_agent/cli.py`, import the builder and pass it in `discover_cmd`:
+In `src/resume_tailor_harness/cli.py`, import the builder and pass it in `discover_cmd`:
 
 ```python
-from resume_agent.discovery.relevance import build_relevance_agent
+from resume_tailor_harness.discovery.relevance import build_relevance_agent
 # ...
     extract_agent = build_extract_agent()
     fit_agent = build_fit_agent()
@@ -903,9 +903,9 @@ Create `tests/test_relevance_corpus.py`:
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import relevance_gate
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.text import relevance_gate
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "relevance" / "labeled.json"
 # The shipped defaults from search.yaml.example:
@@ -936,17 +936,17 @@ anchor/exclude lists in `search.yaml.example` — not the gate logic.)
 
 ```bash
 # Create a separate baseline worktree so this worktree's uncommitted changes are untouched.
-git worktree add ../resume-agent-main main
+git worktree add ../resume-tailor-harness-main main
 
 # Baseline in the main worktree.
-cd ../resume-agent-main
-../resume-agent/.venv/Scripts/python -m resume_agent.cli pull --db-url sqlite:///before.db
-../resume-agent/.venv/Scripts/python -m resume_agent.cli discover --db-url sqlite:///before.db
+cd ../resume-tailor-harness-main
+../resume-tailor-harness/.venv/Scripts/python -m resume_tailor_harness.cli pull --db-url sqlite:///before.db
+../resume-tailor-harness/.venv/Scripts/python -m resume_tailor_harness.cli discover --db-url sqlite:///before.db
 
 # Current branch in the original worktree.
-cd ../resume-agent
-.venv/Scripts/python -m resume_agent.cli pull --db-url sqlite:///after.db
-.venv/Scripts/python -m resume_agent.cli discover --db-url sqlite:///after.db
+cd ../resume-tailor-harness
+.venv/Scripts/python -m resume_tailor_harness.cli pull --db-url sqlite:///after.db
+.venv/Scripts/python -m resume_tailor_harness.cli discover --db-url sqlite:///after.db
 ```
 
 Record in the PR: raw count before vs after, count of obviously off-target titles in each, and the
@@ -961,7 +961,7 @@ Expected: all green.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/fixtures/relevance/ tests/test_relevance_corpus.py tests/test_cli_discovery.py
+git add src/resume_tailor_harness/cli.py tests/fixtures/relevance/ tests/test_relevance_corpus.py tests/test_cli_discovery.py
 git commit -m "feat(discovery): wire relevance agent into CLI + golden-corpus regression guard"
 ```
 
@@ -971,7 +971,7 @@ git commit -m "feat(discovery): wire relevance agent into CLI + golden-corpus re
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/scraper/geo.py`
+- Create: `src/resume_tailor_harness/discovery/scraper/geo.py`
 - Test: `tests/test_scraper_geo.py` (create)
 
 A pure-ish helper that resolves a location string → LinkedIn `geoId` via the **login-free** guest
@@ -984,7 +984,7 @@ injected so tests never hit the network. Verified live: `"Detroit, MI"` → `103
 Create `tests/test_scraper_geo.py`:
 
 ```python
-from resume_agent.discovery.scraper.geo import resolve_geo_id
+from resume_tailor_harness.discovery.scraper.geo import resolve_geo_id
 
 
 class _Resp:
@@ -1046,7 +1046,7 @@ Expected: FAIL — module does not exist.
 
 - [ ] **Step 3: Write the helper**
 
-Create `src/resume_agent/discovery/scraper/geo.py`:
+Create `src/resume_tailor_harness/discovery/scraper/geo.py`:
 
 ```python
 from typing import Any, Protocol
@@ -1113,7 +1113,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/geo.py tests/test_scraper_geo.py
+git add src/resume_tailor_harness/discovery/scraper/geo.py tests/test_scraper_geo.py
 git commit -m "feat(scraper): login-free LinkedIn geoId resolver with cache and fail-open"
 ```
 
@@ -1123,7 +1123,7 @@ git commit -m "feat(scraper): login-free LinkedIn geoId resolver with cache and 
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/scraper/linkedin.py`
+- Modify: `src/resume_tailor_harness/discovery/scraper/linkedin.py`
 - Test: `tests/test_scraper_linkedin.py`
 
 Extend `_search_url` to translate config into LinkedIn's `f_*`/`geoId`/`distance`/`sortBy` params
@@ -1145,8 +1145,8 @@ Add to `tests/test_scraper_linkedin.py`:
 ```python
 import urllib.parse
 
-from resume_agent.discovery.scraper.linkedin import _search_url
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.scraper.linkedin import _search_url
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _params(url):
@@ -1199,12 +1199,12 @@ Expected: FAIL — `_search_url` takes no `geo_resolver` / emits no `f_*`.
 
 - [ ] **Step 3: Write the mapping + extend `_search_url`**
 
-In `src/resume_agent/discovery/scraper/linkedin.py` (add imports + a pure mapper, then call it):
+In `src/resume_tailor_harness/discovery/scraper/linkedin.py` (add imports + a pure mapper, then call it):
 
 ```python
 from typing import Callable
 
-from resume_agent.discovery.scraper.geo import resolve_geo_id
+from resume_tailor_harness.discovery.scraper.geo import resolve_geo_id
 
 _WT = {"remote": "2", "hybrid": "3", "onsite": "1", "on-site": "1"}
 _EXP = {"internship": "1", "entry": "2", "associate": "3",
@@ -1304,7 +1304,7 @@ Skip if no session is configured — it is not required for the suite.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/scraper/linkedin.py tests/test_scraper_linkedin.py
+git add src/resume_tailor_harness/discovery/scraper/linkedin.py tests/test_scraper_linkedin.py
 git commit -m "feat(linkedin): apply native search filters (f_*/geoId/distance/sortBy) from config"
 ```
 

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -22,8 +22,8 @@ def client(tmp_path):
 def _seed_job(client) -> int:
     from sqlmodel import Session
 
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     with Session(client.app.state.engine) as session:
         job = save_job(session, Job(source="manual", company="Acme", title="Eng"))
@@ -32,11 +32,11 @@ def _seed_job(client) -> int:
 
 
 def test_generate_run_and_list(client, monkeypatch):
-    from resume_agent.api.routers import email_drafts as router_module
+    from resume_tailor_harness.api.routers import email_drafts as router_module
 
     def fake_generate(session, job_id, draft_type, instructions=None, **kwargs):
-        from resume_agent.tracking.repository import save_email_draft
-        from resume_agent.tracking.tables import EmailDraft
+        from resume_tailor_harness.tracking.repository import save_email_draft
+        from resume_tailor_harness.tracking.tables import EmailDraft
 
         return save_email_draft(
             session,
@@ -79,8 +79,8 @@ def test_generate_rejects_unknown_type(client):
 def test_save_requires_connection(client):
     from sqlmodel import Session
 
-    from resume_agent.tracking.repository import save_email_draft
-    from resume_agent.tracking.tables import EmailDraft
+    from resume_tailor_harness.tracking.repository import save_email_draft
+    from resume_tailor_harness.tracking.tables import EmailDraft
 
     job_id = _seed_job(client)
     with Session(client.app.state.engine) as session:
@@ -97,9 +97,9 @@ def test_save_requires_connection(client):
 def test_save_creates_gmail_draft(client, monkeypatch):
     from sqlmodel import Session
 
-    from resume_agent.api.routers import email_drafts as router_module
-    from resume_agent.tracking.repository import save_email_draft
-    from resume_agent.tracking.tables import EmailDraft
+    from resume_tailor_harness.api.routers import email_drafts as router_module
+    from resume_tailor_harness.tracking.repository import save_email_draft
+    from resume_tailor_harness.tracking.tables import EmailDraft
 
     created = {}
 
@@ -144,9 +144,9 @@ def test_save_creates_gmail_draft(client, monkeypatch):
 def test_save_wraps_gmail_api_error_in_envelope(client, monkeypatch):
     from sqlmodel import Session
 
-    from resume_agent.api.routers import email_drafts as router_module
-    from resume_agent.tracking.repository import save_email_draft
-    from resume_agent.tracking.tables import EmailDraft
+    from resume_tailor_harness.api.routers import email_drafts as router_module
+    from resume_tailor_harness.tracking.repository import save_email_draft
+    from resume_tailor_harness.tracking.tables import EmailDraft
 
     class _Drafts:
         def create(self, userId, body):

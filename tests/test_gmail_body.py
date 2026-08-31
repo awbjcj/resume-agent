@@ -1,7 +1,7 @@
 import base64
 
-from resume_agent.gmail.classify import hydrating_classifier
-from resume_agent.gmail.client import EmailMessage, extract_body, fetch_message_body
+from resume_tailor_harness.gmail.classify import hydrating_classifier
+from resume_tailor_harness.gmail.client import EmailMessage, extract_body, fetch_message_body
 
 
 def _b64(text: str) -> str:

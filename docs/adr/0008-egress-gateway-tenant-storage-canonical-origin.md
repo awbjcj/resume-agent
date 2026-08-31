@@ -11,7 +11,7 @@ Accepted
 ## Context
 
 A source-based threat model of the public multi-user deployment
-(`resume-agent-threat-model.md`, `security_best_practices_report.md`) found
+(`resume-tailor-harness-threat-model.md`, `security_best_practices_report.md`) found
 three trust-boundary gaps that a normal authenticated tenant — not just an
 external attacker — could exploit:
 

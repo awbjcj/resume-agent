@@ -36,7 +36,7 @@ project's "user progress is sacred" invariant.
 | D2 | Archive storage | Orthogonal `archived_at` column (lossless, status preserved) |
 | D3 | Prune action | Trash-bin: archive now, retention sweep hard-deletes later |
 | D4 | Prune criteria | `rejected` OR `fit_score < threshold` OR `stale > N days` |
-| D5 | Prune trigger | Manual dashboard button (preview + confirm) + `resume-agent prune` CLI |
+| D5 | Prune trigger | Manual dashboard button (preview + confirm) + `resume-tailor-harness prune` CLI |
 | D6 | Config home | `prune.yaml` defaults + dashboard per-run override |
 | D7 | Raw jobs home | New lightweight "Triage" page |
 | D8 | Triage UX | Checkbox cards + sticky action bar; reused for archived-view restore |
@@ -137,7 +137,7 @@ reads the same. Dashboard edits are per-run overrides, not persisted.
 
 ### 6. CLI (`cli.py`)
 
-`resume-agent prune [--dry-run] [--fit N] [--stale-days N] [--retention-days N]`:
+`resume-tailor-harness prune [--dry-run] [--fit N] [--stale-days N] [--retention-days N]`:
 
 - `--dry-run` computes and prints the preview counts without writing, including
   rejected / low-fit / stale primary archive reasons.

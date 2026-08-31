@@ -1,6 +1,6 @@
 import httpx
 
-from resume_agent.security.outbound import fetch_public_text
+from resume_tailor_harness.security.outbound import fetch_public_text
 
 
 def test_fetch_public_text_retains_validated_redirect_provenance():

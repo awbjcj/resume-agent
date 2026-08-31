@@ -1,19 +1,19 @@
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.models.evidence_portfolio import (
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.models.evidence_portfolio import (
     EvidencePortfolio,
     PortfolioSelection,
 )
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
 )
-from resume_agent.tracking.repository import save_application
-from resume_agent.tracking.tables import Application, Job, JobStatus, ResumeVersion
+from resume_tailor_harness.tracking.repository import save_application
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus, ResumeVersion
 
 
 def _client():
@@ -298,7 +298,7 @@ def test_pdf_preview_404_for_unknown_version():
 
 
 def test_failed_gates_names_the_gate_that_actually_blocked():
-    from resume_agent.api.schemas.jobs import ResumeVersionOut
+    from resume_tailor_harness.api.schemas.jobs import ResumeVersionOut
 
     def _version(critiques, fact_check_passed):
         return ResumeVersionOut.model_validate(
@@ -348,7 +348,7 @@ def test_apply_gate_names_does_not_relabel_a_version_with_its_own_recorded_gates
     "ats-keyword" as a failed gate, even though it was advisory when that
     round actually ran.
     """
-    from resume_agent.api.schemas.jobs import ResumeVersionOut
+    from resume_tailor_harness.api.schemas.jobs import ResumeVersionOut
 
     version = ResumeVersionOut.model_validate(
         {
@@ -378,7 +378,7 @@ def test_apply_gate_names_does_not_relabel_a_version_with_its_own_recorded_gates
 
 
 def test_apply_gate_names_still_overrides_legacy_rows_without_a_recorded_roster():
-    from resume_agent.api.schemas.jobs import ResumeVersionOut
+    from resume_tailor_harness.api.schemas.jobs import ResumeVersionOut
 
     version = ResumeVersionOut.model_validate(
         {

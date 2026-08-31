@@ -1,10 +1,10 @@
 import pytest
 
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.coverage import COVERAGE_REVIEWER, CoverageCritique
-from resume_agent.tailor.depth import DEPTH_REVIEWER, DepthCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.verdict import aggregate, failing_gate_names
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.coverage import COVERAGE_REVIEWER, CoverageCritique
+from resume_tailor_harness.tailor.depth import DEPTH_REVIEWER, DepthCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.verdict import aggregate, failing_gate_names
 
 
 def _config(threshold=85):
@@ -105,7 +105,7 @@ def test_passing_provenance_critique_is_a_gate_not_scored():
 
 
 def test_new_deterministic_gates_are_registered():
-    from resume_agent.tailor.verdict import DETERMINISTIC_GATES
+    from resume_tailor_harness.tailor.verdict import DETERMINISTIC_GATES
 
     assert "skill-naming" in DETERMINISTIC_GATES
     assert "numeric-evidence" in DETERMINISTIC_GATES

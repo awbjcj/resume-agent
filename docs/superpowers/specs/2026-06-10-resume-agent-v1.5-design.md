@@ -1,9 +1,9 @@
-# Resume Agent v1.5 — Quality + Lean-Cost Pass — Design Spec
+# Résumé Tailor Harness v1.5 — Quality + Lean-Cost Pass — Design Spec
 
 - **Date:** 2026-06-10
 - **Status:** Approved (design) — ready for implementation planning
 - **Branch:** `v1.5` (off `main`)
-- **Predecessor:** `docs/superpowers/specs/2026-06-08-resume-agent-design.md` (v1)
+- **Predecessor:** `docs/superpowers/specs/2026-06-08-resume-tailor-harness-design.md` (v1)
 
 ---
 

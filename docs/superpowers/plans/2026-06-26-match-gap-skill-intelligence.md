@@ -68,12 +68,12 @@ differs from the global score and an axe check of the populated dashboard.
 
 | Path                                                                                                                                          | Responsibility                                                                                                                                                                                                           |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/resume_agent/tracking/match_gap.py`                                                                                                      | **Add** demand-graph dataclasses + `build_demand_graph()` + `collect_target_skill_tokens()` + `_skills_by_source()`. Reuse existing `_target_jobs`, `profile_skill_tokens`, `normalize_skill`. Legacy `match_gap` stays. |
-| `src/resume_agent/taxonomy/clusters.py`                                                                                                       | **New.** `ClusterMap` dataclass + `load_cluster_map` / `save_cluster_map` / `merge_cluster_map`.                                                                                                                         |
-| `src/resume_agent/tracking/canonicalize.py`                                                                                                   | **Add** `build_skill_themer()` (thematic-grouping agent) next to the existing `build_skill_canonicalizer()`.                                                                                                             |
-| `src/resume_agent/services/match_gap.py`                                                                                                      | **New.** `refresh_clusters()` use-case: collect tokens → dedup → theme → persist.                                                                                                                                        |
-| `src/resume_agent/api/schemas/match_gap.py`                                                                                                   | **Rewrite.** `JobLiteOut`, `SkillNodeOut`, `DemandEdgeOut`, `ThemeOut`, `MatchGapOut`.                                                                                                                                   |
-| `src/resume_agent/api/routers/match_gap.py`                                                                                                   | **Rewrite GET** (rich projection) + **add POST** `/match-gap/refresh-clusters` Run endpoint.                                                                                                                             |
+| `src/resume_tailor_harness/tracking/match_gap.py`                                                                                                      | **Add** demand-graph dataclasses + `build_demand_graph()` + `collect_target_skill_tokens()` + `_skills_by_source()`. Reuse existing `_target_jobs`, `profile_skill_tokens`, `normalize_skill`. Legacy `match_gap` stays. |
+| `src/resume_tailor_harness/taxonomy/clusters.py`                                                                                                       | **New.** `ClusterMap` dataclass + `load_cluster_map` / `save_cluster_map` / `merge_cluster_map`.                                                                                                                         |
+| `src/resume_tailor_harness/tracking/canonicalize.py`                                                                                                   | **Add** `build_skill_themer()` (thematic-grouping agent) next to the existing `build_skill_canonicalizer()`.                                                                                                             |
+| `src/resume_tailor_harness/services/match_gap.py`                                                                                                      | **New.** `refresh_clusters()` use-case: collect tokens → dedup → theme → persist.                                                                                                                                        |
+| `src/resume_tailor_harness/api/schemas/match_gap.py`                                                                                                   | **Rewrite.** `JobLiteOut`, `SkillNodeOut`, `DemandEdgeOut`, `ThemeOut`, `MatchGapOut`.                                                                                                                                   |
+| `src/resume_tailor_harness/api/routers/match_gap.py`                                                                                                   | **Rewrite GET** (rich projection) + **add POST** `/match-gap/refresh-clusters` Run endpoint.                                                                                                                             |
 | `web/src/features/match-gap/aggregate.ts`                                                                                                     | **New.** Pure `deriveView(payload, filters)` — all weighting/filtering/rollups.                                                                                                                                          |
 | `web/src/features/match-gap/use-match-gap.ts`                                                                                                 | **Rewrite.** Richer type + `useRefreshClusters()` hook.                                                                                                                                                                  |
 | `web/src/features/match-gap/Filters.tsx`, `WordCloud.tsx`, `RankedList.tsx`, `SkillDrawer.tsx`, `StatTables.tsx`, `RefreshClustersButton.tsx` | **New** presentational components.                                                                                                                                                                                       |
@@ -85,7 +85,7 @@ differs from the global score and an axe check of the populated dashboard.
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/match_gap.py`
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py`
 - Test: `tests/test_demand_graph.py` (new)
 
 **Interfaces:**
@@ -106,14 +106,14 @@ differs from the global score and an axe check of the populated dashboard.
 # tests/test_demand_graph.py
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.tracking.match_gap import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.tracking.match_gap import (
     DemandGraph,
     build_demand_graph,
     collect_target_skill_tokens,
 )
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():
@@ -205,7 +205,7 @@ Expected: FAIL — `ImportError: cannot import name 'DemandGraph'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/tracking/match_gap.py` (keep everything already there):
+Append to `src/resume_tailor_harness/tracking/match_gap.py` (keep everything already there):
 
 ```python
 _SOURCE_KEYS = (
@@ -338,12 +338,12 @@ def build_demand_graph(
     return DemandGraph(len(jobs), stale and bool(jobs), jobs, skills, edges, themes)
 ```
 
-Add `from resume_agent.taxonomy.clusters import ClusterMap` under a `TYPE_CHECKING` guard at the top (the annotation is a forward ref):
+Add `from resume_tailor_harness.taxonomy.clusters import ClusterMap` under a `TYPE_CHECKING` guard at the top (the annotation is a forward ref):
 
 ```python
 from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
-    from resume_agent.taxonomy.clusters import ClusterMap
+    from resume_tailor_harness.taxonomy.clusters import ClusterMap
 ```
 
 Define `SkillSource = Literal["must", "nice", "tech"]` and use it for
@@ -358,7 +358,7 @@ Expected: PASS (new graph tests **and** the untouched legacy `match_gap` tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/match_gap.py tests/test_demand_graph.py
+git add src/resume_tailor_harness/tracking/match_gap.py tests/test_demand_graph.py
 git commit -m "feat: add demand-graph core for match-gap dashboard"
 ```
 
@@ -368,7 +368,7 @@ git commit -m "feat: add demand-graph core for match-gap dashboard"
 
 **Files:**
 
-- Create: `src/resume_agent/taxonomy/clusters.py`
+- Create: `src/resume_tailor_harness/taxonomy/clusters.py`
 - Test: `tests/test_taxonomy_clusters.py` (new)
 
 **Interfaces:**
@@ -383,7 +383,7 @@ git commit -m "feat: add demand-graph core for match-gap dashboard"
 
 ```python
 # tests/test_taxonomy_clusters.py
-from resume_agent.taxonomy.clusters import (
+from resume_tailor_harness.taxonomy.clusters import (
     ClusterMap,
     load_cluster_map,
     merge_cluster_map,
@@ -436,7 +436,7 @@ Expected: FAIL — `ModuleNotFoundError: ...taxonomy.clusters`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/taxonomy/clusters.py
+# src/resume_tailor_harness/taxonomy/clusters.py
 """Persisted skill cluster map: synonym aliases + thematic grouping.
 
 Extends the flat alias-map idea in taxonomy/skills.py. Merges are monotonic
@@ -527,7 +527,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/taxonomy/clusters.py tests/test_taxonomy_clusters.py
+git add src/resume_tailor_harness/taxonomy/clusters.py tests/test_taxonomy_clusters.py
 git commit -m "feat: add persisted skill cluster map"
 ```
 
@@ -537,7 +537,7 @@ git commit -m "feat: add persisted skill cluster map"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/match_gap.py` (only the forward-ref import; the body already reads `cluster_map`)
+- Modify: `src/resume_tailor_harness/tracking/match_gap.py` (only the forward-ref import; the body already reads `cluster_map`)
 - Test: `tests/test_demand_graph.py` (add cases)
 
 **Interfaces:**
@@ -550,8 +550,8 @@ git commit -m "feat: add persisted skill cluster map"
 Append to `tests/test_demand_graph.py`:
 
 ```python
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.tracking.match_gap import ThemeNode
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.tracking.match_gap import ThemeNode
 
 
 def test_demand_graph_dedupes_via_alias_map():
@@ -611,7 +611,7 @@ run these tests as part of Task 2 and omit a separate Task-3 commit.
 
 The Task-1 body already consumes `cluster_map.aliases/theme_of/theme_label`. No code change expected. If a runtime `ClusterMap` reference is needed anywhere outside the annotation, import it normally at module top (no circular import: `clusters.py` imports nothing from `match_gap.py`). Verify with:
 
-Run: `.venv/Scripts/python.exe -c "import resume_agent.tracking.match_gap"`
+Run: `.venv/Scripts/python.exe -c "import resume_tailor_harness.tracking.match_gap"`
 Expected: no error.
 
 - [ ] **Step 4: Run full suite slice**
@@ -622,7 +622,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit only if this contains production wiring; otherwise include the tests in Task 2's commit**
 
 ```bash
-git add tests/test_demand_graph.py src/resume_agent/tracking/match_gap.py
+git add tests/test_demand_graph.py src/resume_tailor_harness/tracking/match_gap.py
 git commit -m "test: cover cluster-map dedup/theming in demand graph"
 ```
 
@@ -632,7 +632,7 @@ git commit -m "test: cover cluster-map dedup/theming in demand graph"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/canonicalize.py`
+- Modify: `src/resume_tailor_harness/tracking/canonicalize.py`
 - Test: `tests/test_skill_themer.py` (new)
 
 **Interfaces:**
@@ -650,7 +650,7 @@ git commit -m "test: cover cluster-map dedup/theming in demand graph"
 # tests/test_skill_themer.py
 import pytest
 
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.tracking.canonicalize import (
     SkillThemes,
     ThemeGroup,
     build_skill_themer,
@@ -705,7 +705,7 @@ Expected: FAIL — `ImportError: cannot import name 'SkillThemes'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/tracking/canonicalize.py`:
+Append to `src/resume_tailor_harness/tracking/canonicalize.py`:
 
 ```python
 from typing import Callable as _Callable  # already have Callable; reuse existing import
@@ -791,7 +791,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/canonicalize.py tests/test_skill_themer.py
+git add src/resume_tailor_harness/tracking/canonicalize.py tests/test_skill_themer.py
 git commit -m "feat: add skill theming agent"
 ```
 
@@ -801,7 +801,7 @@ git commit -m "feat: add skill theming agent"
 
 **Files:**
 
-- Create: `src/resume_agent/services/match_gap.py`
+- Create: `src/resume_tailor_harness/services/match_gap.py`
 - Test: `tests/test_services_match_gap.py` (new)
 
 **Interfaces:**
@@ -819,10 +819,10 @@ import pytest
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.services.match_gap import refresh_clusters, slugify_theme
-from resume_agent.taxonomy.clusters import load_cluster_map
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.services.match_gap import refresh_clusters, slugify_theme
+from resume_tailor_harness.taxonomy.clusters import load_cluster_map
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():
@@ -916,7 +916,7 @@ Expected: FAIL — `ModuleNotFoundError: ...services.match_gap`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/match_gap.py
+# src/resume_tailor_harness/services/match_gap.py
 """Use-case: refresh the persisted skill cluster map (LLM dedup + theming).
 
 Runs off the read path (a background Run). The dashboard GET only reads the map.
@@ -930,14 +930,14 @@ from threading import Lock
 
 from sqlmodel import Session
 
-from resume_agent.taxonomy.clusters import (
+from resume_tailor_harness.taxonomy.clusters import (
     ClusterMap,
     load_cluster_map,
     merge_cluster_map,
     save_cluster_map,
 )
-from resume_agent.tracking.canonicalize import Themer
-from resume_agent.tracking.match_gap import Canonicalizer, collect_target_skill_tokens
+from resume_tailor_harness.tracking.canonicalize import Themer
+from resume_tailor_harness.tracking.match_gap import Canonicalizer, collect_target_skill_tokens
 
 _SLUG = re.compile(r"[^a-z0-9]+")
 _CLUSTER_WRITE_LOCK = Lock()
@@ -994,7 +994,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/match_gap.py tests/test_services_match_gap.py
+git add src/resume_tailor_harness/services/match_gap.py tests/test_services_match_gap.py
 git commit -m "feat: add refresh_clusters service"
 ```
 
@@ -1004,7 +1004,7 @@ git commit -m "feat: add refresh_clusters service"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/match_gap.py` (full rewrite)
+- Modify: `src/resume_tailor_harness/api/schemas/match_gap.py` (full rewrite)
 - Test: `tests/api/test_schemas_match_gap.py` (rewrite)
 
 **Interfaces:**
@@ -1021,12 +1021,12 @@ git commit -m "feat: add refresh_clusters service"
 
 ```python
 # tests/api/test_schemas_match_gap.py
-from resume_agent.api.schemas.match_gap import (
+from resume_tailor_harness.api.schemas.match_gap import (
     DemandEdgeOut,
     MatchGapOut,
     SkillNodeOut,
 )
-from resume_agent.tracking.match_gap import DemandEdge, SkillNode
+from resume_tailor_harness.tracking.match_gap import DemandEdge, SkillNode
 
 
 def test_skill_node_out_camelizes_theme_id():
@@ -1057,14 +1057,14 @@ Expected: FAIL — `ImportError: cannot import name 'DemandEdgeOut'`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/schemas/match_gap.py
+# src/resume_tailor_harness/api/schemas/match_gap.py
 """Match-gap API schemas: the full skill-demand graph for the dashboard."""
 
 from __future__ import annotations
 
 from typing import Literal
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class JobLiteOut(CamelModel):
@@ -1108,7 +1108,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/match_gap.py tests/api/test_schemas_match_gap.py
+git add src/resume_tailor_harness/api/schemas/match_gap.py tests/api/test_schemas_match_gap.py
 git commit -m "feat: rich match-gap demand-graph schemas"
 ```
 
@@ -1118,7 +1118,7 @@ git commit -m "feat: rich match-gap demand-graph schemas"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/match_gap.py` (rewrite the GET)
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py` (rewrite the GET)
 - Test: `tests/api/test_match_gap.py` (rewrite the existing assertion + add a populated case)
 
 **Interfaces:**
@@ -1133,7 +1133,7 @@ Replace the body of `tests/api/test_match_gap.py`:
 ```python
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client():
@@ -1161,7 +1161,7 @@ Expected: FAIL — old code returns `{"targetTotal":0,"gaps":[]}` (KeyError on `
 
 - [ ] **Step 3: Write minimal implementation**
 
-Rewrite `src/resume_agent/api/routers/match_gap.py`:
+Rewrite `src/resume_tailor_harness/api/routers/match_gap.py`:
 
 ```python
 """Read-only match-gap demand graph + a background cluster-refresh Run."""
@@ -1173,16 +1173,16 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_run_manager, get_session
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.match_gap import MatchGapOut
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.db import get_session as open_session
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.store import load_facts
-from resume_agent.taxonomy.clusters import load_cluster_map
-from resume_agent.tracking.match_gap import build_demand_graph
+from resume_tailor_harness.api.deps import get_run_manager, get_session
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.match_gap import MatchGapOut
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.db import get_session as open_session
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.taxonomy.clusters import load_cluster_map
+from resume_tailor_harness.tracking.match_gap import build_demand_graph
 
 router = APIRouter()
 
@@ -1211,8 +1211,8 @@ def refresh_match_gap_clusters(
     engine = request.app.state.engine
 
     def work(reporter):
-        from resume_agent.services.match_gap import refresh_clusters
-        from resume_agent.tracking.canonicalize import (
+        from resume_tailor_harness.services.match_gap import refresh_clusters
+        from resume_tailor_harness.tracking.canonicalize import (
             build_skill_canonicalizer,
             build_skill_themer,
         )
@@ -1243,7 +1243,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/match_gap.py tests/api/test_match_gap.py
+git add src/resume_tailor_harness/api/routers/match_gap.py tests/api/test_match_gap.py
 git commit -m "feat: rich match-gap GET + refresh-clusters route"
 ```
 
@@ -1258,7 +1258,7 @@ git commit -m "feat: rich match-gap GET + refresh-clusters route"
 
 **Interfaces:**
 
-- Consumes: the POST route from Task 7; monkeypatches `build_skill_canonicalizer` / `build_skill_themer` on `resume_agent.tracking.canonicalize` to fakes (the route imports them inside `work`, so patch the source module).
+- Consumes: the POST route from Task 7; monkeypatches `build_skill_canonicalizer` / `build_skill_themer` on `resume_tailor_harness.tracking.canonicalize` to fakes (the route imports them inside `work`, so patch the source module).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1268,14 +1268,14 @@ import time
 
 from fastapi.testclient import TestClient
 
-import resume_agent.tracking.canonicalize as canon
-from resume_agent.api.app import create_app
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+import resume_tailor_harness.tracking.canonicalize as canon
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _seed(engine):
-    from resume_agent.db import get_session
+    from resume_tailor_harness.db import get_session
     with get_session(engine) as s:
         save_job(s, Job(
             source="manual", company="C", title="T", status=JobStatus.shortlisted.value,
@@ -1293,7 +1293,7 @@ def test_refresh_clusters_run_completes(monkeypatch, tmp_path):
         lambda: (lambda toks: [("Cloud/Infra", ["kubernetes"]), ("Frontend", ["react"])]),
     )
     # redirect the cluster-map path into tmp so the test is hermetic
-    import resume_agent.api.routers.match_gap as router_mod
+    import resume_tailor_harness.api.routers.match_gap as router_mod
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
 
     app = create_app(db_url="sqlite://")

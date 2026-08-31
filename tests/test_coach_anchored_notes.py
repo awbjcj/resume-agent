@@ -1,8 +1,8 @@
 """Regression: an approved anchored coach note must enrich its named role."""
 
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.merge import MergeReport, apply_synthesis_fragments
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.merge import MergeReport, apply_synthesis_fragments
 
 
 def _target_facts() -> ProfileFacts:

@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.discovery.scraper.recipe import Pagination, ScrapeRecipe
-from resume_agent.discovery.scraper.recipe_store import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.scraper.recipe import Pagination, ScrapeRecipe
+from resume_tailor_harness.discovery.scraper.recipe_store import (
     RECIPES_DIR,
     default_recipes_dir,
     host_key,
@@ -13,8 +13,8 @@ from resume_agent.discovery.scraper.recipe_store import (
     recipe_path,
     save_recipe,
 )
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def _recipe():

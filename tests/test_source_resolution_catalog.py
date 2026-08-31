@@ -1,10 +1,10 @@
-from resume_agent.discovery.connectors.detect import (
+from resume_tailor_harness.discovery.connectors.detect import (
     AtsTarget,
     identify_host,
     targets_from_html,
 )
-from resume_agent.discovery.connectors.registry import discoverable_board_families
-from resume_agent.discovery.source_resolution.catalog import (
+from resume_tailor_harness.discovery.connectors.registry import discoverable_board_families
+from resume_tailor_harness.discovery.source_resolution.catalog import (
     BOARD_FAMILIES,
     canonical_target_url,
     render_supported_board_guidance,

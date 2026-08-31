@@ -247,7 +247,7 @@ leave` per pending draft.
   a read-only transcript, recap, and impact.
 
 **CLI:** the `profile interview` command is retired and replaced by
-`resume-agent profile coach` — an interactive chat loop calling the service
+`resume-tailor-harness profile coach` — an interactive chat loop calling the service
 functions directly (no RunManager): print coach message → prompt for reply →
 loop; draft notes prompt `[s]ave / [e]dit / [d]iscard`; `/end` triggers recap
 

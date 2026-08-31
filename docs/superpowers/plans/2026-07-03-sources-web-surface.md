@@ -26,8 +26,8 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/profile.py`
-- Modify: `src/resume_agent/api/routers/profile.py`
+- Modify: `src/resume_tailor_harness/api/schemas/profile.py`
+- Modify: `src/resume_tailor_harness/api/routers/profile.py`
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (regenerated)
 - Test: `tests/api/test_profile_sources.py` (new)
 
@@ -48,9 +48,9 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.models.profile import Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.store import save_facts
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.store import save_facts
 
 
 @pytest.fixture()
@@ -160,7 +160,7 @@ Expected: FAIL — 404s (routes don't exist).
 
 - [ ] **Step 3: Implement**
 
-Add to `src/resume_agent/api/schemas/profile.py`:
+Add to `src/resume_tailor_harness/api/schemas/profile.py`:
 
 ```python
 class SourceOut(CamelModel):
@@ -185,29 +185,29 @@ class SkeletonEntryOut(CamelModel):
     label: str
 ```
 
-In `src/resume_agent/api/routers/profile.py`, add imports:
+In `src/resume_tailor_harness/api/routers/profile.py`, add imports:
 
 ```python
 import re
 import tempfile
 from pathlib import Path
 
-from resume_agent.api.schemas.profile import (
+from resume_tailor_harness.api.schemas.profile import (
     DocumentOut,
     SkeletonEntryOut,
     SourceOut,
     SourcePatch,
 )
-from resume_agent.profile.corpus import (
+from resume_tailor_harness.profile.corpus import (
     _UNSET,
     add_source,
     load_manifest,
     remove_source,
     update_source,
 )
-from resume_agent.profile.fragments import fragment_cache_status
-from resume_agent.profile.store import load_facts
-from resume_agent.profile.synthesis import profile_skeleton
+from resume_tailor_harness.profile.fragments import fragment_cache_status
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.profile.synthesis import profile_skeleton
 ```
 
 and the endpoints:
@@ -322,7 +322,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/api/schemas/profile.py src/resume_agent/api/routers/profile.py contracts/ tests/api/test_profile_sources.py
+git add src/resume_tailor_harness/api/schemas/profile.py src/resume_tailor_harness/api/routers/profile.py contracts/ tests/api/test_profile_sources.py
 git commit -m "Serves the profile source corpus over the API with anchor skeleton"
 ```
 
@@ -332,8 +332,8 @@ git commit -m "Serves the profile source corpus over the API with anchor skeleto
 
 **Files:**
 
-- Modify: `src/resume_agent/services/profile_build.py`
-- Modify: `src/resume_agent/api/routers/profile.py` (`launch_profile_build`)
+- Modify: `src/resume_tailor_harness/services/profile_build.py`
+- Modify: `src/resume_tailor_harness/api/routers/profile.py` (`launch_profile_build`)
 - Test: `tests/api/test_profile_build_run.py`
 
 **Interfaces:**
@@ -361,7 +361,7 @@ def test_build_with_non_anthropic_key_launches_run(tmp_path, monkeypatch):
             files={"file": ("resume.txt", io.BytesIO(b"experience"), "text/plain")},
             data={"docType": "resume"},
         )
-        from resume_agent.services import profile_build
+        from resume_tailor_harness.services import profile_build
 
         monkeypatch.setattr(
             profile_build, "run_corpus_build",
@@ -378,7 +378,7 @@ def test_build_launches_run(client, monkeypatch):
         data={"docType": "resume"},
     )
 
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
 
     def fake_run(reporter, **kwargs):
         return {"experiences": 2, "projects": 1, "warnings": []}
@@ -397,7 +397,7 @@ def test_build_registers_wizard_resume_as_primary_source(client, monkeypatch):
         files={"file": ("resume.txt", io.BytesIO(b"experience"), "text/plain")},
         data={"docType": "resume"},
     )
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
 
     monkeypatch.setattr(
         profile_build, "run_corpus_build",
@@ -418,7 +418,7 @@ def test_build_with_registered_sources_skips_document_store(client, monkeypatch)
         "/api/profile/sources",
         files={"file": ("resume.txt", _io.BytesIO(b"experience"), "text/plain")},
     )
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
 
     monkeypatch.setattr(
         profile_build, "run_corpus_build",
@@ -436,7 +436,7 @@ Expected: FAIL — `run_corpus_build` doesn't exist; `/api/profile/sources` empt
 
 - [ ] **Step 3: Implement**
 
-Replace the body of `src/resume_agent/services/profile_build.py`:
+Replace the body of `src/resume_tailor_harness/services/profile_build.py`:
 
 ```python
 """Profile build use-case: source corpus (+ GitHub) -> facts.json + matrix.json."""
@@ -445,7 +445,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from resume_agent.profile.store import save_facts
+from resume_tailor_harness.profile.store import save_facts
 
 
 def run_corpus_build(
@@ -455,15 +455,15 @@ def run_corpus_build(
     github_username: str | None,
     facts_out: str | Path,
 ) -> dict:
-    from resume_agent.profile.build import build_corpus_profile
-    from resume_agent.profile.inference import build_inference_agent
-    from resume_agent.profile.matrix import build_matrix, load_overrides, save_matrix
-    from resume_agent.profile.merge import build_bullet_dedup_agent
-    from resume_agent.profile.synthesis import (
+    from resume_tailor_harness.profile.build import build_corpus_profile
+    from resume_tailor_harness.profile.inference import build_inference_agent
+    from resume_tailor_harness.profile.matrix import build_matrix, load_overrides, save_matrix
+    from resume_tailor_harness.profile.merge import build_bullet_dedup_agent
+    from resume_tailor_harness.profile.synthesis import (
         build_entailment_agent,
         build_synthesis_agent,
     )
-    from resume_agent.taxonomy.clusters import load_cluster_map
+    from resume_tailor_harness.taxonomy.clusters import load_cluster_map
 
     reporter.begin(3, "Extracting and merging source documents")
     facts, report = build_corpus_profile(
@@ -498,7 +498,7 @@ def run_corpus_build(
 
 (`run_profile_build`, `build_profile`, and `validate_profile` imports go away — the corpus build's own report replaces the legacy validation warnings.)
 
-In `src/resume_agent/api/routers/profile.py`, rework `launch_profile_build`'s precondition block (keep the LLM-key gate comment and check exactly as-is), replacing the `resume_path` logic:
+In `src/resume_tailor_harness/api/routers/profile.py`, rework `launch_profile_build`'s precondition block (keep the LLM-key gate comment and check exactly as-is), replacing the `resume_path` logic:
 
 ```python
     profile_dir = _profile_dir(request)
@@ -528,7 +528,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS (this task adds no routes, so the contract should be unchanged; if the drift gate complains, run `bash scripts/gen_ts_client.sh` and include the regenerated files).
 
 ```bash
-git add src/resume_agent/services/profile_build.py src/resume_agent/api/routers/profile.py tests/api/test_profile_build_run.py
+git add src/resume_tailor_harness/services/profile_build.py src/resume_tailor_harness/api/routers/profile.py tests/api/test_profile_build_run.py
 git commit -m "Runs the web profile build through the corpus pipeline"
 ```
 
@@ -1056,4 +1056,4 @@ git commit -m "Surfaces the profile build report on the settings page"
 - [ ] `.venv/Scripts/python.exe -m pytest && ruff check` — green.
 - [ ] `cd web && npx vitest run && npm run build` — green.
 - [ ] `bash scripts/gen_ts_client.sh` produces no diff (contracts committed in sync).
-- [ ] Manual smoke (optional, needs an API key): `resume-agent serve`, open Settings → Profile — upload a deck, set its anchor, rebuild, watch the run and report panel.
+- [ ] Manual smoke (optional, needs an API key): `resume-tailor-harness serve`, open Settings → Profile — upload a deck, set its anchor, rebuild, watch the run and report panel.

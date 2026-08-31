@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from resume_agent.render.render_config import RenderConfig, load_render_config
-from resume_agent.render.templates import template_path_for
+from resume_tailor_harness.render.render_config import RenderConfig, load_render_config
+from resume_tailor_harness.render.templates import template_path_for
 
 
 def test_defaults():
@@ -42,8 +42,8 @@ def test_legacy_template_path_is_preserved(tmp_path):
 
 
 def test_classic_compiles_with_pinned_root(tmp_path):
-    from resume_agent.render.renderer import render_pdf
-    from resume_agent.render.sample_content import sample_resume_content
+    from resume_tailor_harness.render.renderer import render_pdf
+    from resume_tailor_harness.render.sample_content import sample_resume_content
 
     output = render_pdf(
         sample_resume_content(),

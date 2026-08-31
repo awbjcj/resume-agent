@@ -1,4 +1,4 @@
-from resume_agent.api.schemas.jobs import JobDetail, PipelineItem
+from resume_tailor_harness.api.schemas.jobs import JobDetail, PipelineItem
 
 
 def test_pipeline_item_exposes_attention_flags_camelcase():

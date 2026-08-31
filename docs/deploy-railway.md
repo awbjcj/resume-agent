@@ -18,7 +18,7 @@ tenant isolation independent from the auth-free local container default.
 3. Generate credentials locally:
 
    ```powershell
-   .venv\Scripts\python.exe -m resume_agent.cli hash-password --password "choose-a-password"
+   .venv\Scripts\python.exe -m resume_tailor_harness.cli hash-password --password "choose-a-password"
    python -c "import secrets; print(secrets.token_hex(32))"
    ```
 
@@ -136,7 +136,7 @@ client type from the **Desktop app** client used by the local CLI's
 
    The app derives these URLs only from `APP_BASE_URL`; forwarded host headers
    are never trusted for OAuth callbacks. Add the
-   `http://localhost:8000` equivalents too if you also run `resume-agent serve`
+   `http://localhost:8000` equivalents too if you also run `resume-tailor-harness serve`
    on your machine.
 
 5. Add Railway variables:
@@ -199,7 +199,7 @@ local browser. To update the cloud snapshot:
    same paths at the repository root. Copy every other top-level member into
    local `data/`. Do not extract the whole archive with `-C data`, because that
    would incorrectly nest `config/` and `output/` under `data/`.
-3. Run `resume-agent pull` locally with `BROWSER_ENABLED=true`.
+3. Run `resume-tailor-harness pull` locally with `BROWSER_ENABLED=true`.
 4. Re-pack with `scripts/pack_data.py` and import it into Railway.
 5. Do not mutate the cloud instance between export and import; import is a full
    replacement, not a merge.

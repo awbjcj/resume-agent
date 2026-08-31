@@ -3,8 +3,8 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     added_canonical_tokens,
     apply_taxonomy_corrections,

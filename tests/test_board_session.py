@@ -5,13 +5,13 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from resume_agent.discovery.connectors.http import (
+from resume_tailor_harness.discovery.connectors.http import (
     DEFAULT_TIMEOUT,
     BoardSession,
     board_session,
     current_session,
 )
-from resume_agent.discovery.connectors import http as board
+from resume_tailor_harness.discovery.connectors import http as board
 
 
 class _Recorder(httpx.BaseTransport):

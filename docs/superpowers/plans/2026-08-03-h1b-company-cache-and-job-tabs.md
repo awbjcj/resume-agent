@@ -65,7 +65,7 @@ illustrative snippet that conflicts with them.
 
 | Path                                        | Responsibility                                                                                                    |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `src/resume_agent/h1b/cache.py`             | The only batched read seam over `h1b_company_evidence`.                                                           |
+| `src/resume_tailor_harness/h1b/cache.py`             | The only batched read seam over `h1b_company_evidence`.                                                           |
 | `tests/test_h1b_cache.py`                   | Batching, corruption tolerance, expiry passthrough.                                                               |
 | `tests/test_h1b_enrichment_scope.py`        | Widened research set, narrow scoring map, per-run cap. `run_h1b_enrichment` currently has **zero** test coverage. |
 | `web/src/features/job/TrackingTab.tsx`      | Composes stage + application + danger zone.                                                                       |
@@ -75,14 +75,14 @@ illustrative snippet that conflicts with them.
 
 | Path                                           | Change                                                                                                         |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `src/resume_agent/h1b/models.py`               | `H1BPeriodStat`; `periods` + `denied_count` on evidence; derived rollup.                                       |
-| `src/resume_agent/h1b/service.py`              | Quarter instructions; `schema_version = 2`; stop writing the snapshot.                                         |
-| `src/resume_agent/api/schemas/jobs.py`         | `H1BPeriodStatOut`; `periods`/`deniedCount` on evidence out; `stale` on `H1BSponsorshipOut`.                   |
-| `src/resume_agent/api/routers/jobs.py`         | `_job_detail_response` reads the cache; `_h1b_sponsorship_response` computes `stale`.                          |
-| `src/resume_agent/tracking/queries.py`         | Three row projections take a batched evidence map; detail avoids a redundant status-only lookup.               |
-| `src/resume_agent/services/board.py`           | Pass the DB session to the paginated shortlist projector so the production path can batch-load cache evidence. |
-| `src/resume_agent/services/discovery.py`       | Widen research; keep scoring map narrow; apply cap; stop writing the snapshot.                                 |
-| `src/resume_agent/config.py`                   | `h1b_enrich_max_companies_per_run`.                                                                            |
+| `src/resume_tailor_harness/h1b/models.py`               | `H1BPeriodStat`; `periods` + `denied_count` on evidence; derived rollup.                                       |
+| `src/resume_tailor_harness/h1b/service.py`              | Quarter instructions; `schema_version = 2`; stop writing the snapshot.                                         |
+| `src/resume_tailor_harness/api/schemas/jobs.py`         | `H1BPeriodStatOut`; `periods`/`deniedCount` on evidence out; `stale` on `H1BSponsorshipOut`.                   |
+| `src/resume_tailor_harness/api/routers/jobs.py`         | `_job_detail_response` reads the cache; `_h1b_sponsorship_response` computes `stale`.                          |
+| `src/resume_tailor_harness/tracking/queries.py`         | Three row projections take a batched evidence map; detail avoids a redundant status-only lookup.               |
+| `src/resume_tailor_harness/services/board.py`           | Pass the DB session to the paginated shortlist projector so the production path can batch-load cache evidence. |
+| `src/resume_tailor_harness/services/discovery.py`       | Widen research; keep scoring map narrow; apply cap; stop writing the snapshot.                                 |
+| `src/resume_tailor_harness/config.py`                   | `h1b_enrich_max_companies_per_run`.                                                                            |
 | `web/src/features/job/H1BSponsorshipPanel.tsx` | Period selector, stale label, shared-cache notice.                                                             |
 | `web/src/features/job/StageManager.tsx`        | Delete moves out to the danger zone.                                                                           |
 | `web/src/components/JobModal.tsx`              | Tab restructure.                                                                                               |
@@ -97,7 +97,7 @@ illustrative snippet that conflicts with them.
 
 **Files:**
 
-- Modify: `src/resume_agent/h1b/models.py`
+- Modify: `src/resume_tailor_harness/h1b/models.py`
 - Test: `tests/test_h1b_models.py` (create)
 
 **Interfaces:**
@@ -117,7 +117,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.h1b.models import (
+from resume_tailor_harness.h1b.models import (
     HISTORICAL_ONLY_CAVEAT,
     H1BPeriodStat,
     H1BSponsorshipEvidence,
@@ -223,7 +223,7 @@ Expected: FAIL — `ImportError: cannot import name 'H1BPeriodStat'`
 
 - [ ] **Step 3: Add `H1BPeriodStat` above `H1BSponsorshipEvidence`**
 
-In `src/resume_agent/h1b/models.py`, after the `H1BCompanyResolution` class:
+In `src/resume_tailor_harness/h1b/models.py`, after the `H1BCompanyResolution` class:
 
 ```python
 class H1BPeriodStat(BaseModel):
@@ -317,7 +317,7 @@ Expected: PASS, no lint findings
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/h1b/models.py tests/test_h1b_models.py
+git add src/resume_tailor_harness/h1b/models.py tests/test_h1b_models.py
 git commit -m "feat: add per-quarter H-1B evidence with a derived rollup"
 ```
 
@@ -327,7 +327,7 @@ git commit -m "feat: add per-quarter H-1B evidence with a derived rollup"
 
 **Files:**
 
-- Create: `src/resume_agent/h1b/cache.py`
+- Create: `src/resume_tailor_harness/h1b/cache.py`
 - Test: `tests/test_h1b_cache.py` (create)
 
 **Interfaces:**
@@ -347,10 +347,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import event
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.h1b.cache import load_company_evidence
-from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.tracking.tables import H1BCompanyEvidence
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.h1b.cache import load_company_evidence
+from resume_tailor_harness.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence
 
 
 def _evidence(company: str, *, expires_in_days: int = 30) -> H1BSponsorshipEvidence:
@@ -470,11 +470,11 @@ def test_blank_companies_return_empty_without_querying():
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_h1b_cache.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.h1b.cache'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.h1b.cache'`
 
 - [ ] **Step 3: Create the module**
 
-Create `src/resume_agent/h1b/cache.py`:
+Create `src/resume_tailor_harness/h1b/cache.py`:
 
 ```python
 """Batched read access to the durable per-company H-1B evidence cache."""
@@ -487,9 +487,9 @@ from typing import Any, cast
 
 from sqlmodel import Session, select
 
-from resume_agent.h1b.models import H1BSponsorshipEvidence
-from resume_agent.taxonomy.industries import normalize_company
-from resume_agent.tracking.tables import H1BCompanyEvidence
+from resume_tailor_harness.h1b.models import H1BSponsorshipEvidence
+from resume_tailor_harness.taxonomy.industries import normalize_company
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence
 
 logger = logging.getLogger(__name__)
 
@@ -541,7 +541,7 @@ Expected: PASS (5 passed)
 
 ```bash
 ruff check
-git add src/resume_agent/h1b/cache.py tests/test_h1b_cache.py
+git add src/resume_tailor_harness/h1b/cache.py tests/test_h1b_cache.py
 git commit -m "feat: add batched H-1B company cache read seam"
 ```
 
@@ -551,8 +551,8 @@ git commit -m "feat: add batched H-1B company cache read seam"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/jobs.py:169-193`
-- Modify: `src/resume_agent/api/routers/jobs.py:114-131`
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py:169-193`
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py:114-131`
 - Test: `tests/api/test_job_h1b_detail.py` (create)
 
 **Interfaces:**
@@ -569,8 +569,8 @@ Create `tests/api/test_job_h1b_detail.py`:
 ```python
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.api.routers.jobs import _h1b_sponsorship_response
-from resume_agent.h1b.models import (
+from resume_tailor_harness.api.routers.jobs import _h1b_sponsorship_response
+from resume_tailor_harness.h1b.models import (
     HISTORICAL_ONLY_CAVEAT,
     H1BPeriodStat,
     H1BSponsorshipEvidence,
@@ -636,7 +636,7 @@ Expected: FAIL — `AttributeError: 'H1BSponsorshipOut' object has no attribute 
 
 - [ ] **Step 3: Add the out-schemas**
 
-In `src/resume_agent/api/schemas/jobs.py`, insert before `H1BSponsorshipEvidenceOut`:
+In `src/resume_tailor_harness/api/schemas/jobs.py`, insert before `H1BSponsorshipEvidenceOut`:
 
 ```python
 class H1BPeriodStatOut(CamelModel):
@@ -662,7 +662,7 @@ And add this line to `H1BSponsorshipOut`, after `capability`:
 
 - [ ] **Step 4: Compute `stale` in the response builder**
 
-In `src/resume_agent/api/routers/jobs.py`, replace `_h1b_sponsorship_response` with:
+In `src/resume_tailor_harness/api/routers/jobs.py`, replace `_h1b_sponsorship_response` with:
 
 ```python
 def _h1b_sponsorship_response(
@@ -713,7 +713,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/api/schemas/jobs.py src/resume_agent/api/routers/jobs.py \
+git add src/resume_tailor_harness/api/schemas/jobs.py src/resume_tailor_harness/api/routers/jobs.py \
         tests/api/test_job_h1b_detail.py contracts/openapi.json contracts/ts/api.ts \
         web/src/lib/api/schema.ts
 git commit -m "feat: expose H-1B periods, denied count, and staleness on the API"
@@ -725,7 +725,7 @@ git commit -m "feat: expose H-1B periods, denied count, and staleness on the API
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/jobs.py:94-106`
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py:94-106`
 - Test: `tests/api/test_job_h1b_detail.py` (extend)
 
 **Interfaces:**
@@ -744,9 +744,9 @@ never an engine, and H-1B must be enabled through a temp `env_path` file:
 ```python
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.tracking.tables import H1BCompanyEvidence, Job
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence, Job
 
 
 def _h1b_app(tmp_path):
@@ -804,7 +804,7 @@ Expected: FAIL — `capability` is `"unavailable"` because no per-job snapshot e
 
 - [ ] **Step 3: Point the detail response at the cache**
 
-In `src/resume_agent/api/routers/jobs.py::_job_detail_response`, replace the `else:` branch:
+In `src/resume_tailor_harness/api/routers/jobs.py::_job_detail_response`, replace the `else:` branch:
 
 ```python
     else:
@@ -820,7 +820,7 @@ In `src/resume_agent/api/routers/jobs.py::_job_detail_response`, replace the `el
 Add the import:
 
 ```python
-from resume_agent.h1b.cache import load_company_evidence
+from resume_tailor_harness.h1b.cache import load_company_evidence
 ```
 
 - [ ] **Step 4: Remove the now-orphaned snapshot import**
@@ -836,7 +836,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/api/routers/jobs.py tests/api/test_job_h1b_detail.py
+git add src/resume_tailor_harness/api/routers/jobs.py tests/api/test_job_h1b_detail.py
 git commit -m "fix: read H-1B evidence from the company cache on job detail"
 ```
 
@@ -846,8 +846,8 @@ git commit -m "fix: read H-1B evidence from the company cache on job detail"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py:152-163, 191-227, 230-255, 258-275, 278-290, 318-393, 415-465`
-- Modify: `src/resume_agent/services/board.py:107-114`
+- Modify: `src/resume_tailor_harness/tracking/queries.py:152-163, 191-227, 230-255, 258-275, 278-290, 318-393, 415-465`
+- Modify: `src/resume_tailor_harness/services/board.py:107-114`
 - Test: `tests/test_board_h1b_status.py` (create)
 
 **Interfaces:**
@@ -867,10 +867,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import event
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.services.board import list_board
-from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
+from resume_tailor_harness.services.board import list_board
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence, Job, JobStatus
 
 
 def _seed_evidence(session: Session, company: str) -> None:
@@ -945,7 +945,7 @@ Expected: FAIL — every `h1b_sponsorship_status` is `None` (no per-job snapshot
 
 - [ ] **Step 3: Rewrite the status helper to read the map**
 
-In `src/resume_agent/tracking/queries.py`, replace `_h1b_sponsorship_status` entirely:
+In `src/resume_tailor_harness/tracking/queries.py`, replace `_h1b_sponsorship_status` entirely:
 
 ```python
 def _h1b_sponsorship_status(
@@ -964,8 +964,8 @@ Add imports at the top of the file:
 ```python
 from collections.abc import Mapping
 
-from resume_agent.h1b.cache import load_company_evidence
-from resume_agent.taxonomy.industries import normalize_company
+from resume_tailor_harness.h1b.cache import load_company_evidence
+from resume_tailor_harness.taxonomy.industries import normalize_company
 ```
 
 (`H1BSponsorshipEvidence` is already imported at line 11. If `normalize_company` is already imported, do not duplicate it.)
@@ -1037,7 +1037,7 @@ bad path behind a broad `-k` fallback.
 
 ```bash
 ruff check
-git add src/resume_agent/tracking/queries.py src/resume_agent/services/board.py \
+git add src/resume_tailor_harness/tracking/queries.py src/resume_tailor_harness/services/board.py \
         tests/test_board_h1b_status.py
 git commit -m "fix: resolve board H-1B status from the batched company cache"
 ```
@@ -1048,8 +1048,8 @@ git commit -m "fix: resolve board H-1B status from the batched company cache"
 
 **Files:**
 
-- Modify: `src/resume_agent/h1b/service.py:431-442`
-- Modify: `src/resume_agent/services/discovery.py:143-151`
+- Modify: `src/resume_tailor_harness/h1b/service.py:431-442`
+- Modify: `src/resume_tailor_harness/services/discovery.py:143-151`
 - Test: `tests/test_h1b_service.py` (extend)
 - Test: `tests/test_h1b_enrichment_scope.py` (assert the discovery path too; created in Task 8)
 
@@ -1085,7 +1085,7 @@ def test_manual_check_records_the_cache_pointer_but_no_snapshot():
         session.commit()
         session.refresh(job)
 
-        import resume_agent.h1b.service as service
+        import resume_tailor_harness.h1b.service as service
 
         original = service.h1b_tools
         service.h1b_tools = fake_tools
@@ -1121,7 +1121,7 @@ Expected: FAIL — `h1b_evidence_snapshot` is a dict, not `None`
 
 - [ ] **Step 3: Stop writing the snapshot in the manual path**
 
-In `src/resume_agent/h1b/service.py::check_job_sponsorship`, delete this line
+In `src/resume_tailor_harness/h1b/service.py::check_job_sponsorship`, delete this line
 and update its docstring from “attach its snapshot” to “record cache
 provenance”:
 
@@ -1133,7 +1133,7 @@ Leave `meta.h1b_evidence_id = row.id if row is not None else None` in place.
 
 - [ ] **Step 4: Stop writing the snapshot in the discovery path**
 
-In `src/resume_agent/services/discovery.py::run_h1b_enrichment`, delete the identical line:
+In `src/resume_tailor_harness/services/discovery.py::run_h1b_enrichment`, delete the identical line:
 
 ```python
         meta.h1b_evidence_snapshot = evidence.model_dump(mode="json")
@@ -1148,7 +1148,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/h1b/service.py src/resume_agent/services/discovery.py tests/test_h1b_service.py
+git add src/resume_tailor_harness/h1b/service.py src/resume_tailor_harness/services/discovery.py tests/test_h1b_service.py
 git commit -m "refactor: stop writing the per-job H-1B evidence snapshot"
 ```
 
@@ -1158,7 +1158,7 @@ git commit -m "refactor: stop writing the per-job H-1B evidence snapshot"
 
 **Files:**
 
-- Modify: `src/resume_agent/h1b/service.py:103-140` (agent instructions), `:374-388` (persistence)
+- Modify: `src/resume_tailor_harness/h1b/service.py:103-140` (agent instructions), `:374-388` (persistence)
 - Test: `tests/test_h1b_service.py` (extend)
 
 **Interfaces:**
@@ -1180,7 +1180,7 @@ def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
         h1b_mcp_transport="stdio",
         h1b_mcp_command="server",
     )
-    from resume_agent.h1b.service import DefaultSponsorshipAgentFactory
+    from resume_tailor_harness.h1b.service import DefaultSponsorshipAgentFactory
 
     runner = DefaultSponsorshipAgentFactory(settings).build(tools=None)
     # AgentRunner intentionally narrows the public runner API; tests in this
@@ -1194,7 +1194,7 @@ def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
 
 
 def test_persisted_rows_are_written_at_schema_version_two():
-    from resume_agent.tracking.tables import H1BCompanyEvidence
+    from resume_tailor_harness.tracking.tables import H1BCompanyEvidence
     from sqlmodel import select as model_select
 
     engine = make_engine("sqlite://")
@@ -1210,7 +1210,7 @@ def test_persisted_rows_are_written_at_schema_version_two():
     async def fake_tools(_settings, **_kwargs):
         yield object()
 
-    import resume_agent.h1b.service as service
+    import resume_tailor_harness.h1b.service as service
 
     original = service.h1b_tools
     service.h1b_tools = fake_tools
@@ -1284,7 +1284,7 @@ Expected: PASS. If it fails because the prompt registry snapshots agent instruct
 
 ```bash
 ruff check
-git add src/resume_agent/h1b/service.py tests/test_h1b_service.py
+git add src/resume_tailor_harness/h1b/service.py tests/test_h1b_service.py
 git commit -m "feat: research the four most recent H-1B fiscal quarters"
 ```
 
@@ -1294,8 +1294,8 @@ git commit -m "feat: research the four most recent H-1B fiscal quarters"
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py:78`
-- Modify: `src/resume_agent/services/discovery.py:94-158`
+- Modify: `src/resume_tailor_harness/config.py:78`
+- Modify: `src/resume_tailor_harness/services/discovery.py:94-158`
 - Test: `tests/test_h1b_enrichment_scope.py` (create)
 
 **Interfaces:**
@@ -1314,16 +1314,16 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session
 
-from resume_agent.config import Settings
-from resume_agent.db import init_db, make_engine
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.h1b.models import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.h1b.models import (
     HISTORICAL_ONLY_CAVEAT,
     H1BEnrichmentReport,
     H1BSponsorshipEvidence,
 )
-from resume_agent.services.discovery import run_h1b_enrichment
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.services.discovery import run_h1b_enrichment
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _evidence(company: str) -> H1BSponsorshipEvidence:
@@ -1346,7 +1346,7 @@ class RecordingEnricher:
 
     async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport:
         self.seen.extend(companies)
-        from resume_agent.taxonomy.industries import normalize_company
+        from resume_tailor_harness.taxonomy.industries import normalize_company
 
         return H1BEnrichmentReport(
             by_company={
@@ -1422,7 +1422,7 @@ def test_fresh_cache_hits_still_reach_the_scorer():
     acme_evidence = _evidence("acme")
     globex_evidence = _evidence("globex")
     with Session(engine) as session:
-        from resume_agent.tracking.tables import H1BCompanyEvidence
+        from resume_tailor_harness.tracking.tables import H1BCompanyEvidence
 
         silent = _add(session, "Acme, Inc.", "silent")
         explicit_no = _add(session, "Globex LLC", "explicit_no")
@@ -1461,7 +1461,7 @@ def test_per_run_cap_takes_the_companies_with_the_most_jobs(monkeypatch):
     enricher = RecordingEnricher()
 
     monkeypatch.setattr(
-        "resume_agent.services.discovery.get_settings",
+        "resume_tailor_harness.services.discovery.get_settings",
         lambda: Settings(  # type: ignore[call-arg]
             _env_file=None, h1b_enrich_max_companies_per_run=1
         ),
@@ -1491,7 +1491,7 @@ Add these cap-edge regressions in the same file:
   handed to the enricher. This pins the repository convention that zero means
   unlimited.
 
-> **Note for the implementer:** `SearchConfig` lives in `src/resume_agent/discovery/search_config.py`. If it requires more constructor arguments than `sponsorship_required`, supply the minimum the dataclass demands.
+> **Note for the implementer:** `SearchConfig` lives in `src/resume_tailor_harness/discovery/search_config.py`. If it requires more constructor arguments than `sponsorship_required`, supply the minimum the dataclass demands.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -1500,7 +1500,7 @@ Expected: FAIL — only the `silent` company is researched
 
 - [ ] **Step 3: Add the setting**
 
-In `src/resume_agent/config.py`, after `h1b_cache_ttl_days`:
+In `src/resume_tailor_harness/config.py`, after `h1b_cache_ttl_days`:
 
 ```python
     h1b_enrich_max_companies_per_run: int = Field(default=50, ge=0)
@@ -1580,7 +1580,7 @@ Add these imports to `services/discovery.py` if absent:
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.h1b.cache import load_company_evidence
+from resume_tailor_harness.h1b.cache import load_company_evidence
 ```
 
 - [ ] **Step 6: Update provenance broadly but keep the returned scorer map narrow**
@@ -1639,7 +1639,7 @@ Expected: PASS — `discovery/pipeline.py` was not modified
 
 ```bash
 ruff check
-git add src/resume_agent/config.py src/resume_agent/services/discovery.py tests/test_h1b_enrichment_scope.py
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/services/discovery.py tests/test_h1b_enrichment_scope.py
 git commit -m "feat: widen H-1B research to every surviving company under a run cap"
 ```
 

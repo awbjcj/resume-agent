@@ -2,20 +2,20 @@ import time
 
 from fastapi.testclient import TestClient
 
-import resume_agent.api.routers.suggestions as router_module
-import resume_agent.profile.effective as effective_module
-import resume_agent.services.suggestion_runs as run_module
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.github.repos import RepoMeta
-from resume_agent.suggestions.agents import RepoRef, SuggestionDraft
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+import resume_tailor_harness.api.routers.suggestions as router_module
+import resume_tailor_harness.profile.effective as effective_module
+import resume_tailor_harness.services.suggestion_runs as run_module
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.github.repos import RepoMeta
+from resume_tailor_harness.suggestions.agents import RepoRef, SuggestionDraft
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 class _Result:

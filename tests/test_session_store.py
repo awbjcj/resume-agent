@@ -4,7 +4,7 @@ from typing import Literal
 
 import pytest
 
-from resume_agent.sessions.store import (
+from resume_tailor_harness.sessions.store import (
     SessionModel,
     SessionStore,
     now_iso,

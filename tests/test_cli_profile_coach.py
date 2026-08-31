@@ -1,7 +1,7 @@
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.profile.corpus import add_source
+from resume_tailor_harness import cli
+from resume_tailor_harness.profile.corpus import add_source
 
 
 def _view(sid="s1", *, status="active", turns=None, drafts=None):
@@ -44,7 +44,7 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
     add_source(profile_dir, source, primary=True, mode="literal")
     calls = {"opened": 0, "messages": [], "approved": [], "discarded": [], "built": []}
     monkeypatch.setattr(
-        "resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
+        "resume_tailor_harness.llm_runner.resolve_api_key", lambda model, **_kwargs: "key"
     )
     monkeypatch.setattr(
         cli,
@@ -55,7 +55,7 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
     )
     monkeypatch.setattr(cli, "_engine", lambda db_url: object())
     monkeypatch.setattr(
-        "resume_agent.profile.coach_store.active_session",
+        "resume_tailor_harness.profile.coach_store.active_session",
         lambda profile_dir: {"session_id": "s1"} if resume else None,
     )
 
@@ -63,9 +63,9 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
         calls["opened"] += 1
         return _view()
 
-    monkeypatch.setattr("resume_agent.services.profile_coach.run_opening_turn", opening)
+    monkeypatch.setattr("resume_tailor_harness.services.profile_coach.run_opening_turn", opening)
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.session_view",
+        "resume_tailor_harness.services.profile_coach.session_view",
         lambda profile_dir, sid: _view(),
     )
 
@@ -93,23 +93,23 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
             ],
         )
 
-    monkeypatch.setattr("resume_agent.services.profile_coach.run_message_turn", message)
+    monkeypatch.setattr("resume_tailor_harness.services.profile_coach.run_message_turn", message)
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.run_recap_turn",
+        "resume_tailor_harness.services.profile_coach.run_recap_turn",
         lambda reporter, **kwargs: _view(status="ended") | {"recap": "Covered Acme."},
     )
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.approve_draft",
+        "resume_tailor_harness.services.profile_coach.approve_draft",
         lambda profile_dir, sid, topic_id, **kwargs: (
             calls["approved"].append(kwargs) or "doc-1"
         ),
     )
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.discard_draft",
+        "resume_tailor_harness.services.profile_coach.discard_draft",
         lambda profile_dir, sid, topic_id: calls["discarded"].append(topic_id),
     )
     monkeypatch.setattr(
-        "resume_agent.services.profile_coach.run_build_with_impact",
+        "resume_tailor_harness.services.profile_coach.run_build_with_impact",
         lambda reporter, **kwargs: calls["built"].append(kwargs) or {"impact": {}},
     )
     return profile_dir, calls

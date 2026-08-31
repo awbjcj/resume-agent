@@ -2,11 +2,11 @@
 
 from types import SimpleNamespace
 
-from resume_agent.config import Settings
-from resume_agent.career_lab import agents
-from resume_agent.career_skills.models import AgentFamily
-from resume_agent.career_skills.registry import CareerSkillRegistry
-from resume_agent.llm_runner import AgentRunner
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.career_lab import agents
+from resume_tailor_harness.career_skills.models import AgentFamily
+from resume_tailor_harness.career_skills.registry import CareerSkillRegistry
+from resume_tailor_harness.llm_runner import AgentRunner
 
 
 def test_builders_keep_router_and_formatter_tool_free(monkeypatch):

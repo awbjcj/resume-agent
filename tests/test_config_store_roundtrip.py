@@ -23,9 +23,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from resume_agent.api.schemas.config import DOMAIN_SCHEMAS, ReviewConfigDoc
-from resume_agent.services.config_store import _FILES, YamlConfigStore
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_tailor_harness.api.schemas.config import DOMAIN_SCHEMAS, ReviewConfigDoc
+from resume_tailor_harness.services.config_store import _FILES, YamlConfigStore
+from resume_tailor_harness.tailor.review_config import ReviewConfig
 
 REPO_CONFIG = Path(__file__).resolve().parents[1] / "config"
 

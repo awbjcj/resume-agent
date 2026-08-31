@@ -5,9 +5,9 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.models.profile import Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.store import save_facts
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.store import save_facts
 
 
 @pytest.fixture()
@@ -142,7 +142,7 @@ def test_note_and_url_intake_endpoints(client, monkeypatch):
     )
 
     import httpx
-    import resume_agent.api.routers.profile as profile_router
+    import resume_tailor_harness.api.routers.profile as profile_router
 
     monkeypatch.setattr(
         profile_router,
@@ -161,8 +161,8 @@ def test_sync_github_launches_tracked_run_and_requires_username(client, monkeypa
     assert c.post("/api/profile/sync-github").status_code == 400
     c.put("/api/config/profile", json={"githubUsername": "ada"})
 
-    import resume_agent.api.routers.profile as profile_router
-    from resume_agent.profile.github_harvest import HarvestReport
+    import resume_tailor_harness.api.routers.profile as profile_router
+    from resume_tailor_harness.profile.github_harvest import HarvestReport
 
     monkeypatch.setattr(
         profile_router,

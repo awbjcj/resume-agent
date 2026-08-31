@@ -1,10 +1,10 @@
-# Resume Agent v2 — Reference Connectors (Greenhouse · Adzuna · RemoteOK) Implementation Plan
+# Résumé Tailor Harness v2 — Reference Connectors (Greenhouse · Adzuna · RemoteOK) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add three production connectors — one per query model — behind the Plan 1 `Connector` seam: **Greenhouse** (ATS, company-scoped), **Adzuna** (aggregator, keyword), **RemoteOK** (feed). Each is a _pure JSON→`RawJob` mapper_ tested against saved fixtures, wrapped in a thin connector whose only un-CI-tested part is a single HTTP call. Add `config/connectors.yaml` + `build_connectors()` so a config file decides which sources are live.
 
-**Architecture:** This is **Plan 2 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`). The valuable, fragile logic in every API connector is the _mapping_ (payload → `RawJob`) and the _client-side keyword filter_; both are pure functions over fixtures — the **interface is the test surface**. The HTTP fetch lives behind a one-method seam (`_get_*`) overridden in tests, exactly like Plan 1's LinkedIn `_search_html`. `build_connectors()` is the registry that turns `ConnectorsConfig` into live `Connector` instances in canonical dedup order (ATS → feed → aggregator → LinkedIn).
+**Architecture:** This is **Plan 2 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-tailor-harness-v2-connectors-design.md`). The valuable, fragile logic in every API connector is the _mapping_ (payload → `RawJob`) and the _client-side keyword filter_; both are pure functions over fixtures — the **interface is the test surface**. The HTTP fetch lives behind a one-method seam (`_get_*`) overridden in tests, exactly like Plan 1's LinkedIn `_search_html`. `build_connectors()` is the registry that turns `ConnectorsConfig` into live `Connector` instances in canonical dedup order (ATS → feed → aggregator → LinkedIn).
 
 **Tech Stack:** Python 3.13, uv, **httpx** (already a dep — no new deps), **beautifulsoup4** (already a dep, for HTML→text), pydantic, pytest.
 
@@ -27,8 +27,8 @@
 ```
 config/connectors.yaml.example          # CREATE
 .env.example                            # MODIFY — document ADZUNA_APP_ID/ADZUNA_APP_KEY
-src/resume_agent/config.py              # MODIFY — Settings += adzuna_app_id/app_key
-src/resume_agent/discovery/connectors/
+src/resume_tailor_harness/config.py              # MODIFY — Settings += adzuna_app_id/app_key
+src/resume_tailor_harness/discovery/connectors/
   text.py                               # CREATE — html_to_text + search filter (pure)
   config.py                             # CREATE — ConnectorsConfig + load_connectors_config
   greenhouse.py                         # CREATE — parse_greenhouse + GreenhouseConnector
@@ -52,7 +52,7 @@ tests/test_connectors_registry.py       # CREATE
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/text.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/text.py`
 - Test: `tests/test_connectors_text.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -60,9 +60,9 @@ tests/test_connectors_registry.py       # CREATE
 Create `tests/test_connectors_text.py`:
 
 ```python
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.text import filter_by_search, html_to_text
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_html_to_text_unescapes_and_strips_tags():
@@ -95,19 +95,19 @@ def test_filter_matches_keyword_in_title_or_jd_case_insensitively():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connectors_text.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.text'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.text'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/discovery/connectors/text.py`:
+Create `src/resume_tailor_harness/discovery/connectors/text.py`:
 
 ```python
 import html
 
 from bs4 import BeautifulSoup
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def html_to_text(raw: str) -> str:
@@ -146,7 +146,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/text.py tests/test_connectors_text.py
+git add src/resume_tailor_harness/discovery/connectors/text.py tests/test_connectors_text.py
 git commit -m "feat(connectors): shared html_to_text + keyword filter" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -156,7 +156,7 @@ git commit -m "feat(connectors): shared html_to_text + keyword filter" -m "Co-Au
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/config.py`, `config/connectors.yaml.example`
+- Create: `src/resume_tailor_harness/discovery/connectors/config.py`, `config/connectors.yaml.example`
 - Test: `tests/test_connectors_config.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -166,7 +166,7 @@ Create `tests/test_connectors_config.py`:
 ```python
 from pathlib import Path
 
-from resume_agent.discovery.connectors.config import ConnectorsConfig, load_connectors_config
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig, load_connectors_config
 
 
 def test_defaults_are_all_disabled():
@@ -195,19 +195,19 @@ def test_board_company_defaults_to_token():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connectors_config.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.config'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.config'`.
 
 - [ ] **Step 3: Implement the config model**
 
-Create `src/resume_agent/discovery/connectors/config.py`:
+Create `src/resume_tailor_harness/discovery/connectors/config.py`:
 
 ```python
 from pathlib import Path
 
 from pydantic import Field
 
-from resume_agent.config import load_yaml
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class GreenhouseBoard(ExtensibleModel):
@@ -252,7 +252,7 @@ def load_connectors_config(path: str | Path) -> ConnectorsConfig:
 Create `config/connectors.yaml.example`:
 
 ```yaml
-# Which job-source connectors `resume-agent pull` runs, and their parameters.
+# Which job-source connectors `resume-tailor-harness pull` runs, and their parameters.
 # Copy to config/connectors.yaml and edit. Secrets (Adzuna keys) go in .env.
 
 greenhouse: # ATS boards — company-scoped; lists ALL open roles per board.
@@ -282,7 +282,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/config.py config/connectors.yaml.example tests/test_connectors_config.py
+git add src/resume_tailor_harness/discovery/connectors/config.py config/connectors.yaml.example tests/test_connectors_config.py
 git commit -m "feat(connectors): connectors.yaml config model + example" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -292,7 +292,7 @@ git commit -m "feat(connectors): connectors.yaml config model + example" -m "Co-
 
 **Files:**
 
-- Create: `tests/fixtures/greenhouse/jobs.json`, `src/resume_agent/discovery/connectors/greenhouse.py`
+- Create: `tests/fixtures/greenhouse/jobs.json`, `src/resume_tailor_harness/discovery/connectors/greenhouse.py`
 - Test: `tests/test_connector_greenhouse.py`
 
 - [ ] **Step 1: Create the fixture**
@@ -326,9 +326,9 @@ Create `tests/test_connector_greenhouse.py`:
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.config import GreenhouseBoard
-from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector, parse_greenhouse
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.config import GreenhouseBoard
+from resume_tailor_harness.discovery.connectors.greenhouse import GreenhouseConnector, parse_greenhouse
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "greenhouse" / "jobs.json").read_text())
 
@@ -360,19 +360,19 @@ def test_connector_fetches_boards_and_filters_by_search():
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connector_greenhouse.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.greenhouse'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.greenhouse'`.
 
 - [ ] **Step 4: Implement**
 
-Create `src/resume_agent/discovery/connectors/greenhouse.py`:
+Create `src/resume_tailor_harness/discovery/connectors/greenhouse.py`:
 
 ```python
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.config import GreenhouseBoard
-from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.config import GreenhouseBoard
+from resume_tailor_harness.discovery.connectors.text import filter_by_search, html_to_text
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _BASE = "https://boards-api.greenhouse.io/v1/boards"
 
@@ -424,7 +424,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tests/fixtures/greenhouse/ src/resume_agent/discovery/connectors/greenhouse.py tests/test_connector_greenhouse.py
+git add tests/fixtures/greenhouse/ src/resume_tailor_harness/discovery/connectors/greenhouse.py tests/test_connector_greenhouse.py
 git commit -m "feat(connectors): Greenhouse ATS connector" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -434,13 +434,13 @@ git commit -m "feat(connectors): Greenhouse ATS connector" -m "Co-Authored-By: C
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py` (Settings), `.env.example`
-- Create: `tests/fixtures/adzuna/search.json`, `src/resume_agent/discovery/connectors/adzuna.py`
+- Modify: `src/resume_tailor_harness/config.py` (Settings), `.env.example`
+- Create: `tests/fixtures/adzuna/search.json`, `src/resume_tailor_harness/discovery/connectors/adzuna.py`
 - Test: `tests/test_connector_adzuna.py`
 
 - [ ] **Step 1: Add Adzuna credentials to Settings and `.env.example`**
 
-In `src/resume_agent/config.py`, add these two fields to `class Settings` after `github_token`:
+In `src/resume_tailor_harness/config.py`, add these two fields to `class Settings` after `github_token`:
 
 ```python
     adzuna_app_id: str = ""
@@ -488,8 +488,8 @@ Create `tests/test_connector_adzuna.py`:
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.adzuna import AdzunaConnector, parse_adzuna
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.adzuna import AdzunaConnector, parse_adzuna
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "adzuna" / "search.json").read_text())
 
@@ -520,18 +520,18 @@ def test_connector_filters_by_search():
 - [ ] **Step 4: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connector_adzuna.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.adzuna'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.adzuna'`.
 
 - [ ] **Step 5: Implement**
 
-Create `src/resume_agent/discovery/connectors/adzuna.py`:
+Create `src/resume_tailor_harness/discovery/connectors/adzuna.py`:
 
 ```python
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import filter_by_search
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.text import filter_by_search
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _BASE = "https://api.adzuna.com/v1/api/jobs"
 
@@ -593,7 +593,7 @@ Expected: PASS (Adzuna tests + existing config tests still green).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/config.py .env.example tests/fixtures/adzuna/ src/resume_agent/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
+git add src/resume_tailor_harness/config.py .env.example tests/fixtures/adzuna/ src/resume_tailor_harness/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
 git commit -m "feat(connectors): Adzuna aggregator connector" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -603,7 +603,7 @@ git commit -m "feat(connectors): Adzuna aggregator connector" -m "Co-Authored-By
 
 **Files:**
 
-- Create: `tests/fixtures/remoteok/api.json`, `src/resume_agent/discovery/connectors/remoteok.py`
+- Create: `tests/fixtures/remoteok/api.json`, `src/resume_tailor_harness/discovery/connectors/remoteok.py`
 - Test: `tests/test_connector_remoteok.py`
 
 - [ ] **Step 1: Create the fixture**
@@ -642,8 +642,8 @@ Create `tests/test_connector_remoteok.py`:
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.remoteok import RemoteOKConnector, parse_remoteok
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.remoteok import RemoteOKConnector, parse_remoteok
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "remoteok" / "api.json").read_text())
 
@@ -679,18 +679,18 @@ def test_connector_filters_by_search():
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connector_remoteok.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.remoteok'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.remoteok'`.
 
 - [ ] **Step 4: Implement**
 
-Create `src/resume_agent/discovery/connectors/remoteok.py`:
+Create `src/resume_tailor_harness/discovery/connectors/remoteok.py`:
 
 ```python
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.text import filter_by_search, html_to_text
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _URL = "https://remoteok.com/api"
 
@@ -724,7 +724,7 @@ class RemoteOKConnector:
         return jobs[:limit] if limit is not None else jobs
 
     def _get_all(self) -> list:  # the only un-CI-tested line
-        resp = httpx.get(_URL, headers={"User-Agent": "resume-agent"}, timeout=30)
+        resp = httpx.get(_URL, headers={"User-Agent": "resume-tailor-harness"}, timeout=30)
         resp.raise_for_status()
         return resp.json()
 ```
@@ -737,7 +737,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tests/fixtures/remoteok/ src/resume_agent/discovery/connectors/remoteok.py tests/test_connector_remoteok.py
+git add tests/fixtures/remoteok/ src/resume_tailor_harness/discovery/connectors/remoteok.py tests/test_connector_remoteok.py
 git commit -m "feat(connectors): RemoteOK feed connector" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -747,7 +747,7 @@ git commit -m "feat(connectors): RemoteOK feed connector" -m "Co-Authored-By: Cl
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/registry.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/registry.py`
 - Test: `tests/test_connectors_registry.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -755,9 +755,9 @@ git commit -m "feat(connectors): RemoteOK feed connector" -m "Co-Authored-By: Cl
 Create `tests/test_connectors_registry.py`:
 
 ```python
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.registry import build_connectors
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.registry import build_connectors
 
 
 def _cfg(**enabled):
@@ -792,20 +792,20 @@ def test_adzuna_skipped_without_credentials():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_connectors_registry.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.registry'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.registry'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/discovery/connectors/registry.py`:
+Create `src/resume_tailor_harness/discovery/connectors/registry.py`:
 
 ```python
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.adzuna import AdzunaConnector
-from resume_agent.discovery.connectors.base import Connector
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
-from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
-from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.adzuna import AdzunaConnector
+from resume_tailor_harness.discovery.connectors.base import Connector
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.greenhouse import GreenhouseConnector
+from resume_tailor_harness.discovery.connectors.remoteok import RemoteOKConnector
+from resume_tailor_harness.discovery.scraper.linkedin import build_linkedin_scraper
 
 
 def build_connectors(config: ConnectorsConfig, settings: Settings) -> list[Connector]:
@@ -844,7 +844,7 @@ Expected: ALL pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/registry.py tests/test_connectors_registry.py
+git add src/resume_tailor_harness/discovery/connectors/registry.py tests/test_connectors_registry.py
 git commit -m "feat(connectors): build_connectors registry (canonical order)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -864,4 +864,4 @@ git commit -m "feat(connectors): build_connectors registry (canonical order)" -m
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-agent-v2-reference-connectors.md`. Execute via **superpowers:subagent-driven-development** (fresh subagent per task) or **superpowers:executing-plans** (inline, checkpointed). Next plan in the spine: **Plan 3 — `pull` + `sources`** (the ordered multi-connector run that uses `build_connectors`).
+Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-tailor-harness-v2-reference-connectors.md`. Execute via **superpowers:subagent-driven-development** (fresh subagent per task) or **superpowers:executing-plans** (inline, checkpointed). Next plan in the spine: **Plan 3 — `pull` + `sources`** (the ordered multi-connector run that uses `build_connectors`).

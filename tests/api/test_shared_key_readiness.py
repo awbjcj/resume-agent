@@ -3,16 +3,16 @@ import io
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.services import profile_build
-from resume_agent.tenancy.context import new_user_id
-from resume_agent.tenancy.quotas import (
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.services import profile_build
+from resume_tailor_harness.tenancy.context import new_user_id
+from resume_tailor_harness.tenancy.quotas import (
     FREE_ALLOWANCE_MICROS,
     assign_new_member,
     charge_shared_cost,
 )
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 
 def _add_member(app) -> tuple[str, str]:

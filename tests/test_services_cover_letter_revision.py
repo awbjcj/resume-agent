@@ -2,17 +2,17 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact, Experience, ProfileFacts
-from resume_agent.services.agents import CoverLetterBundle
-from resume_agent.services.cover_letter_revision import revise_cover_letter_version
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts
+from resume_tailor_harness.services.agents import CoverLetterBundle
+from resume_tailor_harness.services.cover_letter_revision import revise_cover_letter_version
+from resume_tailor_harness.tracking.repository import (
     get_cover_letter,
     save_cover_letter,
     save_job,
 )
-from resume_agent.tracking.tables import CoverLetter, Job
+from resume_tailor_harness.tracking.tables import CoverLetter, Job
 
 
 class _Result:
@@ -53,7 +53,7 @@ def test_revise_cover_letter_persists_lineage_and_fact_flag(monkeypatch):
     init_db(engine)
     renders = []
     monkeypatch.setattr(
-        "resume_agent.services.cover_letter_revision.load_facts",
+        "resume_tailor_harness.services.cover_letter_revision.load_facts",
         lambda path: _facts(),
     )
 
@@ -66,7 +66,7 @@ def test_revise_cover_letter_persists_lineage_and_fact_flag(monkeypatch):
         return Path(cover.pdf_path)
 
     monkeypatch.setattr(
-        "resume_agent.services.cover_letter_revision.render_cover_letter",
+        "resume_tailor_harness.services.cover_letter_revision.render_cover_letter",
         fake_render,
     )
 

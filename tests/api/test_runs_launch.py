@@ -5,10 +5,10 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import runs as runs_router
-from resume_agent.progress import ProgressReporter
-from resume_agent.services.errors import list_error_records
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import runs as runs_router
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.services.errors import list_error_records
 
 
 class InlineExecutor(Executor):
@@ -299,7 +299,7 @@ def test_reprocess_endpoint_launches_run(monkeypatch, tmp_path):
 
 
 def test_refresh_endpoint_launches_run(monkeypatch, tmp_path):
-    from resume_agent.services.discovery import RefreshReport
+    from resume_tailor_harness.services.discovery import RefreshReport
 
     def fake_refresh_jobs(session, *, limit=None, reporter=None, **kw):
         return RefreshReport(pulled=0, totals={}, status_counts={}, failures={})
@@ -316,7 +316,7 @@ def test_pull_refresh_disables_skip_known(monkeypatch, tmp_path):
     captured = {}
 
     def fake_pull_jobs(session, **kwargs):
-        from resume_agent.discovery.connectors.runner import PullReport
+        from resume_tailor_harness.discovery.connectors.runner import PullReport
 
         captured.update(kwargs)
         return PullReport()
@@ -332,7 +332,7 @@ def test_pull_refresh_disables_skip_known(monkeypatch, tmp_path):
 
 def test_pull_source_failures_are_recorded_with_the_run_id(monkeypatch, tmp_path):
     def fake_pull_jobs(_session, **_kwargs):
-        from resume_agent.discovery.connectors.runner import PullReport
+        from resume_tailor_harness.discovery.connectors.runner import PullReport
 
         return PullReport(
             failures={"companies": {"https://x.example": "detect failed"}}

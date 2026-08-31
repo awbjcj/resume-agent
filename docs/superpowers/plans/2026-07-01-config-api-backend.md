@@ -28,13 +28,13 @@
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/config.py`
-- Create: `src/resume_agent/services/config_store.py`
+- Create: `src/resume_tailor_harness/api/schemas/config.py`
+- Create: `src/resume_tailor_harness/services/config_store.py`
 - Test: `tests/api/test_config_store.py`
 
 **Interfaces:**
 
-- Consumes: `CamelModel` (`resume_agent.api.schemas.base`), `SearchConfig` (`resume_agent.discovery.search_config`) for the parity test.
+- Consumes: `CamelModel` (`resume_tailor_harness.api.schemas.base`), `SearchConfig` (`resume_tailor_harness.discovery.search_config`) for the parity test.
 - Produces: `ConfigStore` protocol with `get(domain: str) -> CamelModel` and `put(domain: str, model: CamelModel) -> CamelModel`; `YamlConfigStore(config_dir: Path | str = "config")`; `DOMAIN_SCHEMAS: dict[str, type[CamelModel]]` with keys `search`, `review`, `prune`, `render`, `style_guide`, `profile`. Schema classes: `SearchConfigDoc`, `ReviewConfigDoc` (with `ReviewerEntry`, `LengthBudget`), `PruneConfigDoc`, `RenderConfigDoc`, `StyleGuideDoc`, `ProfileConfigDoc`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -45,14 +45,14 @@
 
 import pytest
 
-from resume_agent.api.schemas.config import (
+from resume_tailor_harness.api.schemas.config import (
     DOMAIN_SCHEMAS,
     PruneConfigDoc,
     SearchConfigDoc,
     StyleGuideDoc,
 )
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.services.config_store import YamlConfigStore
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.services.config_store import YamlConfigStore
 
 
 @pytest.fixture()
@@ -112,12 +112,12 @@ def test_domain_registry_contents():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_config_store.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.api.schemas.config'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.api.schemas.config'`
 
 - [ ] **Step 3: Implement the schemas**
 
 ```python
-# src/resume_agent/api/schemas/config.py
+# src/resume_tailor_harness/api/schemas/config.py
 """Typed config documents — the wire contract for /api/config/{domain}.
 
 Each Doc mirrors one YAML file's shape (snake_case on disk, camelCase on the
@@ -129,7 +129,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class SearchConfigDoc(CamelModel):
@@ -215,7 +215,7 @@ DOMAIN_SCHEMAS: dict[str, type[CamelModel]] = {
 - [ ] **Step 4: Implement the store**
 
 ```python
-# src/resume_agent/services/config_store.py
+# src/resume_tailor_harness/services/config_store.py
 """ConfigStore seam: domain name -> typed document, storage behind a protocol.
 
 YamlConfigStore is the only implementation today (YAML/markdown files under
@@ -231,8 +231,8 @@ from typing import Protocol
 
 import yaml
 
-from resume_agent.api.schemas.base import CamelModel
-from resume_agent.api.schemas.config import DOMAIN_SCHEMAS, StyleGuideDoc
+from resume_tailor_harness.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.config import DOMAIN_SCHEMAS, StyleGuideDoc
 
 
 class ConfigStore(Protocol):
@@ -302,8 +302,8 @@ Expected: 7 passed
 - [ ] **Step 6: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/api/schemas/config.py src/resume_agent/services/config_store.py tests/api/test_config_store.py
-git add src/resume_agent/api/schemas/config.py src/resume_agent/services/config_store.py tests/api/test_config_store.py
+ruff check src/resume_tailor_harness/api/schemas/config.py src/resume_tailor_harness/services/config_store.py tests/api/test_config_store.py
+git add src/resume_tailor_harness/api/schemas/config.py src/resume_tailor_harness/services/config_store.py tests/api/test_config_store.py
 git commit -m "feat(api): ConfigStore seam with typed per-domain config documents"
 ```
 
@@ -313,8 +313,8 @@ git commit -m "feat(api): ConfigStore seam with typed per-domain config document
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/config.py`
-- Modify: `src/resume_agent/api/app.py` (register router; add `config_dir` state)
+- Create: `src/resume_tailor_harness/api/routers/config.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register router; add `config_dir` state)
 - Test: `tests/api/test_config_router.py`
 
 **Interfaces:**
@@ -331,7 +331,7 @@ git commit -m "feat(api): ConfigStore seam with typed per-domain config document
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -391,14 +391,14 @@ Expected: FAIL — `create_app() got an unexpected keyword argument 'config_dir'
 - [ ] **Step 3: Implement router + app wiring**
 
 ```python
-# src/resume_agent/api/routers/config.py
+# src/resume_tailor_harness/api/routers/config.py
 """Typed per-domain config resources. Storage lives behind ConfigStore."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from resume_agent.api.schemas.config import (
+from resume_tailor_harness.api.schemas.config import (
     ProfileConfigDoc,
     PruneConfigDoc,
     RenderConfigDoc,
@@ -406,7 +406,7 @@ from resume_agent.api.schemas.config import (
     SearchConfigDoc,
     StyleGuideDoc,
 )
-from resume_agent.services.config_store import ConfigStore
+from resume_tailor_harness.services.config_store import ConfigStore
 
 router = APIRouter()
 
@@ -475,13 +475,13 @@ def put_profile_config(body: ProfileConfigDoc, request: Request):
     return _store(request).put("profile", body)
 ```
 
-In `src/resume_agent/api/app.py`:
+In `src/resume_tailor_harness/api/app.py`:
 
 1. Add parameter `config_dir: Path | str | None = None` to `create_app`.
 2. After `app.state.db_url = resolved_db`, add:
 
 ```python
-from resume_agent.services.config_store import YamlConfigStore  # top of file
+from resume_tailor_harness.services.config_store import YamlConfigStore  # top of file
 
 app.state.config_store = YamlConfigStore(config_dir=config_dir or "config")
 ```
@@ -489,7 +489,7 @@ app.state.config_store = YamlConfigStore(config_dir=config_dir or "config")
 1. Register (with the other guarded routers):
 
 ```python
-from resume_agent.api.routers import config as config_router  # top of file
+from resume_tailor_harness.api.routers import config as config_router  # top of file
 
 app.include_router(config_router.router, prefix="/api", dependencies=guarded)
 ```
@@ -508,7 +508,7 @@ regen command — and include the updated `contracts/openapi.json` in the commit
 
 ```bash
 ruff check
-git add -A src/resume_agent/api tests/api/test_config_router.py contracts
+git add -A src/resume_tailor_harness/api tests/api/test_config_router.py contracts
 git commit -m "feat(api): typed GET/PUT /api/config/{domain} resources"
 ```
 
@@ -518,15 +518,15 @@ git commit -m "feat(api): typed GET/PUT /api/config/{domain} resources"
 
 **Files:**
 
-- Create: `src/resume_agent/services/env_config.py`
-- Create: `src/resume_agent/api/schemas/secrets.py`
-- Create: `src/resume_agent/api/routers/secrets.py`
-- Modify: `src/resume_agent/api/app.py` (settings override reads `app.state.settings`; register router; add `env_path` param)
+- Create: `src/resume_tailor_harness/services/env_config.py`
+- Create: `src/resume_tailor_harness/api/schemas/secrets.py`
+- Create: `src/resume_tailor_harness/api/routers/secrets.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (settings override reads `app.state.settings`; register router; add `env_path` param)
 - Test: `tests/api/test_secrets_router.py`
 
 **Interfaces:**
 
-- Consumes: `parse_env`, `merge_env`, `format_env` (`resume_agent.setup.env_writer`); `get_settings` cache.
+- Consumes: `parse_env`, `merge_env`, `format_env` (`resume_tailor_harness.setup.env_writer`); `get_settings` cache.
 - Produces: `read_env(env_path) -> dict[str, str]`; `write_env_updates(updates: dict[str, str], env_path) -> None` (atomic merge-write + `get_settings.cache_clear()`); routes `GET /api/secrets`, `PUT /api/secrets`, `GET/PUT /api/config/models`. `SECRET_FIELDS: dict[str, str]` (schema field -> env var). Schemas: `SecretStatus {key, is_set, hint}`, `SecretsUpdate` (all-optional str-or-null fields), `ModelsConfigDoc {cheap_model, mid_model, premium_model}`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -538,7 +538,7 @@ git commit -m "feat(api): typed GET/PUT /api/config/{domain} resources"
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -597,7 +597,7 @@ def test_models_config_readable_round_trip(client):
 def test_put_secret_refreshes_app_settings(client):
     client.put("/api/secrets", json={"anthropicApiKey": "sk-ant-new-key-5678"})
     # settings served to routes must see the new value without an app restart
-    from resume_agent.api.deps import get_settings_dep  # noqa: PLC0415
+    from resume_tailor_harness.api.deps import get_settings_dep  # noqa: PLC0415
     app = client.app
     assert app.dependency_overrides[get_settings_dep]().anthropic_api_key == "sk-ant-new-key-5678"
 ```
@@ -610,7 +610,7 @@ Expected: FAIL — `create_app() got an unexpected keyword argument 'env_path'`
 - [ ] **Step 3: Implement env service + schemas + router**
 
 ```python
-# src/resume_agent/services/env_config.py
+# src/resume_tailor_harness/services/env_config.py
 """Read/merge-write .env through the TUI wizard's pure helpers.
 
 The one write path for web-managed env values. After a write, the cached
@@ -624,8 +624,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from resume_agent.config import Settings, get_settings
-from resume_agent.setup.env_writer import format_env, merge_env, parse_env
+from resume_tailor_harness.config import Settings, get_settings
+from resume_tailor_harness.setup.env_writer import format_env, merge_env, parse_env
 
 DEFAULT_ENV_PATH = Path(".env")
 
@@ -652,12 +652,12 @@ def write_env_updates(
 ```
 
 ```python
-# src/resume_agent/api/schemas/secrets.py
+# src/resume_tailor_harness/api/schemas/secrets.py
 """Write-only secrets contract + readable model-tier config."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 # schema field name -> .env variable. One place; GET, PUT, and setup-status use it.
 SECRET_FIELDS: dict[str, str] = {
@@ -701,7 +701,7 @@ class ModelsConfigDoc(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/secrets.py
+# src/resume_tailor_harness/api/routers/secrets.py
 """Write-only secrets + readable model tiers, both backed by .env."""
 
 from __future__ import annotations
@@ -709,13 +709,13 @@ from __future__ import annotations
 from pydantic.alias_generators import to_camel
 from fastapi import APIRouter, Request
 
-from resume_agent.api.schemas.secrets import (
+from resume_tailor_harness.api.schemas.secrets import (
     SECRET_FIELDS,
     ModelsConfigDoc,
     SecretStatus,
     SecretsUpdate,
 )
-from resume_agent.services.env_config import read_env, write_env_updates
+from resume_tailor_harness.services.env_config import read_env, write_env_updates
 
 router = APIRouter()
 
@@ -762,7 +762,7 @@ def put_models(body: ModelsConfigDoc, request: Request):
     return body
 ```
 
-In `src/resume_agent/api/app.py`:
+In `src/resume_tailor_harness/api/app.py`:
 
 1. Add `env_path: Path | str | None = None` parameter; set `app.state.env_path = Path(env_path) if env_path is not None else Path(".env")`.
 2. Change the settings override so refreshes propagate (was a frozen closure):
@@ -797,11 +797,11 @@ In `secrets.py`, replace both `request.app.state.settings = write_env_updates(..
 lines with:
 
 ```python
-from resume_agent.api.app import refresh_app_settings  # NO — circular import.
+from resume_tailor_harness.api.app import refresh_app_settings  # NO — circular import.
 ```
 
 That import would be circular (`app.py` imports the router). Put
-`refresh_app_settings(app, fresh)` in `src/resume_agent/api/deps.py` instead,
+`refresh_app_settings(app, fresh)` in `src/resume_tailor_harness/api/deps.py` instead,
 and import it from there in the router:
 
 ```python
@@ -816,7 +816,7 @@ def refresh_app_settings(app, fresh):
 
 ```python
 # in routers/secrets.py
-from resume_agent.api.deps import refresh_app_settings
+from resume_tailor_harness.api.deps import refresh_app_settings
 ...
     fresh = write_env_updates(updates, request.app.state.env_path)
     refresh_app_settings(request.app, fresh)
@@ -834,7 +834,7 @@ Expected: 5 passed
 Run: `.venv/Scripts/python.exe -m pytest` and `ruff check`
 
 ```bash
-git add -A src/resume_agent tests/api/test_secrets_router.py contracts
+git add -A src/resume_tailor_harness tests/api/test_secrets_router.py contracts
 git commit -m "feat(api): write-only /api/secrets + env-backed /api/config/models"
 ```
 
@@ -844,10 +844,10 @@ git commit -m "feat(api): write-only /api/secrets + env-backed /api/config/model
 
 **Files:**
 
-- Create: `src/resume_agent/services/profile_documents.py`
-- Create: `src/resume_agent/api/schemas/profile.py`
-- Create: `src/resume_agent/api/routers/profile.py` (documents part; build lands in Task 5)
-- Modify: `src/resume_agent/api/app.py` (register router; add `data_dir` param defaulting to `"data"`)
+- Create: `src/resume_tailor_harness/services/profile_documents.py`
+- Create: `src/resume_tailor_harness/api/schemas/profile.py`
+- Create: `src/resume_tailor_harness/api/routers/profile.py` (documents part; build lands in Task 5)
+- Modify: `src/resume_tailor_harness/api/app.py` (register router; add `data_dir` param defaulting to `"data"`)
 - Modify: `pyproject.toml` (add `python-multipart` if absent — required by FastAPI `UploadFile`)
 - Test: `tests/api/test_profile_documents.py`
 
@@ -866,8 +866,8 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.services.profile_documents import DocumentStore
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.services.profile_documents import DocumentStore
 
 
 @pytest.fixture()
@@ -933,7 +933,7 @@ def test_latest_resume_path(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_profile_documents.py -v`
-Expected: FAIL — no module `resume_agent.services.profile_documents`
+Expected: FAIL — no module `resume_tailor_harness.services.profile_documents`
 
 - [ ] **Step 3: Implement store, schemas, router**
 
@@ -942,7 +942,7 @@ If absent, add `"python-multipart>=0.0.9",` to the main dependencies list and
 run `.venv/Scripts/python.exe -m pip install python-multipart`.
 
 ```python
-# src/resume_agent/services/profile_documents.py
+# src/resume_tailor_harness/services/profile_documents.py
 """Manifest-backed profile document store (data/profile/documents/).
 
 File first, manifest last: a crashed upload leaves an orphan directory but
@@ -1049,12 +1049,12 @@ class DocumentStore:
 ```
 
 ```python
-# src/resume_agent/api/schemas/profile.py
+# src/resume_tailor_harness/api/schemas/profile.py
 """Profile document + build wire schemas."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class DocumentOut(CamelModel):
@@ -1066,16 +1066,16 @@ class DocumentOut(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/profile.py
+# src/resume_tailor_harness/api/routers/profile.py
 """Profile documents CRUD (+ profile build run, added in a later task)."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.profile import DocumentOut
-from resume_agent.services.profile_documents import DocumentError, DocumentStore
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.profile import DocumentOut
+from resume_tailor_harness.services.profile_documents import DocumentError, DocumentStore
 
 router = APIRouter()
 
@@ -1122,7 +1122,7 @@ Expected: 7 passed
 
 ```bash
 .venv/Scripts/python.exe -m pytest && ruff check
-git add -A src/resume_agent tests/api/test_profile_documents.py pyproject.toml contracts
+git add -A src/resume_tailor_harness tests/api/test_profile_documents.py pyproject.toml contracts
 git commit -m "feat(api): profile document store with typed multipart upload"
 ```
 
@@ -1132,14 +1132,14 @@ git commit -m "feat(api): profile document store with typed multipart upload"
 
 **Files:**
 
-- Create: `src/resume_agent/services/profile_build.py`
-- Modify: `src/resume_agent/api/routers/profile.py` (add `POST /profile/build`)
+- Create: `src/resume_tailor_harness/services/profile_build.py`
+- Modify: `src/resume_tailor_harness/api/routers/profile.py` (add `POST /profile/build`)
 - Modify: `CLAUDE.md` (API layer section: remove "profile build" from the deferred list)
 - Test: `tests/api/test_profile_build_run.py`
 
 **Interfaces:**
 
-- Consumes: `build_profile(resume_path, github_username, extractor_agent=None, github_client=None)` (`resume_agent.profile.build`), `save_facts` / `validate_profile` (`resume_agent.profile.store` / `.validate`), `DocumentStore.latest_resume_path()`, `ConfigStore.get("profile")`, `RunManager.submit` pattern from `api/routers/runs.py`, `RunOut` + `record_to_run`.
+- Consumes: `build_profile(resume_path, github_username, extractor_agent=None, github_client=None)` (`resume_tailor_harness.profile.build`), `save_facts` / `validate_profile` (`resume_tailor_harness.profile.store` / `.validate`), `DocumentStore.latest_resume_path()`, `ConfigStore.get("profile")`, `RunManager.submit` pattern from `api/routers/runs.py`, `RunOut` + `record_to_run`.
 - Produces: `run_profile_build(reporter, *, document_store, config_store, settings, facts_out="data/profile/facts.json") -> dict` and route `POST /api/profile/build` (202, `RunOut`, singleton_key `"profile-build"`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -1153,7 +1153,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -1192,7 +1192,7 @@ def test_build_launches_run(client, monkeypatch):
         data={"docType": "resume"},
     )
 
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
 
     def fake_run(reporter, **kwargs):
         return {"experiences": 2, "projects": 1, "warnings": []}
@@ -1206,7 +1206,7 @@ def test_build_launches_run(client, monkeypatch):
 ```
 
 Note on the monkeypatch: the router must call `profile_build.run_profile_build`
-through the module (`from resume_agent.services import profile_build` then
+through the module (`from resume_tailor_harness.services import profile_build` then
 `profile_build.run_profile_build(...)`), NOT `from ... import run_profile_build`,
 or the patch will not take. Mirror how the test patches it.
 
@@ -1218,16 +1218,16 @@ Expected: FAIL — 404 on `/api/profile/build` / missing module
 - [ ] **Step 3: Implement service + route**
 
 ```python
-# src/resume_agent/services/profile_build.py
+# src/resume_tailor_harness/services/profile_build.py
 """Profile build use-case: documents + GitHub -> facts.json, with progress."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from resume_agent.profile.build import build_profile
-from resume_agent.profile.store import save_facts
-from resume_agent.profile.validate import validate_profile
+from resume_tailor_harness.profile.build import build_profile
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness.profile.validate import validate_profile
 
 
 def run_profile_build(
@@ -1252,15 +1252,15 @@ def run_profile_build(
     }
 ```
 
-Add to `src/resume_agent/api/routers/profile.py`:
+Add to `src/resume_tailor_harness/api/routers/profile.py`:
 
 ```python
-from resume_agent.api.deps import get_run_manager
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
-from resume_agent.api.schemas.runs import RunOut
-from resume_agent.services import profile_build
-from resume_agent.services.env_config import read_env
+from resume_tailor_harness.api.deps import get_run_manager
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.api.runs.sse import record_to_run
+from resume_tailor_harness.api.schemas.runs import RunOut
+from resume_tailor_harness.services import profile_build
+from resume_tailor_harness.services.env_config import read_env
 from fastapi import Depends
 
 
@@ -1309,7 +1309,7 @@ Expected: 3 passed
 
 ```bash
 .venv/Scripts/python.exe -m pytest && ruff check
-git add -A src/resume_agent tests/api/test_profile_build_run.py CLAUDE.md contracts
+git add -A src/resume_tailor_harness tests/api/test_profile_build_run.py CLAUDE.md contracts
 git commit -m "feat(api): profile build exposed as a run (202 + SSE)"
 ```
 
@@ -1319,14 +1319,14 @@ git commit -m "feat(api): profile build exposed as a run (202 + SSE)"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/setup.py`
-- Create: `src/resume_agent/api/routers/setup.py`
-- Modify: `src/resume_agent/api/app.py` (register)
+- Create: `src/resume_tailor_harness/api/schemas/setup.py`
+- Create: `src/resume_tailor_harness/api/routers/setup.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register)
 - Test: `tests/api/test_setup_status.py`
 
 **Interfaces:**
 
-- Consumes: `read_env` + `SECRET_FIELDS` (Task 3), `DocumentStore` (Task 4), `ConfigStore` (Task 1), `list_sources` (`resume_agent.services.sources`), `app.state.data_dir`.
+- Consumes: `read_env` + `SECRET_FIELDS` (Task 3), `DocumentStore` (Task 4), `ConfigStore` (Task 1), `list_sources` (`resume_tailor_harness.services.sources`), `app.state.data_dir`.
 - Produces: `GET /api/setup/status` returning `SetupStatusOut`:
 
 ```
@@ -1352,7 +1352,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -1406,12 +1406,12 @@ Expected: FAIL — 404
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/api/schemas/setup.py
+# src/resume_tailor_harness/api/schemas/setup.py
 """Setup readiness projection for the first-run gate + dashboard health card."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class SecretsStatus(CamelModel):
@@ -1443,7 +1443,7 @@ class SetupStatusOut(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/setup.py
+# src/resume_tailor_harness/api/routers/setup.py
 """GET /setup/status — one aggregate the gate, wizard, and dashboard all read."""
 
 from __future__ import annotations
@@ -1452,15 +1452,15 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
-from resume_agent.api.schemas.setup import (
+from resume_tailor_harness.api.schemas.setup import (
     ProfileStatus,
     SearchStatus,
     SecretsStatus,
     SetupStatusOut,
     SourcesStatus,
 )
-from resume_agent.services.env_config import read_env
-from resume_agent.services.sources import list_sources
+from resume_tailor_harness.services.env_config import read_env
+from resume_tailor_harness.services.sources import list_sources
 
 router = APIRouter()
 
@@ -1511,7 +1511,7 @@ def get_setup_status(request: Request):
 ```
 
 Check `SourceView`'s enabled attribute name before relying on `v.enabled`
-(`Grep "class SourceView" src/resume_agent/discovery/connectors/sources.py -A 15`)
+(`Grep "class SourceView" src/resume_tailor_harness/discovery/connectors/sources.py -A 15`)
 and adjust if the field is named differently.
 
 Register in `app.py` with the guarded routers. Note `list_sources` reads
@@ -1529,7 +1529,7 @@ Expected: 2 passed
 
 ```bash
 .venv/Scripts/python.exe -m pytest && ruff check
-git add -A src/resume_agent tests/api/test_setup_status.py contracts
+git add -A src/resume_tailor_harness tests/api/test_setup_status.py contracts
 git commit -m "feat(api): GET /api/setup/status readiness aggregate"
 ```
 
@@ -1539,15 +1539,15 @@ git commit -m "feat(api): GET /api/setup/status readiness aggregate"
 
 **Files:**
 
-- Create: `src/resume_agent/services/dashboard.py`
-- Create: `src/resume_agent/api/schemas/dashboard.py`
-- Create: `src/resume_agent/api/routers/dashboard.py`
-- Modify: `src/resume_agent/api/app.py` (register)
+- Create: `src/resume_tailor_harness/services/dashboard.py`
+- Create: `src/resume_tailor_harness/api/schemas/dashboard.py`
+- Create: `src/resume_tailor_harness/api/routers/dashboard.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register)
 - Test: `tests/api/test_dashboard_summary.py`
 
 **Interfaces:**
 
-- Consumes: `Job`, `JobStatus`, `Application` (`resume_agent.tracking.tables`); `get_session` dep.
+- Consumes: `Job`, `JobStatus`, `Application` (`resume_tailor_harness.tracking.tables`); `get_session` dep.
 - Produces: `GET /api/dashboard/summary` returning `DashboardSummaryOut`:
 
 ```
@@ -1561,7 +1561,7 @@ Service: `summarize_dashboard(session) -> DashboardSummary` (plain dataclass mir
 Queue mapping: `triage=filtered`, `approve=shortlisted`, `tailor=approved`, `apply=rendered`;
 `applied` = count of `Application` rows with status != `"ready"`. All job counts
 exclude archived rows (`archived_at IS NULL`). **Verify the triage mapping**
-against `_TRIAGE_STATUSES` in `src/resume_agent/tracking/queries.py:352` — if
+against `_TRIAGE_STATUSES` in `src/resume_tailor_harness/tracking/queries.py:352` — if
 triage includes more statuses than `filtered`, use that tuple instead.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1576,8 +1576,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 @pytest.fixture()
@@ -1617,7 +1617,7 @@ def test_summary_counts_and_queues(client):
 ```
 
 Check `Job`'s required fields before finalizing the seed helper (`Read
-src/resume_agent/tracking/tables.py:37-80`) — add any non-nullable columns the
+src/resume_tailor_harness/tracking/tables.py:37-80`) — add any non-nullable columns the
 constructor requires (e.g. `jd_text`), and match `Application`'s actual column
 names.
 
@@ -1629,7 +1629,7 @@ Expected: FAIL — 404
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/services/dashboard.py
+# src/resume_tailor_harness/services/dashboard.py
 """Read-only dashboard projection: one query pass, no business logic."""
 
 from __future__ import annotations
@@ -1638,7 +1638,7 @@ from dataclasses import dataclass, field
 
 from sqlmodel import Session, func, select
 
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_tailor_harness.tracking.tables import Application, Job, JobStatus
 
 # Pipeline stages that are literally "waiting on the user", keyed by queue name.
 QUEUE_STATUSES: dict[str, tuple[str, ...]] = {
@@ -1676,10 +1676,10 @@ def summarize_dashboard(session: Session) -> DashboardSummary:
 ```
 
 ```python
-# src/resume_agent/api/schemas/dashboard.py
+# src/resume_tailor_harness/api/schemas/dashboard.py
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class DashboardSummaryOut(CamelModel):
@@ -1689,15 +1689,15 @@ class DashboardSummaryOut(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/dashboard.py
+# src/resume_tailor_harness/api/routers/dashboard.py
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.schemas.dashboard import DashboardSummaryOut
-from resume_agent.services.dashboard import summarize_dashboard
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.schemas.dashboard import DashboardSummaryOut
+from resume_tailor_harness.services.dashboard import summarize_dashboard
 
 router = APIRouter()
 
@@ -1718,7 +1718,7 @@ Expected: 1 passed
 
 ```bash
 .venv/Scripts/python.exe -m pytest && ruff check
-git add -A src/resume_agent tests/api/test_dashboard_summary.py contracts
+git add -A src/resume_tailor_harness tests/api/test_dashboard_summary.py contracts
 git commit -m "feat(api): GET /api/dashboard/summary funnel + queue counts"
 ```
 
@@ -1732,7 +1732,7 @@ git commit -m "feat(api): GET /api/dashboard/summary funnel + queue counts"
 - Test: existing suite
 
 The new `create_app` params (`config_dir`, `env_path`, `data_dir`) default to
-the production paths, so `resume-agent serve` behaves unchanged. This task
+the production paths, so `resume-tailor-harness serve` behaves unchanged. This task
 verifies no existing test now touches real files.
 
 - [ ] **Step 1: Audit existing API tests for real-path leakage**
@@ -1748,7 +1748,7 @@ the new state, add an autouse fixture next to `_isolate_runs_root` in
 def _isolate_new_state(tmp_path, monkeypatch):
     """Keep config/env/data writes inside tmp for tests that use create_app()
     without pinning the new path params."""
-    import resume_agent.api.app as app_module
+    import resume_tailor_harness.api.app as app_module
     original = app_module.create_app
 
     def wrapped(*args, **kwargs):
@@ -1760,7 +1760,7 @@ def _isolate_new_state(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "create_app", wrapped)
 ```
 
-Caution: tests import `create_app` directly (`from resume_agent.api.app import
+Caution: tests import `create_app` directly (`from resume_tailor_harness.api.app import
 create_app`), so monkeypatching the module attribute does NOT affect them —
 only add this fixture if audit shows leakage, and in that case prefer fixing
 the individual tests to pass the params explicitly.

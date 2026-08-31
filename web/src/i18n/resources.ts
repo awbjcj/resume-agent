@@ -13,7 +13,7 @@ export async function loadAutoTranslations(
 const en = {
   auto: autoEn,
   app: {
-    documentTitle: "Resume Agent",
+    documentTitle: "Résumé Tailor Harness",
   },
   model: {
     select: "Select a model",

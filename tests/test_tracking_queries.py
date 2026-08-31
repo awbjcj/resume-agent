@@ -3,21 +3,21 @@ from datetime import datetime, timezone
 from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.models.base import Source
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.models.base import Source
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.tracking.repository import (
     save_application,
     save_job,
     save_resume_version,
 )
-from resume_agent.tracking.queries import (
+from resume_tailor_harness.tracking.queries import (
     job_detail_row,
     pipeline_rows,
     shortlist_rows,
     triage_rows,
 )
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationStatus,
     Job,
@@ -395,7 +395,7 @@ def test_pipeline_rows_distinguish_no_version_from_empty_critiques():
 
 
 def test_archived_jobs_excluded_from_shortlist_and_pipeline():
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as s:
         keep = save_job(
@@ -428,9 +428,9 @@ def test_archived_jobs_excluded_from_shortlist_and_pipeline():
 
 
 def test_archived_jobs_excluded_from_application_job_pairs():
-    from resume_agent.tracking.queries import application_job_pairs
-    from resume_agent.tracking.repository import archive_job, save_application
-    from resume_agent.tracking.tables import Application, ApplicationStatus
+    from resume_tailor_harness.tracking.queries import application_job_pairs
+    from resume_tailor_harness.tracking.repository import archive_job, save_application
+    from resume_tailor_harness.tracking.tables import Application, ApplicationStatus
 
     with _session() as s:
         keep = save_job(
@@ -523,7 +523,7 @@ def test_pipeline_rows_include_lean_metadata_fields():
 
 
 def test_triage_rows_are_pre_shortlist_and_unarchived():
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as s:
         save_job(
@@ -610,8 +610,8 @@ def test_triage_and_detail_rows_surface_reject_reason():
 
 
 def test_archived_rows_lists_all_archived_any_status():
-    from resume_agent.tracking.queries import archived_rows
-    from resume_agent.tracking.repository import archive_job
+    from resume_tailor_harness.tracking.queries import archived_rows
+    from resume_tailor_harness.tracking.repository import archive_job
 
     with _session() as s:
         a = save_job(
@@ -769,7 +769,7 @@ def test_shortlist_and_triage_rows_never_touch_jd_text():
     """
     import inspect
 
-    import resume_agent.tracking.queries as queries_module
+    import resume_tailor_harness.tracking.queries as queries_module
 
     for fn in (queries_module._shortlist_row, queries_module._triage_row):
         assert "jd_text" not in inspect.getsource(fn), (

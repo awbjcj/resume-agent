@@ -171,7 +171,7 @@ breaks the DB-free connector contract.
 
 ### Bypass
 
-`resume-agent pull --refresh` (and the API pull-run equivalent) passes
+`resume-tailor-harness pull --refresh` (and the API pull-run equivalent) passes
 `skip_seen=None`, re-fetching everything to pick up JD refreshes/edits.
 
 ---

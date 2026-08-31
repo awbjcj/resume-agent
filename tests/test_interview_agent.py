@@ -2,7 +2,7 @@
 
 import pytest
 
-from resume_agent.interview.agent import (
+from resume_tailor_harness.interview.agent import (
     DebriefTurn,
     InterviewTurn,
     NewPlanItem,
@@ -16,7 +16,7 @@ from resume_agent.interview.agent import (
     render_context,
     render_transcript,
 )
-from resume_agent.interview.store import InterviewStyle
+from resume_tailor_harness.interview.store import InterviewStyle
 
 
 def _session(plan_statuses, turns=()):
@@ -169,7 +169,7 @@ def test_opening_format_instruction_states_the_positional_id_convention():
     # The formatter is the only thing that fills question_id, and it is told to
     # invent nothing -- so if the prompt does not name the q1/q2 convention it
     # copies the interviewer's bare "1", which can never match a generated id.
-    from resume_agent.interview.agent import _formatter_instructions
+    from resume_tailor_harness.interview.agent import _formatter_instructions
 
     text = " ".join(_formatter_instructions(OpeningInterview))
     assert "q1" in text
@@ -178,7 +178,7 @@ def test_opening_format_instruction_states_the_positional_id_convention():
 def test_answer_turn_formatter_omits_the_opening_only_instruction():
     # Answer turns read real ids off the rendered plan; repeating the positional
     # convention there would invite the formatter to renumber an existing plan.
-    from resume_agent.interview.agent import _formatter_instructions
+    from resume_tailor_harness.interview.agent import _formatter_instructions
 
     assert "q1" not in " ".join(_formatter_instructions(InterviewTurn))
 

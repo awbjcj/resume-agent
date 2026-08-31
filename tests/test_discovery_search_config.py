@@ -1,4 +1,4 @@
-from resume_agent.discovery.search_config import SearchConfig, load_search_config
+from resume_tailor_harness.discovery.search_config import SearchConfig, load_search_config
 
 
 def test_defaults_are_empty():

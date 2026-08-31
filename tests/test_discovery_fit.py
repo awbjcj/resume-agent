@@ -1,17 +1,17 @@
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.llm_runner import AgentRunner
+from resume_tailor_harness.llm_runner import AgentRunner
 
-from resume_agent.discovery.fit import (
+from resume_tailor_harness.discovery.fit import (
     FitLocation,
     FitScore,
     build_fit_agent,
     compose_fit_input,
     score_fit,
 )
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
 
 
 class _FakeResult:
@@ -68,7 +68,7 @@ def test_score_fit_returns_fitscore():
 def test_ascore_fit_uses_arun():
     import asyncio
 
-    from resume_agent.discovery.fit import ascore_fit
+    from resume_tailor_harness.discovery.fit import ascore_fit
 
     class _AsyncAgent:
         def run(self, prompt):

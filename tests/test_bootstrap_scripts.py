@@ -45,7 +45,7 @@ def test_dev_commands_use_current_python_and_standard_npm_script(monkeypatch):
         api_host="127.0.0.1", api_port=8100, web_host="localhost", web_port=3100
     )
 
-    assert backend[:4] == [dev.sys.executable, "-m", "resume_agent.cli", "serve"]
+    assert backend[:4] == [dev.sys.executable, "-m", "resume_tailor_harness.cli", "serve"]
     assert backend[-4:] == ["--host", "127.0.0.1", "--port", "8100"]
     assert frontend == [
         "/tools/npm",

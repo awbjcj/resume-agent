@@ -15,7 +15,7 @@
 - **Spec:** `docs/superpowers/specs/2026-08-29-application-timeline-design.md`. Read the "Reminders" and "Calendar export" sections before Task 1.
 - **Tests run offline.** `.venv/Scripts/python.exe -m pytest`. No network, no API key.
 - **No new Python or npm dependencies.** The `.ics` writer is hand-rolled: RFC 5545 for the subset used here is a few dozen lines, and `icalendar` would be a new dependency for that.
-- **All datetimes stored and compared in UTC.** Use `resume_agent.tracking.tables.utcnow`.
+- **All datetimes stored and compared in UTC.** Use `resume_tailor_harness.tracking.tables.utcnow`.
 - **Time is always injectable.** Every function that reads the clock takes `now: datetime | None = None`. Tests must never sleep or depend on wall time.
 - **`gmail.send` remains permanently out of scope.** This phase must not touch OAuth scopes.
 - **No `webcal://` feed.** Per the spec, a feed needs a capability token, revoke path, and rate limit under ADR-0008. Per-event and bulk download only, behind the existing session auth.
@@ -88,17 +88,17 @@ These amendments are binding and supersede narrower snippets later in the plan.
 
 | File | Responsibility |
 | --- | --- |
-| `src/resume_agent/config.py` | **Modify.** Two settings beside `follow_up_days` (`config.py:189`). |
-| `src/resume_agent/services/reminders.py` | **Modify.** Add interview and offer-deadline reminders beside the existing follow-up logic. Same episode-key idiom. |
-| `src/resume_agent/services/gmail_sync.py:45` | **Modify.** Stop calling `create_follow_up_reminders`. |
-| `src/resume_agent/services/reminder_scheduler.py` | **Create.** The all-users hourly tick. Separate from `gmail/scheduler.py` because it must run for users with no Gmail token — that independence is the whole point. |
-| `src/resume_agent/api/app.py:167-181` | **Modify.** Start/stop the new loop beside the Gmail one. |
-| `src/resume_agent/calendar/ics.py` | **Create.** RFC 5545 serializer. New package — it is not tracking, not API, and reusable. |
-| `src/resume_agent/calendar/events.py` | **Create.** `ApplicationEvent` → calendar-entry mapping. Split from the serializer so the RFC logic is testable without the ORM. |
-| `src/resume_agent/api/routers/calendar.py` | **Create.** Two `.ics` routes. |
-| `src/resume_agent/tracking/queries.py` | **Modify.** `upcoming_events(session, within_days, now)`. |
-| `src/resume_agent/api/schemas/dashboard.py` | **Modify.** `UpcomingEventOut` + a field on `DashboardSummaryOut`. |
-| `src/resume_agent/api/routers/dashboard.py` | **Modify.** Populate it. |
+| `src/resume_tailor_harness/config.py` | **Modify.** Two settings beside `follow_up_days` (`config.py:189`). |
+| `src/resume_tailor_harness/services/reminders.py` | **Modify.** Add interview and offer-deadline reminders beside the existing follow-up logic. Same episode-key idiom. |
+| `src/resume_tailor_harness/services/gmail_sync.py:45` | **Modify.** Stop calling `create_follow_up_reminders`. |
+| `src/resume_tailor_harness/services/reminder_scheduler.py` | **Create.** The all-users hourly tick. Separate from `gmail/scheduler.py` because it must run for users with no Gmail token — that independence is the whole point. |
+| `src/resume_tailor_harness/api/app.py:167-181` | **Modify.** Start/stop the new loop beside the Gmail one. |
+| `src/resume_tailor_harness/calendar/ics.py` | **Create.** RFC 5545 serializer. New package — it is not tracking, not API, and reusable. |
+| `src/resume_tailor_harness/calendar/events.py` | **Create.** `ApplicationEvent` → calendar-entry mapping. Split from the serializer so the RFC logic is testable without the ORM. |
+| `src/resume_tailor_harness/api/routers/calendar.py` | **Create.** Two `.ics` routes. |
+| `src/resume_tailor_harness/tracking/queries.py` | **Modify.** `upcoming_events(session, within_days, now)`. |
+| `src/resume_tailor_harness/api/schemas/dashboard.py` | **Modify.** `UpcomingEventOut` + a field on `DashboardSummaryOut`. |
+| `src/resume_tailor_harness/api/routers/dashboard.py` | **Modify.** Populate it. |
 | `web/src/features/dashboard/UpcomingCard.tsx` | **Create.** The Next 7 days card. |
 | `web/src/features/dashboard/DashboardPage.tsx` | **Modify.** Mount it. |
 | `web/src/features/job/EventRow.tsx` | **Modify.** Add-to-calendar button. |
@@ -109,7 +109,7 @@ These amendments are binding and supersede narrower snippets later in the plan.
 ### Task 1: Reminder settings
 
 **Files:**
-- Modify: `src/resume_agent/config.py:189`
+- Modify: `src/resume_tailor_harness/config.py:189`
 - Test: `tests/test_reminder_settings.py`
 
 **Interfaces:**
@@ -122,7 +122,7 @@ These amendments are binding and supersede narrower snippets later in the plan.
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 
 def test_defaults_match_the_spec():
@@ -152,7 +152,7 @@ Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'intervie
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/config.py`, directly after line 189's `follow_up_days`:
+In `src/resume_tailor_harness/config.py`, directly after line 189's `follow_up_days`:
 
 ```python
     # Long-lead nudges only. The ~1-hour lead is owned by the exported .ics
@@ -170,8 +170,8 @@ Expected: PASS (4 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/config.py tests/test_reminder_settings.py
-git add src/resume_agent/config.py tests/test_reminder_settings.py
+ruff check src/resume_tailor_harness/config.py tests/test_reminder_settings.py
+git add src/resume_tailor_harness/config.py tests/test_reminder_settings.py
 git commit -m "feat(config): interview and offer-deadline reminder lead times"
 ```
 
@@ -180,7 +180,7 @@ git commit -m "feat(config): interview and offer-deadline reminder lead times"
 ### Task 2: Interview and offer-deadline reminders
 
 **Files:**
-- Modify: `src/resume_agent/services/reminders.py`
+- Modify: `src/resume_tailor_harness/services/reminders.py`
 - Test: `tests/test_event_reminders.py`
 
 **Interfaces:**
@@ -200,13 +200,13 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.reminders import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.reminders import (
     DEADLINE_KIND,
     INTERVIEW_KIND,
     create_event_reminders,
 )
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
 
@@ -327,7 +327,7 @@ Expected: FAIL — `ImportError: cannot import name 'INTERVIEW_KIND'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `src/resume_agent/services/reminders.py`:
+Append to `src/resume_tailor_harness/services/reminders.py`:
 
 ```python
 INTERVIEW_KIND = "interview_soon"
@@ -419,9 +419,9 @@ def create_event_reminders(
     return created
 ```
 
-Add the imports this needs at the top of the module: `EventKind`, `EventResult` from `resume_agent.tracking.event_vocab`, and a new `upcoming_event_rows` query.
+Add the imports this needs at the top of the module: `EventKind`, `EventResult` from `resume_tailor_harness.tracking.event_vocab`, and a new `upcoming_event_rows` query.
 
-Add that query to `src/resume_agent/tracking/queries.py`, following the existing `application_job_pairs` idiom:
+Add that query to `src/resume_tailor_harness/tracking/queries.py`, following the existing `application_job_pairs` idiom:
 
 ```python
 def upcoming_event_rows(
@@ -447,8 +447,8 @@ Expected: PASS (11 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/services/reminders.py src/resume_agent/tracking/queries.py tests/test_event_reminders.py
-git add src/resume_agent/services/reminders.py src/resume_agent/tracking/queries.py tests/test_event_reminders.py
+ruff check src/resume_tailor_harness/services/reminders.py src/resume_tailor_harness/tracking/queries.py tests/test_event_reminders.py
+git add src/resume_tailor_harness/services/reminders.py src/resume_tailor_harness/tracking/queries.py tests/test_event_reminders.py
 git commit -m "feat(reminders): interview and offer-deadline nudges"
 ```
 
@@ -457,9 +457,9 @@ git commit -m "feat(reminders): interview and offer-deadline nudges"
 ### Task 3: Decouple reminders from Gmail
 
 **Files:**
-- Create: `src/resume_agent/services/reminder_scheduler.py`
-- Modify: `src/resume_agent/services/gmail_sync.py:44-46`
-- Modify: `src/resume_agent/api/app.py:167-181`
+- Create: `src/resume_tailor_harness/services/reminder_scheduler.py`
+- Modify: `src/resume_tailor_harness/services/gmail_sync.py:44-46`
+- Modify: `src/resume_tailor_harness/api/app.py:167-181`
 - Test: `tests/test_reminder_scheduler.py`
 
 **Interfaces:**
@@ -482,12 +482,12 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.reminder_scheduler import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.reminder_scheduler import (
     REMINDER_INTERVAL_SECONDS,
     run_reminder_pass,
 )
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationEvent,
     Job,
@@ -560,7 +560,7 @@ def test_interval_is_hourly():
 def test_gmail_sync_no_longer_creates_reminders():
     import inspect
 
-    from resume_agent.services import gmail_sync
+    from resume_tailor_harness.services import gmail_sync
 
     source = inspect.getsource(gmail_sync)
     assert "create_follow_up_reminders" not in source
@@ -569,12 +569,12 @@ def test_gmail_sync_no_longer_creates_reminders():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_reminder_scheduler.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.reminder_scheduler'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.reminder_scheduler'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/services/reminder_scheduler.py
+# src/resume_tailor_harness/services/reminder_scheduler.py
 """Reminders for every user, hourly, independent of Gmail.
 
 Reminder generation previously lived inside `run_gmail_sync`, which calls
@@ -596,8 +596,8 @@ from typing import Any
 
 from sqlmodel import Session
 
-from resume_agent.db import get_session
-from resume_agent.services.reminders import (
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.services.reminders import (
     create_event_reminders,
     create_follow_up_reminders,
 )
@@ -626,9 +626,9 @@ async def reminder_tick(state: Any, *, now: datetime | None = None) -> dict[str,
     from sqlalchemy import select
     from sqlalchemy.orm import Session as SystemSession
 
-    from resume_agent.tenancy.bootstrap import build_context
-    from resume_agent.tenancy.context import use_context
-    from resume_agent.tenancy.system_db import User
+    from resume_tailor_harness.tenancy.bootstrap import build_context
+    from resume_tailor_harness.tenancy.context import use_context
+    from resume_tailor_harness.tenancy.system_db import User
 
     with SystemSession(state.system_engine, expire_on_commit=False) as session:
         users = list(
@@ -666,12 +666,12 @@ async def reminder_loop(state: Any) -> None:
             logger.exception("reminder tick crashed")
 ```
 
-In `src/resume_agent/services/gmail_sync.py`, delete the `create_follow_up_reminders` import and its call at line 45. Keep the two-step reporter contract by relabelling step 1 — change `reporter.step(1, label="Checking follow-ups")` to `reporter.step(1, label="Classifying")` and drop `reminders` from the returned dict, returning `{"pending": len(pending)}`.
+In `src/resume_tailor_harness/services/gmail_sync.py`, delete the `create_follow_up_reminders` import and its call at line 45. Keep the two-step reporter contract by relabelling step 1 — change `reporter.step(1, label="Checking follow-ups")` to `reporter.step(1, label="Classifying")` and drop `reminders` from the returned dict, returning `{"pending": len(pending)}`.
 
-In `src/resume_agent/api/app.py`, beside the Gmail scheduler wiring at lines 167-181, add a `reminder_task` started unconditionally (no Gmail-token check) and cancelled in the same shutdown block:
+In `src/resume_tailor_harness/api/app.py`, beside the Gmail scheduler wiring at lines 167-181, add a `reminder_task` started unconditionally (no Gmail-token check) and cancelled in the same shutdown block:
 
 ```python
-        from resume_agent.services.reminder_scheduler import reminder_loop
+        from resume_tailor_harness.services.reminder_scheduler import reminder_loop
 
         app.state.reminder_task = asyncio.create_task(reminder_loop(app.state))
 ```
@@ -691,8 +691,8 @@ Expected: PASS. Any test asserting `result["reminders"]` must be updated to refl
 - [ ] **Step 6: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/services/ src/resume_agent/api/app.py tests/test_reminder_scheduler.py
-git add src/resume_agent/services/ src/resume_agent/api/app.py tests/test_reminder_scheduler.py
+ruff check src/resume_tailor_harness/services/ src/resume_tailor_harness/api/app.py tests/test_reminder_scheduler.py
+git add src/resume_tailor_harness/services/ src/resume_tailor_harness/api/app.py tests/test_reminder_scheduler.py
 git commit -m "fix(reminders): decouple from Gmail; hourly all-user tick"
 ```
 
@@ -701,8 +701,8 @@ git commit -m "fix(reminders): decouple from Gmail; hourly all-user tick"
 ### Task 4: `.ics` serializer
 
 **Files:**
-- Create: `src/resume_agent/calendar/__init__.py` (empty)
-- Create: `src/resume_agent/calendar/ics.py`
+- Create: `src/resume_tailor_harness/calendar/__init__.py` (empty)
+- Create: `src/resume_tailor_harness/calendar/ics.py`
 - Test: `tests/test_ics.py`
 
 **Interfaces:**
@@ -724,14 +724,14 @@ git commit -m "fix(reminders): decouple from Gmail; hourly all-user tick"
 # tests/test_ics.py
 from datetime import datetime, timezone
 
-from resume_agent.calendar.ics import CalendarEntry, render_calendar
+from resume_tailor_harness.calendar.ics import CalendarEntry, render_calendar
 
 START = datetime(2026, 3, 9, 19, 0, tzinfo=timezone.utc)
 
 
 def _entry(**over):
     base = dict(
-        uid="event-1@resume-agent",
+        uid="event-1@resume-tailor-harness",
         summary="Technical round — Acme",
         start=START,
         end=datetime(2026, 3, 9, 20, 0, tzinfo=timezone.utc),
@@ -796,7 +796,7 @@ def test_long_lines_are_folded_at_75_octets_with_a_leading_space():
 def test_uid_is_stable_so_reimport_updates_rather_than_duplicates():
     first = render_calendar([_entry()])
     second = render_calendar([_entry()])
-    assert "UID:event-1@resume-agent" in first
+    assert "UID:event-1@resume-tailor-harness" in first
     assert first == second.replace(
         second.split("DTSTAMP:")[1].split("\r\n")[0],
         first.split("DTSTAMP:")[1].split("\r\n")[0],
@@ -804,7 +804,7 @@ def test_uid_is_stable_so_reimport_updates_rather_than_duplicates():
 
 
 def test_multiple_entries_render_as_multiple_vevents():
-    out = render_calendar([_entry(), _entry(uid="event-2@resume-agent")])
+    out = render_calendar([_entry(), _entry(uid="event-2@resume-tailor-harness")])
     assert out.count("BEGIN:VEVENT") == 2
 
 
@@ -816,12 +816,12 @@ def test_empty_list_is_a_valid_empty_calendar():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_ics.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.calendar'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.calendar'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/calendar/ics.py
+# src/resume_tailor_harness/calendar/ics.py
 """Minimal RFC 5545 writer for the subset this app emits.
 
 Hand-rolled rather than adding `icalendar`: the subset is a few dozen lines,
@@ -835,7 +835,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-_PRODID = "-//resume-agent//application timeline//EN"
+_PRODID = "-//resume-tailor-harness//application timeline//EN"
 _LINE_OCTETS = 75
 
 
@@ -952,8 +952,8 @@ Expected: PASS (10 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/calendar/ tests/test_ics.py
-git add src/resume_agent/calendar/ tests/test_ics.py
+ruff check src/resume_tailor_harness/calendar/ tests/test_ics.py
+git add src/resume_tailor_harness/calendar/ tests/test_ics.py
 git commit -m "feat(calendar): RFC 5545 ics writer"
 ```
 
@@ -962,7 +962,7 @@ git commit -m "feat(calendar): RFC 5545 ics writer"
 ### Task 5: Event → calendar entry mapping
 
 **Files:**
-- Create: `src/resume_agent/calendar/events.py`
+- Create: `src/resume_tailor_harness/calendar/events.py`
 - Test: `tests/test_calendar_events.py`
 
 **Interfaces:**
@@ -975,9 +975,9 @@ git commit -m "feat(calendar): RFC 5545 ics writer"
 # tests/test_calendar_events.py
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.calendar.events import entries_for_upcoming, entry_for_event
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.calendar.events import entries_for_upcoming, entry_for_event
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 from sqlmodel import Session
 
 NOW = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
@@ -1039,7 +1039,7 @@ def test_description_carries_interviewers_platform_and_notes():
 
 
 def test_uid_is_stable_and_scoped_to_the_event():
-    assert entry_for_event(_event(), _job()).uid == "application-event-1@resume-agent"
+    assert entry_for_event(_event(), _job()).uid == "application-event-1@resume-tailor-harness"
 
 
 def test_all_day_events_carry_no_alarm():
@@ -1090,11 +1090,11 @@ def test_upcoming_excludes_past_and_undated_events():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_calendar_events.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.calendar.events'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.calendar.events'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/calendar/events.py` with:
+Create `src/resume_tailor_harness/calendar/events.py` with:
 
 - `KIND_LABELS` / `PLATFORM_LABELS` mirroring the web maps from Phase 1 Task 10, as module-level dicts. (Duplicated across the language boundary by necessity; add a comment noting they must stay in sync with `EventFormDialog.tsx`.)
 - `entry_for_event(event, job)`:
@@ -1102,7 +1102,7 @@ Create `src/resume_agent/calendar/events.py` with:
   - `start`: `event.occurred_at`. `end`: `start + duration_minutes` when set, else `None`.
   - `location`/`url`: if `location_or_link` starts with `http://` or `https://`, set both; otherwise `location` only.
   - `description`: interviewers, platform label (or `platform_other`), modality, notes — joined with newlines, blanks skipped.
-  - `uid`: `f"application-event-{event.id}@resume-agent"`.
+  - `uid`: `f"application-event-{event.id}@resume-tailor-harness"`.
   - `alarm_minutes_before`: `None` when `all_day`, else `60`.
 - `entries_for_upcoming(session, *, now=None, within_days=90)`: uses `upcoming_event_rows` from Task 2, filters to `occurred_at > now` and within the window, maps each through `entry_for_event`, sorted by start.
 
@@ -1114,8 +1114,8 @@ Expected: PASS (10 tests)
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-ruff check src/resume_agent/calendar/events.py tests/test_calendar_events.py
-git add src/resume_agent/calendar/events.py tests/test_calendar_events.py
+ruff check src/resume_tailor_harness/calendar/events.py tests/test_calendar_events.py
+git add src/resume_tailor_harness/calendar/events.py tests/test_calendar_events.py
 git commit -m "feat(calendar): map application events to calendar entries"
 ```
 
@@ -1124,8 +1124,8 @@ git commit -m "feat(calendar): map application events to calendar entries"
 ### Task 6: Calendar download routes
 
 **Files:**
-- Create: `src/resume_agent/api/routers/calendar.py`
-- Modify: `src/resume_agent/api/app.py` (register beside the other guarded routers)
+- Create: `src/resume_tailor_harness/api/routers/calendar.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (register beside the other guarded routers)
 - Test: `tests/api/test_calendar_routes.py`
 
 **Interfaces:**
@@ -1140,7 +1140,7 @@ Both return `text/calendar; charset=utf-8` with a `Content-Disposition: attachme
 # tests/api/test_calendar_routes.py
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client():
@@ -1215,7 +1215,7 @@ Expected: FAIL — 404 on both routes.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/resume_agent/api/routers/calendar.py
+# src/resume_tailor_harness/api/routers/calendar.py
 """Calendar downloads. Authenticated like every other route.
 
 No subscribable feed: a webcal:// URL is unauthenticated by construction
@@ -1230,11 +1230,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Response
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.calendar.events import entries_for_upcoming, entry_for_event
-from resume_agent.calendar.ics import render_calendar
-from resume_agent.tracking.repository import get_application_event, get_job
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.calendar.events import entries_for_upcoming, entry_for_event
+from resume_tailor_harness.calendar.ics import render_calendar
+from resume_tailor_harness.tracking.repository import get_application_event, get_job
 
 router = APIRouter()
 
@@ -1282,8 +1282,8 @@ Expected: PASS (4 tests)
 
 ```bash
 make openapi && make client
-ruff check src/resume_agent/api/routers/calendar.py
-git add src/resume_agent/api/ tests/api/test_calendar_routes.py contracts/ web/src/lib/api/schema.ts
+ruff check src/resume_tailor_harness/api/routers/calendar.py
+git add src/resume_tailor_harness/api/ tests/api/test_calendar_routes.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(api): ics download routes for events and upcoming pipeline"
 ```
 
@@ -1292,9 +1292,9 @@ git commit -m "feat(api): ics download routes for events and upcoming pipeline"
 ### Task 7: Dashboard upcoming-events data
 
 **Files:**
-- Modify: `src/resume_agent/tracking/queries.py`
-- Modify: `src/resume_agent/api/schemas/dashboard.py`
-- Modify: `src/resume_agent/api/routers/dashboard.py`
+- Modify: `src/resume_tailor_harness/tracking/queries.py`
+- Modify: `src/resume_tailor_harness/api/schemas/dashboard.py`
+- Modify: `src/resume_tailor_harness/api/routers/dashboard.py`
 - Test: `tests/api/test_dashboard_upcoming.py`
 
 **Interfaces:**
@@ -1311,7 +1311,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client():
@@ -1407,7 +1407,7 @@ Expected: PASS (6 tests)
 make openapi && make client
 .venv/Scripts/python.exe -m pytest -q -k dashboard
 ruff check
-git add src/resume_agent/ tests/api/test_dashboard_upcoming.py contracts/ web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/ tests/api/test_dashboard_upcoming.py contracts/ web/src/lib/api/schema.ts
 git commit -m "feat(api): upcoming events on the dashboard summary"
 ```
 
@@ -1566,20 +1566,20 @@ Start the app, create an event with a date and time, download its `.ics`, and op
 
 - [ ] **Step 3: Document**
 
-Update `src/resume_agent/gmail/CLAUDE.md`: reminders are no longer produced by `run_gmail_sync`. State plainly that they previously were, that this silently denied reminders to users without a Gmail token, and that `services/reminder_scheduler.py` now owns them on an hourly all-user tick.
+Update `src/resume_tailor_harness/gmail/CLAUDE.md`: reminders are no longer produced by `run_gmail_sync`. State plainly that they previously were, that this silently denied reminders to users without a Gmail token, and that `services/reminder_scheduler.py` now owns them on an hourly all-user tick.
 
-Create `src/resume_agent/calendar/CLAUDE.md` covering: why hand-rolled rather than `icalendar`; the folding/escaping/exclusive-DTEND rules that are easy to get wrong; the lead-time split (VALARM owns ~1 hour, the app owns 24h/48h) and why; and why there is no `webcal://` feed.
+Create `src/resume_tailor_harness/calendar/CLAUDE.md` covering: why hand-rolled rather than `icalendar`; the folding/escaping/exclusive-DTEND rules that are easy to get wrong; the lead-time split (VALARM owns ~1 hour, the app owns 24h/48h) and why; and why there is no `webcal://` feed.
 
 Add to the root `CLAUDE.md` architecture map:
 
 | Area | Lives in |
 | --- | --- |
-| Calendar export (`.ics`, RFC 5545) | `src/resume_agent/calendar/CLAUDE.md` |
+| Calendar export (`.ics`, RFC 5545) | `src/resume_tailor_harness/calendar/CLAUDE.md` |
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/calendar/CLAUDE.md src/resume_agent/gmail/CLAUDE.md CLAUDE.md
+git add src/resume_tailor_harness/calendar/CLAUDE.md src/resume_tailor_harness/gmail/CLAUDE.md CLAUDE.md
 git commit -m "docs: calendar export and reminder decoupling notes"
 ```
 

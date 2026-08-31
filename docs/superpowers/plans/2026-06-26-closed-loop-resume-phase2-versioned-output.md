@@ -4,7 +4,7 @@
 
 **Goal:** Mirror every resume/cover-letter version to a well-organized per-job folder with self-describing `content.json` snapshots and a `manifest.json` table of contents, via an idempotent projection from the database.
 
-**Architecture:** A pure `export.py` module computes folder paths, version-keyed filenames, and a manifest dict from DB rows. `export_job_artifacts(session, job_id, base)` is the idempotent projection that writes the folder. The render path writes PDFs straight into the per-job folder; the tailor/revise use-cases and a new `resume-agent export [--all]` CLI call the projection so the mirror stays in sync. The database remains the authoritative version store.
+**Architecture:** A pure `export.py` module computes folder paths, version-keyed filenames, and a manifest dict from DB rows. `export_job_artifacts(session, job_id, base)` is the idempotent projection that writes the folder. The render path writes PDFs straight into the per-job folder; the tailor/revise use-cases and a new `resume-tailor-harness export [--all]` CLI call the projection so the mirror stays in sync. The database remains the authoritative version store.
 
 **Tech Stack:** Python 3 / SQLModel / SQLite, Typst rendering, Typer CLI; pytest (offline).
 
@@ -22,12 +22,12 @@
 
 **Files:**
 
-- Create: `src/resume_agent/render/export.py`
+- Create: `src/resume_tailor_harness/render/export.py`
 - Test: `tests/test_render_export.py`
 
 **Interfaces:**
 
-- Consumes: `Job`, `ResumeVersion`, `CoverLetter` (`resume_agent.tracking.tables`), existing `_slug` idea from `renderer.py`.
+- Consumes: `Job`, `ResumeVersion`, `CoverLetter` (`resume_tailor_harness.tracking.tables`), existing `_slug` idea from `renderer.py`.
 - Produces: `job_slug(job: Job) -> str`; `job_dir(base: str | Path, job: Job) -> Path`; `resume_pdf_name(v: ResumeVersion) -> str`; `resume_json_name(v: ResumeVersion) -> str`; `cover_letter_pdf_name(cl: CoverLetter) -> str`; `cover_letter_json_name(cl: CoverLetter) -> str`.
 
 - [ ] **Step 1: Write the failing test**
@@ -36,10 +36,10 @@
 # tests/test_render_export.py
 from pathlib import Path
 
-from resume_agent.render.export import (
+from resume_tailor_harness.render.export import (
     cover_letter_pdf_name, job_dir, job_slug, resume_json_name, resume_pdf_name,
 )
-from resume_agent.tracking.tables import CoverLetter, Job, ResumeVersion
+from resume_tailor_harness.tracking.tables import CoverLetter, Job, ResumeVersion
 
 
 def test_job_slug_and_dir():
@@ -62,12 +62,12 @@ def test_cover_letter_filename():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_render_export.py -v`
-Expected: FAIL (`ModuleNotFoundError: resume_agent.render.export`).
+Expected: FAIL (`ModuleNotFoundError: resume_tailor_harness.render.export`).
 
 - [ ] **Step 3: Implement the helpers**
 
 ```python
-# src/resume_agent/render/export.py
+# src/resume_tailor_harness/render/export.py
 """Filesystem projection of a job's resume/cover-letter versions.
 
 The database is authoritative; this module mirrors it into a per-job folder for
@@ -78,8 +78,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from resume_agent.render.renderer import _slug
-from resume_agent.tracking.tables import CoverLetter, Job, ResumeVersion
+from resume_tailor_harness.render.renderer import _slug
+from resume_tailor_harness.tracking.tables import CoverLetter, Job, ResumeVersion
 
 
 def job_slug(job: Job) -> str:
@@ -116,7 +116,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/render/export.py tests/test_render_export.py
+git add src/resume_tailor_harness/render/export.py tests/test_render_export.py
 git commit -m "feat: per-job folder path and version-keyed filename helpers"
 ```
 
@@ -126,7 +126,7 @@ git commit -m "feat: per-job folder path and version-keyed filename helpers"
 
 **Files:**
 
-- Modify: `src/resume_agent/render/export.py`
+- Modify: `src/resume_tailor_harness/render/export.py`
 - Test: `tests/test_render_export.py`
 
 **Interfaces:**
@@ -138,8 +138,8 @@ git commit -m "feat: per-job folder path and version-keyed filename helpers"
 
 ```python
 # add to tests/test_render_export.py
-from resume_agent.render.export import build_manifest
-from resume_agent.tracking.tables import Application
+from resume_tailor_harness.render.export import build_manifest
+from resume_tailor_harness.tracking.tables import Application
 
 
 def test_build_manifest_shape():
@@ -213,7 +213,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/render/export.py tests/test_render_export.py
+git add src/resume_tailor_harness/render/export.py tests/test_render_export.py
 git commit -m "feat: manifest builder for per-job export"
 ```
 
@@ -223,7 +223,7 @@ git commit -m "feat: manifest builder for per-job export"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py` (near `resume_versions_for_job:107`)
+- Modify: `src/resume_tailor_harness/tracking/repository.py` (near `resume_versions_for_job:107`)
 - Test: `tests/test_tracking_repository.py` (append; create if absent)
 
 **Interfaces:**
@@ -235,11 +235,11 @@ git commit -m "feat: manifest builder for per-job export"
 ```python
 # tests/test_tracking_repository.py
 from sqlmodel import Session
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import (
     cover_letters_for_job, save_cover_letter, save_job,
 )
-from resume_agent.tracking.tables import CoverLetter, Job
+from resume_tailor_harness.tracking.tables import CoverLetter, Job
 
 
 def test_cover_letters_for_job():
@@ -275,7 +275,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py tests/test_tracking_repository.py
+git add src/resume_tailor_harness/tracking/repository.py tests/test_tracking_repository.py
 git commit -m "feat: cover_letters_for_job repository helper"
 ```
 
@@ -285,7 +285,7 @@ git commit -m "feat: cover_letters_for_job repository helper"
 
 **Files:**
 
-- Modify: `src/resume_agent/render/export.py`
+- Modify: `src/resume_tailor_harness/render/export.py`
 - Test: `tests/test_render_export.py`
 
 **Interfaces:**
@@ -299,9 +299,9 @@ git commit -m "feat: cover_letters_for_job repository helper"
 # add to tests/test_render_export.py
 import json
 from sqlmodel import Session
-from resume_agent.db import init_db, make_engine
-from resume_agent.render.export import export_job_artifacts
-from resume_agent.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.render.export import export_job_artifacts
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
 
 
 def test_export_writes_manifest_and_content_idempotently(tmp_path):
@@ -341,7 +341,7 @@ import json
 
 from sqlmodel import Session
 
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.tracking.repository import (
     application_for_job, cover_letters_for_job, get_job, resume_versions_for_job,
 )
 
@@ -384,7 +384,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/render/export.py tests/test_render_export.py
+git add src/resume_tailor_harness/render/export.py tests/test_render_export.py
 git commit -m "feat: idempotent export_job_artifacts projection"
 ```
 
@@ -394,8 +394,8 @@ git commit -m "feat: idempotent export_job_artifacts projection"
 
 **Files:**
 
-- Modify: `src/resume_agent/render/service.py:15-40` (`render_version`)
-- Modify: `src/resume_agent/cover_letter/render.py:32-56` (`render_cover_letter`)
+- Modify: `src/resume_tailor_harness/render/service.py:15-40` (`render_version`)
+- Modify: `src/resume_tailor_harness/cover_letter/render.py:32-56` (`render_cover_letter`)
 - Test: `tests/test_render_service.py` (append; mirror existing render tests)
 
 **Interfaces:**
@@ -408,11 +408,11 @@ git commit -m "feat: idempotent export_job_artifacts projection"
 ```python
 # tests/test_render_service.py  (append)
 from sqlmodel import Session
-from resume_agent.db import init_db, make_engine
-from resume_agent.render.render_config import RenderConfig
-from resume_agent.render.service import render_version
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.render.render_config import RenderConfig
+from resume_tailor_harness.render.service import render_version
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 
 def test_render_version_writes_into_per_job_folder(tmp_path):
@@ -443,10 +443,10 @@ Expected: FAIL (PDF lands in flat `output_dir`, no manifest).
 
 - [ ] **Step 3: Update `render_version`**
 
-In `src/resume_agent/render/service.py`, replace the filename/out_path block (lines ~29-31) and add the export call before `return`:
+In `src/resume_tailor_harness/render/service.py`, replace the filename/out_path block (lines ~29-31) and add the export call before `return`:
 
 ```python
-from resume_agent.render.export import export_job_artifacts, job_dir, resume_pdf_name
+from resume_tailor_harness.render.export import export_job_artifacts, job_dir, resume_pdf_name
 ```
 
 ```python
@@ -468,10 +468,10 @@ from resume_agent.render.export import export_job_artifacts, job_dir, resume_pdf
 
 - [ ] **Step 4: Update `render_cover_letter`**
 
-In `src/resume_agent/cover_letter/render.py`, replace the filename/out_path block (lines ~46-50) and add export:
+In `src/resume_tailor_harness/cover_letter/render.py`, replace the filename/out_path block (lines ~46-50) and add export:
 
 ```python
-from resume_agent.render.export import cover_letter_pdf_name, export_job_artifacts, job_dir
+from resume_tailor_harness.render.export import cover_letter_pdf_name, export_job_artifacts, job_dir
 ```
 
 ```python
@@ -495,7 +495,7 @@ Expected: PASS. Also run the existing cover-letter render test module to confirm
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/render/service.py src/resume_agent/cover_letter/render.py tests/test_render_service.py
+git add src/resume_tailor_harness/render/service.py src/resume_tailor_harness/cover_letter/render.py tests/test_render_service.py
 git commit -m "feat: render PDFs into per-job folders and export manifest"
 ```
 
@@ -505,9 +505,9 @@ git commit -m "feat: render PDFs into per-job folders and export manifest"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/tailoring.py:29-48` (`tailor`)
-- Modify: `src/resume_agent/services/revision.py` (Phase 1) — call export after persisting
-- Modify: `src/resume_agent/services/cover_letters.py` + `src/resume_agent/services/cover_letter_revision.py` (Phase 1) — call export
+- Modify: `src/resume_tailor_harness/services/tailoring.py:29-48` (`tailor`)
+- Modify: `src/resume_tailor_harness/services/revision.py` (Phase 1) — call export after persisting
+- Modify: `src/resume_tailor_harness/services/cover_letters.py` + `src/resume_tailor_harness/services/cover_letter_revision.py` (Phase 1) — call export
 - Test: `tests/test_services_tailoring_export.py`
 
 **Interfaces:**
@@ -520,10 +520,10 @@ git commit -m "feat: render PDFs into per-job folders and export manifest"
 ```python
 # tests/test_services_tailoring_export.py
 from sqlmodel import Session
-from resume_agent.db import init_db, make_engine
-from resume_agent.services import tailoring as T
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services import tailoring as T
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job
 
 
 def test_tailor_exports_each_job(monkeypatch, tmp_path):
@@ -551,10 +551,10 @@ Expected: FAIL (`AttributeError: module ... has no attribute 'export_job_artifac
 
 - [ ] **Step 3: Call export in `tailor`**
 
-In `src/resume_agent/services/tailoring.py`, import and call export over the result keys:
+In `src/resume_tailor_harness/services/tailoring.py`, import and call export over the result keys:
 
 ```python
-from resume_agent.render.export import export_job_artifacts
+from resume_tailor_harness.render.export import export_job_artifacts
 ```
 
 At the end of `tailor`, replace `return tailor_jobs(...)` with:
@@ -575,7 +575,7 @@ In `services/revision.py` (Phase 1), before returning `child`:
 
 ```python
     saved = save_resume_version(session, child)
-    from resume_agent.render.export import export_job_artifacts
+    from resume_tailor_harness.render.export import export_job_artifacts
     export_job_artifacts(session, saved.job_id)
     return saved
 ```
@@ -590,23 +590,23 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/services/ tests/test_services_tailoring_export.py
+git add src/resume_tailor_harness/services/ tests/test_services_tailoring_export.py
 git commit -m "feat: refresh per-job export after tailor and revise"
 ```
 
 ---
 
-### Task 7: `resume-agent export` CLI command
+### Task 7: `resume-tailor-harness export` CLI command
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (add `export` command near other commands)
+- Modify: `src/resume_tailor_harness/cli.py` (add `export` command near other commands)
 - Test: `tests/test_cli_export.py`
 
 **Interfaces:**
 
 - Consumes: `export_job_artifacts`, `get_job`, a "list all job ids" query.
-- Produces: `resume-agent export [JOB_ID] [--all] [--output DIR]` — exports one job, or every job with `--all`.
+- Produces: `resume-tailor-harness export [JOB_ID] [--all] [--output DIR]` — exports one job, or every job with `--all`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -614,10 +614,10 @@ git commit -m "feat: refresh per-job export after tailor and revise"
 # tests/test_cli_export.py
 from typer.testing import CliRunner
 from sqlmodel import Session
-from resume_agent.cli import app
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.cli import app
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job
 
 runner = CliRunner()
 
@@ -641,7 +641,7 @@ Expected: FAIL (`No such command 'export'`).
 
 - [ ] **Step 3: Implement the command**
 
-Add to `src/resume_agent/cli.py` (import `export_job_artifacts` and a job-listing helper; if none exists, use `select(Job)`):
+Add to `src/resume_tailor_harness/cli.py` (import `export_job_artifacts` and a job-listing helper; if none exists, use `select(Job)`):
 
 ```python
 @app.command("export")
@@ -654,8 +654,8 @@ def export_cmd(
     """Write per-job folders (content.json + manifest.json) from the database."""
     from sqlmodel import select
 
-    from resume_agent.render.export import export_job_artifacts
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.render.export import export_job_artifacts
+    from resume_tailor_harness.tracking.tables import Job
 
     engine = _engine(db_url)
     with get_session(engine) as session:
@@ -680,8 +680,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_export.py
-git commit -m "feat: resume-agent export CLI for per-job folder backfill"
+git add src/resume_tailor_harness/cli.py tests/test_cli_export.py
+git commit -m "feat: resume-tailor-harness export CLI for per-job folder backfill"
 ```
 
 ---
@@ -695,7 +695,7 @@ Expected: all PASS, lint clean.
 
 - [ ] **Step 2: Manual smoke (optional)**
 
-`resume-agent export --all` against a real dev DB → confirm `output/{company}-{title}-{id}/manifest.json` + `content.json` files appear and are stable on a second run.
+`resume-tailor-harness export --all` against a real dev DB → confirm `output/{company}-{title}-{id}/manifest.json` + `content.json` files appear and are stable on a second run.
 
 - [ ] **Step 3: Commit (if cleanup)**
 
@@ -715,7 +715,7 @@ git add -A && git commit -m "chore: phase-2 export verification"
 - Idempotent `export_job_artifacts` projection, DB authoritative → Task 4 (`test_export_writes_manifest_and_content_idempotently`). ✓
 - Render writes straight into per-job folder → Task 5. ✓
 - Export called after tailor/revise/render → Tasks 5 (render), 6 (tailor/revise). ✓
-- `resume-agent export [--all]` backfill → Task 7. ✓
+- `resume-tailor-harness export [--all]` backfill → Task 7. ✓
 
 **Placeholder scan:** none. Test in Task 5/7 use fakes for the Typst renderer / real CliRunner — concrete, not placeholders.
 

@@ -2,8 +2,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.routers import gmail as gmail_router
-from resume_agent.tenancy.system_db import User
+from resume_tailor_harness.api.routers import gmail as gmail_router
+from resume_tailor_harness.tenancy.system_db import User
 
 
 def test_gmail_connect_passes_login_hint_and_incremental_auth(mu_app, monkeypatch):

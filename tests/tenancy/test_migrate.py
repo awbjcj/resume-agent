@@ -2,14 +2,14 @@ import shutil
 
 import pytest
 
-from resume_agent.tenancy import migrate
+from resume_tailor_harness.tenancy import migrate
 
 
 def _legacy_root(tmp_path):
     root = tmp_path / "data"
     (root / "profile").mkdir(parents=True)
     (root / "profile" / "facts.json").write_text("{}", encoding="utf-8")
-    (root / "resume_agent.db").write_bytes(b"db")
+    (root / "resume_tailor_harness.db").write_bytes(b"db")
     (root / ".env").write_text("GITHUB_TOKEN=token\n", encoding="utf-8")
     return root
 
@@ -18,7 +18,7 @@ def test_adoption_moves_legacy_children_and_env(tmp_path):
     root = _legacy_root(tmp_path)
     moved = migrate.adopt_legacy_root(root, "abc123def456")
     workspace = root / "users" / "abc123def456"
-    assert set(moved) == {"resume_agent.db", "profile", ".env"}
+    assert set(moved) == {"resume_tailor_harness.db", "profile", ".env"}
     assert (workspace / "profile" / "facts.json").is_file()
     assert (workspace / "secrets.env").is_file()
     assert not (root / migrate.ADOPTION_JOURNAL).exists()
@@ -47,7 +47,7 @@ def test_migrated_root_ignores_recreated_compatibility_paths(tmp_path):
 
     assert migrate.is_legacy_root(root) is False
 
-    (root / "resume_agent.db").write_bytes(b"legacy")
+    (root / "resume_tailor_harness.db").write_bytes(b"legacy")
     assert migrate.is_legacy_root(root) is True
 
 
@@ -66,5 +66,5 @@ def test_adoption_rolls_back_completed_moves_on_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(migrate.shutil, "move", fail_second)
     with pytest.raises(migrate.AdoptionError, match="rolled back"):
         migrate.adopt_legacy_root(root, "abc123def456")
-    assert (root / "resume_agent.db").is_file()
+    assert (root / "resume_tailor_harness.db").is_file()
     assert (root / "profile").is_dir()

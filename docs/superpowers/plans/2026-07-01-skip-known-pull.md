@@ -16,7 +16,7 @@
 - Identity match: exact `url`, **or** `compute_dedup_key(company, title)` **with** a matching normalized location. No schema change, no new columns.
 - Known-index query filters `archived_at IS NULL` (mirrors `find_existing`).
 - Connectors stay DB-free: they accept a `skip_seen` closure, never a `Session`.
-- Default pull skips known jobs; `resume-agent pull --refresh` bypasses skip entirely.
+- Default pull skips known jobs; `resume-tailor-harness pull --refresh` bypasses skip entirely.
 
 ## Review corrections (2026-07-01)
 
@@ -49,7 +49,7 @@ This section supersedes conflicting task snippets below.
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/known_jobs.py`
+- Create: `src/resume_tailor_harness/discovery/known_jobs.py`
 - Test: `tests/test_known_jobs.py`
 
 **Interfaces:**
@@ -66,15 +66,15 @@ This section supersedes conflicting task snippets below.
 # tests/test_known_jobs.py
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.known_jobs import (
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.known_jobs import (
     KnownJobsIndex,
     build_known_index,
     make_skip_seen,
 )
-from resume_agent.tracking.dedup import compute_dedup_key
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():
@@ -145,7 +145,7 @@ def test_skip_seen_false_for_unknown_job():
 
 
 def test_archived_jobs_are_not_known():
-    from resume_agent.tracking.tables import utcnow
+    from resume_tailor_harness.tracking.tables import utcnow
     with _session() as s:
         job = Job(
             source="greenhouse", url="https://gh/1", company="Acme",
@@ -161,22 +161,22 @@ def test_archived_jobs_are_not_known():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_known_jobs.py -v`
-Expected: FAIL with `ModuleNotFoundError: resume_agent.discovery.known_jobs`.
+Expected: FAIL with `ModuleNotFoundError: resume_tailor_harness.discovery.known_jobs`.
 
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/discovery/known_jobs.py
+# src/resume_tailor_harness/discovery/known_jobs.py
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
 from sqlmodel import Session, select
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.source_tier import source_rank
-from resume_agent.tracking.dedup import compute_dedup_key
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.source_tier import source_rank
+from resume_tailor_harness.tracking.dedup import compute_dedup_key
+from resume_tailor_harness.tracking.tables import Job
 
 SkipSeen = Callable[[RawJob], bool]
 
@@ -256,7 +256,7 @@ Expected: PASS (7 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/known_jobs.py tests/test_known_jobs.py
+git add src/resume_tailor_harness/discovery/known_jobs.py tests/test_known_jobs.py
 git commit -m "feat: add KnownJobsIndex + skip_seen predicate for pre-fetch skip"
 ```
 
@@ -266,7 +266,7 @@ git commit -m "feat: add KnownJobsIndex + skip_seen predicate for pre-fetch skip
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/harvest.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/harvest.py`
 - Test: `tests/test_harvest_skip.py`
 
 **Interfaces:**
@@ -278,9 +278,9 @@ git commit -m "feat: add KnownJobsIndex + skip_seen predicate for pre-fetch skip
 
 ```python
 # tests/test_harvest_skip.py
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.harvest import harvest_detailed
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _row(title, url):
@@ -331,10 +331,10 @@ Expected: FAIL — `harvest_detailed() got an unexpected keyword argument 'skip_
 
 - [ ] **Step 3: Edit `harvest_detailed`**
 
-In `src/resume_agent/discovery/connectors/harvest.py`, add the import and the parameter. Replace the current `harvest_detailed` signature and loop head:
+In `src/resume_tailor_harness/discovery/connectors/harvest.py`, add the import and the parameter. Replace the current `harvest_detailed` signature and loop head:
 
 ```python
-from resume_agent.discovery.known_jobs import SkipSeen
+from resume_tailor_harness.discovery.known_jobs import SkipSeen
 ```
 
 ```python
@@ -388,7 +388,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/harvest.py tests/test_harvest_skip.py
+git add src/resume_tailor_harness/discovery/connectors/harvest.py tests/test_harvest_skip.py
 git commit -m "feat: skip known rows before the detail fetch in harvest_detailed"
 ```
 
@@ -398,10 +398,10 @@ git commit -m "feat: skip known rows before the detail fetch in harvest_detailed
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/workday.py`
-- Modify: `src/resume_agent/discovery/connectors/tesla.py`
-- Modify: `src/resume_agent/discovery/connectors/google.py`
-- Modify: `src/resume_agent/discovery/connectors/companies.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/workday.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/tesla.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/google.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py`
 - Test: `tests/test_connector_companies.py` (extend)
 
 **Interfaces:**
@@ -418,10 +418,10 @@ git commit -m "feat: skip known rows before the detail fetch in harvest_detailed
 
 ```python
 # tests/test_connector_companies.py  (append)
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.search_config import SearchConfig
-import resume_agent.discovery.connectors.companies as companies
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.companies as companies
 
 
 def test_companies_forwards_skip_seen_to_backend(monkeypatch):
@@ -432,7 +432,7 @@ def test_companies_forwards_skip_seen_to_backend(monkeypatch):
         return [RawJob("workday", "https://wd/1", "Acme", "Backend Engineer", "Remote", "jd text here")]
 
     monkeypatch.setattr(companies, "detect_ats", lambda url: __import__(
-        "resume_agent.discovery.connectors.detect", fromlist=["AtsTarget"]
+        "resume_tailor_harness.discovery.connectors.detect", fromlist=["AtsTarget"]
     ).AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers"))
     monkeypatch.setitem(companies._BACKENDS, "workday", fake_workday)
 
@@ -551,7 +551,7 @@ Expected: PASS (existing tests still green; new forwarding test passes).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/workday.py src/resume_agent/discovery/connectors/tesla.py src/resume_agent/discovery/connectors/google.py src/resume_agent/discovery/connectors/companies.py tests/test_connector_companies.py
+git add src/resume_tailor_harness/discovery/connectors/workday.py src/resume_tailor_harness/discovery/connectors/tesla.py src/resume_tailor_harness/discovery/connectors/google.py src/resume_tailor_harness/discovery/connectors/companies.py tests/test_connector_companies.py
 git commit -m "feat: thread skip_seen through N+1 backends and companies dispatch"
 ```
 
@@ -561,7 +561,7 @@ git commit -m "feat: thread skip_seen through N+1 backends and companies dispatc
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/adzuna.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/adzuna.py`
 - Test: `tests/test_connector_adzuna.py` (extend)
 
 **Interfaces:**
@@ -574,8 +574,8 @@ git commit -m "feat: thread skip_seen through N+1 backends and companies dispatc
 
 ```python
 # tests/test_connector_adzuna.py  (append)
-import resume_agent.discovery.connectors.adzuna as adzuna_mod
-from resume_agent.discovery.connectors.adzuna import AdzunaConnector
+import resume_tailor_harness.discovery.connectors.adzuna as adzuna_mod
+from resume_tailor_harness.discovery.connectors.adzuna import AdzunaConnector
 
 
 def test_adzuna_skips_known_jobs_before_enrichment(monkeypatch):
@@ -597,7 +597,7 @@ def test_adzuna_skips_known_jobs_before_enrichment(monkeypatch):
 
     monkeypatch.setattr(adzuna_mod, "enrich_adzuna_jobs", fake_enrich)
 
-    from resume_agent.discovery.search_config import SearchConfig
+    from resume_tailor_harness.discovery.search_config import SearchConfig
     skip_seen = lambda row: row.url == "https://a/1"
     connector = AdzunaConnector("id", "key", "us")
     result = connector.fetch(SearchConfig(role_anchors=["engineer"]), limit=None, skip_seen=skip_seen)
@@ -632,7 +632,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
+git add src/resume_tailor_harness/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
 git commit -m "feat: skip known Adzuna jobs before the browser render"
 ```
 
@@ -642,11 +642,11 @@ git commit -m "feat: skip known Adzuna jobs before the browser render"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/base.py` (Protocol)
-- Modify: `src/resume_agent/discovery/connectors/greenhouse.py`
-- Modify: `src/resume_agent/discovery/connectors/lever.py`
-- Modify: `src/resume_agent/discovery/connectors/remoteok.py`
-- Modify: `src/resume_agent/discovery/scraper/linkedin.py` (the connector class's `fetch`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/base.py` (Protocol)
+- Modify: `src/resume_tailor_harness/discovery/connectors/greenhouse.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/lever.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/remoteok.py`
+- Modify: `src/resume_tailor_harness/discovery/scraper/linkedin.py` (the connector class's `fetch`)
 - Test: none new (covered by existing connector tests + Task 6 integration).
 
 **Interfaces:**
@@ -693,7 +693,7 @@ Expected: PASS (signatures widened, behavior unchanged).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/base.py src/resume_agent/discovery/connectors/greenhouse.py src/resume_agent/discovery/connectors/lever.py src/resume_agent/discovery/connectors/remoteok.py src/resume_agent/discovery/scraper/linkedin.py
+git add src/resume_tailor_harness/discovery/connectors/base.py src/resume_tailor_harness/discovery/connectors/greenhouse.py src/resume_tailor_harness/discovery/connectors/lever.py src/resume_tailor_harness/discovery/connectors/remoteok.py src/resume_tailor_harness/discovery/scraper/linkedin.py
 git commit -m "feat: accept skip_seen uniformly across the Connector protocol"
 ```
 
@@ -703,7 +703,7 @@ git commit -m "feat: accept skip_seen uniformly across the Connector protocol"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/runner.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/runner.py`
 - Modify: `tests/test_connectors_runner.py` (update test doubles + add test)
 
 **Interfaces:**
@@ -767,7 +767,7 @@ Expected: FAIL — `run_pull() got an unexpected keyword argument 'skip_known'`.
 Add the import and the toggle:
 
 ```python
-from resume_agent.discovery.known_jobs import build_known_index, make_skip_seen
+from resume_tailor_harness.discovery.known_jobs import build_known_index, make_skip_seen
 ```
 
 Change the signature and add the index build before the loop, then pass `skip_seen`:
@@ -809,7 +809,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/runner.py tests/test_connectors_runner.py
+git add src/resume_tailor_harness/discovery/connectors/runner.py tests/test_connectors_runner.py
 git commit -m "feat: build known-jobs index in run_pull with a skip_known toggle"
 ```
 
@@ -819,21 +819,21 @@ git commit -m "feat: build known-jobs index in run_pull with a skip_known toggle
 
 **Files:**
 
-- Modify: `src/resume_agent/services/discovery.py` (`pull_jobs`)
-- Modify: `src/resume_agent/cli.py` (`pull_cmd`)
+- Modify: `src/resume_tailor_harness/services/discovery.py` (`pull_jobs`)
+- Modify: `src/resume_tailor_harness/cli.py` (`pull_cmd`)
 - Test: `tests/test_services_sources.py` (extend) or a small new `tests/test_pull_refresh.py`
 
 **Interfaces:**
 
 - Produces:
   - `pull_jobs(..., skip_known: bool = True)` forwarding to `run_pull`.
-  - `resume-agent pull --refresh` → `pull_jobs(skip_known=False)`.
+  - `resume-tailor-harness pull --refresh` → `pull_jobs(skip_known=False)`.
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_pull_refresh.py
-import resume_agent.services.discovery as disc
+import resume_tailor_harness.services.discovery as disc
 
 
 def test_pull_jobs_forwards_skip_known(monkeypatch, tmp_path):
@@ -841,13 +841,13 @@ def test_pull_jobs_forwards_skip_known(monkeypatch, tmp_path):
 
     def fake_run_pull(session, connectors, search, telemetry_path, **kw):
         captured.update(kw)
-        from resume_agent.discovery.connectors.runner import PullReport
+        from resume_tailor_harness.discovery.connectors.runner import PullReport
         return PullReport()
 
     monkeypatch.setattr(disc, "run_pull", fake_run_pull)
     monkeypatch.setattr(disc, "build_source_connectors", lambda *a, **k: [])
     monkeypatch.setattr(disc, "load_search_config", lambda p: __import__(
-        "resume_agent.discovery.search_config", fromlist=["SearchConfig"]).SearchConfig())
+        "resume_tailor_harness.discovery.search_config", fromlist=["SearchConfig"]).SearchConfig())
     monkeypatch.setattr(disc, "load_connectors_config", lambda p: object())
 
     disc.pull_jobs(session=None, skip_known=False)
@@ -919,8 +919,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/discovery.py src/resume_agent/cli.py tests/test_pull_refresh.py
-git commit -m "feat: expose skip-known bypass as resume-agent pull --refresh"
+git add src/resume_tailor_harness/services/discovery.py src/resume_tailor_harness/cli.py tests/test_pull_refresh.py
+git commit -m "feat: expose skip-known bypass as resume-tailor-harness pull --refresh"
 ```
 
 ---

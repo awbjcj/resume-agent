@@ -28,23 +28,23 @@
 
 | Path | Responsibility |
 |---|---|
-| `src/resume_agent/tracking/stages.py` | The status rank ladder and the single `advance()` status-write helper. No I/O. |
-| `src/resume_agent/services/redo.py` | The redo use-case: `RedoStage`, `StageOutcome`, `repull_job`, `redo_jobs`. Orchestration only — delegates every stage to existing services. |
+| `src/resume_tailor_harness/tracking/stages.py` | The status rank ladder and the single `advance()` status-write helper. No I/O. |
+| `src/resume_tailor_harness/services/redo.py` | The redo use-case: `RedoStage`, `StageOutcome`, `repull_job`, `redo_jobs`. Orchestration only — delegates every stage to existing services. |
 
 **Modified backend files**
 
 | Path | Change |
 |---|---|
-| `src/resume_agent/discovery/pipeline.py` | `StageScope` dataclass; `_stage_jobs` honours it; every status write routes through `advance`; per-job failures logged. |
-| `src/resume_agent/tailor/service.py` | `TailorOutcome`; `_persist_rounds` uses `advance`; writes `attempt`/`tailor_model`; logs and returns failures. |
-| `src/resume_agent/services/tailoring.py` | Carries failures through; `fail_on_partial` raises only on total failure, naming the cause. |
-| `src/resume_agent/services/errors.py` | `"job"` kind, `StageFailure`, `record_job_failure`, `resolve_job_failures`. |
-| `src/resume_agent/tracking/tables.py` | `ResumeVersion.attempt`, `ResumeVersion.tailor_model`. |
-| `src/resume_agent/services/discovery.py` | Pass `StageScope` instead of `job_ids`. |
-| `src/resume_agent/api/schemas/runs.py` | `RedoParams`, `StageOutcomeOut`, `RedoResultOut`. |
-| `src/resume_agent/api/schemas/errors.py` | `JobFailureDetails`, `ErrorRecordOut.job_details`, `ErrorRecordsOut.pagination`. |
-| `src/resume_agent/api/routers/runs.py` | `POST /api/redo`. |
-| `src/resume_agent/api/routers/errors.py` | `_row()` projects typed job details; list gains `page`/`pageSize`. |
+| `src/resume_tailor_harness/discovery/pipeline.py` | `StageScope` dataclass; `_stage_jobs` honours it; every status write routes through `advance`; per-job failures logged. |
+| `src/resume_tailor_harness/tailor/service.py` | `TailorOutcome`; `_persist_rounds` uses `advance`; writes `attempt`/`tailor_model`; logs and returns failures. |
+| `src/resume_tailor_harness/services/tailoring.py` | Carries failures through; `fail_on_partial` raises only on total failure, naming the cause. |
+| `src/resume_tailor_harness/services/errors.py` | `"job"` kind, `StageFailure`, `record_job_failure`, `resolve_job_failures`. |
+| `src/resume_tailor_harness/tracking/tables.py` | `ResumeVersion.attempt`, `ResumeVersion.tailor_model`. |
+| `src/resume_tailor_harness/services/discovery.py` | Pass `StageScope` instead of `job_ids`. |
+| `src/resume_tailor_harness/api/schemas/runs.py` | `RedoParams`, `StageOutcomeOut`, `RedoResultOut`. |
+| `src/resume_tailor_harness/api/schemas/errors.py` | `JobFailureDetails`, `ErrorRecordOut.job_details`, `ErrorRecordsOut.pagination`. |
+| `src/resume_tailor_harness/api/routers/runs.py` | `POST /api/redo`. |
+| `src/resume_tailor_harness/api/routers/errors.py` | `_row()` projects typed job details; list gains `page`/`pageSize`. |
 
 **New web files**
 
@@ -67,11 +67,11 @@
 ## Task 1: Status ladder
 
 **Files:**
-- Create: `src/resume_agent/tracking/stages.py`
+- Create: `src/resume_tailor_harness/tracking/stages.py`
 - Test: `tests/test_tracking_stages.py`
 
 **Interfaces:**
-- Consumes: `JobStatus`, `Job` from `resume_agent.tracking.tables`.
+- Consumes: `JobStatus`, `Job` from `resume_tailor_harness.tracking.tables`.
 - Produces: `rank(status: str) -> int`; `advance(job: Job, target: str, *, never_regress: bool) -> bool`.
 
 - [ ] **Step 1: Write the failing test**
@@ -79,8 +79,8 @@
 Create `tests/test_tracking_stages.py`:
 
 ```python
-from resume_agent.tracking.stages import advance, rank
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.stages import advance, rank
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _job(status: str) -> Job:
@@ -139,11 +139,11 @@ def test_advance_is_a_noop_write_at_equal_rank():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tracking_stages.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.stages'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking.stages'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `src/resume_agent/tracking/stages.py`:
+Create `src/resume_tailor_harness/tracking/stages.py`:
 
 ```python
 """The pipeline status ladder and the single status-write helper.
@@ -155,7 +155,7 @@ rendered. `advance` is the one place that distinction is enforced.
 
 from __future__ import annotations
 
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 # rejected sits below raw deliberately: it makes "redo never rejects" a
 # consequence of "redo never regresses" rather than a separate rule.
@@ -193,7 +193,7 @@ Expected: PASS — 8 passed
 
 ```bash
 ruff check
-git add src/resume_agent/tracking/stages.py tests/test_tracking_stages.py
+git add src/resume_tailor_harness/tracking/stages.py tests/test_tracking_stages.py
 git commit -m "feat(tracking): add the pipeline status ladder and advance()"
 ```
 
@@ -202,13 +202,13 @@ git commit -m "feat(tracking): add the pipeline status ladder and advance()"
 ## Task 2: `StageScope` — run the funnel over explicit jobs
 
 **Files:**
-- Modify: `src/resume_agent/discovery/pipeline.py`
-- Modify: `src/resume_agent/services/discovery.py`
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py`
+- Modify: `src/resume_tailor_harness/services/discovery.py`
 - Test: `tests/test_pipeline_stage_scope.py`
 
 **Interfaces:**
-- Consumes: `advance`, `rank` from `resume_agent.tracking.stages` (Task 1).
-- Produces: `StageScope(job_ids: frozenset[int] | None, any_status: bool, never_regress: bool)` exported from `resume_agent.discovery.pipeline`. Every stage function (`run_relevance`, `run_extract`, `run_filter`, `run_score`) and `discover` take `scope: StageScope = StageScope()` in place of `job_ids`.
+- Consumes: `advance`, `rank` from `resume_tailor_harness.tracking.stages` (Task 1).
+- Produces: `StageScope(job_ids: frozenset[int] | None, any_status: bool, never_regress: bool)` exported from `resume_tailor_harness.discovery.pipeline`. Every stage function (`run_relevance`, `run_extract`, `run_filter`, `run_score`) and `discover` take `scope: StageScope = StageScope()` in place of `job_ids`.
 
 **Context:** stage functions currently take `job_ids: set[int] | None` and select rows with `_stage_jobs(session, <status>, job_ids)`, then assign `job.status = ...` directly. Callers to update: `discover()` (internal, 4 call sites), `services/discovery.py::discover_jobs` and `reprocess_jobs` (pass `job_ids=`), `discovery/pipeline.py::reprocess` (passes `job_ids=set(selected)`).
 
@@ -220,11 +220,11 @@ Create `tests/test_pipeline_stage_scope.py`:
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.pipeline import StageScope, _stage_jobs, run_filter
-from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import JobCriteria
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.pipeline import StageScope, _stage_jobs, run_filter
+from resume_tailor_harness.discovery.search_config import SearchConfig
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @pytest.fixture
@@ -316,12 +316,12 @@ Expected: FAIL — `ImportError: cannot import name 'StageScope'`
 
 - [ ] **Step 3: Add `StageScope` and rewire `_stage_jobs`**
 
-In `src/resume_agent/discovery/pipeline.py`, add the import and the dataclass near the top (after the existing imports):
+In `src/resume_tailor_harness/discovery/pipeline.py`, add the import and the dataclass near the top (after the existing imports):
 
 ```python
 from dataclasses import dataclass
 
-from resume_agent.tracking.stages import advance
+from resume_tailor_harness.tracking.stages import advance
 
 
 @dataclass(frozen=True)
@@ -395,10 +395,10 @@ In `discover`, pass `scope=scope` to all four stage calls.
 
 - [ ] **Step 5: Update the three external callers**
 
-In `src/resume_agent/discovery/pipeline.py::reprocess`, change the `discover(...)` call's `job_ids=set(selected)` to `scope=StageScope(job_ids=frozenset(selected))`.
+In `src/resume_tailor_harness/discovery/pipeline.py::reprocess`, change the `discover(...)` call's `job_ids=set(selected)` to `scope=StageScope(job_ids=frozenset(selected))`.
 
-In `src/resume_agent/services/discovery.py`:
-- add `from resume_agent.discovery.pipeline import StageScope` to the existing pipeline import,
+In `src/resume_tailor_harness/services/discovery.py`:
+- add `from resume_tailor_harness.discovery.pipeline import StageScope` to the existing pipeline import,
 - in `discover_jobs`, change the signature's `job_ids: set[int] | None = None` to stay as-is (it is the public service API) but pass
   `scope=StageScope(job_ids=frozenset(job_ids)) if job_ids else StageScope()` to `discover(...)`.
 
@@ -416,7 +416,7 @@ Expected: PASS — no regressions. This run is the real proof that `StageScope()
 
 ```bash
 ruff check
-git add src/resume_agent/discovery/pipeline.py src/resume_agent/services/discovery.py tests/test_pipeline_stage_scope.py
+git add src/resume_tailor_harness/discovery/pipeline.py src/resume_tailor_harness/services/discovery.py tests/test_pipeline_stage_scope.py
 git commit -m "refactor(discovery): add StageScope so funnel stages can run over explicit jobs"
 ```
 
@@ -425,7 +425,7 @@ git commit -m "refactor(discovery): add StageScope so funnel stages can run over
 ## Task 3: Durable per-job failures
 
 **Files:**
-- Modify: `src/resume_agent/services/errors.py`
+- Modify: `src/resume_tailor_harness/services/errors.py`
 - Test: `tests/test_errors_service.py` (append)
 
 **Interfaces:**
@@ -442,9 +442,9 @@ Append to `tests/test_errors_service.py`:
 
 ```python
 def test_record_job_failure_stores_formatted_details(session):
-    from resume_agent.services.errors import StageFailure, record_job_failure
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.errors import StageFailure, record_job_failure
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(
         session, Job(source="manual", jd_text="jd", company="Acme", title="Staff")
@@ -477,9 +477,9 @@ def test_record_job_failure_stores_formatted_details(session):
 
 
 def test_repeated_job_failure_dedupes_and_counts(session):
-    from resume_agent.services.errors import StageFailure, record_job_failure
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.errors import StageFailure, record_job_failure
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
@@ -492,9 +492,9 @@ def test_repeated_job_failure_dedupes_and_counts(session):
 
 
 def test_different_stages_are_separate_records(session):
-    from resume_agent.services.errors import StageFailure, record_job_failure
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.services.errors import StageFailure, record_job_failure
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
@@ -506,13 +506,13 @@ def test_different_stages_are_separate_records(session):
 
 
 def test_success_resolves_open_job_failure(session):
-    from resume_agent.services.errors import (
+    from resume_tailor_harness.services.errors import (
         StageFailure,
         record_job_failure,
         resolve_job_failures,
     )
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
@@ -526,13 +526,13 @@ def test_success_resolves_open_job_failure(session):
 
 
 def test_resolve_leaves_other_stages_open(session):
-    from resume_agent.services.errors import (
+    from resume_tailor_harness.services.errors import (
         StageFailure,
         record_job_failure,
         resolve_job_failures,
     )
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
@@ -546,7 +546,7 @@ def test_resolve_leaves_other_stages_open(session):
 
 
 def test_stage_failure_truncates_message_and_traceback():
-    from resume_agent.services.errors import (
+    from resume_tailor_harness.services.errors import (
         MAX_MESSAGE_CHARS,
         MAX_TRACEBACK_CHARS,
         StageFailure,
@@ -569,13 +569,13 @@ Expected: FAIL — `ImportError: cannot import name 'StageFailure'`
 
 - [ ] **Step 3: Write the implementation**
 
-In `src/resume_agent/services/errors.py`, add imports at the top:
+In `src/resume_tailor_harness/services/errors.py`, add imports at the top:
 
 ```python
 import traceback
 from dataclasses import dataclass
 
-from resume_agent.tracking.tables import ErrorRecord, Job, utcnow
+from resume_tailor_harness.tracking.tables import ErrorRecord, Job, utcnow
 ```
 
 Change the kinds set:
@@ -691,7 +691,7 @@ Expected: PASS — all existing plus 6 new tests.
 
 ```bash
 ruff check
-git add src/resume_agent/services/errors.py tests/test_errors_service.py
+git add src/resume_tailor_harness/services/errors.py tests/test_errors_service.py
 git commit -m "feat(errors): record and auto-resolve durable per-job stage failures"
 ```
 
@@ -700,12 +700,12 @@ git commit -m "feat(errors): record and auto-resolve durable per-job stage failu
 ## Task 4: Version attempts and forward-only tailor status
 
 **Files:**
-- Modify: `src/resume_agent/tracking/tables.py`
-- Modify: `src/resume_agent/tailor/service.py:27-53` (`_persist_rounds`)
+- Modify: `src/resume_tailor_harness/tracking/tables.py`
+- Modify: `src/resume_tailor_harness/tailor/service.py:27-53` (`_persist_rounds`)
 - Test: `tests/test_tailor_service.py` (append)
 
 **Interfaces:**
-- Consumes: `advance` from `resume_agent.tracking.stages` (Task 1).
+- Consumes: `advance` from `resume_tailor_harness.tracking.stages` (Task 1).
 - Produces: `ResumeVersion.attempt: int` and `ResumeVersion.tailor_model: str | None`; `_persist_rounds(session, job, rounds, *, model: str | None = None)`.
 
 - [ ] **Step 1: Write the failing test**
@@ -785,7 +785,7 @@ Expected: FAIL — `AttributeError: 'ResumeVersion' object has no attribute 'att
 
 - [ ] **Step 3: Add the columns**
 
-In `src/resume_agent/tracking/tables.py`, inside `class ResumeVersion`, add after `critique_json`:
+In `src/resume_tailor_harness/tracking/tables.py`, inside `class ResumeVersion`, add after `critique_json`:
 
 ```python
     attempt: int = Field(default=0, index=True)
@@ -796,10 +796,10 @@ Both are additive with defaults, so existing rows read back as `attempt=0, tailo
 
 - [ ] **Step 4: Rewrite `_persist_rounds`**
 
-In `src/resume_agent/tailor/service.py`, add the import:
+In `src/resume_tailor_harness/tailor/service.py`, add the import:
 
 ```python
-from resume_agent.tracking.stages import advance
+from resume_tailor_harness.tracking.stages import advance
 ```
 
 Replace `_persist_rounds` (lines 27-53):
@@ -851,7 +851,7 @@ def _persist_rounds(
     return versions
 ```
 
-Add `resume_versions_for_job` to the existing `resume_agent.tracking.repository` import at the top of the file.
+Add `resume_versions_for_job` to the existing `resume_tailor_harness.tracking.repository` import at the top of the file.
 
 > `never_regress=True` is unconditional here. Tailoring only ever moves a job to
 > `tailored`, and no caller wants that to demote a rendered job — including the
@@ -867,7 +867,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/tracking/tables.py src/resume_agent/tailor/service.py tests/test_tailor_service.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tailor/service.py tests/test_tailor_service.py
 git commit -m "feat(tailor): append versions under an attempt number, never regress status"
 ```
 
@@ -878,13 +878,13 @@ git commit -m "feat(tailor): append versions under an attempt number, never regr
 This is the task that fixes `RuntimeError: Tailoring failed for x of x jobs`.
 
 **Files:**
-- Modify: `src/resume_agent/tailor/service.py:95-165` (`tailor_jobs`)
-- Modify: `src/resume_agent/services/tailoring.py:44-92` (`tailor`)
+- Modify: `src/resume_tailor_harness/tailor/service.py:95-165` (`tailor_jobs`)
+- Modify: `src/resume_tailor_harness/services/tailoring.py:44-92` (`tailor`)
 - Test: `tests/test_tailor_service.py` (append), `tests/test_services_tailoring.py` (create)
 
 **Interfaces:**
-- Consumes: `StageFailure` from `resume_agent.services.errors` (Task 3).
-- Produces: `TailorOutcome(versions: dict[int, list[ResumeVersion]], failures: dict[int, StageFailure])` exported from `resume_agent.tailor.service`. `tailor_jobs(...) -> TailorOutcome`. `services.tailoring.tailor(...) -> TailorOutcome`.
+- Consumes: `StageFailure` from `resume_tailor_harness.services.errors` (Task 3).
+- Produces: `TailorOutcome(versions: dict[int, list[ResumeVersion]], failures: dict[int, StageFailure])` exported from `resume_tailor_harness.tailor.service`. `tailor_jobs(...) -> TailorOutcome`. `services.tailoring.tailor(...) -> TailorOutcome`.
 
 **Breaking-change note:** `tailor_jobs` and `services.tailoring.tailor` currently return `dict[int, list[ResumeVersion]]`. Both are internal (no HTTP consumer returns them directly), so this is a safe internal change — but the router in Task 8 and `api/routers/runs.py:276` both read the result and must be updated in the same commit.
 
@@ -976,8 +976,8 @@ Create `tests/test_services_tailoring.py`:
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.services.errors import StageFailure
-from resume_agent.tailor.service import TailorOutcome
+from resume_tailor_harness.services.errors import StageFailure
+from resume_tailor_harness.tailor.service import TailorOutcome
 
 
 @pytest.fixture
@@ -989,9 +989,9 @@ def session():
 
 
 def test_fail_on_partial_raises_only_when_everything_failed(monkeypatch, session):
-    from resume_agent.services import tailoring
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job, JobStatus
+    from resume_tailor_harness.services import tailoring
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job, JobStatus
 
     job = save_job(
         session, Job(source="manual", jd_text="jd", status=JobStatus.approved.value)
@@ -1017,9 +1017,9 @@ def test_fail_on_partial_raises_only_when_everything_failed(monkeypatch, session
 
 
 def test_partial_failure_does_not_raise(monkeypatch, session):
-    from resume_agent.services import tailoring
-    from resume_agent.tracking.repository import save_job
-    from resume_agent.tracking.tables import Job, JobStatus
+    from resume_tailor_harness.services import tailoring
+    from resume_tailor_harness.tracking.repository import save_job
+    from resume_tailor_harness.tracking.tables import Job, JobStatus
 
     ok = save_job(
         session, Job(source="manual", jd_text="a", status=JobStatus.approved.value)
@@ -1055,12 +1055,12 @@ Expected: FAIL — `ImportError: cannot import name 'TailorOutcome'`
 
 - [ ] **Step 3: Add `TailorOutcome` and stop swallowing errors**
 
-In `src/resume_agent/tailor/service.py`, add imports:
+In `src/resume_tailor_harness/tailor/service.py`, add imports:
 
 ```python
 from dataclasses import dataclass, field
 
-from resume_agent.services.errors import StageFailure
+from resume_tailor_harness.services.errors import StageFailure
 ```
 
 Add the dataclass above `tailor_jobs`:
@@ -1155,8 +1155,8 @@ Replace the tail of `tailor` (lines 71-92):
 ```
 
 Change the return annotation to `-> TailorOutcome`, and add
-`from resume_agent.tailor.service import TailorOutcome, tailor_jobs` plus
-`from resume_agent.llm_runner import model_for_tier` to the imports.
+`from resume_tailor_harness.tailor.service import TailorOutcome, tailor_jobs` plus
+`from resume_tailor_harness.llm_runner import model_for_tier` to the imports.
 
 > `ReviewConfig.tailor_tier` is `Literal["cheap","mid","premium"]` defaulting to
 > `"premium"` (`tailor/review_config.py:32`), and `build_tailor_bundle` reads it
@@ -1164,7 +1164,7 @@ Change the return annotation to `-> TailorOutcome`, and add
 
 - [ ] **Step 5: Update the existing tailor router call site**
 
-In `src/resume_agent/api/routers/runs.py`, in `do_tailor` (line 276), change:
+In `src/resume_tailor_harness/api/routers/runs.py`, in `do_tailor` (line 276), change:
 
 ```python
         outcome = tailor(
@@ -1198,13 +1198,13 @@ In `src/resume_agent/api/routers/runs.py`, in `do_tailor` (line 276), change:
 - [ ] **Step 6: Run the tailor suites**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_service.py tests/test_services_tailoring.py tests/test_cli_tailor.py tests/test_cli_tailor_deep.py tests/api -v`
-Expected: PASS. Fix any other call site the failures reveal — `grep -rn "tailor_jobs\|services.tailoring import\|from resume_agent.services.tailoring" src/ tests/` finds them all.
+Expected: PASS. Fix any other call site the failures reveal — `grep -rn "tailor_jobs\|services.tailoring import\|from resume_tailor_harness.services.tailoring" src/ tests/` finds them all.
 
 - [ ] **Step 7: Lint and commit**
 
 ```bash
 ruff check
-git add src/resume_agent/tailor/service.py src/resume_agent/services/tailoring.py src/resume_agent/api/routers/runs.py tests/test_tailor_service.py tests/test_services_tailoring.py
+git add src/resume_tailor_harness/tailor/service.py src/resume_tailor_harness/services/tailoring.py src/resume_tailor_harness/api/routers/runs.py tests/test_tailor_service.py tests/test_services_tailoring.py
 git commit -m "fix(tailor): surface the real per-job failure instead of an opaque count"
 ```
 
@@ -1213,11 +1213,11 @@ git commit -m "fix(tailor): surface the real per-job failure instead of an opaqu
 ## Task 6: Re-pull a job's description
 
 **Files:**
-- Create: `src/resume_agent/services/redo.py`
+- Create: `src/resume_tailor_harness/services/redo.py`
 - Test: `tests/test_services_redo_pull.py`
 
 **Interfaces:**
-- Consumes: `job_from_url` from `resume_agent.discovery.url_ingest.service`; `compute_dedup_key`, `compute_content_fingerprint` from `resume_agent.tracking.dedup`; `company_rename_collides` from `resume_agent.tracking.repository`; `StageFailure` from `resume_agent.services.errors` (Task 3).
+- Consumes: `job_from_url` from `resume_tailor_harness.discovery.url_ingest.service`; `compute_dedup_key`, `compute_content_fingerprint` from `resume_tailor_harness.tracking.dedup`; `company_rename_collides` from `resume_tailor_harness.tracking.repository`; `StageFailure` from `resume_tailor_harness.services.errors` (Task 3).
 - Produces:
   - `RedoStage = Literal["pull", "extract", "tailor", "render"]`
   - `REDO_STAGES: tuple[RedoStage, ...] = ("pull", "extract", "tailor", "render")`
@@ -1233,10 +1233,10 @@ import httpx
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.services import redo
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.services import redo
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @pytest.fixture
@@ -1371,11 +1371,11 @@ def test_repull_keeps_identity_when_the_new_key_would_collide(session, monkeypat
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_redo_pull.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.redo'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.redo'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/services/redo.py`:
+Create `src/resume_tailor_harness/services/redo.py`:
 
 ```python
 """Redo any pipeline stage on explicitly chosen jobs.
@@ -1397,11 +1397,11 @@ import httpx
 from playwright.sync_api import Error as PlaywrightError
 from sqlmodel import Session
 
-from resume_agent.discovery.url_ingest.service import job_from_url
-from resume_agent.services.errors import StageFailure
-from resume_agent.tracking.dedup import compute_content_fingerprint, compute_dedup_key
-from resume_agent.tracking.repository import company_rename_collides, save_job
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.discovery.url_ingest.service import job_from_url
+from resume_tailor_harness.services.errors import StageFailure
+from resume_tailor_harness.tracking.dedup import compute_content_fingerprint, compute_dedup_key
+from resume_tailor_harness.tracking.repository import company_rename_collides, save_job
+from resume_tailor_harness.tracking.tables import Job
 
 logger = logging.getLogger(__name__)
 
@@ -1488,14 +1488,14 @@ def repull_job(
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_redo_pull.py -v`
 Expected: PASS — 6 passed
 
-> If `RawJob` is not importable from `resume_agent.discovery.connectors.base`,
+> If `RawJob` is not importable from `resume_tailor_harness.discovery.connectors.base`,
 > find it with `grep -rn "class RawJob" src/` and fix the test import.
 
 - [ ] **Step 5: Lint and commit**
 
 ```bash
 ruff check
-git add src/resume_agent/services/redo.py tests/test_services_redo_pull.py
+git add src/resume_tailor_harness/services/redo.py tests/test_services_redo_pull.py
 git commit -m "feat(redo): re-pull a job's description in place, bypassing the ingest freeze"
 ```
 
@@ -1504,11 +1504,11 @@ git commit -m "feat(redo): re-pull a job's description in place, bypassing the i
 ## Task 7: The redo orchestrator
 
 **Files:**
-- Modify: `src/resume_agent/services/redo.py`
+- Modify: `src/resume_tailor_harness/services/redo.py`
 - Test: `tests/test_services_redo.py`
 
 **Interfaces:**
-- Consumes: `repull_job`, `StageOutcome`, `REDO_STAGES` (Task 6); `StageScope` from `resume_agent.discovery.pipeline` (Task 2); `record_job_failure`, `resolve_job_failures` (Task 3); `TailorOutcome` (Task 5).
+- Consumes: `repull_job`, `StageOutcome`, `REDO_STAGES` (Task 6); `StageScope` from `resume_tailor_harness.discovery.pipeline` (Task 2); `record_job_failure`, `resolve_job_failures` (Task 3); `TailorOutcome` (Task 5).
 - Produces: `redo_jobs(session, *, job_ids, stages, deep=False, reporter=None, run_id=None) -> list[StageOutcome]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1519,11 +1519,11 @@ Create `tests/test_services_redo.py`:
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.services import redo
-from resume_agent.services.errors import StageFailure, list_error_records
-from resume_agent.tailor.service import TailorOutcome
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.services import redo
+from resume_tailor_harness.services.errors import StageFailure, list_error_records
+from resume_tailor_harness.tailor.service import TailorOutcome
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 @pytest.fixture
@@ -1650,29 +1650,29 @@ def test_redo_never_regresses_a_rendered_job(session, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_redo.py -v`
-Expected: FAIL — `AttributeError: module 'resume_agent.services.redo' has no attribute 'redo_jobs'`
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.services.redo' has no attribute 'redo_jobs'`
 
 - [ ] **Step 3: Write the orchestrator**
 
-Append to `src/resume_agent/services/redo.py` (and add the imports listed at the top of the block):
+Append to `src/resume_tailor_harness/services/redo.py` (and add the imports listed at the top of the block):
 
 ```python
 from collections.abc import Sequence
 
-from resume_agent.config import get_settings
-from resume_agent.discovery.pipeline import StageScope, run_extract, run_filter, run_score
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.profile.store import load_facts
-from resume_agent.progress import ProgressReporter
-from resume_agent.render.export import resume_download_name  # noqa: F401  (kept for parity)
-from resume_agent.services.agents import build_discovery_bundle, build_url_extract_agent
-from resume_agent.services.discovery import _skill_artifacts
-from resume_agent.services.errors import record_job_failure, resolve_job_failures
-from resume_agent.services.rendering import render_resume_version
-from resume_agent.services.tailoring import tailor
-from resume_agent.tenancy.limits import enforce_active_budget
-from resume_agent.tenancy.paths import FACTS_PATH, SEARCH_PATH
-from resume_agent.tracking.repository import (
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.discovery.pipeline import StageScope, run_extract, run_filter, run_score
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.progress import ProgressReporter
+from resume_tailor_harness.render.export import resume_download_name  # noqa: F401  (kept for parity)
+from resume_tailor_harness.services.agents import build_discovery_bundle, build_url_extract_agent
+from resume_tailor_harness.services.discovery import _skill_artifacts
+from resume_tailor_harness.services.errors import record_job_failure, resolve_job_failures
+from resume_tailor_harness.services.rendering import render_resume_version
+from resume_tailor_harness.services.tailoring import tailor
+from resume_tailor_harness.tenancy.limits import enforce_active_budget
+from resume_tailor_harness.tenancy.paths import FACTS_PATH, SEARCH_PATH
+from resume_tailor_harness.tracking.repository import (
     application_for_job,
     get_job,
     resume_versions_for_job,
@@ -1745,7 +1745,7 @@ def _run_extract(session, jobs, run_id) -> list[StageOutcome]:
 
 
 def _run_tailor(session, jobs, run_id, deep) -> list[StageOutcome]:
-    from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP
+    from resume_tailor_harness.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP
 
     ids = [job.id for job in jobs if job.id is not None]
     outcome = tailor(
@@ -1873,7 +1873,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/services/redo.py tests/test_services_redo.py
+git add src/resume_tailor_harness/services/redo.py tests/test_services_redo.py
 git commit -m "feat(redo): orchestrate pull/extract/tailor/render over explicit jobs"
 ```
 
@@ -1882,12 +1882,12 @@ git commit -m "feat(redo): orchestrate pull/extract/tailor/render over explicit 
 ## Task 8: `POST /api/redo`
 
 **Files:**
-- Modify: `src/resume_agent/api/schemas/runs.py`
-- Modify: `src/resume_agent/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py`
 - Test: `tests/api/test_redo_endpoint.py`
 
 **Interfaces:**
-- Consumes: `redo_jobs`, `RedoStage` (Task 7); `launch`, `session_work` from `resume_agent.api.runs.launch`.
+- Consumes: `redo_jobs`, `RedoStage` (Task 7); `launch`, `session_work` from `resume_tailor_harness.api.runs.launch`.
 - Produces: `RedoParams`, `StageOutcomeOut`, `RedoResultOut`; `POST /api/redo` returning `202` + `RunOut`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1897,7 +1897,7 @@ Create `tests/api/test_redo_endpoint.py`:
 ```python
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client(tmp_path) -> TestClient:
@@ -1928,7 +1928,7 @@ def test_redo_rejects_an_unknown_stage(tmp_path):
 
 
 def test_redo_dedupes_repeated_ids_and_stages():
-    from resume_agent.api.schemas.runs import RedoParams
+    from resume_tailor_harness.api.schemas.runs import RedoParams
 
     params = RedoParams(jobIds=[3, 3, 1], stages=["tailor", "tailor"])
 
@@ -1955,14 +1955,14 @@ Expected: FAIL — 404 on `/api/redo`, and `ImportError` for `RedoParams`.
 
 - [ ] **Step 3: Add the schemas**
 
-In `src/resume_agent/api/schemas/runs.py`, add:
+In `src/resume_tailor_harness/api/schemas/runs.py`, add:
 
 ```python
 from typing import Literal
 
 from pydantic import Field, field_validator
 
-from resume_agent.services.redo import RedoStage
+from resume_tailor_harness.services.redo import RedoStage
 
 
 def _dedupe(values: list) -> list:
@@ -2000,11 +2000,11 @@ class RedoResultOut(CamelModel):
 
 - [ ] **Step 4: Add the endpoint**
 
-In `src/resume_agent/api/routers/runs.py`, add to the imports:
+In `src/resume_tailor_harness/api/routers/runs.py`, add to the imports:
 
 ```python
-from resume_agent.api.schemas.runs import RedoParams, RedoResultOut, StageOutcomeOut
-from resume_agent.services.redo import redo_jobs
+from resume_tailor_harness.api.schemas.runs import RedoParams, RedoResultOut, StageOutcomeOut
+from resume_tailor_harness.services.redo import redo_jobs
 ```
 
 Add the endpoint after `launch_tailor`:
@@ -2053,7 +2053,7 @@ Expected: PASS — the drift gate accepts the regenerated contract.
 
 ```bash
 ruff check
-git add src/resume_agent/api/schemas/runs.py src/resume_agent/api/routers/runs.py tests/api/test_redo_endpoint.py contracts/
+git add src/resume_tailor_harness/api/schemas/runs.py src/resume_tailor_harness/api/routers/runs.py tests/api/test_redo_endpoint.py contracts/
 git commit -m "feat(api): add POST /api/redo with boundary-validated params"
 ```
 
@@ -2062,12 +2062,12 @@ git commit -m "feat(api): add POST /api/redo with boundary-validated params"
 ## Task 9: Typed job failure details and paginated errors
 
 **Files:**
-- Modify: `src/resume_agent/api/schemas/errors.py`
-- Modify: `src/resume_agent/api/routers/errors.py`
+- Modify: `src/resume_tailor_harness/api/schemas/errors.py`
+- Modify: `src/resume_tailor_harness/api/routers/errors.py`
 - Test: `tests/api/test_errors_endpoint.py` (create or append if it exists)
 
 **Interfaces:**
-- Consumes: `RedoStage` (Task 6); `page_from_slice` from `resume_agent.services.pagination`.
+- Consumes: `RedoStage` (Task 6); `page_from_slice` from `resume_tailor_harness.services.pagination`.
 - Produces: `JobFailureDetails`; `ErrorRecordOut.job_details`; `ErrorRecordsOut.pagination`; `GET /api/errors?page=&pageSize=`.
 
 - [ ] **Step 1: Write the failing test**
@@ -2077,9 +2077,9 @@ Create `tests/api/test_errors_endpoint.py`:
 ```python
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.db import make_engine
-from resume_agent.services.errors import StageFailure, record_error, record_job_failure
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import make_engine
+from resume_tailor_harness.services.errors import StageFailure, record_error, record_job_failure
 
 
 def _client(tmp_path) -> TestClient:
@@ -2091,8 +2091,8 @@ def test_job_record_exposes_typed_details(tmp_path):
     with _client(tmp_path) as client:
         from sqlmodel import Session
 
-        from resume_agent.tracking.repository import save_job
-        from resume_agent.tracking.tables import Job
+        from resume_tailor_harness.tracking.repository import save_job
+        from resume_tailor_harness.tracking.tables import Job
 
         engine = client.app.state.engine
         with Session(engine) as session:
@@ -2189,12 +2189,12 @@ Expected: FAIL — `KeyError: 'jobDetails'`
 
 - [ ] **Step 3: Add the schemas**
 
-In `src/resume_agent/api/schemas/errors.py`:
+In `src/resume_tailor_harness/api/schemas/errors.py`:
 
 ```python
 from typing import Literal
 
-from resume_agent.services.redo import RedoStage
+from resume_tailor_harness.services.redo import RedoStage
 
 
 class JobFailureDetails(CamelModel):
@@ -2246,13 +2246,13 @@ class ErrorRecordsOut(CamelModel):
 
 - [ ] **Step 4: Project details and paginate in the router**
 
-In `src/resume_agent/api/routers/errors.py`:
+In `src/resume_tailor_harness/api/routers/errors.py`:
 
 ```python
 from pydantic import ValidationError
 
-from resume_agent.api.schemas.errors import JobFailureDetails, PageOut
-from resume_agent.services.pagination import page_from_slice
+from resume_tailor_harness.api.schemas.errors import JobFailureDetails, PageOut
+from resume_tailor_harness.services.pagination import page_from_slice
 
 MAX_PAGE_SIZE = 200
 
@@ -2296,7 +2296,7 @@ def list_errors(
     )
 ```
 
-Import `paginate` from `resume_agent.services.pagination`.
+Import `paginate` from `resume_tailor_harness.services.pagination`.
 
 > `paginate` slices in Python because `list_error_records` already returns a
 > list. Open error counts are bounded by `Clear all` and auto-resolve, so an
@@ -2316,7 +2316,7 @@ Expected: PASS
 
 ```bash
 ruff check
-git add src/resume_agent/api/schemas/errors.py src/resume_agent/api/routers/errors.py tests/api/test_errors_endpoint.py contracts/
+git add src/resume_tailor_harness/api/schemas/errors.py src/resume_tailor_harness/api/routers/errors.py tests/api/test_errors_endpoint.py contracts/
 git commit -m "feat(api): expose typed job failure details and paginate the errors list"
 ```
 

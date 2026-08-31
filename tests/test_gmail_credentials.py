@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from resume_agent.api.schemas.secrets import SECRET_FIELDS
-from resume_agent.config import Settings
-from resume_agent.tenancy.workspace import (
+from resume_tailor_harness.api.schemas.secrets import SECRET_FIELDS
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.workspace import (
     effective_settings,
     workspace_paths,
 )

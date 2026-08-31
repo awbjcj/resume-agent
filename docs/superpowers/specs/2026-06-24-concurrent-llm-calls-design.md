@@ -44,7 +44,7 @@ The serial loops:
 3. **Rate limiting: global semaphore + agno's built-in backoff retry.** A single
    `asyncio.Semaphore` caps total in-flight calls; retry/backoff is delegated to
    agno's per-agent config, not owned by our code.
-4. **New module `src/resume_agent/concurrency.py`** holds the fan-out helper.
+4. **New module `src/resume_tailor_harness/concurrency.py`** holds the fan-out helper.
 
 ## Why asyncio is safe here (and dodges the Session landmine)
 
@@ -63,7 +63,7 @@ agents and return values. That is the seam the whole design rests on.
 
 ## Architecture
 
-### The concurrency seam — `src/resume_agent/concurrency.py`
+### The concurrency seam — `src/resume_tailor_harness/concurrency.py`
 
 ```python
 async def gather_isolated(

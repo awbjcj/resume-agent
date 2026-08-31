@@ -9,7 +9,7 @@ This project is developed on `main`. Security fixes are applied to `main` only.
 **Please do not open a public issue for security vulnerabilities.**
 
 Report privately through GitHub's
-[Security Advisories](https://github.com/awbjcj/resume-agent/security/advisories/new)
+[Security Advisories](https://github.com/awbjcj/resume-tailor-harness/security/advisories/new)
 ("Report a vulnerability" button). Include:
 
 - a description of the issue and its impact,

@@ -238,7 +238,7 @@ def count_prompt_tokens() -> Iterator[TokenCounts]:
     billing sees, and works with or without an active tenancy context (the real
     recorder returns early without one; the tally must not).
     """
-    from resume_agent.tenancy import usage as usage_module
+    from resume_tailor_harness.tenancy import usage as usage_module
 
     counts = TokenCounts()
     original = usage_module.record_call

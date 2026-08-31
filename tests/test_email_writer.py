@@ -4,14 +4,14 @@ from types import SimpleNamespace
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.email_writer import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.email_writer import (
     DRAFT_TYPES,
     EmailDraftContent,
     generate_email_draft,
 )
-from resume_agent.tracking.repository import save_application, save_job
-from resume_agent.tracking.tables import Application, Job
+from resume_tailor_harness.tracking.repository import save_application, save_job
+from resume_tailor_harness.tracking.tables import Application, Job
 
 
 class _FakeAgent:

@@ -2,14 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.storage import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.storage import (
     TenantPathError,
     artifact_path,
     resolve_artifact_pdf,
 )
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def _context(paths: WorkspacePaths) -> UserContext:

@@ -1,4 +1,4 @@
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -7,7 +7,7 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
-from resume_agent.profile.ids import assign_fact_ids, deterministic_id
+from resume_tailor_harness.profile.ids import assign_fact_ids, deterministic_id
 
 
 def _facts():

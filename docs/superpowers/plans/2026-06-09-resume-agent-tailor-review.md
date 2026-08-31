@@ -1,8 +1,8 @@
-# Resume Agent — Tailor + Review Implementation Plan
+# Résumé Tailor Harness — Tailor + Review Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the Tailor + Review component: take an approved job + your `facts.json`, have an Agno **tailor** agent draft a fact-locked `ResumeContent`, run it through a multi-agent **review panel** (fact-check **gate** + ATS/recruiter/hiring-manager/concision), and **revise** in a loop until the fact-check passes and the weighted score clears the threshold (or `max_rounds`). Persist every round to `resume_versions` and expose `resume-agent approve` + `resume-agent tailor`.
+**Goal:** Build the Tailor + Review component: take an approved job + your `facts.json`, have an Agno **tailor** agent draft a fact-locked `ResumeContent`, run it through a multi-agent **review panel** (fact-check **gate** + ATS/recruiter/hiring-manager/concision), and **revise** in a loop until the fact-check passes and the weighted score clears the threshold (or `max_rounds`). Persist every round to `resume_versions` and expose `resume-tailor-harness approve` + `resume-tailor-harness tailor`.
 
 **Architecture:** Every LLM role is an Agno `Agent` with an `output_schema` (`ResumeContent` for tailor/reviser, `ReviewCritique` for each reviewer). The loop + aggregation are **plain Python** (deterministic, unit-testable with fake agents): a hard gate on the fact-check reviewer plus a weighted average of the rest. Roster/weights/thresholds come from `config/review.yaml`.
 
@@ -27,7 +27,7 @@ Design spec §5.3. Decisions for this plan:
 ## File Structure (created/modified)
 
 ```
-src/resume_agent/
+src/resume_tailor_harness/
   config.py                 # MODIFY: add mid_model, premium_model
   cli.py                    # MODIFY: add `approve` and `tailor` commands
   tracking/
@@ -59,8 +59,8 @@ tests/
 
 **Files:**
 
-- Modify: `src/resume_agent/config.py`, `tests/test_config.py`
-- Create: `src/resume_agent/tailor/__init__.py`, `src/resume_agent/tailor/review_config.py`
+- Modify: `src/resume_tailor_harness/config.py`, `tests/test_config.py`
+- Create: `src/resume_tailor_harness/tailor/__init__.py`, `src/resume_tailor_harness/tailor/review_config.py`
 - Test: `tests/test_tailor_review_config.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -77,7 +77,7 @@ def test_settings_has_model_tier_defaults():
 Create `tests/test_tailor_review_config.py`:
 
 ```python
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec, load_review_config
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec, load_review_config
 
 
 def test_defaults():
@@ -110,32 +110,32 @@ Run:
 uv run pytest tests/test_config.py::test_settings_has_model_tier_defaults tests/test_tailor_review_config.py -v
 ```
 
-Expected: FAIL (`AttributeError: ... 'mid_model'` and `ModuleNotFoundError: ... 'resume_agent.tailor'`).
+Expected: FAIL (`AttributeError: ... 'mid_model'` and `ModuleNotFoundError: ... 'resume_tailor_harness.tailor'`).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/config.py`, add these two lines to `Settings` immediately after `cheap_model`:
+In `src/resume_tailor_harness/config.py`, add these two lines to `Settings` immediately after `cheap_model`:
 
 ```python
     mid_model: str = "claude-sonnet-4-6"
     premium_model: str = "claude-opus-4-8"
 ```
 
-Create `src/resume_agent/tailor/__init__.py`:
+Create `src/resume_tailor_harness/tailor/__init__.py`:
 
 ```python
 """Tailor + Review component: draft, review, and revise a fact-locked resume."""
 ```
 
-Create `src/resume_agent/tailor/review_config.py`:
+Create `src/resume_tailor_harness/tailor/review_config.py`:
 
 ```python
 from pathlib import Path
 
 from pydantic import Field
 
-from resume_agent.config import load_yaml
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class ReviewerSpec(ExtensibleModel):
@@ -168,7 +168,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/config.py src/resume_agent/tailor/__init__.py src/resume_agent/tailor/review_config.py tests/test_config.py tests/test_tailor_review_config.py
+git add src/resume_tailor_harness/config.py src/resume_tailor_harness/tailor/__init__.py src/resume_tailor_harness/tailor/review_config.py tests/test_config.py tests/test_tailor_review_config.py
 git commit -m "feat(tailor): model-tier settings + ReviewConfig" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -178,7 +178,7 @@ git commit -m "feat(tailor): model-tier settings + ReviewConfig" -m "Co-Authored
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/agents.py`
+- Create: `src/resume_tailor_harness/tailor/agents.py`
 - Test: `tests/test_tailor_agents.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -188,9 +188,9 @@ Create `tests/test_tailor_agents.py`:
 ```python
 from agno.agent import Agent
 
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.agents import (
     build_reviewer_agent,
     build_reviser_agent,
     build_tailor_agent,
@@ -226,19 +226,19 @@ Run:
 uv run pytest tests/test_tailor_agents.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.agents'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.agents'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tailor/agents.py`:
+Create `src/resume_tailor_harness/tailor/agents.py`:
 
 ```python
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
-from resume_agent.config import get_settings
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
+from resume_tailor_harness.config import get_settings
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
 
 
 def model_for_tier(tier: str) -> str:
@@ -328,7 +328,7 @@ Expected: PASS (3 tests). The agent-construction tests must not make network cal
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/agents.py tests/test_tailor_agents.py
+git add src/resume_tailor_harness/tailor/agents.py tests/test_tailor_agents.py
 git commit -m "feat(tailor): tailor/reviser/reviewer Agno agent factories" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -338,7 +338,7 @@ git commit -m "feat(tailor): tailor/reviser/reviewer Agno agent factories" -m "C
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/tailoring.py`
+- Create: `src/resume_tailor_harness/tailor/tailoring.py`
 - Test: `tests/test_tailor_tailoring.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -348,11 +348,11 @@ Create `tests/test_tailor_tailoring.py`:
 ```python
 import pytest
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue
-from resume_agent.tailor.tailoring import (
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue
+from resume_tailor_harness.tailor.tailoring import (
     compose_revise_input,
     compose_tailor_input,
     revise,
@@ -427,19 +427,19 @@ Run:
 uv run pytest tests/test_tailor_tailoring.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.tailoring'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.tailoring'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tailor/tailoring.py`:
+Create `src/resume_tailor_harness/tailor/tailoring.py`:
 
 ```python
 from typing import Any, Protocol
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
 
 
 class Runner(Protocol):
@@ -512,7 +512,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/tailoring.py tests/test_tailor_tailoring.py
+git add src/resume_tailor_harness/tailor/tailoring.py tests/test_tailor_tailoring.py
 git commit -m "feat(tailor): tailor + revise wrappers and prompt composition" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -522,7 +522,7 @@ git commit -m "feat(tailor): tailor + revise wrappers and prompt composition" -m
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/panel.py`
+- Create: `src/resume_tailor_harness/tailor/panel.py`
 - Test: `tests/test_tailor_panel.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -532,11 +532,11 @@ Create `tests/test_tailor_panel.py`:
 ```python
 import pytest
 
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.panel import compose_review_input, review_one, run_panel
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.panel import compose_review_input, review_one, run_panel
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 class _Result:
@@ -593,19 +593,19 @@ Run:
 uv run pytest tests/test_tailor_panel.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.panel'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.panel'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tailor/panel.py`:
+Create `src/resume_tailor_harness/tailor/panel.py`:
 
 ```python
 from typing import Any, Protocol
 
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig
 
 
 class Runner(Protocol):
@@ -649,7 +649,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/panel.py tests/test_tailor_panel.py
+git add src/resume_tailor_harness/tailor/panel.py tests/test_tailor_panel.py
 git commit -m "feat(tailor): review panel (review_one + run_panel)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -659,7 +659,7 @@ git commit -m "feat(tailor): review panel (review_one + run_panel)" -m "Co-Autho
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/verdict.py`
+- Create: `src/resume_tailor_harness/tailor/verdict.py`
 - Test: `tests/test_tailor_verdict.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -667,9 +667,9 @@ git commit -m "feat(tailor): review panel (review_one + run_panel)" -m "Co-Autho
 Create `tests/test_tailor_verdict.py`:
 
 ```python
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.verdict import PanelVerdict, aggregate
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.verdict import PanelVerdict, aggregate
 
 
 def _config(threshold=85):
@@ -726,18 +726,18 @@ Run:
 uv run pytest tests/test_tailor_verdict.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.verdict'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.verdict'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tailor/verdict.py`:
+Create `src/resume_tailor_harness/tailor/verdict.py`:
 
 ```python
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig
 
 
 class PanelVerdict(ExtensibleModel):
@@ -786,7 +786,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/verdict.py tests/test_tailor_verdict.py
+git add src/resume_tailor_harness/tailor/verdict.py tests/test_tailor_verdict.py
 git commit -m "feat(tailor): panel verdict aggregation (gate + weighted score)" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -796,7 +796,7 @@ git commit -m "feat(tailor): panel verdict aggregation (gate + weighted score)" 
 
 **Files:**
 
-- Create: `src/resume_agent/tailor/workflow.py`
+- Create: `src/resume_tailor_harness/tailor/workflow.py`
 - Test: `tests/test_tailor_workflow.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -804,12 +804,12 @@ git commit -m "feat(tailor): panel verdict aggregation (gate + weighted score)" 
 Create `tests/test_tailor_workflow.py`:
 
 ```python
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique, ReviewIssue
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.workflow import TailorRound, run_tailor_review
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.workflow import TailorRound, run_tailor_review
 
 
 class _Result:
@@ -904,23 +904,23 @@ Run:
 uv run pytest tests/test_tailor_workflow.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.workflow'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tailor.workflow'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/tailor/workflow.py`:
+Create `src/resume_tailor_harness/tailor/workflow.py`:
 
 ```python
 from typing import Any, Protocol
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.panel import compose_review_input, run_panel
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.tailoring import compose_revise_input, compose_tailor_input, revise, tailor
-from resume_agent.tailor.verdict import PanelVerdict, aggregate
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.tailor.panel import compose_review_input, run_panel
+from resume_tailor_harness.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.tailoring import compose_revise_input, compose_tailor_input, revise, tailor
+from resume_tailor_harness.tailor.verdict import PanelVerdict, aggregate
 
 
 class Runner(Protocol):
@@ -975,7 +975,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tailor/workflow.py tests/test_tailor_workflow.py
+git add src/resume_tailor_harness/tailor/workflow.py tests/test_tailor_workflow.py
 git commit -m "feat(tailor): tailor->review->revise loop" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -985,8 +985,8 @@ git commit -m "feat(tailor): tailor->review->revise loop" -m "Co-Authored-By: Cl
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/repository.py`
-- Create: `src/resume_agent/tailor/service.py`
+- Modify: `src/resume_tailor_harness/tracking/repository.py`
+- Create: `src/resume_tailor_harness/tailor/service.py`
 - Test: `tests/test_tailor_service.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -996,14 +996,14 @@ Create `tests/test_tailor_service.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.service import tailor_job
-from resume_agent.tracking.repository import resume_versions_for_job, save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.service import tailor_job
+from resume_tailor_harness.tracking.repository import resume_versions_for_job, save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 class _Result:
@@ -1062,14 +1062,14 @@ Run:
 uv run pytest tests/test_tailor_service.py -v
 ```
 
-Expected: FAIL — `ImportError`/`ModuleNotFoundError` (`resume_versions_for_job`, `resume_agent.tailor.service`).
+Expected: FAIL — `ImportError`/`ModuleNotFoundError` (`resume_versions_for_job`, `resume_tailor_harness.tailor.service`).
 
 - [ ] **Step 3: Implement**
 
-Append to `src/resume_agent/tracking/repository.py` (add the `ResumeVersion` import to the existing tables import line, and add the functions):
+Append to `src/resume_tailor_harness/tracking/repository.py` (add the `ResumeVersion` import to the existing tables import line, and add the functions):
 
 ```python
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_tailor_harness.tracking.tables import Job, ResumeVersion
 
 
 def get_job(session: Session, job_id: int) -> Job | None:
@@ -1087,21 +1087,21 @@ def resume_versions_for_job(session: Session, job_id: int) -> list[ResumeVersion
     return list(session.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).all())
 ```
 
-(The existing file already imports `Job` from `resume_agent.tracking.tables` and `select` from `sqlmodel`; change the `Job` import to `Job, ResumeVersion` rather than adding a duplicate import line.)
+(The existing file already imports `Job` from `resume_tailor_harness.tracking.tables` and `select` from `sqlmodel`; change the `Job` import to `Job, ResumeVersion` rather than adding a duplicate import line.)
 
-Create `src/resume_agent/tailor/service.py`:
+Create `src/resume_tailor_harness/tailor/service.py`:
 
 ```python
 from typing import Any, Protocol
 
 from sqlmodel import Session
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.workflow import run_tailor_review
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.tailor.review_config import ReviewConfig
+from resume_tailor_harness.tailor.workflow import run_tailor_review
+from resume_tailor_harness.tracking.repository import save_job, save_resume_version
+from resume_tailor_harness.tracking.tables import Job, JobStatus, ResumeVersion
 
 
 class Runner(Protocol):
@@ -1151,7 +1151,7 @@ Expected: PASS (existing repository tests still green + the new service test).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py src/resume_agent/tailor/service.py tests/test_tailor_service.py
+git add src/resume_tailor_harness/tracking/repository.py src/resume_tailor_harness/tailor/service.py tests/test_tailor_service.py
 git commit -m "feat(tailor): persist resume versions + tailor_job service" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -1161,7 +1161,7 @@ git commit -m "feat(tailor): persist resume versions + tailor_job service" -m "C
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_tailor.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1171,10 +1171,10 @@ Create `tests/test_cli_tailor.py`:
 ```python
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.repository import get_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.repository import get_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 runner = CliRunner()
 
@@ -1249,15 +1249,15 @@ Expected: FAIL — the `approve`/`tailor` commands don't exist yet.
 
 - [ ] **Step 3: Implement**
 
-Add these imports near the other imports in `src/resume_agent/cli.py`:
+Add these imports near the other imports in `src/resume_tailor_harness/cli.py`:
 
 ```python
-from resume_agent.discovery.search_config import load_search_config  # (already imported in Discovery task; do not duplicate)
-from resume_agent.tracking.repository import get_job, jobs_by_status, save_job
-from resume_agent.tracking.tables import JobStatus
-from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
-from resume_agent.tailor.review_config import load_review_config
-from resume_agent.tailor.service import tailor_job
+from resume_tailor_harness.discovery.search_config import load_search_config  # (already imported in Discovery task; do not duplicate)
+from resume_tailor_harness.tracking.repository import get_job, jobs_by_status, save_job
+from resume_tailor_harness.tracking.tables import JobStatus
+from resume_tailor_harness.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
+from resume_tailor_harness.tailor.review_config import load_review_config
+from resume_tailor_harness.tailor.service import tailor_job
 ```
 
 (If `load_search_config` / `jobs_by_status` are already imported from the Discovery task, do not add duplicate import lines.)
@@ -1346,8 +1346,8 @@ Expected: PASS (3 tests). (The `tailor` test patches `cli.build_reviewer_agents`
 Run:
 
 ```bash
-uv run resume-agent approve --help
-uv run resume-agent tailor --help
+uv run resume-tailor-harness approve --help
+uv run resume-tailor-harness tailor --help
 ```
 
 Expected: help text for each (exit 0).
@@ -1365,7 +1365,7 @@ Expected: all tests pass (Discovery total + Tailor additions).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_tailor.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_tailor.py
 git commit -m "feat(tailor): approve + tailor CLI commands" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

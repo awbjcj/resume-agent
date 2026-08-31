@@ -4,7 +4,7 @@
 
 **Goal:** `sync_github_sources` discovers `*dossier*.md` files in a repo's root, materializes each as its own project-mode source doc (one Project fact per dossier), and replaces the README virtual doc for that repo.
 
-**Architecture:** All changes live in `src/resume_agent/profile/github_harvest.py`. Dossier candidates are picked from the existing root listing by filename, validated by `repo_url:` frontmatter matching the harvested repo, and written verbatim (30 KB cap) as `github--<repo>--<stem>.md` docs with `mode="project"`, `origin="github"`. The extraction pipeline (`extract_project_fragments`), manifest, and upload-supersession logic are untouched — a repo with N dossiers yields N docs, hence N Project facts.
+**Architecture:** All changes live in `src/resume_tailor_harness/profile/github_harvest.py`. Dossier candidates are picked from the existing root listing by filename, validated by `repo_url:` frontmatter matching the harvested repo, and written verbatim (30 KB cap) as `github--<repo>--<stem>.md` docs with `mode="project"`, `origin="github"`. The extraction pipeline (`extract_project_fragments`), manifest, and upload-supersession logic are untouched — a repo with N dossiers yields N docs, hence N Project facts.
 
 **Tech Stack:** Python 3.13, httpx (`MockTransport` in tests), pytest.
 
@@ -27,7 +27,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/github_harvest.py` (near `_pick_doc_entries`, line ~85)
+- Modify: `src/resume_tailor_harness/profile/github_harvest.py` (near `_pick_doc_entries`, line ~85)
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
@@ -40,7 +40,7 @@
 Append to `tests/test_profile_github_harvest.py`:
 
 ```python
-from resume_agent.profile.github_harvest import (
+from resume_tailor_harness.profile.github_harvest import (
     _pick_doc_entries,
     _pick_dossier_entries,
 )
@@ -96,7 +96,7 @@ Expected: ImportError (`_pick_dossier_entries` not defined).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/profile/github_harvest.py`, add below `_CONTEXT_DOC_NAMES`:
+In `src/resume_tailor_harness/profile/github_harvest.py`, add below `_CONTEXT_DOC_NAMES`:
 
 ```python
 _MAX_DOSSIERS = 5
@@ -132,7 +132,7 @@ Same command as Step 2. Expected: 3 passed. Then run the whole file: `.venv/Scri
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/github_harvest.py tests/test_profile_github_harvest.py
+git add src/resume_tailor_harness/profile/github_harvest.py tests/test_profile_github_harvest.py
 git commit -m "Adds dossier candidate selection to GitHub harvest listing
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
@@ -144,7 +144,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/github_harvest.py` (`_filename_for`, line ~191)
+- Modify: `src/resume_tailor_harness/profile/github_harvest.py` (`_filename_for`, line ~191)
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
@@ -157,7 +157,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 Append to `tests/test_profile_github_harvest.py`:
 
 ```python
-from resume_agent.profile.github_harvest import _dossier_filename, _github_docs_for
+from resume_tailor_harness.profile.github_harvest import _dossier_filename, _github_docs_for
 
 
 def test_dossier_filename_slugs_and_dodges_upload_conflicts(tmp_path):
@@ -200,7 +200,7 @@ def test_dossier_filename_keeps_sanitized_stem_collisions_distinct(tmp_path):
     assert second != first
 ```
 
-Note: `normalize_repo_url` (in `src/resume_agent/profile/github_ingest.py`) strips scheme and casefolds, so `"https://github.com/me/mine"` → `"github.com/me/mine"` — the expected value above is exact.
+Note: `normalize_repo_url` (in `src/resume_tailor_harness/profile/github_ingest.py`) strips scheme and casefolds, so `"https://github.com/me/mine"` → `"github.com/me/mine"` — the expected value above is exact.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -290,7 +290,7 @@ def _github_docs_for(profile_dir: str | Path, repo_url: str | None) -> set[str]:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/github_harvest.py tests/test_profile_github_harvest.py
+git add src/resume_tailor_harness/profile/github_harvest.py tests/test_profile_github_harvest.py
 git commit -m "Adds dossier filename scheme and per-repo doc lookup helpers
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
@@ -302,7 +302,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/github_harvest.py` (`sync_github_sources`, lines ~259-315)
+- Modify: `src/resume_tailor_harness/profile/github_harvest.py` (`sync_github_sources`, lines ~259-315)
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
@@ -596,7 +596,7 @@ Run: `ruff check` — expected: clean.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/github_harvest.py tests/test_profile_github_harvest.py
+git add src/resume_tailor_harness/profile/github_harvest.py tests/test_profile_github_harvest.py
 git commit -m "Harvests in-repo dossier files as per-project GitHub sources
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
@@ -687,7 +687,7 @@ And extend the "Handoff" section after the existing command block:
 
 ```markdown
 Committing dossiers to the repository root also works without the manual
-`profile add`: `resume-agent profile sync-github` discovers root files named
+`profile add`: `resume-tailor-harness profile sync-github` discovers root files named
 `*dossier*.md` (up to 5 per repository, 30 KB each), validates their
 `repo_url` frontmatter, and ingests each as its own project source, replacing
 the auto-harvested README document. A manual upload still overrides

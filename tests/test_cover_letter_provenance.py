@@ -1,9 +1,9 @@
-from resume_agent.cover_letter.provenance import (
+from resume_tailor_harness.cover_letter.provenance import (
     collect_fact_ids,
     unsupported_provenance,
 )
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts, Skill
 
 
 def _facts():

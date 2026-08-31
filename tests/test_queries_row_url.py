@@ -1,7 +1,7 @@
-from resume_agent.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.queries import pipeline_rows, shortlist_rows, triage_rows
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.queries import pipeline_rows, shortlist_rows, triage_rows
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def test_board_rows_and_schemas_expose_posting_url():

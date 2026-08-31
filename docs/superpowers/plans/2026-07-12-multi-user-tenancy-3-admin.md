@@ -50,7 +50,7 @@ These corrections are normative and override later reference snippets:
 - Prerequisites: Plans 1 and 2 fully landed (this plan consumes `mu_client`/`login` fixtures, `require_context`, the system tables, and `resolve_limit`/`system_default`).
 - Delete-user refuses: the last admin, self-deletion, and targets with in-flight runs; it evicts the engine (`EngineRegistry.evict`) **before** removing the workspace directory; requires `?confirm=DELETE`.
 - Self-service export contains the caller's `secrets.env` — the UI must say so ("this archive is secret material").
-- PAT-based admin CLI: `admin login` = login endpoint → mint PAT named `cli` → cache `{apiUrl, username, token}` at `~/.resume-agent/credentials.json`; server chosen by `RESUME_AGENT_URL` (default `http://localhost:8000`).
+- PAT-based admin CLI: `admin login` = login endpoint → mint PAT named `cli` → cache `{apiUrl, username, token}` at `~/.resume-tailor-harness/credentials.json`; server chosen by `RESUME_TAILOR_HARNESS_URL` (default `http://localhost:8000`).
 - Non-admin on `/api/admin/*` → 403 `FORBIDDEN`. Admin page hidden from non-admin nav; register page linked from login.
 - All new endpoints ride the contract pipeline: camelCase schemas → `bash scripts/gen_ts_client.sh` → drift gate `tests/api/test_openapi_contract.py`.
 - Test: `.venv/Scripts/python.exe -m pytest`; lint: `ruff check`; web: `cd web && npx vitest run`.
@@ -61,10 +61,10 @@ These corrections are normative and override later reference snippets:
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/admin_users.py`
-- Create: `src/resume_agent/api/schemas/admin_users.py`
-- Modify: `src/resume_agent/api/deps.py` (add `require_admin`)
-- Modify: `src/resume_agent/api/app.py` (include router)
+- Create: `src/resume_tailor_harness/api/routers/admin_users.py`
+- Create: `src/resume_tailor_harness/api/schemas/admin_users.py`
+- Modify: `src/resume_tailor_harness/api/deps.py` (add `require_admin`)
+- Modify: `src/resume_tailor_harness/api/app.py` (include router)
 - Test: `tests/api/test_admin_users.py`
 
 **Interfaces:**
@@ -83,7 +83,7 @@ These corrections are normative and override later reference snippets:
 # tests/api/test_admin_users.py
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.system_db import User
+from resume_tailor_harness.tenancy.system_db import User
 
 from tests.api.conftest import login
 from tests.api.test_tenancy_isolation import _register
@@ -186,7 +186,7 @@ Expected: FAIL — 404s (router missing). Note `test_disabled_user_cannot_login`
 
 ```python
 def require_admin() -> UserContext:
-    from resume_agent.tenancy.context import require_context
+    from resume_tailor_harness.tenancy.context import require_context
 
     ctx = require_context()
     if not ctx.is_admin:
@@ -195,12 +195,12 @@ def require_admin() -> UserContext:
 ```
 
 ```python
-# src/resume_agent/api/schemas/admin_users.py
+# src/resume_tailor_harness/api/schemas/admin_users.py
 from datetime import datetime
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class AdminUser(CamelModel):
@@ -237,7 +237,7 @@ class ResetPasswordRequest(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/admin_users.py
+# src/resume_tailor_harness/api/routers/admin_users.py
 """Admin user management — the one surface behind both the SPA admin page
 and the HTTP-client admin CLI."""
 
@@ -252,20 +252,20 @@ from sqlalchemy.orm import Session
 from sqlmodel import Session as SMSession
 from sqlmodel import select as sm_select
 
-from resume_agent.api import auth
-from resume_agent.api.deps import require_admin
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.admin_users import (
+from resume_tailor_harness.api import auth
+from resume_tailor_harness.api.deps import require_admin
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.admin_users import (
     AdminUser,
     AdminUserList,
     AdminUserPatch,
     ResetPasswordRequest,
 )
-from resume_agent.tenancy.context import UserContext
-from resume_agent.tenancy.limits import weekly_usage
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import workspace_paths
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.tenancy.context import UserContext
+from resume_tailor_harness.tenancy.limits import weekly_usage
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import workspace_paths
+from resume_tailor_harness.tracking.tables import Job
 
 router = APIRouter(prefix="/admin/users", tags=["admin"])
 
@@ -403,7 +403,7 @@ def delete_user(
     return {"status": "deleted"}
 ```
 
-Register in `app.py`: `from resume_agent.api.routers import admin_users as admin_users_router` and `app.include_router(admin_users_router.router, prefix="/api", dependencies=guarded)`.
+Register in `app.py`: `from resume_tailor_harness.api.routers import admin_users as admin_users_router` and `app.include_router(admin_users_router.router, prefix="/api", dependencies=guarded)`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -413,7 +413,7 @@ Expected: 6 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/admin_users.py src/resume_agent/api/schemas/admin_users.py src/resume_agent/api/deps.py src/resume_agent/api/app.py tests/api/test_admin_users.py
+git add src/resume_tailor_harness/api/routers/admin_users.py src/resume_tailor_harness/api/schemas/admin_users.py src/resume_tailor_harness/api/deps.py src/resume_tailor_harness/api/app.py tests/api/test_admin_users.py
 git commit -m "Adds admin user management API with guarded deletion"
 ```
 
@@ -423,9 +423,9 @@ git commit -m "Adds admin user management API with guarded deletion"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/admin_invites.py`
-- Create: `src/resume_agent/api/schemas/admin_invites.py`
-- Modify: `src/resume_agent/api/app.py` (include router)
+- Create: `src/resume_tailor_harness/api/routers/admin_invites.py`
+- Create: `src/resume_tailor_harness/api/schemas/admin_invites.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (include router)
 - Test: `tests/api/test_admin_invites.py`
 
 **Interfaces:**
@@ -482,10 +482,10 @@ Expected: FAIL — 404s
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/api/schemas/admin_invites.py
+# src/resume_tailor_harness/api/schemas/admin_invites.py
 from datetime import datetime
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class InviteMintRequest(CamelModel):
@@ -513,7 +513,7 @@ class InviteList(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/admin_invites.py
+# src/resume_tailor_harness/api/routers/admin_invites.py
 from __future__ import annotations
 
 import uuid
@@ -523,17 +523,17 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.deps import require_admin
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.admin_invites import (
+from resume_tailor_harness.api.deps import require_admin
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.admin_invites import (
     InviteInfo,
     InviteList,
     InviteMinted,
     InviteMintRequest,
 )
-from resume_agent.tenancy.context import UserContext
-from resume_agent.tenancy.secrets import hash_secret, mint_secret
-from resume_agent.tenancy.system_db import InviteCode
+from resume_tailor_harness.tenancy.context import UserContext
+from resume_tailor_harness.tenancy.secrets import hash_secret, mint_secret
+from resume_tailor_harness.tenancy.system_db import InviteCode
 
 router = APIRouter(prefix="/admin/invites", tags=["admin"])
 
@@ -595,7 +595,7 @@ Expected: 2 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/admin_invites.py src/resume_agent/api/schemas/admin_invites.py src/resume_agent/api/app.py tests/api/test_admin_invites.py
+git add src/resume_tailor_harness/api/routers/admin_invites.py src/resume_tailor_harness/api/schemas/admin_invites.py src/resume_tailor_harness/api/app.py tests/api/test_admin_invites.py
 git commit -m "Adds invite minting, listing, and revocation"
 ```
 
@@ -605,9 +605,9 @@ git commit -m "Adds invite minting, listing, and revocation"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/admin_system.py`
-- Create: `src/resume_agent/api/schemas/admin_system.py`
-- Modify: `src/resume_agent/api/app.py`
+- Create: `src/resume_tailor_harness/api/routers/admin_system.py`
+- Create: `src/resume_tailor_harness/api/schemas/admin_system.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_admin_system.py`
 
 **Interfaces:**
@@ -625,8 +625,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.limits import DEFAULT_WEEKLY_TOKEN_BUDGET
-from resume_agent.tenancy.system_db import UsageEvent, User
+from resume_tailor_harness.tenancy.limits import DEFAULT_WEEKLY_TOKEN_BUDGET
+from resume_tailor_harness.tenancy.system_db import UsageEvent, User
 
 from tests.api.conftest import login
 
@@ -671,8 +671,8 @@ Expected: FAIL — 404s
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/api/schemas/admin_system.py
-from resume_agent.api.schemas.base import CamelModel
+# src/resume_tailor_harness/api/schemas/admin_system.py
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class SystemDefaults(CamelModel):
@@ -694,7 +694,7 @@ class UsageReport(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/admin_system.py
+# src/resume_tailor_harness/api/routers/admin_system.py
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -703,16 +703,16 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from resume_agent.api.deps import require_admin
-from resume_agent.api.schemas.admin_system import SystemDefaults, UsageReport, UserUsage
-from resume_agent.tenancy.context import UserContext
-from resume_agent.tenancy.limits import (
+from resume_tailor_harness.api.deps import require_admin
+from resume_tailor_harness.api.schemas.admin_system import SystemDefaults, UsageReport, UserUsage
+from resume_tailor_harness.tenancy.context import UserContext
+from resume_tailor_harness.tenancy.limits import (
     DEFAULT_MAX_ACTIVE_JOBS,
     DEFAULT_MAX_CONCURRENT_RUNS,
     DEFAULT_WEEKLY_TOKEN_BUDGET,
     system_default,
 )
-from resume_agent.tenancy.system_db import SystemSetting, UsageEvent, User
+from resume_tailor_harness.tenancy.system_db import SystemSetting, UsageEvent, User
 
 router = APIRouter(prefix="/admin/system", tags=["admin"])
 
@@ -791,7 +791,7 @@ Expected: 2 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/admin_system.py src/resume_agent/api/schemas/admin_system.py src/resume_agent/api/app.py tests/api/test_admin_system.py
+git add src/resume_tailor_harness/api/routers/admin_system.py src/resume_tailor_harness/api/schemas/admin_system.py src/resume_tailor_harness/api/app.py tests/api/test_admin_system.py
 git commit -m "Adds system defaults and aggregate usage endpoints"
 ```
 
@@ -801,8 +801,8 @@ git commit -m "Adds system defaults and aggregate usage endpoints"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/account.py` (from Plan 2 Task 5)
-- Modify: `src/resume_agent/api/schemas/account.py`
+- Modify: `src/resume_tailor_harness/api/routers/account.py` (from Plan 2 Task 5)
+- Modify: `src/resume_tailor_harness/api/schemas/account.py`
 - Test: `tests/api/test_account.py`
 
 **Interfaces:**
@@ -897,19 +897,19 @@ from fastapi.responses import FileResponse
 from sqlalchemy import case, func, select
 from starlette.background import BackgroundTask
 
-from resume_agent.api import auth as auth_mod
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.api.schemas.account import AccountUsage, PasswordChangeRequest
-from resume_agent.config import Settings
-from resume_agent.services.backup import export_data_root
-from resume_agent.tenancy.limits import (
+from resume_tailor_harness.api import auth as auth_mod
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.api.schemas.account import AccountUsage, PasswordChangeRequest
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.services.backup import export_data_root
+from resume_tailor_harness.tenancy.limits import (
     DEFAULT_WEEKLY_TOKEN_BUDGET,
     resolve_limit,
     system_default,
     weekly_usage,
 )
-from resume_agent.tenancy.system_db import UsageEvent, User
-from resume_agent.tenancy.workspace import workspace_paths
+from resume_tailor_harness.tenancy.system_db import UsageEvent, User
+from resume_tailor_harness.tenancy.workspace import workspace_paths
 
 
 @router.post("/password")
@@ -993,7 +993,7 @@ Expected: 4 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/account.py src/resume_agent/api/schemas/account.py tests/api/test_account.py
+git add src/resume_tailor_harness/api/routers/account.py src/resume_tailor_harness/api/schemas/account.py tests/api/test_account.py
 git commit -m "Adds password change, workspace self-export, and usage meter"
 ```
 
@@ -1003,14 +1003,14 @@ git commit -m "Adds password change, workspace self-export, and usage meter"
 
 **Files:**
 
-- Create: `src/resume_agent/admin_cli.py`
-- Modify: `src/resume_agent/cli.py` (register the sub-app)
+- Create: `src/resume_tailor_harness/admin_cli.py`
+- Modify: `src/resume_tailor_harness/cli.py` (register the sub-app)
 - Test: `tests/test_admin_cli.py`
 
 **Interfaces:**
 
 - Consumes: Tasks 1-4 endpoints; Plan 2 login + PAT endpoints.
-- Produces: `resume-agent admin <cmd>` — `login`, `logout`, `whoami`, `list-users`, `invite [--expires-days N]`, `set-role USERNAME ROLE`, `set-limits USERNAME [--budget N] [--max-jobs N] [--max-runs N]`, `usage [--days N]`, `disable USERNAME`, `enable USERNAME`, `delete USERNAME --confirm`, `reset-password USERNAME`. Server from `RESUME_AGENT_URL` (default `http://localhost:8000`); credentials at `~/.resume-agent/credentials.json` (`{"apiUrl", "username", "token"}`, the token being a PAT named `cli`). All commands print human-readable tables/lines via `typer.echo`.
+- Produces: `resume-tailor-harness admin <cmd>` — `login`, `logout`, `whoami`, `list-users`, `invite [--expires-days N]`, `set-role USERNAME ROLE`, `set-limits USERNAME [--budget N] [--max-jobs N] [--max-runs N]`, `usage [--days N]`, `disable USERNAME`, `enable USERNAME`, `delete USERNAME --confirm`, `reset-password USERNAME`. Server from `RESUME_TAILOR_HARNESS_URL` (default `http://localhost:8000`); credentials at `~/.resume-tailor-harness/credentials.json` (`{"apiUrl", "username", "token"}`, the token being a PAT named `cli`). All commands print human-readable tables/lines via `typer.echo`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1021,7 +1021,7 @@ Test through the FastAPI app with httpx's ASGI transport so no server is needed:
 import httpx
 import pytest
 
-from resume_agent import admin_cli
+from resume_tailor_harness import admin_cli
 
 from tests.api.conftest import login  # reuse fixture helpers; mu_app fixture via conftest
 
@@ -1079,7 +1079,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/admin_cli.py
+# src/resume_tailor_harness/admin_cli.py
 """HTTP-client admin CLI (the vsda manage_users.py pattern).
 
 Thin: every command is one or two HTTP calls against the same /api/admin/*
@@ -1096,14 +1096,14 @@ from pathlib import Path
 import httpx
 import typer
 
-CREDENTIALS_PATH = Path.home() / ".resume-agent" / "credentials.json"
+CREDENTIALS_PATH = Path.home() / ".resume-tailor-harness" / "credentials.json"
 DEFAULT_URL = "http://localhost:8000"
 
-admin_app = typer.Typer(help="Manage users on a deployed resume-agent instance.")
+admin_app = typer.Typer(help="Manage users on a deployed resume-tailor-harness instance.")
 
 
 def api_url() -> str:
-    return os.environ.get("RESUME_AGENT_URL", DEFAULT_URL).rstrip("/")
+    return os.environ.get("RESUME_TAILOR_HARNESS_URL", DEFAULT_URL).rstrip("/")
 
 
 def _make_client(base_url: str) -> httpx.Client:
@@ -1125,7 +1125,7 @@ def _save_credentials(creds: dict) -> None:
 def _authed_client() -> httpx.Client:
     creds = load_credentials()
     if creds is None:
-        raise typer.Exit(code=_fail("Not logged in. Run: resume-agent admin login"))
+        raise typer.Exit(code=_fail("Not logged in. Run: resume-tailor-harness admin login"))
     client = _make_client(creds["apiUrl"])
     client.headers["Authorization"] = f"Bearer {creds['token']}"
     return client
@@ -1172,7 +1172,7 @@ def do_logout() -> None:
 def do_whoami() -> None:
     creds = load_credentials()
     if creds is None:
-        typer.echo(f"Not logged in. RESUME_AGENT_URL={api_url()}")
+        typer.echo(f"Not logged in. RESUME_TAILOR_HARNESS_URL={api_url()}")
         return
     typer.echo(f"{creds['username']} -> {creds['apiUrl']}")
 
@@ -1262,7 +1262,7 @@ def do_reset_password(username: str, password: str) -> None:
 # ---- typer bindings ----
 
 @admin_app.command("login")
-def login_cmd(url: str = typer.Option(None, "--url", help="Server URL (default RESUME_AGENT_URL)")) -> None:
+def login_cmd(url: str = typer.Option(None, "--url", help="Server URL (default RESUME_TAILOR_HARNESS_URL)")) -> None:
     target = (url or api_url()).rstrip("/")
     username = typer.prompt("Username")
     password = typer.prompt("Password", hide_input=True)
@@ -1338,7 +1338,7 @@ def reset_password_cmd(username: str) -> None:
 Register in `cli.py` next to `profile_app`:
 
 ```python
-from resume_agent.admin_cli import admin_app
+from resume_tailor_harness.admin_cli import admin_app
 
 app.add_typer(admin_app, name="admin")
 ```
@@ -1353,7 +1353,7 @@ Expected: 3 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/admin_cli.py src/resume_agent/cli.py tests/test_admin_cli.py
+git add src/resume_tailor_harness/admin_cli.py src/resume_tailor_harness/cli.py tests/test_admin_cli.py
 git commit -m "Adds HTTP-client admin CLI over the admin API"
 ```
 
@@ -2078,8 +2078,8 @@ Append to CLAUDE.md's tenancy section:
 ```markdown
 Admin surfaces: `/api/admin/users|invites|system/*` behind `require_admin`
 (403 FORBIDDEN otherwise) — one surface, two clients (SPA Admin page +
-`resume-agent admin <cmd>` HTTP CLI, PAT cached at
-`~/.resume-agent/credentials.json`, server from RESUME_AGENT_URL). Account
+`resume-tailor-harness admin <cmd>` HTTP CLI, PAT cached at
+`~/.resume-tailor-harness/credentials.json`, server from RESUME_TAILOR_HARNESS_URL). Account
 self-service: password change (reissues the session cookie), PAT CRUD,
 usage meter, and workspace export (`/api/account/export` — archive contains
 secrets.env). Delete-user: confirm flag, refuses last admin/self/in-flight
@@ -2101,7 +2101,7 @@ git commit -m "Adds SPA admin page with contract regeneration"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/admin.py` (import handler engine lifecycle; both routes behind `require_admin`)
+- Modify: `src/resume_tailor_harness/api/routers/admin.py` (import handler engine lifecycle; both routes behind `require_admin`)
 - Test: `tests/api/test_admin_root_import_export.py`
 
 **Interfaces:**
@@ -2163,7 +2163,7 @@ In `api/routers/admin.py`:
 1. Add `ctx: UserContext = Depends(require_admin)` to both route signatures when `request.app.state.system_engine is not None` — simplest uniform shape: add a small local dependency that no-ops in legacy mode:
 
 ```python
-from resume_agent.api.deps import require_admin
+from resume_tailor_harness.api.deps import require_admin
 
 
 def require_admin_when_multiuser(request: Request) -> None:
@@ -2185,10 +2185,10 @@ and add `dependencies=[Depends(require_admin_when_multiuser)]` to the router con
                 system_engine.dispose()
             request.app.state.engine.dispose()
             if system_engine is not None:
-                from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
-                from resume_agent.tenancy.engines import EngineRegistry
-                from resume_agent.tenancy.system_db import init_system_db, make_system_engine
-                from resume_agent.tenancy import usage
+                from resume_tailor_harness.tenancy.bootstrap import build_context, ensure_bootstrapped
+                from resume_tailor_harness.tenancy.engines import EngineRegistry
+                from resume_tailor_harness.tenancy.system_db import init_system_db, make_system_engine
+                from resume_tailor_harness.tenancy import usage
 
                 new_system = make_system_engine(request.app.state.data_dir)
                 init_system_db(new_system)
@@ -2220,7 +2220,7 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → green (legacy imp
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/admin.py src/resume_agent/services/backup.py tests/api/test_admin_root_import_export.py
+git add src/resume_tailor_harness/api/routers/admin.py src/resume_tailor_harness/services/backup.py tests/api/test_admin_root_import_export.py
 git commit -m "Rebuilds tenancy engines across whole-root import under multi-user"
 ```             request.app.state.engine = engine
 ```
@@ -2235,6 +2235,6 @@ Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → green (legacy imp
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/admin.py src/resume_agent/services/backup.py tests/api/test_admin_root_import_export.py
+git add src/resume_tailor_harness/api/routers/admin.py src/resume_tailor_harness/services/backup.py tests/api/test_admin_root_import_export.py
 git commit -m "Rebuilds tenancy engines across whole-root import under multi-user"
 ```

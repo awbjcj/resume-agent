@@ -8,7 +8,7 @@ const autoI18nPlugin = require("./i18n-auto-plugin.cjs") as PluginItem;
 
 export function i18nTransform(): Plugin {
   return {
-    name: "resume-agent-i18n-transform",
+    name: "resume-tailor-harness-i18n-transform",
     enforce: "pre",
     async transform(code, id) {
       const filename = id.split("?", 1)[0];

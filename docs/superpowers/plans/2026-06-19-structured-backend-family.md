@@ -16,12 +16,12 @@
 
 | File                                                 | Responsibility                                            | Action |
 | ---------------------------------------------------- | --------------------------------------------------------- | ------ |
-| `src/resume_agent/discovery/connectors/detect.py`    | `AtsTarget` descriptor; URL/host → target                 | Modify |
-| `src/resume_agent/discovery/connectors/workday.py`   | Workday cxs list+detail fetch, request-shaping, list-gate | Create |
-| `src/resume_agent/discovery/connectors/tesla.py`     | Tesla careers JSON singleton backend                      | Create |
-| `src/resume_agent/discovery/connectors/google.py`    | Google careers JSON singleton backend                     | Create |
-| `src/resume_agent/discovery/connectors/companies.py` | Dispatch table; thread `search`/`limit` to adapters       | Modify |
-| `src/resume_agent/discovery/connectors/text.py`      | Shared `primary_search_text` and list-row relevance gate  | Modify |
+| `src/resume_tailor_harness/discovery/connectors/detect.py`    | `AtsTarget` descriptor; URL/host → target                 | Modify |
+| `src/resume_tailor_harness/discovery/connectors/workday.py`   | Workday cxs list+detail fetch, request-shaping, list-gate | Create |
+| `src/resume_tailor_harness/discovery/connectors/tesla.py`     | Tesla careers JSON singleton backend                      | Create |
+| `src/resume_tailor_harness/discovery/connectors/google.py`    | Google careers JSON singleton backend                     | Create |
+| `src/resume_tailor_harness/discovery/connectors/companies.py` | Dispatch table; thread `search`/`limit` to adapters       | Modify |
+| `src/resume_tailor_harness/discovery/connectors/text.py`      | Shared `primary_search_text` and list-row relevance gate  | Modify |
 | `tests/test_connector_detect.py`                     | Extend with Workday triple + singletons                   | Modify |
 | `tests/test_connector_workday.py`                    | Workday parse/list-gate/fetch                             | Create |
 | `tests/test_connector_tesla.py`                      | Tesla parse/fetch                                         | Create |
@@ -36,7 +36,7 @@ No change to `config.py`, `registry.py`, or `connectors.yaml` — Workday/Tesla/
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/detect.py:47-50`
+- Modify: `src/resume_tailor_harness/discovery/connectors/detect.py:47-50`
 - Test: `tests/test_connector_detect.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -85,7 +85,7 @@ Expected: PASS (all existing positional tests still green)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/detect.py tests/test_connector_detect.py
+git add src/resume_tailor_harness/discovery/connectors/detect.py tests/test_connector_detect.py
 git commit -m "feat: extend AtsTarget with optional workday/singleton fields"
 ```
 
@@ -95,7 +95,7 @@ git commit -m "feat: extend AtsTarget with optional workday/singleton fields"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/detect.py:44,70-73,91-93`
+- Modify: `src/resume_tailor_harness/discovery/connectors/detect.py:44,70-73,91-93`
 - Test: `tests/test_connector_detect.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -175,7 +175,7 @@ Expected: PASS. Note `test_l1_workday_url` (`.../careers`) still passes — `ats
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/detect.py tests/test_connector_detect.py
+git add src/resume_tailor_harness/discovery/connectors/detect.py tests/test_connector_detect.py
 git commit -m "feat: capture workday tenant/datacenter/site in L1 detection"
 ```
 
@@ -185,7 +185,7 @@ git commit -m "feat: capture workday tenant/datacenter/site in L1 detection"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/detect.py` (add `_singleton`, call it first in `detect_ats`)
+- Modify: `src/resume_tailor_harness/discovery/connectors/detect.py` (add `_singleton`, call it first in `detect_ats`)
 - Test: `tests/test_connector_detect.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -261,7 +261,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/detect.py tests/test_connector_detect.py
+git add src/resume_tailor_harness/discovery/connectors/detect.py tests/test_connector_detect.py
 git commit -m "feat: detect tesla/google careers by host-match singleton"
 ```
 
@@ -271,22 +271,22 @@ git commit -m "feat: detect tesla/google careers by host-match singleton"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/workday.py`
-- Modify: `src/resume_agent/discovery/connectors/text.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/workday.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/text.py`
 - Test: `tests/test_connector_workday.py`
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_connector_workday.py
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.workday import (
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.workday import (
     cxs_jobs_url,
     list_request_body,
     parse_list_rows,
 )
-from resume_agent.discovery.connectors.text import primary_search_text, listing_relevance_gate
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.text import primary_search_text, listing_relevance_gate
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers")
 
@@ -379,13 +379,13 @@ def listing_relevance_gate(jobs: list[RawJob], search: SearchConfig) -> list[Raw
 ```
 
 ```python
-# src/resume_agent/discovery/connectors/workday.py
+# src/resume_tailor_harness/discovery/connectors/workday.py
 from dataclasses import dataclass
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import primary_search_text
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.text import primary_search_text
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
 
@@ -443,7 +443,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/text.py src/resume_agent/discovery/connectors/workday.py tests/test_connector_workday.py
+git add src/resume_tailor_harness/discovery/connectors/text.py src/resume_tailor_harness/discovery/connectors/workday.py tests/test_connector_workday.py
 git commit -m "feat: workday list parsing and cxs request body"
 ```
 
@@ -453,7 +453,7 @@ git commit -m "feat: workday list parsing and cxs request body"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/workday.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/workday.py`
 - Test: `tests/test_connector_workday.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -461,7 +461,7 @@ git commit -m "feat: workday list parsing and cxs request body"
 ```python
 # append to tests/test_connector_workday.py
 from datetime import datetime, timezone
-from resume_agent.discovery.connectors.workday import cxs_detail_url, apply_detail
+from resume_tailor_harness.discovery.connectors.workday import cxs_detail_url, apply_detail
 
 DETAIL = {
     "jobPostingInfo": {
@@ -502,8 +502,8 @@ Expected: FAIL — `cxs_detail_url`/`apply_detail` undefined
 
 ```python
 # workday.py — add imports
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.text import html_to_text, primary_search_text
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.text import html_to_text, primary_search_text
 ```
 
 ```python
@@ -534,7 +534,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/workday.py tests/test_connector_workday.py
+git add src/resume_tailor_harness/discovery/connectors/workday.py tests/test_connector_workday.py
 git commit -m "feat: workday detail parsing (jd, url, posted_at)"
 ```
 
@@ -544,14 +544,14 @@ git commit -m "feat: workday detail parsing (jd, url, posted_at)"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/workday.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/workday.py`
 - Test: `tests/test_connector_workday.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # append to tests/test_connector_workday.py
-import resume_agent.discovery.connectors.workday as workday
+import resume_tailor_harness.discovery.connectors.workday as workday
 
 
 class _Resp:
@@ -619,7 +619,7 @@ Expected: FAIL — `fetch_workday` / `workday.httpx` undefined
 ```python
 # workday.py — add imports at top
 import httpx
-from resume_agent.discovery.connectors.text import listing_relevance_gate
+from resume_tailor_harness.discovery.connectors.text import listing_relevance_gate
 ```
 
 ```python
@@ -670,7 +670,7 @@ Expected: PASS (all Workday tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/workday.py tests/test_connector_workday.py
+git add src/resume_tailor_harness/discovery/connectors/workday.py tests/test_connector_workday.py
 git commit -m "feat: workday fetch with request-shaping and list-gate-before-detail"
 ```
 
@@ -680,7 +680,7 @@ git commit -m "feat: workday fetch with request-shaping and list-gate-before-det
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/tesla.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/tesla.py`
 - Test: `tests/test_connector_tesla.py`
 
 > **Build-time note:** confirm Tesla's exact careers endpoints from the browser network tab before running live. The parser below targets the documented shape (`/cua-api/apps/careers/state` listings + `/cua-api/apps/careers/job/{id}` detail); the tests pin the _parser_ against a fixture, so only the two URL constants need confirming.
@@ -689,9 +689,9 @@ git commit -m "feat: workday fetch with request-shaping and list-gate-before-det
 
 ```python
 # tests/test_connector_tesla.py
-import resume_agent.discovery.connectors.tesla as tesla
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.tesla as tesla
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("tesla")
 STATE = {"listings": [
@@ -741,15 +741,15 @@ Expected: FAIL — `ModuleNotFoundError: tesla`
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/discovery/connectors/tesla.py
+# src/resume_tailor_harness/discovery/connectors/tesla.py
 from dataclasses import dataclass
 
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_text, listing_relevance_gate
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.text import html_to_text, listing_relevance_gate
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _STATE_URL = "https://www.tesla.com/cua-api/apps/careers/state"          # confirm at build time
 _JOB_URL = "https://www.tesla.com/cua-api/apps/careers/job/{id}"        # confirm at build time
@@ -806,7 +806,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/tesla.py tests/test_connector_tesla.py
+git add src/resume_tailor_harness/discovery/connectors/tesla.py tests/test_connector_tesla.py
 git commit -m "feat: tesla careers singleton backend (parser fixture-tested)"
 ```
 
@@ -816,7 +816,7 @@ git commit -m "feat: tesla careers singleton backend (parser fixture-tested)"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/google.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/google.py`
 - Test: `tests/test_connector_google.py`
 
 > **Build-time note:** confirm Google's careers search endpoint (`careers.google.com/api/v3/search/`) and response keys from the network tab; the parser is fixture-pinned, so only the URL/keys may need adjustment.
@@ -825,9 +825,9 @@ git commit -m "feat: tesla careers singleton backend (parser fixture-tested)"
 
 ```python
 # tests/test_connector_google.py
-import resume_agent.discovery.connectors.google as google
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.google as google
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("google")
 PAGE = {"count": 1, "jobs": [{
@@ -876,14 +876,14 @@ Expected: FAIL — `ModuleNotFoundError: google`
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/discovery/connectors/google.py
+# src/resume_tailor_harness/discovery/connectors/google.py
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_text, primary_search_text
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.text import html_to_text, primary_search_text
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _SEARCH_URL = "https://careers.google.com/api/v3/search/"   # confirm at build time
 _MAX_PAGES = 20
@@ -930,7 +930,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/google.py tests/test_connector_google.py
+git add src/resume_tailor_harness/discovery/connectors/google.py tests/test_connector_google.py
 git commit -m "feat: google careers singleton backend (search-shaped, fixture-tested)"
 ```
 
@@ -940,15 +940,15 @@ git commit -m "feat: google careers singleton backend (search-shaped, fixture-te
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/companies.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/companies.py`
 - Test: `tests/test_connector_companies.py`
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 # append to tests/test_connector_companies.py
-from resume_agent.discovery.search_config import SearchConfig
-import resume_agent.discovery.connectors.companies as companies
+from resume_tailor_harness.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.companies as companies
 
 
 def test_companies_dispatches_workday(monkeypatch):
@@ -956,7 +956,7 @@ def test_companies_dispatches_workday(monkeypatch):
 
     def fake_workday(target, search, limit=None):
         calls["target"] = target
-        from resume_agent.discovery.connectors.base import RawJob
+        from resume_tailor_harness.discovery.connectors.base import RawJob
         return [RawJob("workday", "u", "acme", "Software Engineer", "Austin", "jd")]
 
     monkeypatch.setitem(companies._BACKENDS, "workday", fake_workday)
@@ -988,16 +988,16 @@ Expected: FAIL — `companies` has no `fetch_workday` / dispatch
 # companies.py — replace the whole file body below the imports
 import httpx
 
-from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
-from resume_agent.discovery.connectors.base import RawJob, board_error
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats
-from resume_agent.discovery.connectors.google import fetch_google
-from resume_agent.discovery.connectors.greenhouse import fetch_greenhouse_board, parse_greenhouse
-from resume_agent.discovery.connectors.lever import fetch_lever_board, parse_lever
-from resume_agent.discovery.connectors.tesla import fetch_tesla
-from resume_agent.discovery.connectors.text import relevance_gate
-from resume_agent.discovery.connectors.workday import fetch_workday
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
+from resume_tailor_harness.discovery.connectors.base import RawJob, board_error
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget, detect_ats
+from resume_tailor_harness.discovery.connectors.google import fetch_google
+from resume_tailor_harness.discovery.connectors.greenhouse import fetch_greenhouse_board, parse_greenhouse
+from resume_tailor_harness.discovery.connectors.lever import fetch_lever_board, parse_lever
+from resume_tailor_harness.discovery.connectors.tesla import fetch_tesla
+from resume_tailor_harness.discovery.connectors.text import relevance_gate
+from resume_tailor_harness.discovery.connectors.workday import fetch_workday
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _greenhouse(target, search, limit=None):
@@ -1066,7 +1066,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/companies.py tests/test_connector_companies.py
+git add src/resume_tailor_harness/discovery/connectors/companies.py tests/test_connector_companies.py
 git commit -m "feat: dispatch companies connector to workday/tesla/google backends"
 ```
 
@@ -1081,7 +1081,7 @@ Expected: PASS, no regressions in existing connector/detect/companies tests.
 
 - [ ] **Step 2: Lint**
 
-Run: `ruff check src/resume_agent/discovery/connectors`
+Run: `ruff check src/resume_tailor_harness/discovery/connectors`
 Expected: clean (fix any unused-import orphans introduced by the dispatch rewrite).
 
 - [ ] **Step 3: Commit any lint fixes**

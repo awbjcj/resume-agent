@@ -1,9 +1,9 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.services import discovery
-from resume_agent.discovery.connectors.runner import PullReport
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.services import discovery
+from resume_tailor_harness.discovery.connectors.runner import PullReport
+from resume_tailor_harness.discovery.scraper.dashboard import DashboardScraper
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def _session():
@@ -33,7 +33,7 @@ def test_pull_jobs_forwards_skip_known(monkeypatch):
 
     def fake_run_pull(session, connectors, search, telemetry_path, **kwargs):
         captured.update(kwargs)
-        from resume_agent.discovery.connectors.runner import PullReport
+        from resume_tailor_harness.discovery.connectors.runner import PullReport
 
         return PullReport()
 

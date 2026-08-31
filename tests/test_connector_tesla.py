@@ -2,9 +2,9 @@ import json
 from contextlib import nullcontext
 from pathlib import Path
 
-import resume_agent.discovery.connectors.tesla as tesla
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.tesla as tesla
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("tesla")
 FIXTURES = Path(__file__).parent / "fixtures" / "tesla"
@@ -132,7 +132,7 @@ def test_capture_state_raises_isolable_error_when_exhausted(monkeypatch):
 
 
 def test_tesla_block_is_isolated_not_fatal_to_the_pull():
-    from resume_agent.discovery.connectors.companies import _failure_reason
+    from resume_tailor_harness.discovery.connectors.companies import _failure_reason
 
     reason = _failure_reason(tesla.TeslaStateUnavailable("blocked"))
     assert reason is not None  # a reason string means harvest records, not re-raises

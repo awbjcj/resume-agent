@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.tenancy.context import new_user_id
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.tenancy.context import new_user_id
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import provision_workspace
 
 
 def _add_user(app, username: str, password: str):

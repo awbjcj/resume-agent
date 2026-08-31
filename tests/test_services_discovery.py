@@ -1,18 +1,18 @@
 import httpx
 import pytest
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.connectors.base import RawJob
-import resume_agent.profile.effective as effective_module
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.effective import build_effective_taxonomy
-from resume_agent.profile.matrix import build_matrix, save_matrix
-from resume_agent.profile.store import save_facts
-from resume_agent.services import discovery
-from resume_agent.services.agents import DiscoveryBundle
-from resume_agent.services.discovery import UrlFetchError
-from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
-from resume_agent.taxonomy.corrections import (
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.discovery.connectors.base import RawJob
+import resume_tailor_harness.profile.effective as effective_module
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.effective import build_effective_taxonomy
+from resume_tailor_harness.profile.matrix import build_matrix, save_matrix
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness.services import discovery
+from resume_tailor_harness.services.agents import DiscoveryBundle
+from resume_tailor_harness.services.discovery import UrlFetchError
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_tailor_harness.taxonomy.corrections import (
     TaxonomyCorrections,
     save_taxonomy_corrections,
 )
@@ -212,7 +212,7 @@ class _FakeResult:
 
 class _ExtractRunner:
     def run(self, prompt: str):
-        from resume_agent.models.job import JobCriteriaExtract, SponsorshipSignal
+        from resume_tailor_harness.models.job import JobCriteriaExtract, SponsorshipSignal
 
         return _FakeResult(
             JobCriteriaExtract.model_validate(
@@ -239,7 +239,7 @@ class _ExtractRunner:
 
 class _FitRunner:
     def run(self, prompt: str):
-        from resume_agent.discovery.fit import FitScore
+        from resume_tailor_harness.discovery.fit import FitScore
 
         return _FakeResult(FitScore(score=77, rationale="ok"))
 
@@ -249,7 +249,7 @@ class _FitRunner:
 
 class _IndustryRunner:
     def run(self, prompt: str):
-        from resume_agent.discovery.industry import IndustryClassification
+        from resume_tailor_harness.discovery.industry import IndustryClassification
 
         return _FakeResult(IndustryClassification(groups=[]))
 
@@ -258,7 +258,7 @@ class _IndustryRunner:
 
 
 def _bundle():
-    from resume_agent.services.agents import DiscoveryBundle
+    from resume_tailor_harness.services.agents import DiscoveryBundle
 
     extract = _ExtractRunner()
     fit = _FitRunner()
@@ -272,9 +272,9 @@ def _bundle():
 
 
 def test_reprocess_jobs_rescores_shortlisted(tmp_path):
-    from resume_agent.services.discovery import reprocess_jobs
-    from resume_agent.tracking.repository import jobs_by_status, save_job
-    from resume_agent.tracking.tables import Job, JobStatus
+    from resume_tailor_harness.services.discovery import reprocess_jobs
+    from resume_tailor_harness.tracking.repository import jobs_by_status, save_job
+    from resume_tailor_harness.tracking.tables import Job, JobStatus
 
     facts = tmp_path / "facts.json"
     facts.write_text('{"contact": {"name": "Ada"}}', "utf-8")
@@ -305,9 +305,9 @@ def test_reprocess_jobs_rescores_shortlisted(tmp_path):
 
 
 def test_run_pull_finish_false_does_not_emit_done(tmp_path):
-    from resume_agent.discovery.connectors.runner import run_pull
-    from resume_agent.discovery.search_config import SearchConfig
-    from resume_agent.progress import ProgressReporter, read_progress
+    from resume_tailor_harness.discovery.connectors.runner import run_pull
+    from resume_tailor_harness.discovery.search_config import SearchConfig
+    from resume_tailor_harness.progress import ProgressReporter, read_progress
 
     with _session() as s:
         reporter = ProgressReporter("refresh", tmp_path)
@@ -324,8 +324,8 @@ def test_run_pull_finish_false_does_not_emit_done(tmp_path):
 
 
 def test_refresh_jobs_discovers_only_pull_changed_raw_jobs(monkeypatch):
-    from resume_agent.discovery.connectors.runner import PullReport
-    from resume_agent.services.discovery import RefreshReport, refresh_jobs
+    from resume_tailor_harness.discovery.connectors.runner import PullReport
+    from resume_tailor_harness.services.discovery import RefreshReport, refresh_jobs
 
     seen = {}
 

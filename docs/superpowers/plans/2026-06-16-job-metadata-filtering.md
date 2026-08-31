@@ -10,8 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-16-job-metadata-filtering-design.md`
 
-**Test command:** `cd D:/Fun/resume-agent && .venv/Scripts/python -m pytest tests/ -q`
-**Lint:** `cd D:/Fun/resume-agent && .venv/Scripts/python -m ruff check`
+**Test command:** `cd D:/Fun/resume-tailor-harness && .venv/Scripts/python -m pytest tests/ -q`
+**Lint:** `cd D:/Fun/resume-tailor-harness && .venv/Scripts/python -m ruff check`
 
 ---
 
@@ -19,21 +19,21 @@
 
 | File                                                                    | Responsibility                                                    | Action        |
 | ----------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------- |
-| `src/resume_agent/models/job.py`                                        | `JobCriteria` + new `Seniority`/`EmploymentType` enums + 5 fields | Modify        |
-| `src/resume_agent/discovery/extract.py`                                 | Extract-agent instructions cover new fields                       | Modify        |
-| `src/resume_agent/tracking/tables.py`                                   | `Job.posted_at` column                                            | Modify        |
-| `src/resume_agent/tracking/migrate.py`                                  | `ensure_posted_at_column` (idempotent ALTER)                      | Modify        |
-| `src/resume_agent/db.py`                                                | Call the new migration in `init_db`                               | Modify        |
-| `src/resume_agent/discovery/connectors/base.py`                         | `RawJob.posted_at`                                                | Modify        |
-| `src/resume_agent/discovery/connectors/dates.py`                        | `parse_iso_datetime` pure helper                                  | Create        |
-| `src/resume_agent/discovery/connectors/{greenhouse,remoteok,adzuna}.py` | Populate `RawJob.posted_at`                                       | Modify        |
-| `src/resume_agent/discovery/ingest.py`                                  | Thread `posted_at` into `Job`                                     | Modify        |
-| `src/resume_agent/discovery/pipeline.py`                                | `reextract` over post-raw jobs                                    | Modify        |
-| `src/resume_agent/cli.py`                                               | `discover --reextract` flag                                       | Modify        |
-| `src/resume_agent/tracking/queries.py`                                  | Widen `ShortlistRow`/`PipelineRow`, `SkillTag`, coverage tagging  | Modify        |
-| `src/resume_agent/dashboard/filtering.py`                               | `FilterState`, filter/sort/composite/cloud — pure                 | Create        |
-| `src/resume_agent/dashboard/ui.py`                                      | `skill_chip`, `meta_line`, control-desk + chip CSS                | Modify        |
-| `src/resume_agent/dashboard/pages.py`                                   | Shortlist control desk + rich cards; Pipeline meta line           | Modify        |
+| `src/resume_tailor_harness/models/job.py`                                        | `JobCriteria` + new `Seniority`/`EmploymentType` enums + 5 fields | Modify        |
+| `src/resume_tailor_harness/discovery/extract.py`                                 | Extract-agent instructions cover new fields                       | Modify        |
+| `src/resume_tailor_harness/tracking/tables.py`                                   | `Job.posted_at` column                                            | Modify        |
+| `src/resume_tailor_harness/tracking/migrate.py`                                  | `ensure_posted_at_column` (idempotent ALTER)                      | Modify        |
+| `src/resume_tailor_harness/db.py`                                                | Call the new migration in `init_db`                               | Modify        |
+| `src/resume_tailor_harness/discovery/connectors/base.py`                         | `RawJob.posted_at`                                                | Modify        |
+| `src/resume_tailor_harness/discovery/connectors/dates.py`                        | `parse_iso_datetime` pure helper                                  | Create        |
+| `src/resume_tailor_harness/discovery/connectors/{greenhouse,remoteok,adzuna}.py` | Populate `RawJob.posted_at`                                       | Modify        |
+| `src/resume_tailor_harness/discovery/ingest.py`                                  | Thread `posted_at` into `Job`                                     | Modify        |
+| `src/resume_tailor_harness/discovery/pipeline.py`                                | `reextract` over post-raw jobs                                    | Modify        |
+| `src/resume_tailor_harness/cli.py`                                               | `discover --reextract` flag                                       | Modify        |
+| `src/resume_tailor_harness/tracking/queries.py`                                  | Widen `ShortlistRow`/`PipelineRow`, `SkillTag`, coverage tagging  | Modify        |
+| `src/resume_tailor_harness/dashboard/filtering.py`                               | `FilterState`, filter/sort/composite/cloud — pure                 | Create        |
+| `src/resume_tailor_harness/dashboard/ui.py`                                      | `skill_chip`, `meta_line`, control-desk + chip CSS                | Modify        |
+| `src/resume_tailor_harness/dashboard/pages.py`                                   | Shortlist control desk + rich cards; Pipeline meta line           | Modify        |
 | `tests/...`                                                             | One test file per module above                                    | Create/Modify |
 
 ---
@@ -42,7 +42,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/models/job.py`
+- Modify: `src/resume_tailor_harness/models/job.py`
 - Test: `tests/test_models_job.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -50,7 +50,7 @@
 Add to `tests/test_models_job.py`:
 
 ```python
-from resume_agent.models.job import (
+from resume_tailor_harness.models.job import (
     EmploymentType,
     JobCriteria,
     Seniority,
@@ -90,14 +90,14 @@ Expected: FAIL — `ImportError: cannot import name 'Seniority'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/models/job.py`, add two enums and five fields. Full file after edit:
+In `src/resume_tailor_harness/models/job.py`, add two enums and five fields. Full file after edit:
 
 ```python
 from enum import Enum
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class SponsorshipSignal(str, Enum):
@@ -155,7 +155,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/job.py tests/test_models_job.py
+git add src/resume_tailor_harness/models/job.py tests/test_models_job.py
 git commit -m "feat(models): add seniority, employment type, tech stack, industry, company size to JobCriteria"
 ```
 
@@ -165,7 +165,7 @@ git commit -m "feat(models): add seniority, employment type, tech stack, industr
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/extract.py`
+- Modify: `src/resume_tailor_harness/discovery/extract.py`
 - Test: `tests/test_discovery_extract.py`
 
 The agent's output schema is already `JobCriteria`, so new fields are auto-included. We only extend the natural-language instructions so the model populates them, and assert the instructions mention them.
@@ -175,7 +175,7 @@ The agent's output schema is already `JobCriteria`, so new fields are auto-inclu
 Add to `tests/test_discovery_extract.py`:
 
 ```python
-from resume_agent.discovery.extract import _INSTRUCTIONS
+from resume_tailor_harness.discovery.extract import _INSTRUCTIONS
 
 
 def test_instructions_mention_new_fields():
@@ -191,7 +191,7 @@ Expected: FAIL — assertion error on "seniority".
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/extract.py`, replace `_INSTRUCTIONS`:
+In `src/resume_tailor_harness/discovery/extract.py`, replace `_INSTRUCTIONS`:
 
 ```python
 _INSTRUCTIONS = [
@@ -214,7 +214,7 @@ Expected: PASS (all extract tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/extract.py tests/test_discovery_extract.py
+git add src/resume_tailor_harness/discovery/extract.py tests/test_discovery_extract.py
 git commit -m "feat(discovery): extend extract-agent instructions for new metadata fields"
 ```
 
@@ -224,9 +224,9 @@ git commit -m "feat(discovery): extend extract-agent instructions for new metada
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py:37-54` (the `Job` model)
-- Modify: `src/resume_agent/tracking/migrate.py`
-- Modify: `src/resume_agent/db.py:28-30` (`init_db`)
+- Modify: `src/resume_tailor_harness/tracking/tables.py:37-54` (the `Job` model)
+- Modify: `src/resume_tailor_harness/tracking/migrate.py`
+- Modify: `src/resume_tailor_harness/db.py:28-30` (`init_db`)
 - Test: `tests/test_migrate.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -237,7 +237,7 @@ Add to `tests/test_migrate.py`:
 from sqlalchemy import text
 from sqlmodel import create_engine
 
-from resume_agent.tracking.migrate import ensure_posted_at_column
+from resume_tailor_harness.tracking.migrate import ensure_posted_at_column
 
 
 def test_ensure_posted_at_column_adds_missing_column():
@@ -268,7 +268,7 @@ Expected: FAIL — `ImportError: cannot import name 'ensure_posted_at_column'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add to `src/resume_agent/tracking/migrate.py`:
+Add to `src/resume_tailor_harness/tracking/migrate.py`:
 
 ```python
 def ensure_posted_at_column(engine: Engine) -> None:
@@ -281,7 +281,7 @@ def ensure_posted_at_column(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN posted_at DATETIME"))
 ```
 
-In `src/resume_agent/tracking/tables.py`, add the field to `Job` (right after `created_at` line 54). The class becomes:
+In `src/resume_tailor_harness/tracking/tables.py`, add the field to `Job` (right after `created_at` line 54). The class becomes:
 
 ```python
 class Job(SQLModel, table=True):
@@ -305,10 +305,10 @@ class Job(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 ```
 
-In `src/resume_agent/db.py`, wire the migration into `init_db`:
+In `src/resume_tailor_harness/db.py`, wire the migration into `init_db`:
 
 ```python
-from resume_agent.tracking.migrate import ensure_dedup_key_column, ensure_posted_at_column
+from resume_tailor_harness.tracking.migrate import ensure_dedup_key_column, ensure_posted_at_column
 
 # ...
 
@@ -326,7 +326,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_migrate.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_migrate.py
 git commit -m "feat(db): add Job.posted_at column with idempotent migration"
 ```
 
@@ -336,8 +336,8 @@ git commit -m "feat(db): add Job.posted_at column with idempotent migration"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/base.py:7-16` (`RawJob`)
-- Modify: `src/resume_agent/discovery/ingest.py:19-67`
+- Modify: `src/resume_tailor_harness/discovery/connectors/base.py:7-16` (`RawJob`)
+- Modify: `src/resume_tailor_harness/discovery/ingest.py:19-67`
 - Test: `tests/test_ingest_jobs.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -347,10 +347,10 @@ Add to `tests/test_ingest_jobs.py`:
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.ingest import ingest_jobs
-from resume_agent.tracking.repository import jobs_by_status
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.ingest import ingest_jobs
+from resume_tailor_harness.tracking.repository import jobs_by_status
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 def test_ingest_threads_posted_at(session_factory):
@@ -373,14 +373,14 @@ Expected: FAIL — `TypeError: RawJob.__init__() got an unexpected keyword argum
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/discovery/connectors/base.py`, add the field (and the import):
+In `src/resume_tailor_harness/discovery/connectors/base.py`, add the field (and the import):
 
 ```python
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 @dataclass
@@ -396,7 +396,7 @@ class RawJob:
     posted_at: datetime | None = None
 ```
 
-In `src/resume_agent/discovery/ingest.py`, thread `posted_at` through `add_job` and `ingest_jobs`:
+In `src/resume_tailor_harness/discovery/ingest.py`, thread `posted_at` through `add_job` and `ingest_jobs`:
 
 ```python
 from datetime import datetime
@@ -458,7 +458,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/base.py src/resume_agent/discovery/ingest.py tests/test_ingest_jobs.py
+git add src/resume_tailor_harness/discovery/connectors/base.py src/resume_tailor_harness/discovery/ingest.py tests/test_ingest_jobs.py
 git commit -m "feat(ingest): thread RawJob.posted_at into Job"
 ```
 
@@ -468,10 +468,10 @@ git commit -m "feat(ingest): thread RawJob.posted_at into Job"
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/dates.py`
-- Modify: `src/resume_agent/discovery/connectors/greenhouse.py:11-26`
-- Modify: `src/resume_agent/discovery/connectors/remoteok.py:10-26`
-- Modify: `src/resume_agent/discovery/connectors/adzuna.py:10-24`
+- Create: `src/resume_tailor_harness/discovery/connectors/dates.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/greenhouse.py:11-26`
+- Modify: `src/resume_tailor_harness/discovery/connectors/remoteok.py:10-26`
+- Modify: `src/resume_tailor_harness/discovery/connectors/adzuna.py:10-24`
 - Test: `tests/test_connector_dates.py` (create), and the three existing connector tests
 
 LinkedIn `posted_at` stays `None` (no date element is scraped today — deferred, absorbed by the neutral null rule).
@@ -483,7 +483,7 @@ Create `tests/test_connector_dates.py`:
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
 
 
 def test_parses_iso_with_z():
@@ -510,7 +510,7 @@ Expected: FAIL — module does not exist.
 
 - [ ] **Step 3: Write the date helper**
 
-Create `src/resume_agent/discovery/connectors/dates.py`:
+Create `src/resume_tailor_harness/discovery/connectors/dates.py`:
 
 ```python
 from datetime import datetime, timezone
@@ -549,7 +549,7 @@ Add to `tests/test_connector_greenhouse.py`:
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.discovery.connectors.greenhouse import parse_greenhouse
+from resume_tailor_harness.discovery.connectors.greenhouse import parse_greenhouse
 
 
 def test_parse_greenhouse_sets_posted_at_from_updated_at():
@@ -570,7 +570,7 @@ Add to `tests/test_connector_remoteok.py`:
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.discovery.connectors.remoteok import parse_remoteok
+from resume_tailor_harness.discovery.connectors.remoteok import parse_remoteok
 
 
 def test_parse_remoteok_sets_posted_at_from_date():
@@ -584,7 +584,7 @@ Add to `tests/test_connector_adzuna.py`:
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.discovery.connectors.adzuna import parse_adzuna
+from resume_tailor_harness.discovery.connectors.adzuna import parse_adzuna
 
 
 def test_parse_adzuna_sets_posted_at_from_created():
@@ -605,7 +605,7 @@ Expected: FAIL — `posted_at` is `None` (field defaults), assertions fail.
 `greenhouse.py` — update `parse_greenhouse`'s `RawJob(...)` to add the import and field:
 
 ```python
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
 # ...
         jobs.append(
             RawJob(
@@ -623,7 +623,7 @@ from resume_agent.discovery.connectors.dates import parse_iso_datetime
 `remoteok.py` — add import + field:
 
 ```python
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
 # ...
         jobs.append(
             RawJob(
@@ -641,7 +641,7 @@ from resume_agent.discovery.connectors.dates import parse_iso_datetime
 `adzuna.py` — add import + field:
 
 ```python
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
 # ...
         jobs.append(
             RawJob(
@@ -664,7 +664,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/dates.py src/resume_agent/discovery/connectors/greenhouse.py src/resume_agent/discovery/connectors/remoteok.py src/resume_agent/discovery/connectors/adzuna.py tests/test_connector_dates.py tests/test_connector_greenhouse.py tests/test_connector_remoteok.py tests/test_connector_adzuna.py
+git add src/resume_tailor_harness/discovery/connectors/dates.py src/resume_tailor_harness/discovery/connectors/greenhouse.py src/resume_tailor_harness/discovery/connectors/remoteok.py src/resume_tailor_harness/discovery/connectors/adzuna.py tests/test_connector_dates.py tests/test_connector_greenhouse.py tests/test_connector_remoteok.py tests/test_connector_adzuna.py
 git commit -m "feat(connectors): capture posting date into RawJob.posted_at for API connectors"
 ```
 
@@ -674,8 +674,8 @@ git commit -m "feat(connectors): capture posting date into RawJob.posted_at for 
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/pipeline.py`
-- Modify: `src/resume_agent/cli.py:164-178`
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py`
+- Modify: `src/resume_tailor_harness/cli.py:164-178`
 - Test: `tests/test_discovery_pipeline.py`, `tests/test_cli_discovery.py`
 
 Re-extract re-runs the extract agent over jobs that already moved past `raw`, rewriting `criteria_json` in place. It does **not** change status or re-score fit.
@@ -685,10 +685,10 @@ Re-extract re-runs the extract agent over jobs that already moved past `raw`, re
 Add to `tests/test_discovery_pipeline.py` (match the file's existing fake-agent + session helpers; the snippet below shows the assertions):
 
 ```python
-from resume_agent.discovery.pipeline import reextract
-from resume_agent.models.job import JobCriteria, Seniority
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.pipeline import reextract
+from resume_tailor_harness.models.job import JobCriteria, Seniority
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 class _FakeResult:
@@ -726,7 +726,7 @@ Expected: FAIL — `ImportError: cannot import name 'reextract'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add to `src/resume_agent/discovery/pipeline.py`:
+Add to `src/resume_tailor_harness/discovery/pipeline.py`:
 
 ```python
 _REEXTRACT_STATUSES = (
@@ -774,7 +774,7 @@ def test_discover_reextract_invokes_reextract(monkeypatch, tmp_path):
         called["hit"] = True
         return 3
 
-    monkeypatch.setattr("resume_agent.cli.reextract", fake_reextract)
+    monkeypatch.setattr("resume_tailor_harness.cli.reextract", fake_reextract)
     # ... build search.yaml + facts.json via the file's existing helpers ...
     result = runner.invoke(app, ["discover", "--reextract", "--search", str(search_path),
                                  "--facts", str(facts_path), "--db-url", "sqlite://"])
@@ -789,10 +789,10 @@ Expected: FAIL — `--reextract` is not a known option.
 
 - [ ] **Step 7: Add the flag to the CLI**
 
-In `src/resume_agent/cli.py`, import `reextract` alongside `discover`, and update `discover_cmd`:
+In `src/resume_tailor_harness/cli.py`, import `reextract` alongside `discover`, and update `discover_cmd`:
 
 ```python
-from resume_agent.discovery.pipeline import discover, reextract  # adjust existing import
+from resume_tailor_harness.discovery.pipeline import discover, reextract  # adjust existing import
 
 
 @app.command("discover")
@@ -829,7 +829,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/discovery/pipeline.py src/resume_agent/cli.py tests/test_discovery_pipeline.py tests/test_cli_discovery.py
+git add src/resume_tailor_harness/discovery/pipeline.py src/resume_tailor_harness/cli.py tests/test_discovery_pipeline.py tests/test_cli_discovery.py
 git commit -m "feat(discovery): add 'discover --reextract' backfill path"
 ```
 
@@ -839,7 +839,7 @@ git commit -m "feat(discovery): add 'discover --reextract' backfill path"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/queries.py`
+- Modify: `src/resume_tailor_harness/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py`
 
 `shortlist_rows` flattens `criteria_json` into typed fields and builds `SkillTag`s (must + nice), tagging each by profile coverage via `match_gap.profile_skill_tokens`. `pipeline_rows` gains only the three lean fields (salary string parts + remote + seniority). Profile facts are loaded once and passed in (testable), defaulting to no coverage when absent.
@@ -851,10 +851,10 @@ Add to `tests/test_tracking_queries.py`:
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.base import Source
-from resume_agent.models.profile import Skill
-from resume_agent.tracking.queries import shortlist_rows
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.base import Source
+from resume_tailor_harness.models.profile import Skill
+from resume_tailor_harness.tracking.queries import shortlist_rows
 
 
 def _facts_with_python() -> ProfileFacts:
@@ -907,13 +907,13 @@ Expected: FAIL — `shortlist_rows()` takes 1 positional arg / `ShortlistRow` ha
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/tracking/queries.py`, add imports and replace `ShortlistRow` + `shortlist_rows`, and widen `PipelineRow`/`pipeline_rows`:
+In `src/resume_tailor_harness/tracking/queries.py`, add imports and replace `ShortlistRow` + `shortlist_rows`, and widen `PipelineRow`/`pipeline_rows`:
 
 ```python
 from datetime import datetime
 
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.tracking.match_gap import normalize_skill, profile_skill_tokens
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.tracking.match_gap import normalize_skill, profile_skill_tokens
 
 
 @dataclass
@@ -1029,7 +1029,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/queries.py tests/test_tracking_queries.py
+git add src/resume_tailor_harness/tracking/queries.py tests/test_tracking_queries.py
 git commit -m "feat(queries): flatten metadata + profile-coverage skill tags into shortlist/pipeline rows"
 ```
 
@@ -1039,7 +1039,7 @@ git commit -m "feat(queries): flatten metadata + profile-coverage skill tags int
 
 **Files:**
 
-- Create: `src/resume_agent/dashboard/filtering.py`
+- Create: `src/resume_tailor_harness/dashboard/filtering.py`
 - Test: `tests/test_dashboard_filtering.py` (create)
 
 Pure module — no Streamlit. Operates on the `ShortlistRow`/`SkillTag` from Task 7. `now` is injected for deterministic recency tests.
@@ -1051,14 +1051,14 @@ Create `tests/test_dashboard_filtering.py`:
 ```python
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.dashboard.filtering import (
+from resume_tailor_harness.dashboard.filtering import (
     FilterState,
     apply_filters,
     available_skill_cloud,
     composite_score,
     sort_rows,
 )
-from resume_agent.tracking.queries import ShortlistRow, SkillTag
+from resume_tailor_harness.tracking.queries import ShortlistRow, SkillTag
 
 NOW = datetime(2026, 6, 16, tzinfo=timezone.utc)
 
@@ -1161,7 +1161,7 @@ Expected: FAIL — module does not exist.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/dashboard/filtering.py`:
+Create `src/resume_tailor_harness/dashboard/filtering.py`:
 
 ```python
 """Pure filtering, sorting, and composite ranking over ShortlistRows.
@@ -1172,8 +1172,8 @@ No Streamlit imports — every function is deterministic and unit-testable.
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from resume_agent.tracking.match_gap import normalize_skill
-from resume_agent.tracking.queries import ShortlistRow, SkillTag
+from resume_tailor_harness.tracking.match_gap import normalize_skill
+from resume_tailor_harness.tracking.queries import ShortlistRow, SkillTag
 
 SALARY_CEILING = 250_000
 RECENCY_WINDOW_DAYS = 30
@@ -1310,7 +1310,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/filtering.py tests/test_dashboard_filtering.py
+git add src/resume_tailor_harness/dashboard/filtering.py tests/test_dashboard_filtering.py
 git commit -m "feat(dashboard): pure metadata filtering, sorting, and named-preset composite ranking"
 ```
 
@@ -1320,7 +1320,7 @@ git commit -m "feat(dashboard): pure metadata filtering, sorting, and named-pres
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/ui.py`
+- Modify: `src/resume_tailor_harness/dashboard/ui.py`
 - Test: `tests/test_dashboard_ui.py`
 
 Pure HTML helpers (the module's existing contract: no Streamlit at import/call time for these).
@@ -1330,8 +1330,8 @@ Pure HTML helpers (the module's existing contract: no Streamlit at import/call t
 Add to `tests/test_dashboard_ui.py`:
 
 ```python
-from resume_agent.dashboard.ui import THEME_CSS, meta_line, skill_chip
-from resume_agent.tracking.queries import ShortlistRow, SkillTag
+from resume_tailor_harness.dashboard.ui import THEME_CSS, meta_line, skill_chip
+from resume_tailor_harness.tracking.queries import ShortlistRow, SkillTag
 
 
 def test_skill_chip_encodes_coverage_requirement_and_active():
@@ -1382,7 +1382,7 @@ Expected: FAIL — `ImportError: cannot import name 'skill_chip'`.
 
 - [ ] **Step 3: Write the helpers + CSS**
 
-In `src/resume_agent/dashboard/ui.py`, add the helpers (after `fit_block`):
+In `src/resume_tailor_harness/dashboard/ui.py`, add the helpers (after `fit_block`):
 
 ```python
 def skill_chip(tag, active: bool) -> str:
@@ -1483,7 +1483,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/ui.py tests/test_dashboard_ui.py
+git add src/resume_tailor_harness/dashboard/ui.py tests/test_dashboard_ui.py
 git commit -m "feat(dashboard): skill-chip + meta-line helpers and control-desk CSS"
 ```
 
@@ -1493,26 +1493,26 @@ git commit -m "feat(dashboard): skill-chip + meta-line helpers and control-desk 
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/pages.py:65-113` (`render_shortlist_page`)
+- Modify: `src/resume_tailor_harness/dashboard/pages.py:65-113` (`render_shortlist_page`)
 - Test: manual (Streamlit page render; logic already covered by Tasks 7–9)
 
 Streamlit page bodies aren't unit-tested in this codebase (the tests cover the pure helpers and CSS). This task wires the tested pieces together. Keep the existing card structure (meter | body columns, pinned Approve footer) and slot in the control desk + new card content.
 
 - [ ] **Step 1: Add the control-desk renderer**
 
-In `src/resume_agent/dashboard/pages.py`, add imports:
+In `src/resume_tailor_harness/dashboard/pages.py`, add imports:
 
 ```python
 import streamlit as st
 
-from resume_agent.dashboard.filtering import (
+from resume_tailor_harness.dashboard.filtering import (
     FilterState,
     apply_filters,
     available_skill_cloud,
     sort_rows,
 )
-from resume_agent.dashboard.ui import meta_line, skill_chip  # add to existing ui import
-from resume_agent.profile.store import load_facts
+from resume_tailor_harness.dashboard.ui import meta_line, skill_chip  # add to existing ui import
+from resume_tailor_harness.profile.store import load_facts
 from pathlib import Path
 ```
 
@@ -1546,7 +1546,7 @@ def _control_desk(rows) -> FilterState:
     cloud = available_skill_cloud(rows)
     options = [t.name for t in cloud]
     chosen = st.multiselect("Skills (any match)", options, key="f_skills")
-    from resume_agent.tracking.match_gap import normalize_skill
+    from resume_tailor_harness.tracking.match_gap import normalize_skill
     skills = {normalize_skill(s) for s in chosen}
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1580,7 +1580,7 @@ def render_shortlist_page(session) -> None:
     if not rows:
         empty_state(
             "◇", "Nothing shortlisted yet",
-            "Run <code>resume-agent discover</code> to score jobs and surface the keepers here.",
+            "Run <code>resume-tailor-harness discover</code> to score jobs and surface the keepers here.",
         )
         return
 
@@ -1626,11 +1626,11 @@ def render_shortlist_page(session) -> None:
                     st.rerun()
 ```
 
-Add `from resume_agent.tracking.match_gap import normalize_skill` to the imports if not already present.
+Add `from resume_tailor_harness.tracking.match_gap import normalize_skill` to the imports if not already present.
 
 - [ ] **Step 3: Verify import + smoke**
 
-Run: `.venv/Scripts/python -c "import resume_agent.dashboard.pages"`
+Run: `.venv/Scripts/python -c "import resume_tailor_harness.dashboard.pages"`
 Expected: no error (module imports cleanly).
 Run: `.venv/Scripts/python -m pytest tests/test_dashboard_app.py tests/test_dashboard_match_gap.py -q`
 Expected: PASS (existing dashboard tests still green).
@@ -1638,7 +1638,7 @@ Expected: PASS (existing dashboard tests still green).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/pages.py
+git add src/resume_tailor_harness/dashboard/pages.py
 git commit -m "feat(dashboard): Shortlist control desk, metadata filters, skill-tag cloud, rich cards"
 ```
 
@@ -1648,7 +1648,7 @@ git commit -m "feat(dashboard): Shortlist control desk, metadata filters, skill-
 
 **Files:**
 
-- Modify: `src/resume_agent/dashboard/pages.py:116-132` (`_render_pipeline_card`)
+- Modify: `src/resume_tailor_harness/dashboard/pages.py:116-132` (`_render_pipeline_card`)
 - Test: manual (covered by `PipelineRow` widening in Task 7)
 
 - [ ] **Step 1: Add the lean meta line to the pipeline card**
@@ -1674,7 +1674,7 @@ In `_render_pipeline_card`, inside the `head` column, after the title/company ma
 
 - [ ] **Step 2: Verify**
 
-Run: `.venv/Scripts/python -c "import resume_agent.dashboard.pages"`
+Run: `.venv/Scripts/python -c "import resume_tailor_harness.dashboard.pages"`
 Expected: clean import.
 Run: `.venv/Scripts/python -m pytest tests/test_tracking_queries.py tests/test_dashboard_app.py -q`
 Expected: PASS.
@@ -1682,7 +1682,7 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/resume_agent/dashboard/pages.py
+git add src/resume_tailor_harness/dashboard/pages.py
 git commit -m "feat(dashboard): lean salary/remote/seniority line on pipeline cards"
 ```
 
@@ -1704,7 +1704,7 @@ Expected: no errors. Fix any reported issues and re-run.
 
 - [ ] **Step 3: Manual headless dashboard check**
 
-Run: `.venv/Scripts/python -m streamlit run src/resume_agent/dashboard/app.py --server.headless true`
+Run: `.venv/Scripts/python -m streamlit run src/resume_tailor_harness/dashboard/app.py --server.headless true`
 Then in a browser at the printed URL, on a DB that has shortlisted jobs:
 
 - Confirm the control desk renders below the masthead with all filters + sort + skill cloud.

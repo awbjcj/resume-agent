@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-import resume_agent.discovery.url_ingest.fetch as fetch
-from resume_agent.security.outbound import PublicTextResponse
+import resume_tailor_harness.discovery.url_ingest.fetch as fetch
+from resume_tailor_harness.security.outbound import PublicTextResponse
 
 
 def _public(text, url):

@@ -1,7 +1,7 @@
-from resume_agent.discovery.connectors.breezy import apply_detail as apply_breezy_detail
-from resume_agent.discovery.connectors.breezy import parse_breezy
-from resume_agent.discovery.connectors.recruitee import parse_recruitee
-from resume_agent.discovery.connectors.workable import parse_workable
+from resume_tailor_harness.discovery.connectors.breezy import apply_detail as apply_breezy_detail
+from resume_tailor_harness.discovery.connectors.breezy import parse_breezy
+from resume_tailor_harness.discovery.connectors.recruitee import parse_recruitee
+from resume_tailor_harness.discovery.connectors.workable import parse_workable
 
 
 def test_provider_owned_company_fields_are_distinguished_from_board_tokens():

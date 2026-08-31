@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add `resume-agent setup` — a standalone Textual TUI that takes a new user from zero → configured → validated → ready, writing `.env` and `config/*.yaml` atomically, replacing the manual copy-and-edit ritual.
+**Goal:** Add `resume-tailor-harness setup` — a standalone Textual TUI that takes a new user from zero → configured → validated → ready, writing `.env` and `config/*.yaml` atomically, replacing the manual copy-and-edit ritual.
 
 **Architecture:** Pure cores + thin shell. All real work lives in pure, unit-tested functions (`WizardState`, `merge_env`, the `build_*` YAML generators, `preflight`, `validate`, `atomic_write_all`); the Textual `App` is a thin screen-per-step shell that binds to `WizardState` and calls the cores. Pre-write validation reads secrets explicitly from `WizardState` (never the `@lru_cache get_settings()`); the optional post-write `profile build` runs as a subprocess that reads the freshly written `.env`. Writes are atomic-at-end (temp file + `os.replace`).
 
@@ -14,15 +14,15 @@
 
 | File                                                                                                                                                                                                     | Responsibility                                                                                                  |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `src/resume_agent/setup/__init__.py`                                                                                                                                                                     | Package marker.                                                                                                 |
-| `src/resume_agent/setup/state.py`                                                                                                                                                                        | `WizardState` dataclass + `managed_env()`. The single source screens bind to.                                   |
-| `src/resume_agent/setup/env_writer.py`                                                                                                                                                                   | `parse_env`, `merge_env`, `format_env` (pure).                                                                  |
-| `src/resume_agent/setup/yaml_gen.py`                                                                                                                                                                     | `parse_greenhouse_boards`, `build_profile_sources/build_search/build_connectors` (pure), `render_from_example`. |
-| `src/resume_agent/setup/preflight.py`                                                                                                                                                                    | `CheckResult` + detect-and-instruct preflight checks (injected callables).                                      |
-| `src/resume_agent/setup/validate.py`                                                                                                                                                                     | `anthropic_ping`, `connector_smoke` (injected clients).                                                         |
-| `src/resume_agent/setup/writer.py`                                                                                                                                                                       | `atomic_write_all` (temp file + `os.replace`, per-file, tmp cleanup on error) + `load_existing_state`.          |
-| `src/resume_agent/setup/app.py`                                                                                                                                                                          | Thin Textual `SetupApp` (screen per step) + `_perform_write` seam.                                              |
-| `src/resume_agent/cli.py`                                                                                                                                                                                | `setup` command (MODIFY).                                                                                       |
+| `src/resume_tailor_harness/setup/__init__.py`                                                                                                                                                                     | Package marker.                                                                                                 |
+| `src/resume_tailor_harness/setup/state.py`                                                                                                                                                                        | `WizardState` dataclass + `managed_env()`. The single source screens bind to.                                   |
+| `src/resume_tailor_harness/setup/env_writer.py`                                                                                                                                                                   | `parse_env`, `merge_env`, `format_env` (pure).                                                                  |
+| `src/resume_tailor_harness/setup/yaml_gen.py`                                                                                                                                                                     | `parse_greenhouse_boards`, `build_profile_sources/build_search/build_connectors` (pure), `render_from_example`. |
+| `src/resume_tailor_harness/setup/preflight.py`                                                                                                                                                                    | `CheckResult` + detect-and-instruct preflight checks (injected callables).                                      |
+| `src/resume_tailor_harness/setup/validate.py`                                                                                                                                                                     | `anthropic_ping`, `connector_smoke` (injected clients).                                                         |
+| `src/resume_tailor_harness/setup/writer.py`                                                                                                                                                                       | `atomic_write_all` (temp file + `os.replace`, per-file, tmp cleanup on error) + `load_existing_state`.          |
+| `src/resume_tailor_harness/setup/app.py`                                                                                                                                                                          | Thin Textual `SetupApp` (screen per step) + `_perform_write` seam.                                              |
+| `src/resume_tailor_harness/cli.py`                                                                                                                                                                                | `setup` command (MODIFY).                                                                                       |
 | `pyproject.toml`                                                                                                                                                                                         | Add `textual` (MODIFY via `uv add`).                                                                            |
 | `README.md`                                                                                                                                                                                              | One line on running `setup` after `uv sync` (MODIFY).                                                           |
 | `tests/test_setup_state.py`, `test_setup_env_writer.py`, `test_setup_yaml_gen.py`, `test_setup_preflight.py`, `test_setup_validate.py`, `test_setup_writer.py`, `test_setup_app.py`, `test_cli_setup.py` | NEW.                                                                                                            |
@@ -34,7 +34,7 @@
 **Files:**
 
 - Modify: `pyproject.toml` (via `uv add`)
-- Create: `src/resume_agent/setup/__init__.py`, `src/resume_agent/setup/state.py`
+- Create: `src/resume_tailor_harness/setup/__init__.py`, `src/resume_tailor_harness/setup/state.py`
 - Test: `tests/test_setup_state.py`
 
 - [ ] **Step 1: Add the dependency**
@@ -46,12 +46,12 @@ Expected: `pyproject.toml` gains `textual` under dependencies; lockfile updates;
 
 ```python
 # tests/test_setup_state.py
-from resume_agent.setup.state import WizardState
+from resume_tailor_harness.setup.state import WizardState
 
 
 def test_defaults_match_settings_defaults():
     s = WizardState()
-    assert s.db_url == "sqlite:///data/resume_agent.db"
+    assert s.db_url == "sqlite:///data/resume_tailor_harness.db"
     assert s.cheap_model == "claude-haiku-4-5-20251001"
     assert s.remote_policy == "any"
     assert s.greenhouse_boards == []
@@ -62,24 +62,24 @@ def test_managed_env_omits_empty_and_maps_keys():
     env = s.managed_env()
     assert env["ANTHROPIC_API_KEY"] == "sk-test"
     assert "GITHUB_TOKEN" not in env          # empty → omitted
-    assert env["DB_URL"] == "sqlite:///data/resume_agent.db"
+    assert env["DB_URL"] == "sqlite:///data/resume_tailor_harness.db"
     assert "OPENAI_API_KEY" not in env         # never managed
 ```
 
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_setup_state.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.setup'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.setup'`
 
 - [ ] **Step 4: Write the implementation**
 
 ```python
-# src/resume_agent/setup/__init__.py
+# src/resume_tailor_harness/setup/__init__.py
 """Interactive setup wizard (pure cores + thin Textual shell)."""
 ```
 
 ```python
-# src/resume_agent/setup/state.py
+# src/resume_tailor_harness/setup/state.py
 from dataclasses import dataclass, field
 
 
@@ -94,7 +94,7 @@ class WizardState:
     adzuna_app_key: str = ""
     linkedin_email: str = ""
     linkedin_password: str = ""
-    db_url: str = "sqlite:///data/resume_agent.db"
+    db_url: str = "sqlite:///data/resume_tailor_harness.db"
     cheap_model: str = "claude-haiku-4-5-20251001"
     mid_model: str = "claude-sonnet-4-6"
     premium_model: str = "claude-opus-4-8"
@@ -150,7 +150,7 @@ Expected: PASS (2 tests)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/setup/__init__.py src/resume_agent/setup/state.py tests/test_setup_state.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/setup/__init__.py src/resume_tailor_harness/setup/state.py tests/test_setup_state.py
 git commit -m "feat(setup): add textual dep + WizardState"
 ```
 
@@ -160,14 +160,14 @@ git commit -m "feat(setup): add textual dep + WizardState"
 
 **Files:**
 
-- Create: `src/resume_agent/setup/yaml_gen.py`
+- Create: `src/resume_tailor_harness/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_yaml_gen.py
-from resume_agent.setup.yaml_gen import parse_greenhouse_boards
+from resume_tailor_harness.setup.yaml_gen import parse_greenhouse_boards
 
 
 def test_parses_token_and_company():
@@ -200,17 +200,17 @@ Expected: FAIL with `ModuleNotFoundError` / `ImportError`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/yaml_gen.py
+# src/resume_tailor_harness/setup/yaml_gen.py
 import datetime as _dt
 
 import yaml
 
-from resume_agent.setup.state import WizardState
+from resume_tailor_harness.setup.state import WizardState
 
 
 def _header() -> str:
     today = _dt.date.today().isoformat()
-    return f"# Generated by 'resume-agent setup' on {today} — see README for field docs\n"
+    return f"# Generated by 'resume-tailor-harness setup' on {today} — see README for field docs\n"
 
 
 def parse_greenhouse_boards(text: str) -> list[dict]:
@@ -237,7 +237,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/yaml_gen.py tests/test_setup_yaml_gen.py
+git add src/resume_tailor_harness/setup/yaml_gen.py tests/test_setup_yaml_gen.py
 git commit -m "feat(setup): parse_greenhouse_boards pure parser"
 ```
 
@@ -247,14 +247,14 @@ git commit -m "feat(setup): parse_greenhouse_boards pure parser"
 
 **Files:**
 
-- Create: `src/resume_agent/setup/env_writer.py`
+- Create: `src/resume_tailor_harness/setup/env_writer.py`
 - Test: `tests/test_setup_env_writer.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_env_writer.py
-from resume_agent.setup.env_writer import format_env, merge_env, parse_env
+from resume_tailor_harness.setup.env_writer import format_env, merge_env, parse_env
 
 
 def test_parse_env_ignores_comments_and_blanks():
@@ -287,7 +287,7 @@ Expected: FAIL with `ModuleNotFoundError`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/env_writer.py
+# src/resume_tailor_harness/setup/env_writer.py
 """Pure .env read/merge/format. The actual file write lives in writer.py."""
 
 
@@ -330,7 +330,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/env_writer.py tests/test_setup_env_writer.py
+git add src/resume_tailor_harness/setup/env_writer.py tests/test_setup_env_writer.py
 git commit -m "feat(setup): pure .env merge/format"
 ```
 
@@ -340,22 +340,22 @@ git commit -m "feat(setup): pure .env merge/format"
 
 **Files:**
 
-- Modify: `src/resume_agent/setup/yaml_gen.py`
+- Modify: `src/resume_tailor_harness/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_yaml_gen.py  (append)
-from resume_agent.config import load_yaml
-from resume_agent.setup.state import WizardState
-from resume_agent.setup.yaml_gen import build_profile_sources
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.setup.state import WizardState
+from resume_tailor_harness.setup.yaml_gen import build_profile_sources
 
 
 def test_build_profile_sources_round_trips(tmp_path):
     state = WizardState(resume_path="resume.pdf", github_username="octocat")
     text = build_profile_sources(state)
-    assert text.startswith("# Generated by 'resume-agent setup'")
+    assert text.startswith("# Generated by 'resume-tailor-harness setup'")
     p = tmp_path / "profile_sources.yaml"
     p.write_text(text, encoding="utf-8")
     data = load_yaml(p)
@@ -371,7 +371,7 @@ Expected: FAIL with `ImportError: cannot import name 'build_profile_sources'`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/yaml_gen.py  (append)
+# src/resume_tailor_harness/setup/yaml_gen.py  (append)
 def build_profile_sources(state: WizardState) -> str:
     data = {
         "resume_path": state.resume_path,
@@ -388,7 +388,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/yaml_gen.py tests/test_setup_yaml_gen.py
+git add src/resume_tailor_harness/setup/yaml_gen.py tests/test_setup_yaml_gen.py
 git commit -m "feat(setup): build_profile_sources + round-trip"
 ```
 
@@ -398,15 +398,15 @@ git commit -m "feat(setup): build_profile_sources + round-trip"
 
 **Files:**
 
-- Modify: `src/resume_agent/setup/yaml_gen.py`
+- Modify: `src/resume_tailor_harness/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_yaml_gen.py  (append)
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.setup.yaml_gen import build_search
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.setup.yaml_gen import build_search
 
 
 def test_build_search_round_trips(tmp_path):
@@ -432,7 +432,7 @@ Expected: FAIL with `ImportError: cannot import name 'build_search'`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/yaml_gen.py  (append)
+# src/resume_tailor_harness/setup/yaml_gen.py  (append)
 def build_search(state: WizardState) -> str:
     data = {
         "keywords": state.keywords,
@@ -455,7 +455,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/yaml_gen.py tests/test_setup_yaml_gen.py
+git add src/resume_tailor_harness/setup/yaml_gen.py tests/test_setup_yaml_gen.py
 git commit -m "feat(setup): build_search + round-trip"
 ```
 
@@ -465,15 +465,15 @@ git commit -m "feat(setup): build_search + round-trip"
 
 **Files:**
 
-- Modify: `src/resume_agent/setup/yaml_gen.py`
+- Modify: `src/resume_tailor_harness/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_yaml_gen.py  (append)
-from resume_agent.discovery.connectors.config import load_connectors_config
-from resume_agent.setup.yaml_gen import build_connectors
+from resume_tailor_harness.discovery.connectors.config import load_connectors_config
+from resume_tailor_harness.setup.yaml_gen import build_connectors
 
 
 def test_build_connectors_round_trips(tmp_path):
@@ -502,7 +502,7 @@ Expected: FAIL with `ImportError: cannot import name 'build_connectors'`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/yaml_gen.py  (append)
+# src/resume_tailor_harness/setup/yaml_gen.py  (append)
 def build_connectors(state: WizardState) -> str:
     data = {
         "greenhouse": {"enabled": state.greenhouse_enabled, "boards": state.greenhouse_boards},
@@ -521,7 +521,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/yaml_gen.py tests/test_setup_yaml_gen.py
+git add src/resume_tailor_harness/setup/yaml_gen.py tests/test_setup_yaml_gen.py
 git commit -m "feat(setup): build_connectors + round-trip"
 ```
 
@@ -533,21 +533,21 @@ review.yaml and render.yaml take no wizard input, so they are generated by copyi
 
 **Files:**
 
-- Modify: `src/resume_agent/setup/yaml_gen.py`
+- Modify: `src/resume_tailor_harness/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_yaml_gen.py  (append)
-from resume_agent.render.render_config import load_render_config
-from resume_agent.setup.yaml_gen import render_from_example
-from resume_agent.tailor.review_config import load_review_config
+from resume_tailor_harness.render.render_config import load_render_config
+from resume_tailor_harness.setup.yaml_gen import render_from_example
+from resume_tailor_harness.tailor.review_config import load_review_config
 
 
 def test_render_from_example_review_round_trips(tmp_path):
     text = render_from_example("config/review.yaml.example")
-    assert text.startswith("# Generated by 'resume-agent setup'")
+    assert text.startswith("# Generated by 'resume-tailor-harness setup'")
     p = tmp_path / "review.yaml"
     p.write_text(text, encoding="utf-8")
     cfg = load_review_config(p)
@@ -573,7 +573,7 @@ Expected: FAIL with `ImportError: cannot import name 'render_from_example'`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/yaml_gen.py  (append)
+# src/resume_tailor_harness/setup/yaml_gen.py  (append)
 from pathlib import Path
 
 
@@ -591,7 +591,7 @@ Expected: PASS (2 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/yaml_gen.py tests/test_setup_yaml_gen.py
+git add src/resume_tailor_harness/setup/yaml_gen.py tests/test_setup_yaml_gen.py
 git commit -m "feat(setup): render review/render configs from maintained examples"
 ```
 
@@ -601,14 +601,14 @@ git commit -m "feat(setup): render review/render configs from maintained example
 
 **Files:**
 
-- Create: `src/resume_agent/setup/preflight.py`
+- Create: `src/resume_tailor_harness/setup/preflight.py`
 - Test: `tests/test_setup_preflight.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_preflight.py
-from resume_agent.setup.preflight import (
+from resume_tailor_harness.setup.preflight import (
     CheckResult,
     check_examples_present,
     check_python,
@@ -653,7 +653,7 @@ Expected: FAIL with `ModuleNotFoundError`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/preflight.py
+# src/resume_tailor_harness/setup/preflight.py
 import shutil
 import sys
 from dataclasses import dataclass
@@ -727,7 +727,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/preflight.py tests/test_setup_preflight.py
+git add src/resume_tailor_harness/setup/preflight.py tests/test_setup_preflight.py
 git commit -m "feat(setup): detect-and-instruct preflight checks"
 ```
 
@@ -737,15 +737,15 @@ git commit -m "feat(setup): detect-and-instruct preflight checks"
 
 **Files:**
 
-- Create: `src/resume_agent/setup/validate.py`
+- Create: `src/resume_tailor_harness/setup/validate.py`
 - Test: `tests/test_setup_validate.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_setup_validate.py
-from resume_agent.setup.preflight import CheckResult
-from resume_agent.setup.validate import anthropic_ping, connector_smoke
+from resume_tailor_harness.setup.preflight import CheckResult
+from resume_tailor_harness.setup.validate import anthropic_ping, connector_smoke
 
 
 class _OkClient:
@@ -786,10 +786,10 @@ Expected: FAIL with `ModuleNotFoundError`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/validate.py
+# src/resume_tailor_harness/setup/validate.py
 from typing import Callable
 
-from resume_agent.setup.preflight import CheckResult
+from resume_tailor_harness.setup.preflight import CheckResult
 
 
 def _default_anthropic_client(api_key: str):
@@ -830,7 +830,7 @@ Expected: PASS (3 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/validate.py tests/test_setup_validate.py
+git add src/resume_tailor_harness/setup/validate.py tests/test_setup_validate.py
 git commit -m "feat(setup): anthropic_ping + connector_smoke with injected clients"
 ```
 
@@ -840,7 +840,7 @@ git commit -m "feat(setup): anthropic_ping + connector_smoke with injected clien
 
 **Files:**
 
-- Create: `src/resume_agent/setup/writer.py`
+- Create: `src/resume_tailor_harness/setup/writer.py`
 - Test: `tests/test_setup_writer.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -851,9 +851,9 @@ import os
 
 import pytest
 
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.setup.state import WizardState
-from resume_agent.setup.writer import atomic_write_all
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.setup.state import WizardState
+from resume_tailor_harness.setup.writer import atomic_write_all
 
 
 def _seed_examples(root):
@@ -893,7 +893,7 @@ def test_partial_failure_leaves_no_tmp_litter(tmp_path, monkeypatch):
             raise OSError("disk full")
         return real_replace(src, dst)
 
-    monkeypatch.setattr("resume_agent.setup.writer.os.replace", flaky_replace)
+    monkeypatch.setattr("resume_tailor_harness.setup.writer.os.replace", flaky_replace)
     report = atomic_write_all(state, root=tmp_path)
 
     assert any(status.startswith("error") for status in report.values())
@@ -908,16 +908,16 @@ Expected: FAIL with `ModuleNotFoundError`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-# src/resume_agent/setup/writer.py
+# src/resume_tailor_harness/setup/writer.py
 import os
 from pathlib import Path
 
-from resume_agent.config import load_yaml
-from resume_agent.discovery.connectors.config import load_connectors_config
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.setup.env_writer import format_env, merge_env, parse_env
-from resume_agent.setup.state import WizardState
-from resume_agent.setup.yaml_gen import (
+from resume_tailor_harness.config import load_yaml
+from resume_tailor_harness.discovery.connectors.config import load_connectors_config
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.setup.env_writer import format_env, merge_env, parse_env
+from resume_tailor_harness.setup.state import WizardState
+from resume_tailor_harness.setup.yaml_gen import (
     build_connectors,
     build_profile_sources,
     build_search,
@@ -1017,7 +1017,7 @@ Expected: PASS (2 tests)
 
 ```python
 # tests/test_setup_writer.py  (append)
-from resume_agent.setup.writer import load_existing_state
+from resume_tailor_harness.setup.writer import load_existing_state
 
 
 def test_load_existing_state_round_trips_what_was_written(tmp_path):
@@ -1043,7 +1043,7 @@ Expected: PASS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/setup/writer.py tests/test_setup_writer.py
+git add src/resume_tailor_harness/setup/writer.py tests/test_setup_writer.py
 git commit -m "feat(setup): atomic_write_all + load_existing_state pre-fill"
 ```
 
@@ -1055,7 +1055,7 @@ The full screen-by-screen UI follows the screen table in the spec (§5.2). This 
 
 **Files:**
 
-- Create: `src/resume_agent/setup/app.py`
+- Create: `src/resume_tailor_harness/setup/app.py`
 - Test: `tests/test_setup_app.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1064,8 +1064,8 @@ The full screen-by-screen UI follows the screen table in the spec (§5.2). This 
 # tests/test_setup_app.py
 import pytest
 
-from resume_agent.setup.app import SetupApp
-from resume_agent.setup.state import WizardState
+from resume_tailor_harness.setup.app import SetupApp
+from resume_tailor_harness.setup.state import WizardState
 
 
 def test_perform_write_calls_injected_writer():
@@ -1097,7 +1097,7 @@ Expected: FAIL with `ModuleNotFoundError`
 - [ ] **Step 3: Write the minimal shell**
 
 ```python
-# src/resume_agent/setup/app.py
+# src/resume_tailor_harness/setup/app.py
 """Thin Textual shell for the setup wizard.
 
 The pure cores (state, yaml_gen, env_writer, preflight, validate, writer) hold
@@ -1113,14 +1113,14 @@ from typing import Callable
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static
 
-from resume_agent.setup.state import WizardState
-from resume_agent.setup.writer import atomic_write_all
+from resume_tailor_harness.setup.state import WizardState
+from resume_tailor_harness.setup.writer import atomic_write_all
 
 
 class SetupApp(App):
     """Wizard application. ``writer`` is injected for testability."""
 
-    TITLE = "Resume Agent — Setup"
+    TITLE = "Résumé Tailor Harness — Setup"
 
     def __init__(
         self,
@@ -1137,7 +1137,7 @@ class SetupApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(
-            "Welcome to Resume Agent setup.\n"
+            "Welcome to Résumé Tailor Harness setup.\n"
             "Press Ctrl+Q to quit. (Screens build out per spec §5.2.)",
             id="welcome",
         )
@@ -1158,7 +1158,7 @@ Note: if `test_app_boots_without_error` errors on the `asyncio` marker, add `pyt
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/setup/app.py tests/test_setup_app.py pyproject.toml uv.lock
+git add src/resume_tailor_harness/setup/app.py tests/test_setup_app.py pyproject.toml uv.lock
 git commit -m "feat(setup): thin Textual shell + write seam"
 ```
 
@@ -1168,7 +1168,7 @@ git commit -m "feat(setup): thin Textual shell + write seam"
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_setup.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1177,8 +1177,8 @@ git commit -m "feat(setup): thin Textual shell + write seam"
 # tests/test_cli_setup.py
 from typer.testing import CliRunner
 
-import resume_agent.cli as cli_mod
-from resume_agent.cli import app
+import resume_tailor_harness.cli as cli_mod
+from resume_tailor_harness.cli import app
 
 runner = CliRunner()
 
@@ -1193,7 +1193,7 @@ def test_setup_command_launches_app(monkeypatch):
         def run(self):
             launched["ran"] = True
 
-    monkeypatch.setattr("resume_agent.setup.app.SetupApp", FakeApp)
+    monkeypatch.setattr("resume_tailor_harness.setup.app.SetupApp", FakeApp)
     result = runner.invoke(app, ["setup"])
     assert result.exit_code == 0
     assert launched["ran"] is True
@@ -1217,7 +1217,7 @@ Append after the `dashboard_cmd` definition (near `cli.py:366`):
 @app.command("setup")
 def setup_cmd() -> None:
     """Launch the interactive setup wizard (zero → configured → ready)."""
-    from resume_agent.setup.app import SetupApp
+    from resume_tailor_harness.setup.app import SetupApp
 
     SetupApp().run()
 ```
@@ -1230,7 +1230,7 @@ Expected: PASS (2 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_setup.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_setup.py
 git commit -m "feat(cli): add 'setup' command launching the wizard"
 ```
 
@@ -1249,29 +1249,29 @@ In `README.md`, in the **Setup** section, immediately after step 1 (`uv sync`), 
 ```markdown
 # 1a. (Recommended) Run the guided setup wizard instead of hand-editing config
 
-uv run resume-agent setup
+uv run resume-tailor-harness setup
 ```
 
-And add a one-line note under the section: _"`resume-agent setup` walks you through secrets, search criteria, and connectors, then writes `.env` and `config/_.yaml` for you — the manual steps below are the alternative."\*
+And add a one-line note under the section: _"`resume-tailor-harness setup` walks you through secrets, search criteria, and connectors, then writes `.env` and `config/_.yaml` for you — the manual steps below are the alternative."\*
 
 - [ ] **Step 2: Run the full suite + lint**
 
 Run: `uv run pytest -q`
 Expected: PASS (all existing tests + the new `test_setup_*` and `test_cli_setup`).
 
-Run: `uv run ruff check src/resume_agent/setup src/resume_agent/cli.py`
+Run: `uv run ruff check src/resume_tailor_harness/setup src/resume_tailor_harness/cli.py`
 Expected: clean.
 
 - [ ] **Step 3: Manual smoke (optional but recommended)**
 
-Run: `uv run resume-agent setup`
+Run: `uv run resume-tailor-harness setup`
 Expected: the Textual welcome screen renders; Ctrl+Q quits cleanly. (No config is written from the skeleton welcome screen until the engineer wires the Confirm screen to `_perform_write`.)
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add README.md
-git commit -m "docs(setup): point new users at 'resume-agent setup'"
+git commit -m "docs(setup): point new users at 'resume-tailor-harness setup'"
 ```
 
 ---
@@ -1286,7 +1286,7 @@ git commit -m "docs(setup): point new users at 'resume-agent setup'"
 - §5.4 config generation (clean YAML + header; greenhouse parser; round-trip through real loaders) → Tasks 2, 4, 5, 6, 7 (every builder round-trips through its real loader). ✓
 - §5.5 atomic write protocol (temp + `os.replace`, per-file, no litter) → Task 10 (incl. the mid-write-failure/no-tmp-litter test). ✓
 - §5.6 re-run pre-fill → Task 10 (`load_existing_state` + round-trip test). ✓
-- §5.7 process/freshness (in-memory secrets pre-write; subprocess profile build) → Task 9 (`anthropic_ping(api_key)` takes the key directly, never `get_settings`); the subprocess `profile build` is the engineer's Confirm/Build-screen wiring noted in Task 11 (calls `resume-agent profile build` via `subprocess`, mirroring `dashboard_cmd`). ✓
+- §5.7 process/freshness (in-memory secrets pre-write; subprocess profile build) → Task 9 (`anthropic_ping(api_key)` takes the key directly, never `get_settings`); the subprocess `profile build` is the engineer's Confirm/Build-screen wiring noted in Task 11 (calls `resume-tailor-harness profile build` via `subprocess`, mirroring `dashboard_cmd`). ✓
 - §6 testing rings → Ring 1 (Tasks 1–8, 10), Ring 2 (Task 9), Ring 3 (Task 11 pilot + Task 10 failure test). ✓
 - §7 files touched / §2 decision 14 (`textual` hard dep, preflight detect-only) → Tasks 1, 8, 12, 13. ✓
 

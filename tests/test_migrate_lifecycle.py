@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
-from resume_agent.db import make_engine
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.db import make_engine
+from resume_tailor_harness.tracking.migrate import (
     ensure_content_fingerprint_column,
     ensure_gate_override_column,
     ensure_reject_category_column,

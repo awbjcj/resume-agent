@@ -308,12 +308,12 @@ Two items remain deliberately live-only: running `scripts/stream_latency.py` aga
 a configured server/session, and comparing prompt-cache TTFT on turn 1 versus turn 6.
 The code and reporting seam are present, but this offline implementation does not
 invent provider measurements. The script accepts an existing Coach session, base URL,
-and optional `RESUME_AGENT_TOKEN`.
+and optional `RESUME_TAILOR_HARNESS_TOKEN`.
 
 ## Candidate-holdback decision
 
 **Task 3's `_safe_prefix_len`.** I've prepared the seam (`ProseEmitter.feed` in
-`src/resume_agent/sessions/turns.py:92`, replacing the `safe_length = len(self.\_pending)
+`src/resume_tailor_harness/sessions/turns.py:92`, replacing the `safe_length = len(self.\_pending)
 
 - self.\_holdback` branch), but the policy itself is a genuine security/latency trade-off
   that belongs to whoever owns the leak risk, not to a default:

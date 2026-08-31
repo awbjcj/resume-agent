@@ -6,10 +6,10 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 import pytest
 
-from resume_agent.api.app import create_app
-from resume_agent.api.runs.conversation import with_conversation_stream
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.sessions.stream import Completed, RunStreamSink, TextDelta
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.runs.conversation import with_conversation_stream
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.sessions.stream import Completed, RunStreamSink, TextDelta
 
 
 class InlineExecutor(Executor):
@@ -67,7 +67,7 @@ def test_stream_route_404s_for_missing_run(tmp_path):
 
 
 def test_terminal_run_fallback_preserves_error_truth(tmp_path):
-    from resume_agent.api.runs.stream_sse import stream_events
+    from resume_tailor_harness.api.runs.stream_sse import stream_events
 
     class Manager:
         def stream_path(self, run_id):

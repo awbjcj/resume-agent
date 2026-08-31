@@ -4,9 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _app(tmp_path):
@@ -14,7 +14,7 @@ def _app(tmp_path):
     data_root.mkdir()
     (data_root / "profile").mkdir()
     (data_root / "profile" / "facts.json").write_text("{}", encoding="utf-8")
-    db_url = f"sqlite:///{(data_root / 'resume_agent.db').as_posix()}"
+    db_url = f"sqlite:///{(data_root / 'resume_tailor_harness.db').as_posix()}"
     env = tmp_path / ".env"
     env.write_text(
         "AUTH_USERNAME=owner\n"
@@ -107,7 +107,7 @@ def test_admin_routes_are_guarded(tmp_path):
         encoding="utf-8",
     )
     app = create_app(
-        db_url=f"sqlite:///{(data_root / 'resume_agent.db').as_posix()}",
+        db_url=f"sqlite:///{(data_root / 'resume_tailor_harness.db').as_posix()}",
         app_mode="hosted",
         data_dir=data_root,
         api_token="secret",
@@ -118,7 +118,7 @@ def test_admin_routes_are_guarded(tmp_path):
 
 
 def test_export_cleans_temporary_directory_when_build_fails(tmp_path, monkeypatch):
-    from resume_agent.api.routers import admin
+    from resume_tailor_harness.api.routers import admin
 
     app, _ = _app(tmp_path)
     temporary = tmp_path / "failed-export"

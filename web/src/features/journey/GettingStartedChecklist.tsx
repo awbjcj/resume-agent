@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 import { useJourney, type JourneyCta, type JourneyStage } from "./use-journey";
 
-const DISMISS_KEY = "resume-agent-getting-started-dismissed";
+const DISMISS_KEY = "resume-tailor-harness-getting-started-dismissed";
 
 function RowAction({ cta }: { cta: JourneyCta }) {
   if ("pull" in cta) return <PullDialog triggerLabel={cta.label} />;

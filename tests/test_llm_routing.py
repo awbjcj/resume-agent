@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.llm_routing import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_routing import (
     RouteConfigError,
     direct_api_base_url,
     effective_mode,

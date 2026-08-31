@@ -1,6 +1,6 @@
 import json
 
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.profile.group_corrections import (
     GroupCorrection,
     GroupCorrections,
     corrections_path,

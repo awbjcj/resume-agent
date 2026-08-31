@@ -6,11 +6,11 @@ from evals.metrics import ProbeRecord, RoundRecord
 from evals.report import _reviewer_score, render_artifact, render_report
 from evals.runner import CaseResult
 from evals.usage import UsageTotals
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import ResumeContent
+from resume_tailor_harness.models.review import ReviewCritique
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
 def _result(case_id: str, quality: int, ats_score: int) -> CaseResult:

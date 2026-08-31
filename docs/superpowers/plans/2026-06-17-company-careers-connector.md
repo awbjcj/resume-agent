@@ -12,13 +12,13 @@
 
 ## File Structure
 
-- **Modify** `src/resume_agent/discovery/connectors/greenhouse.py` — add module function `fetch_greenhouse_board(token)`; make `GreenhouseConnector._get_board` delegate to it.
-- **Modify** `src/resume_agent/discovery/connectors/lever.py` — add module function `fetch_lever_board(token)`; make `LeverConnector._get_board` delegate to it.
-- **Create** `src/resume_agent/discovery/connectors/ashby.py` — `fetch_ashby_board(token)` + `parse_ashby(payload, company)`.
-- **Create** `src/resume_agent/discovery/connectors/detect.py` — `AtsTarget` dataclass + `detect_ats(url)` (L1 + L2).
-- **Create** `src/resume_agent/discovery/connectors/companies.py` — `CompaniesConnector`.
-- **Modify** `src/resume_agent/discovery/connectors/config.py` — `CompaniesConfig` + field on `ConnectorsConfig`.
-- **Modify** `src/resume_agent/discovery/connectors/registry.py` — register `CompaniesConnector`.
+- **Modify** `src/resume_tailor_harness/discovery/connectors/greenhouse.py` — add module function `fetch_greenhouse_board(token)`; make `GreenhouseConnector._get_board` delegate to it.
+- **Modify** `src/resume_tailor_harness/discovery/connectors/lever.py` — add module function `fetch_lever_board(token)`; make `LeverConnector._get_board` delegate to it.
+- **Create** `src/resume_tailor_harness/discovery/connectors/ashby.py` — `fetch_ashby_board(token)` + `parse_ashby(payload, company)`.
+- **Create** `src/resume_tailor_harness/discovery/connectors/detect.py` — `AtsTarget` dataclass + `detect_ats(url)` (L1 + L2).
+- **Create** `src/resume_tailor_harness/discovery/connectors/companies.py` — `CompaniesConnector`.
+- **Modify** `src/resume_tailor_harness/discovery/connectors/config.py` — `CompaniesConfig` + field on `ConnectorsConfig`.
+- **Modify** `src/resume_tailor_harness/discovery/connectors/registry.py` — register `CompaniesConnector`.
 - **Modify** `config/connectors.yaml.example` — add a `companies:` section.
 - **Create** `tests/fixtures/ashby/job_board.json`, `tests/test_connector_ashby.py`, `tests/test_connector_detect.py`, `tests/test_connector_companies.py`.
 - **Modify** `tests/test_connector_greenhouse.py`, `tests/test_connector_lever.py`, `tests/test_connectors_config.py`, `tests/test_connectors_registry.py`.
@@ -33,8 +33,8 @@ Lift the inlined httpx call into a module function each connector delegates to, 
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/greenhouse.py:62-65`
-- Modify: `src/resume_agent/discovery/connectors/lever.py:80-83`
+- Modify: `src/resume_tailor_harness/discovery/connectors/greenhouse.py:62-65`
+- Modify: `src/resume_tailor_harness/discovery/connectors/lever.py:80-83`
 - Test: `tests/test_connector_greenhouse.py`, `tests/test_connector_lever.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -43,7 +43,7 @@ Add to the end of `tests/test_connector_greenhouse.py`:
 
 ```python
 def test_get_board_delegates_to_module_fetcher(monkeypatch):
-    import resume_agent.discovery.connectors.greenhouse as gh
+    import resume_tailor_harness.discovery.connectors.greenhouse as gh
 
     called = {}
 
@@ -61,7 +61,7 @@ Add to the end of `tests/test_connector_lever.py`:
 
 ```python
 def test_get_board_delegates_to_module_fetcher(monkeypatch):
-    import resume_agent.discovery.connectors.lever as lever
+    import resume_tailor_harness.discovery.connectors.lever as lever
 
     called = {}
 
@@ -82,7 +82,7 @@ Expected: FAIL with `AttributeError: module ... has no attribute 'fetch_greenhou
 
 - [ ] **Step 3: Add the module functions and delegate**
 
-In `src/resume_agent/discovery/connectors/greenhouse.py`, add after the `_BASE` constant (line 9):
+In `src/resume_tailor_harness/discovery/connectors/greenhouse.py`, add after the `_BASE` constant (line 9):
 
 ```python
 def fetch_greenhouse_board(token: str) -> dict:
@@ -99,7 +99,7 @@ Replace the body of `GreenhouseConnector._get_board` (lines 62-65) with:
         return fetch_greenhouse_board(token)
 ```
 
-In `src/resume_agent/discovery/connectors/lever.py`, add after the `_BASE` constant (line 9):
+In `src/resume_tailor_harness/discovery/connectors/lever.py`, add after the `_BASE` constant (line 9):
 
 ```python
 def fetch_lever_board(token: str) -> list:
@@ -124,7 +124,7 @@ Expected: PASS (the new delegation tests and all existing ones).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/greenhouse.py src/resume_agent/discovery/connectors/lever.py tests/test_connector_greenhouse.py tests/test_connector_lever.py
+git add src/resume_tailor_harness/discovery/connectors/greenhouse.py src/resume_tailor_harness/discovery/connectors/lever.py tests/test_connector_greenhouse.py tests/test_connector_lever.py
 git commit -m "refactor: extract shared greenhouse/lever board fetchers"
 ```
 
@@ -136,7 +136,7 @@ A new ATS backend: fetch a board's JSON and map it to `RawJob`s, mirroring `gree
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/ashby.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/ashby.py`
 - Create: `tests/fixtures/ashby/job_board.json`
 - Test: `tests/test_connector_ashby.py`
 
@@ -177,7 +177,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
+from resume_tailor_harness.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
 
 FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "ashby" / "job_board.json").read_text())
 
@@ -207,7 +207,7 @@ def test_parse_ashby_falls_back_to_html_description():
 
 
 def test_fetch_ashby_board_hits_posting_api(monkeypatch):
-    import resume_agent.discovery.connectors.ashby as ashby
+    import resume_tailor_harness.discovery.connectors.ashby as ashby
 
     captured = {}
 
@@ -230,18 +230,18 @@ def test_fetch_ashby_board_hits_posting_api(monkeypatch):
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `pytest tests/test_connector_ashby.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.ashby'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.ashby'`.
 
 - [ ] **Step 4: Write the implementation**
 
-Create `src/resume_agent/discovery/connectors/ashby.py`:
+Create `src/resume_tailor_harness/discovery/connectors/ashby.py`:
 
 ```python
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.dates import parse_iso_datetime
+from resume_tailor_harness.discovery.connectors.text import html_to_text
 
 _BASE = "https://api.ashbyhq.com/posting-api/job-board"
 
@@ -280,7 +280,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/ashby.py tests/test_connector_ashby.py tests/fixtures/ashby/job_board.json
+git add src/resume_tailor_harness/discovery/connectors/ashby.py tests/test_connector_ashby.py tests/fixtures/ashby/job_board.json
 git commit -m "feat: add ashby ATS backend (fetch + parse)"
 ```
 
@@ -292,7 +292,7 @@ Resolve a careers URL to `(ats, token)` via L1 URL pattern, then L2 one-GET HTML
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/detect.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/detect.py`
 - Test: `tests/test_connector_detect.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -300,8 +300,8 @@ Resolve a careers URL to `(ats, token)` via L1 URL pattern, then L2 one-GET HTML
 Create `tests/test_connector_detect.py`:
 
 ```python
-import resume_agent.discovery.connectors.detect as detect
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats
+import resume_tailor_harness.discovery.connectors.detect as detect
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget, detect_ats
 
 
 def test_l1_greenhouse_url():
@@ -350,11 +350,11 @@ def test_l2_fails_open_on_fetch_error(monkeypatch):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_connector_detect.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.detect'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.detect'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/discovery/connectors/detect.py`:
+Create `src/resume_tailor_harness/discovery/connectors/detect.py`:
 
 ```python
 import re
@@ -444,7 +444,7 @@ Expected: PASS (9 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/detect.py tests/test_connector_detect.py
+git add src/resume_tailor_harness/discovery/connectors/detect.py tests/test_connector_detect.py
 git commit -m "feat: add ATS detection (L1 url pattern + L2 html sniff)"
 ```
 
@@ -456,7 +456,7 @@ Add the config section that holds careers URLs. Coexists with existing sections;
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/config.py:44-53`
+- Modify: `src/resume_tailor_harness/discovery/connectors/config.py:44-53`
 - Modify: `config/connectors.yaml.example`
 - Test: `tests/test_connectors_config.py`
 
@@ -491,7 +491,7 @@ Expected: FAIL with `AttributeError: 'ConnectorsConfig' object has no attribute 
 
 - [ ] **Step 3: Add the config model**
 
-In `src/resume_agent/discovery/connectors/config.py`, add a class before `ConnectorsConfig` (after `LinkedInConfig`, line 45):
+In `src/resume_tailor_harness/discovery/connectors/config.py`, add a class before `ConnectorsConfig` (after `LinkedInConfig`, line 45):
 
 ```python
 class CompaniesConfig(ExtensibleModel):
@@ -527,7 +527,7 @@ Expected: PASS (all, including the 3 new tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/config.py config/connectors.yaml.example tests/test_connectors_config.py
+git add src/resume_tailor_harness/discovery/connectors/config.py config/connectors.yaml.example tests/test_connectors_config.py
 git commit -m "feat: add companies connector config section"
 ```
 
@@ -539,8 +539,8 @@ The connector itself: detect → dispatch → collect → gate, with per-URL fai
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/companies.py`
-- Modify: `src/resume_agent/discovery/connectors/registry.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/companies.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py`
 - Test: `tests/test_connector_companies.py`, `tests/test_connectors_registry.py`
 
 - [ ] **Step 1: Write the failing tests for the connector**
@@ -548,10 +548,10 @@ The connector itself: detect → dispatch → collect → gate, with per-URL fai
 Create `tests/test_connector_companies.py`:
 
 ```python
-import resume_agent.discovery.connectors.companies as companies
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.search_config import SearchConfig
+import resume_tailor_harness.discovery.connectors.companies as companies
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 _GH = {
     "jobs": [
@@ -636,22 +636,22 @@ def test_limit_caps_results(monkeypatch):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_connector_companies.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.discovery.connectors.companies'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.discovery.connectors.companies'`.
 
 - [ ] **Step 3: Write the connector**
 
-Create `src/resume_agent/discovery/connectors/companies.py`:
+Create `src/resume_tailor_harness/discovery/connectors/companies.py`:
 
 ```python
 import httpx
 
-from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
-from resume_agent.discovery.connectors.base import RawJob, board_error
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats
-from resume_agent.discovery.connectors.greenhouse import fetch_greenhouse_board, parse_greenhouse
-from resume_agent.discovery.connectors.lever import fetch_lever_board, parse_lever
-from resume_agent.discovery.connectors.text import relevance_gate
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
+from resume_tailor_harness.discovery.connectors.base import RawJob, board_error
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget, detect_ats
+from resume_tailor_harness.discovery.connectors.greenhouse import fetch_greenhouse_board, parse_greenhouse
+from resume_tailor_harness.discovery.connectors.lever import fetch_lever_board, parse_lever
+from resume_tailor_harness.discovery.connectors.text import relevance_gate
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 class CompaniesConnector:
@@ -744,10 +744,10 @@ Expected: FAIL — `companies` not built (no registration yet).
 
 - [ ] **Step 7: Register the connector**
 
-In `src/resume_agent/discovery/connectors/registry.py`, add the import after the Lever import (line 6):
+In `src/resume_tailor_harness/discovery/connectors/registry.py`, add the import after the Lever import (line 6):
 
 ```python
-from resume_agent.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
 ```
 
 Add the registration block immediately after the Lever block (after line 19, before the RemoteOK block):
@@ -765,7 +765,7 @@ Expected: PASS (all, including the 3 new tests; existing order tests unaffected 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/companies.py src/resume_agent/discovery/connectors/registry.py tests/test_connector_companies.py tests/test_connectors_registry.py
+git add src/resume_tailor_harness/discovery/connectors/companies.py src/resume_tailor_harness/discovery/connectors/registry.py tests/test_connector_companies.py tests/test_connectors_registry.py
 git commit -m "feat: add companies connector with ATS auto-detection"
 ```
 
@@ -782,7 +782,7 @@ Expected: PASS — all tests green, including every pre-existing test (no existi
 
 - [ ] **Step 2: Lint**
 
-Run: `ruff check src/resume_agent/discovery/connectors/`
+Run: `ruff check src/resume_tailor_harness/discovery/connectors/`
 Expected: no errors.
 
 - [ ] **Step 3: Sanity-check detection against the spec acceptance criteria**

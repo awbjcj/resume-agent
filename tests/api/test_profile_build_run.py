@@ -5,7 +5,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -66,7 +66,7 @@ def test_build_with_non_anthropic_key_launches_run(tmp_path, monkeypatch):
             files={"file": ("resume.txt", io.BytesIO(b"experience"), "text/plain")},
             data={"docType": "resume"},
         )
-        from resume_agent.services import profile_build
+        from resume_tailor_harness.services import profile_build
 
         monkeypatch.setattr(
             profile_build,
@@ -88,7 +88,7 @@ def test_build_launches_run(client, monkeypatch):
         data={"docType": "resume"},
     )
 
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
 
     def fake_run(reporter, **kwargs):
         return {"experiences": 2, "projects": 1, "warnings": []}
@@ -107,7 +107,7 @@ def test_build_registers_wizard_resume_as_primary_source(client, monkeypatch):
         files={"file": ("resume.txt", io.BytesIO(b"experience"), "text/plain")},
         data={"docType": "resume"},
     )
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
 
     monkeypatch.setattr(
         profile_build,
@@ -129,7 +129,7 @@ def test_build_with_registered_sources_skips_document_store(client, monkeypatch)
         "/api/profile/sources",
         files={"file": ("resume.txt", _io.BytesIO(b"experience"), "text/plain")},
     )
-    from resume_agent.services import profile_build
+    from resume_tailor_harness.services import profile_build
 
     monkeypatch.setattr(
         profile_build,

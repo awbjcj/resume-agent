@@ -3,10 +3,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import event
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.h1b.cache import load_company_evidence
-from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.tracking.tables import H1BCompanyEvidence
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.h1b.cache import load_company_evidence
+from resume_tailor_harness.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
+from resume_tailor_harness.tracking.tables import H1BCompanyEvidence
 
 
 def _evidence(company: str, *, expires_in_days: int = 30) -> H1BSponsorshipEvidence:

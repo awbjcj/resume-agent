@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from resume_agent.discovery import scout
-from resume_agent.interview import agent as interview
-from resume_agent.profile import coach
+from resume_tailor_harness.discovery import scout
+from resume_tailor_harness.interview import agent as interview
+from resume_tailor_harness.profile import coach
 
 
 def _cache_enabled(runner) -> bool:

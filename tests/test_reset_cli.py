@@ -3,9 +3,9 @@ from pathlib import Path
 from sqlmodel import Session, select
 from typer.testing import CliRunner
 
-from resume_agent.cli import app
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.cli import app
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job
 
 runner = CliRunner()
 

@@ -79,9 +79,9 @@ These amendments supersede conflicting snippets later in the plan.
 
 **Files:**
 
-- Create: `src/resume_agent/prompts/__init__.py` (empty)
-- Create: `src/resume_agent/prompts/registry.py`
-- Modify: `src/resume_agent/interview/agent.py` (extract `_PERSONA_CORE` from `persona_instructions`)
+- Create: `src/resume_tailor_harness/prompts/__init__.py` (empty)
+- Create: `src/resume_tailor_harness/prompts/registry.py`
+- Modify: `src/resume_tailor_harness/interview/agent.py` (extract `_PERSONA_CORE` from `persona_instructions`)
 - Test: `tests/test_prompt_registry.py`
 
 **Interfaces:**
@@ -95,7 +95,7 @@ These amendments supersede conflicting snippets later in the plan.
 # tests/test_prompt_registry.py
 """Registry is a projection of real agent instruction lists — never a copy."""
 
-from resume_agent.prompts.registry import PROMPT_SPECS, SPECS_BY_KEY, spec_for
+from resume_tailor_harness.prompts.registry import PROMPT_SPECS, SPECS_BY_KEY, spec_for
 
 VALID_STAGES = {"tailoring", "review", "cover-letter", "discovery", "profile", "interview", "email"}
 
@@ -123,8 +123,8 @@ def test_fact_check_is_the_only_locked_agent():
 
 def test_registry_projects_the_real_instruction_objects():
     """Identity (not equality): the registry must import the module constant, not copy text."""
-    from resume_agent.discovery import fit
-    from resume_agent.tailor import agents as tailor_agents
+    from resume_tailor_harness.discovery import fit
+    from resume_tailor_harness.tailor import agents as tailor_agents
 
     assert SPECS_BY_KEY["fit-score"].instructions == tuple(fit._INSTRUCTIONS)
     assert SPECS_BY_KEY["reviewer-fact-check"].instructions == tuple(
@@ -133,7 +133,7 @@ def test_registry_projects_the_real_instruction_objects():
 
 
 def test_interviewer_registers_the_persona_core():
-    from resume_agent.interview.agent import _PERSONA_CORE
+    from resume_tailor_harness.interview.agent import _PERSONA_CORE
 
     assert SPECS_BY_KEY["interviewer"].instructions == tuple(_PERSONA_CORE)
 ```
@@ -141,7 +141,7 @@ def test_interviewer_registers_the_persona_core():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_prompt_registry.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.prompts'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.prompts'`
 
 - [ ] **Step 3: Extract `_PERSONA_CORE` in `interview/agent.py`**
 
@@ -168,7 +168,7 @@ Only lines containing f-string interpolation stay inline; everything else moves.
 - [ ] **Step 4: Write the registry**
 
 ```python
-# src/resume_agent/prompts/registry.py
+# src/resume_tailor_harness/prompts/registry.py
 """Declarative projection of every LLM agent's base prompt.
 
 Instruction lists stay defined in their home modules; this registry imports
@@ -181,12 +181,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from resume_agent.cover_letter import agents as cover_letter_agents
-from resume_agent.discovery import extract, fit, industry, relevance, source_scout
-from resume_agent.discovery.scraper import learn
-from resume_agent.discovery.url_ingest import llm as url_ingest_llm
-from resume_agent.interview import agent as interview_agent
-from resume_agent.profile import (
+from resume_tailor_harness.cover_letter import agents as cover_letter_agents
+from resume_tailor_harness.discovery import extract, fit, industry, relevance, source_scout
+from resume_tailor_harness.discovery.scraper import learn
+from resume_tailor_harness.discovery.url_ingest import llm as url_ingest_llm
+from resume_tailor_harness.interview import agent as interview_agent
+from resume_tailor_harness.profile import (
     coach,
     extractor,
     inference,
@@ -194,13 +194,13 @@ from resume_agent.profile import (
     project_extractor,
     synthesis,
 )
-from resume_agent.prompts.guidance import NON_EDITABLE_KEYS
-from resume_agent.services import email_writer
-from resume_agent.suggestions import agents as suggestions_agents
-from resume_agent.tailor import agents as tailor_agents
-from resume_agent.tailor import match_plan
-from resume_agent.taxonomy import groups
-from resume_agent.tracking import canonicalize
+from resume_tailor_harness.prompts.guidance import NON_EDITABLE_KEYS
+from resume_tailor_harness.services import email_writer
+from resume_tailor_harness.suggestions import agents as suggestions_agents
+from resume_tailor_harness.tailor import agents as tailor_agents
+from resume_tailor_harness.tailor import match_plan
+from resume_tailor_harness.taxonomy import groups
+from resume_tailor_harness.tracking import canonicalize
 
 
 @dataclass(frozen=True)
@@ -358,10 +358,10 @@ def spec_for(key: str) -> PromptSpec | None:
     return SPECS_BY_KEY.get(key)
 ```
 
-Note: this file imports `NON_EDITABLE_KEYS` from `prompts/guidance.py`, which Task 2 creates. For this task, create a minimal `src/resume_agent/prompts/guidance.py` containing only:
+Note: this file imports `NON_EDITABLE_KEYS` from `prompts/guidance.py`, which Task 2 creates. For this task, create a minimal `src/resume_tailor_harness/prompts/guidance.py` containing only:
 
 ```python
-# src/resume_agent/prompts/guidance.py
+# src/resume_tailor_harness/prompts/guidance.py
 NON_EDITABLE_KEYS = frozenset({"reviewer-fact-check"})
 ```
 
@@ -375,7 +375,7 @@ Expected: PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/prompts tests/test_prompt_registry.py src/resume_agent/interview/agent.py
+git add src/resume_tailor_harness/prompts tests/test_prompt_registry.py src/resume_tailor_harness/interview/agent.py
 git commit -m "feat(prompts): declarative PromptSpec registry projecting all agent prompts"
 ```
 
@@ -385,8 +385,8 @@ git commit -m "feat(prompts): declarative PromptSpec registry projecting all age
 
 **Files:**
 
-- Modify: `src/resume_agent/prompts/guidance.py` (extend the Task-1 stub)
-- Modify: `src/resume_agent/tenancy/paths.py` (add `AGENT_GUIDANCE_PATH`)
+- Modify: `src/resume_tailor_harness/prompts/guidance.py` (extend the Task-1 stub)
+- Modify: `src/resume_tailor_harness/tenancy/paths.py` (add `AGENT_GUIDANCE_PATH`)
 - Test: `tests/test_prompt_guidance.py`
 
 **Interfaces:**
@@ -402,7 +402,7 @@ git commit -m "feat(prompts): declarative PromptSpec registry projecting all age
 
 import yaml
 
-from resume_agent.prompts.guidance import (
+from resume_tailor_harness.prompts.guidance import (
     GUIDANCE_HEADER,
     guidance_for,
     load_guidance,
@@ -473,7 +473,7 @@ AGENT_GUIDANCE_PATH = "config/agent_guidance.yaml"
 Replace `prompts/guidance.py` with:
 
 ```python
-# src/resume_agent/prompts/guidance.py
+# src/resume_tailor_harness/prompts/guidance.py
 """Per-agent user guidance: layered beneath base prompts, never replacing them.
 
 Must not import prompts.registry (registry imports every agent module and the
@@ -487,7 +487,7 @@ from collections.abc import Sequence
 
 import yaml
 
-from resume_agent.tenancy.paths import AGENT_GUIDANCE_PATH, resolve_tenant_path
+from resume_tailor_harness.tenancy.paths import AGENT_GUIDANCE_PATH, resolve_tenant_path
 
 NON_EDITABLE_KEYS = frozenset({"reviewer-fact-check"})
 MAX_GUIDANCE_CHARS = 4000
@@ -552,7 +552,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/prompts/guidance.py src/resume_agent/tenancy/paths.py tests/test_prompt_guidance.py
+git add src/resume_tailor_harness/prompts/guidance.py src/resume_tailor_harness/tenancy/paths.py tests/test_prompt_guidance.py
 git commit -m "feat(prompts): per-workspace agent guidance layered via with_guidance"
 ```
 
@@ -563,7 +563,7 @@ git commit -m "feat(prompts): per-workspace agent guidance layered via with_guid
 **Files:**
 
 - Modify: every builder listed in the table below
-- Modify: `src/resume_agent/tailor/agents.py` (`_merged_advisory_instructions` per-reviewer guidance)
+- Modify: `src/resume_tailor_harness/tailor/agents.py` (`_merged_advisory_instructions` per-reviewer guidance)
 - Test: `tests/test_prompt_injection.py`
 
 **Interfaces:**
@@ -579,7 +579,7 @@ git commit -m "feat(prompts): per-workspace agent guidance layered via with_guid
 
 import yaml
 
-from resume_agent.prompts.guidance import GUIDANCE_HEADER
+from resume_tailor_harness.prompts.guidance import GUIDANCE_HEADER
 
 
 def _write_guidance(tmp_path, data):
@@ -591,7 +591,7 @@ def _write_guidance(tmp_path, data):
 def test_reviewer_agent_receives_guidance(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _write_guidance(tmp_path, {"reviewer-recruiter": "Weight the summary heavily."})
-    from resume_agent.tailor.agents import build_reviewer_agent
+    from resume_tailor_harness.tailor.agents import build_reviewer_agent
 
     runner = build_reviewer_agent("recruiter")
     instructions = list(runner._agent.instructions)
@@ -602,7 +602,7 @@ def test_reviewer_agent_receives_guidance(tmp_path, monkeypatch):
 def test_fact_check_agent_never_receives_guidance(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _write_guidance(tmp_path, {"reviewer-fact-check": "be lenient"})
-    from resume_agent.tailor.agents import build_reviewer_agent
+    from resume_tailor_harness.tailor.agents import build_reviewer_agent
 
     runner = build_reviewer_agent("fact-check")
     assert GUIDANCE_HEADER not in list(runner._agent.instructions)
@@ -611,7 +611,7 @@ def test_fact_check_agent_never_receives_guidance(tmp_path, monkeypatch):
 def test_fit_agent_receives_guidance(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _write_guidance(tmp_path, {"fit-score": "Penalize on-site-only roles."})
-    from resume_agent.discovery.fit import build_fit_agent
+    from resume_tailor_harness.discovery.fit import build_fit_agent
 
     runner = build_fit_agent()
     instructions = list(runner._agent.instructions)
@@ -621,7 +621,7 @@ def test_fit_agent_receives_guidance(tmp_path, monkeypatch):
 def test_merged_advisory_embeds_per_reviewer_guidance(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _write_guidance(tmp_path, {"reviewer-recruiter": "Weight the summary heavily."})
-    from resume_agent.tailor.agents import _merged_advisory_instructions
+    from resume_tailor_harness.tailor.agents import _merged_advisory_instructions
 
     lines = _merged_advisory_instructions(["recruiter", "concision"])
     recruiter_rubric = next(l for l in lines if l.startswith("Rubric for 'recruiter'"))
@@ -639,7 +639,7 @@ Expected: FAIL — guidance text absent from instructions.
 
 - [ ] **Step 3: Wire the sites**
 
-The transformation is identical everywhere: wrap the final composed instruction list in `with_guidance("<key>", ...)`, importing `from resume_agent.prompts.guidance import with_guidance` at each module top. Exact key ↔ site map:
+The transformation is identical everywhere: wrap the final composed instruction list in `with_guidance("<key>", ...)`, importing `from resume_tailor_harness.prompts.guidance import with_guidance` at each module top. Exact key ↔ site map:
 
 | File                                       | Site                               | Wrap                                                                                                               |
 | ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -671,7 +671,7 @@ The transformation is identical everywhere: wrap the final composed instruction 
 For the merged advisory panel, edit `_merged_advisory_instructions` in `tailor/agents.py` — after building `rubric` for each name, append that reviewer's guidance into its rubric line:
 
 ```python
-from resume_agent.prompts.guidance import guidance_for, with_guidance  # module top
+from resume_tailor_harness.prompts.guidance import guidance_for, with_guidance  # module top
 
     for name in names:
         rubric = [
@@ -707,9 +707,9 @@ git commit -m "feat(prompts): layer user guidance into every agent builder"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/prompts.py`
-- Create: `src/resume_agent/api/routers/prompts.py`
-- Modify: `src/resume_agent/api/app.py` (include router, guarded)
+- Create: `src/resume_tailor_harness/api/schemas/prompts.py`
+- Create: `src/resume_tailor_harness/api/routers/prompts.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (include router, guarded)
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` (regenerated)
 - Test: `tests/api/test_prompts_api.py`
 
@@ -727,7 +727,7 @@ git commit -m "feat(prompts): layer user guidance into every agent builder"
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 @pytest.fixture()
@@ -789,12 +789,12 @@ Expected: FAIL — 404 on `/api/agents/prompts` (route missing).
 - [ ] **Step 3: Implement schemas + router**
 
 ```python
-# src/resume_agent/api/schemas/prompts.py
+# src/resume_tailor_harness/api/schemas/prompts.py
 """Wire contract for agent prompt transparency + guidance editing."""
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class AgentPromptItem(CamelModel):
@@ -812,15 +812,15 @@ class GuidanceUpdate(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/prompts.py
+# src/resume_tailor_harness/api/routers/prompts.py
 """Agent prompt transparency: view every base prompt, edit the guidance layer."""
 
 from fastapi import APIRouter
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.prompts import AgentPromptItem, GuidanceUpdate
-from resume_agent.prompts.guidance import load_guidance, save_guidance
-from resume_agent.prompts.registry import PROMPT_SPECS, spec_for
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.prompts import AgentPromptItem, GuidanceUpdate
+from resume_tailor_harness.prompts.guidance import load_guidance, save_guidance
+from resume_tailor_harness.prompts.registry import PROMPT_SPECS, spec_for
 
 router = APIRouter()
 
@@ -857,7 +857,7 @@ def put_guidance(key: str, body: GuidanceUpdate) -> AgentPromptItem:
     return _item(spec, saved)
 ```
 
-In `api/app.py`, import the router alongside the others (`from resume_agent.api.routers import prompts as prompts_router`) and include it next to the config router (line ~290):
+In `api/app.py`, import the router alongside the others (`from resume_tailor_harness.api.routers import prompts as prompts_router`) and include it next to the config router (line ~290):
 
 ```python
 app.include_router(prompts_router.router, prefix="/api", dependencies=guarded)
@@ -871,7 +871,7 @@ Run: `bash scripts/gen_ts_client.sh` then `.venv/Scripts/python.exe -m pytest te
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api tests/api/test_prompts_api.py contracts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/api tests/api/test_prompts_api.py contracts web/src/lib/api/schema.ts
 git commit -m "feat(api): agent prompt transparency + guidance endpoints"
 ```
 
@@ -881,7 +881,7 @@ git commit -m "feat(api): agent prompt transparency + guidance endpoints"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/config.py` (`ReviewConfigDoc`)
+- Modify: `src/resume_tailor_harness/api/schemas/config.py` (`ReviewConfigDoc`)
 - Modify: `web/src/features/settings/pages/ReviewSettingsPage.tsx`
 - Modify: `contracts/*`, `web/src/lib/api/schema.ts` (regenerated)
 - Test: `tests/api/test_config_router.py` (extend), `web/src/features/settings/pages/ReviewSettingsPage.test.tsx` (create if absent)
@@ -937,7 +937,7 @@ Write `ReviewSettingsPage.test.tsx` following the pattern of `web/src/features/s
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/config.py tests/api/test_config_router.py contracts web
+git add src/resume_tailor_harness/api/schemas/config.py tests/api/test_config_router.py contracts web
 git commit -m "feat(review): expose merged-advisory + writer tiers in contract and settings UI"
 ```
 
@@ -1098,8 +1098,8 @@ git commit -m "feat(web): Agent Prompts settings page — view prompts, edit gui
 
 **Files:**
 
-- Create: `src/resume_agent/render/templates.py`
-- Create: `src/resume_agent/render/sample_content.py`
+- Create: `src/resume_tailor_harness/render/templates.py`
+- Create: `src/resume_tailor_harness/render/sample_content.py`
 - Test: `tests/test_render_templates.py`
 
 **Interfaces:**
@@ -1122,7 +1122,7 @@ git commit -m "feat(web): Agent Prompts settings page — view prompts, edit gui
 
 import pytest
 
-from resume_agent.render.templates import (
+from resume_tailor_harness.render.templates import (
     BUNDLED,
     TemplateNotFoundError,
     list_templates,
@@ -1169,7 +1169,7 @@ def test_list_templates_bundled_first(tmp_path, monkeypatch):
 
 
 def test_sample_content_is_valid_and_small():
-    from resume_agent.render.sample_content import sample_resume_content
+    from resume_tailor_harness.render.sample_content import sample_resume_content
 
     content = sample_resume_content()
     assert content.contact.name
@@ -1181,7 +1181,7 @@ def test_sample_content_is_valid_and_small():
 - [ ] **Step 3: Implement**
 
 ```python
-# src/resume_agent/render/templates.py
+# src/resume_tailor_harness/render/templates.py
 """Template identity: bundled manifest + workspace custom templates.
 
 Users select templates by id ("classic", "custom:<stem>"), never by path;
@@ -1193,7 +1193,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_tailor_harness.tenancy.paths import resolve_tenant_path
 
 CUSTOM_TEMPLATES_DIR = "config/templates"
 
@@ -1258,11 +1258,11 @@ def list_templates() -> list[TemplateInfo]:
 ```
 
 ```python
-# src/resume_agent/render/sample_content.py
+# src/resume_tailor_harness/render/sample_content.py
 """Deterministic sample resume used for template validation and previews."""
 
-from resume_agent.models.profile import Contact, Education
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact, Education
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
@@ -1315,7 +1315,7 @@ If `Education` field names differ (check `models/profile.py`), use its actual re
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/render/templates.py src/resume_agent/render/sample_content.py tests/test_render_templates.py
+git add src/resume_tailor_harness/render/templates.py src/resume_tailor_harness/render/sample_content.py tests/test_render_templates.py
 git commit -m "feat(render): template manifest, id resolution, sample content"
 ```
 
@@ -1325,10 +1325,10 @@ git commit -m "feat(render): template manifest, id resolution, sample content"
 
 **Files:**
 
-- Modify: `src/resume_agent/render/render_config.py`
-- Modify: `src/resume_agent/render/renderer.py` (`render_pdf` gains `root`)
-- Modify: `src/resume_agent/render/service.py` (`render_version` resolves template + fit)
-- Modify: `src/resume_agent/render/templates.py` (add `template_path_for`)
+- Modify: `src/resume_tailor_harness/render/render_config.py`
+- Modify: `src/resume_tailor_harness/render/renderer.py` (`render_pdf` gains `root`)
+- Modify: `src/resume_tailor_harness/render/service.py` (`render_version` resolves template + fit)
+- Modify: `src/resume_tailor_harness/render/templates.py` (add `template_path_for`)
 - Test: `tests/test_render_config.py` (create; move/extend any existing render-config assertions), existing render service tests (update fakes)
 
 **Interfaces:**
@@ -1350,8 +1350,8 @@ from pathlib import Path
 
 import yaml
 
-from resume_agent.render.render_config import RenderConfig, load_render_config
-from resume_agent.render.templates import template_path_for
+from resume_tailor_harness.render.render_config import RenderConfig, load_render_config
+from resume_tailor_harness.render.templates import template_path_for
 
 
 def test_defaults_use_classic_template():
@@ -1436,7 +1436,7 @@ Note: with `root` set, Typst resolves the input path against the root when relat
 `render/service.py`:
 
 ```python
-from resume_agent.render.templates import template_path_for
+from resume_tailor_harness.render.templates import template_path_for
 
 RenderFn = Callable[..., Path]
 
@@ -1452,8 +1452,8 @@ RenderFn = Callable[..., Path]
 
 ```python
 def test_classic_template_compiles_with_pinned_root(tmp_path):
-    from resume_agent.render.renderer import render_pdf
-    from resume_agent.render.sample_content import sample_resume_content
+    from resume_tailor_harness.render.renderer import render_pdf
+    from resume_tailor_harness.render.sample_content import sample_resume_content
 
     out = render_pdf(
         sample_resume_content(), tmp_path / "sample.pdf",
@@ -1467,7 +1467,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests/test_render_config.py -q` and the
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/render tests
+git add src/resume_tailor_harness/render tests
 git commit -m "feat(render): template-id config keys, root-pinned compile, fit toggle"
 ```
 
@@ -1477,8 +1477,8 @@ git commit -m "feat(render): template-id config keys, root-pinned compile, fit t
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/config.py` (`RenderConfigDoc`)
-- Modify: `src/resume_agent/api/routers/config.py` (`put_render` validates the template id)
+- Modify: `src/resume_tailor_harness/api/schemas/config.py` (`RenderConfigDoc`)
+- Modify: `src/resume_tailor_harness/api/routers/config.py` (`put_render` validates the template id)
 - Modify: `config/render.yaml.example` (create if absent — check first)
 - Modify: `contracts/*`, `web/src/lib/api/schema.ts` (regenerated)
 - Test: `tests/api/test_config_router.py` (extend)
@@ -1527,8 +1527,8 @@ class RenderConfigDoc(CamelModel):
 `api/routers/config.py` — replace `put_render`:
 
 ```python
-from resume_agent.api.errors import ApiException
-from resume_agent.render.templates import TemplateNotFoundError, resolve_template
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.render.templates import TemplateNotFoundError, resolve_template
 
 @router.put("/config/render", response_model=RenderConfigDoc)
 def put_render(body: RenderConfigDoc, request: Request):
@@ -1556,7 +1556,7 @@ fit_one_page: true
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/resume_agent/api config/render.yaml.example tests contracts web/src
+git add src/resume_tailor_harness/api config/render.yaml.example tests contracts web/src
 git commit -m "feat(api)!: render config contract is template id + fitOnePage"
 ```
 
@@ -1566,10 +1566,10 @@ git commit -m "feat(api)!: render config contract is template id + fitOnePage"
 
 **Files:**
 
-- Create: `src/resume_agent/services/render_templates.py`
-- Create: `src/resume_agent/api/routers/render_templates.py`
-- Create: `src/resume_agent/api/schemas/render_templates.py`
-- Modify: `src/resume_agent/api/app.py` (include router, guarded)
+- Create: `src/resume_tailor_harness/services/render_templates.py`
+- Create: `src/resume_tailor_harness/api/routers/render_templates.py`
+- Create: `src/resume_tailor_harness/api/schemas/render_templates.py`
+- Modify: `src/resume_tailor_harness/api/app.py` (include router, guarded)
 - Modify: `contracts/*`, `web/src/lib/api/schema.ts` (regenerated)
 - Test: `tests/api/test_render_templates_api.py`
 
@@ -1589,7 +1589,7 @@ git commit -m "feat(api)!: render config contract is template id + fitOnePage"
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 VALID_TYP = """
 #let payload = json(bytes(sys.inputs.at("data", default: "{}")))
@@ -1678,7 +1678,7 @@ Run → FAIL (routes missing).
 - [ ] **Step 2: Implement the service**
 
 ```python
-# src/resume_agent/services/render_templates.py
+# src/resume_tailor_harness/services/render_templates.py
 """Custom template lifecycle: validate-on-upload, preview, delete-with-fallback.
 
 The validation compile is both the UX (typst errors surface at upload time)
@@ -1690,14 +1690,14 @@ import re
 import tempfile
 from pathlib import Path
 
-from resume_agent.render.renderer import render_pdf
-from resume_agent.render.sample_content import sample_resume_content
-from resume_agent.render.templates import (
+from resume_tailor_harness.render.renderer import render_pdf
+from resume_tailor_harness.render.sample_content import sample_resume_content
+from resume_tailor_harness.render.templates import (
     CUSTOM_TEMPLATES_DIR,
     TemplateInfo,
     resolve_template,
 )
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_tailor_harness.tenancy.paths import resolve_tenant_path
 
 MAX_TEMPLATE_BYTES = 200 * 1024
 _FILENAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\.typ")
@@ -1767,8 +1767,8 @@ def render_preview(template_id: str) -> bytes:
 - [ ] **Step 3: Implement schemas + router**
 
 ```python
-# src/resume_agent/api/schemas/render_templates.py
-from resume_agent.api.schemas.base import CamelModel
+# src/resume_tailor_harness/api/schemas/render_templates.py
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class TemplateListItem(CamelModel):
@@ -1779,17 +1779,17 @@ class TemplateListItem(CamelModel):
 ```
 
 ```python
-# src/resume_agent/api/routers/render_templates.py
+# src/resume_tailor_harness/api/routers/render_templates.py
 """Template management for rendering: list, upload (validated), delete, preview."""
 
 from fastapi import APIRouter, Request, Response, UploadFile
 
-from resume_agent.api.deps import get_config_store
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.render_templates import TemplateListItem
-from resume_agent.api.uploads import UploadTooLargeError, read_upload
-from resume_agent.render.templates import TemplateNotFoundError, list_templates
-from resume_agent.services.render_templates import (
+from resume_tailor_harness.api.deps import get_config_store
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.render_templates import TemplateListItem
+from resume_tailor_harness.api.uploads import UploadTooLargeError, read_upload
+from resume_tailor_harness.render.templates import TemplateNotFoundError, list_templates
+from resume_tailor_harness.services.render_templates import (
     MAX_TEMPLATE_BYTES,
     TemplateValidationError,
     delete_custom_template,
@@ -1851,7 +1851,7 @@ In `api/app.py`, include next to the config router: `app.include_router(render_t
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent tests/api/test_render_templates_api.py contracts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness tests/api/test_render_templates_api.py contracts web/src/lib/api/schema.ts
 git commit -m "feat(api): render template list/upload/delete/preview with validation compile"
 ```
 

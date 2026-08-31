@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from resume_agent.config import Settings
-from resume_agent.llm_runner import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_runner import (
     AgentRunner,
     build_model,
     build_search_equipped,
     model_access_available,
     refresh_agent_api_key,
 )
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.spend import SpendDecision
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.spend import SpendDecision
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 GATEWAY = "https://sub2api.example.com"
 DIRECT_OPENAI = "https://direct-openai.example/v1"

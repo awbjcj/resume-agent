@@ -1,10 +1,10 @@
 from sqlmodel import select
 from typer.testing import CliRunner
 
-import resume_agent.cli as cli
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services.discovery import UrlFetchError
-from resume_agent.tracking.tables import Job
+import resume_tailor_harness.cli as cli
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services.discovery import UrlFetchError
+from resume_tailor_harness.tracking.tables import Job
 
 runner = CliRunner()
 

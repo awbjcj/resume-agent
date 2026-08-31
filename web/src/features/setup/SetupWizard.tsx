@@ -23,11 +23,11 @@ export function SetupWizard() {
     <div className="mx-auto flex min-h-svh w-full max-w-2xl flex-col gap-8 px-5 py-10">
       <header className="flex items-center gap-3">
         <div className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-primary">
-          Resume Agent · First-run setup
+          Résumé Tailor Harness · First-run setup
         </div>
         <Button variant="ghost" size="sm" className="ml-auto"
           onClick={() => {
-            localStorage.setItem("resume-agent-setup-dismissed", "1");
+            localStorage.setItem("resume-tailor-harness-setup-dismissed", "1");
             navigate("/");
           }}>
           Exit setup

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def _client() -> TestClient:
@@ -30,7 +30,7 @@ def test_redo_rejects_an_unknown_stage():
 
 
 def test_redo_dedupes_repeated_ids_and_stages():
-    from resume_agent.api.schemas.runs import RedoParams
+    from resume_tailor_harness.api.schemas.runs import RedoParams
 
     params = RedoParams(job_ids=[3, 3, 1], stages=["tailor", "tailor"])
 

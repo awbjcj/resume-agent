@@ -20,7 +20,7 @@ def _percentile(values: list[float], fraction: float) -> float:
 
 
 async def probe(base_url: str, session_id: str, message: str) -> None:
-    token = os.environ.get("RESUME_AGENT_TOKEN", "")
+    token = os.environ.get("RESUME_TAILOR_HARNESS_TOKEN", os.environ.get("RESUME_AGENT_TOKEN", ""))
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     started = time.perf_counter()
     async with httpx.AsyncClient(

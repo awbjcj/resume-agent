@@ -18,8 +18,8 @@ from typing import cast
 
 from fastapi import Request
 
-from resume_agent.api import deps
-from resume_agent.tenancy.context import current_context
+from resume_tailor_harness.api import deps
+from resume_tailor_harness.tenancy.context import current_context
 
 
 class _DummyRunManager:

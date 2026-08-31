@@ -1,6 +1,6 @@
 import httpx
 
-from resume_agent import admin_cli
+from resume_tailor_harness import admin_cli
 
 
 def test_admin_cli_login_persists_pat_and_reuses_it(tmp_path, monkeypatch, capsys):

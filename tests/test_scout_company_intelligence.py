@@ -5,14 +5,14 @@ from typing import Iterator
 
 from sqlmodel import Session
 
-from resume_agent.company_intelligence.models import (
+from resume_tailor_harness.company_intelligence.models import (
     CompanyIntelligenceEvidence,
     CompanyIntelligenceInsight,
     CompanyIntelligenceSource,
 )
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.scout_intelligence import ScoutCompanyIntelligenceLookup
-from resume_agent.tracking.tables import CompanyIntelligenceEvidenceRow
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.scout_intelligence import ScoutCompanyIntelligenceLookup
+from resume_tailor_harness.tracking.tables import CompanyIntelligenceEvidenceRow
 
 
 NOW = datetime(2026, 8, 30, 12, tzinfo=timezone.utc)
@@ -155,7 +155,7 @@ def test_tool_never_invokes_the_company_research_provider(monkeypatch):
         raise AssertionError("saved dossier lookup must not refresh research")
 
     monkeypatch.setattr(
-        "resume_agent.services.company_intelligence.generate_company_intelligence",
+        "resume_tailor_harness.services.company_intelligence.generate_company_intelligence",
         fail_if_refreshed,
     )
     with _lookup(

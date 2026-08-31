@@ -3,8 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
 
 TrapKind = Literal[
     "missing_skill",

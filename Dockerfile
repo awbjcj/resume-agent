@@ -1,6 +1,6 @@
 FROM node:22-alpine AS web
 WORKDIR /build
-# web/scripts/i18n-catalog.mjs scans ../src/resume_agent for backend progress
+# web/scripts/i18n-catalog.mjs scans ../src/resume_tailor_harness for backend progress
 # labels during `npm run build`'s i18n:check step, so the Python source needs
 # to exist a level above the web workdir even though this stage never runs it.
 COPY src ./src
@@ -38,17 +38,17 @@ COPY resume-template ./resume-template
 COPY config/*.example ./config.defaults/
 COPY config/prune.yaml config/review.early_stop.yaml config/review.match_plan.yaml ./config.defaults/
 COPY --from=web /build/web/dist ./web/dist
-RUN groupadd --system resume-agent \
-    && useradd --system --gid resume-agent --home-dir /app resume-agent \
+RUN groupadd --system resume-tailor-harness \
+    && useradd --system --gid resume-tailor-harness --home-dir /app resume-tailor-harness \
     && mkdir -p /app/data \
-    && chown -R resume-agent:resume-agent /app
+    && chown -R resume-tailor-harness:resume-tailor-harness /app
 
 ENV BROWSER_ENABLED=false
 # Stay root at container start: /app/data is a Railway volume whose ownership
-# comes from whatever UID a prior build's resume-agent user had, which drifts
+# comes from whatever UID a prior build's resume-tailor-harness user had, which drifts
 # across image rebuilds. container_runtime.py reclaims the volume for the
-# current build's UID and drops to resume-agent before the app runs.
+# current build's UID and drops to resume-tailor-harness before the app runs.
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
-ENTRYPOINT ["python", "-m", "resume_agent.container_runtime"]
+ENTRYPOINT ["python", "-m", "resume_tailor_harness.container_runtime"]

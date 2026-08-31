@@ -1,4 +1,4 @@
-from resume_agent.discovery.scraper.geo import resolve_geo_id
+from resume_tailor_harness.discovery.scraper.geo import resolve_geo_id
 
 
 class _Resp:

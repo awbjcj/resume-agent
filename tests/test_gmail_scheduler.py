@@ -3,9 +3,9 @@ from concurrent.futures import Executor, Future
 from pathlib import Path
 from types import SimpleNamespace
 
-from resume_agent.api.runs.manager import RunManager
-from resume_agent.db import init_db, make_engine
-from resume_agent.gmail.scheduler import tick
+from resume_tailor_harness.api.runs.manager import RunManager
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.gmail.scheduler import tick
 
 
 class InlineExecutor(Executor):

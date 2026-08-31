@@ -2,10 +2,10 @@ from typing import Literal
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.taxonomy.clusters import ClusterMap, merge_cluster_map
-from resume_agent.taxonomy.corrections import TaxonomyCorrections
-from resume_agent.tracking.match_gap import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, merge_cluster_map
+from resume_tailor_harness.taxonomy.corrections import TaxonomyCorrections
+from resume_tailor_harness.tracking.match_gap import (
     CategoryNode,
     DemandEdge,
     DemandGraph,
@@ -15,8 +15,8 @@ from resume_agent.tracking.match_gap import (
     build_demand_graph,
     collect_target_skill_tokens,
 )
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():

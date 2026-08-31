@@ -2,10 +2,10 @@ import threading
 
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
-from resume_agent.discovery.connectors.runner import run_pull
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob
+from resume_tailor_harness.discovery.connectors.runner import run_pull
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 class _HandshakeConnector:

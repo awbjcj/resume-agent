@@ -1,11 +1,11 @@
-from resume_agent.cover_letter.drafting import (
+from resume_tailor_harness.cover_letter.drafting import (
     compose_cover_letter_input,
     compose_revise_input,
     draft_cover_letter,
 )
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts
 
 
 class _Result:

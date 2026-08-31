@@ -3,12 +3,12 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.migrate import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.migrate import (
     ensure_application_event_sequence_override_column,
     ensure_application_submitted_events,
 )
-from resume_agent.tracking.tables import Application, ApplicationEvent, Job
+from resume_tailor_harness.tracking.tables import Application, ApplicationEvent, Job
 
 
 def _persisted_id(value: int | None) -> int:

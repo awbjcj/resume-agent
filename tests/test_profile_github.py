@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from resume_agent.profile.github import GitHubClient
+from resume_tailor_harness.profile.github import GitHubClient
 
 
 def _client(handler) -> GitHubClient:

@@ -2,8 +2,8 @@ import re
 import unicodedata
 
 from evals.schema import Trap
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.resume import ResumeContent
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.resume import ResumeContent
 
 
 def resume_text(content: ResumeContent) -> str:

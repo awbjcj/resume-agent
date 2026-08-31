@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from resume_agent.discovery.connectors.dates import (
+from resume_tailor_harness.discovery.connectors.dates import (
     parse_epoch_millis,
     parse_iso_datetime,
     parse_relative_posted_at,

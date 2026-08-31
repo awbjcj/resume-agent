@@ -1,8 +1,8 @@
-# Resume Agent — Foundation Implementation Plan
+# Résumé Tailor Harness — Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the shared spine of Resume Agent v1 — dependencies, config loader, the extensible Pydantic domain models, the SQLite (SQLModel) tables, and the DB session — so every later component (profile, discovery, tailor, render, tracking) has typed data structures and persistence to build on.
+**Goal:** Build the shared spine of Résumé Tailor Harness v1 — dependencies, config loader, the extensible Pydantic domain models, the SQLite (SQLModel) tables, and the DB session — so every later component (profile, discovery, tailor, render, tracking) has typed data structures and persistence to build on.
 
 **Architecture:** A `src/`-layout Python package. Pydantic v2 models define the domain (single source of truth, extensible via `schema_version` + `extra`, provenance via `FactItem.id`). SQLModel tables persist pipeline state with JSON columns so adding fields needs no migration. Config comes from `.env` (secrets) + YAML (behavior).
 
@@ -15,12 +15,12 @@
 
 ## Reference
 
-Design spec: `docs/superpowers/specs/2026-06-08-resume-agent-design.md` (see §3 cross-cutting principles, §5.1–5.5 components, §6 layout).
+Design spec: `docs/superpowers/specs/2026-06-08-resume-tailor-harness-design.md` (see §3 cross-cutting principles, §5.1–5.5 components, §6 layout).
 
 ## File Structure (created by this plan)
 
 ```
-src/resume_agent/
+src/resume_tailor_harness/
   __init__.py
   config.py                 # Settings (.env) + load_yaml helper
   db.py                     # engine, init_db, get_session
@@ -59,7 +59,7 @@ Each file has one responsibility. Models are split by domain area (profile / job
 **Files:**
 
 - Modify: `pyproject.toml`
-- Create: `src/resume_agent/__init__.py`
+- Create: `src/resume_tailor_harness/__init__.py`
 - Delete: `main.py`
 - Test: `tests/test_smoke.py`
 
@@ -89,7 +89,7 @@ Edit `pyproject.toml` — update the project metadata and append the build + pyt
 
 ```toml
 [project]
-name = "resume-agent"
+name = "resume-tailor-harness"
 version = "0.1.0"
 description = "Personal AI job-hunt, resume-tailoring, and application-tracking pipeline"
 readme = "README.md"
@@ -111,7 +111,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/resume_agent"]
+packages = ["src/resume_tailor_harness"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -120,10 +120,10 @@ addopts = "-q"
 
 - [ ] **Step 4: Create the package and remove the uv stub**
 
-Create `src/resume_agent/__init__.py`:
+Create `src/resume_tailor_harness/__init__.py`:
 
 ```python
-"""Resume Agent — personal job-hunt automation pipeline."""
+"""Résumé Tailor Harness — personal job-hunt automation pipeline."""
 
 __version__ = "0.1.0"
 ```
@@ -140,9 +140,9 @@ Create `tests/test_smoke.py`:
 
 ```python
 def test_package_imports():
-    import resume_agent
+    import resume_tailor_harness
 
-    assert resume_agent.__version__ == "0.1.0"
+    assert resume_tailor_harness.__version__ == "0.1.0"
 ```
 
 - [ ] **Step 6: Run it (it should pass once the package installs)**
@@ -153,12 +153,12 @@ Run:
 uv run pytest tests/test_smoke.py -v
 ```
 
-Expected: PASS. (`uv run` syncs the project into the venv in editable mode, making `resume_agent` importable.)
+Expected: PASS. (`uv run` syncs the project into the venv in editable mode, making `resume_tailor_harness` importable.)
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/__init__.py tests/test_smoke.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/__init__.py tests/test_smoke.py
 git commit -m "chore: src-layout package scaffold + foundation deps" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -168,8 +168,8 @@ git commit -m "chore: src-layout package scaffold + foundation deps" -m "Co-Auth
 
 **Files:**
 
-- Create: `src/resume_agent/models/__init__.py`
-- Create: `src/resume_agent/models/base.py`
+- Create: `src/resume_tailor_harness/models/__init__.py`
+- Create: `src/resume_tailor_harness/models/base.py`
 - Test: `tests/test_models_base.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -177,7 +177,7 @@ git commit -m "chore: src-layout package scaffold + foundation deps" -m "Co-Auth
 Create `tests/test_models_base.py`:
 
 ```python
-from resume_agent.models.base import ExtensibleModel, FactItem, Source, new_id
+from resume_tailor_harness.models.base import ExtensibleModel, FactItem, Source, new_id
 
 
 def test_new_id_is_unique_and_short():
@@ -221,17 +221,17 @@ Run:
 uv run pytest tests/test_models_base.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.models'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/models/__init__.py`:
+Create `src/resume_tailor_harness/models/__init__.py`:
 
 ```python
-"""Domain models for Resume Agent."""
+"""Domain models for Résumé Tailor Harness."""
 ```
 
-Create `src/resume_agent/models/base.py`:
+Create `src/resume_tailor_harness/models/base.py`:
 
 ```python
 import uuid
@@ -290,7 +290,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/__init__.py src/resume_agent/models/base.py tests/test_models_base.py
+git add src/resume_tailor_harness/models/__init__.py src/resume_tailor_harness/models/base.py tests/test_models_base.py
 git commit -m "feat(models): extensible base model + provenance fact item" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -300,7 +300,7 @@ git commit -m "feat(models): extensible base model + provenance fact item" -m "C
 
 **Files:**
 
-- Create: `src/resume_agent/models/profile.py`
+- Create: `src/resume_tailor_harness/models/profile.py`
 - Test: `tests/test_models_profile.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -308,7 +308,7 @@ git commit -m "feat(models): extensible base model + provenance fact item" -m "C
 Create `tests/test_models_profile.py`:
 
 ```python
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Contact,
     Experience,
     GitHubProfile,
@@ -390,16 +390,16 @@ Run:
 uv run pytest tests/test_models_profile.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.profile'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.models.profile'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/models/profile.py`:
+Create `src/resume_tailor_harness/models/profile.py`:
 
 ```python
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel, FactItem, Source
+from resume_tailor_harness.models.base import ExtensibleModel, FactItem, Source
 
 
 class Link(ExtensibleModel):
@@ -550,7 +550,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/profile.py tests/test_models_profile.py
+git add src/resume_tailor_harness/models/profile.py tests/test_models_profile.py
 git commit -m "feat(models): comprehensive ProfileFacts fact-lock schema" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -560,7 +560,7 @@ git commit -m "feat(models): comprehensive ProfileFacts fact-lock schema" -m "Co
 
 **Files:**
 
-- Create: `src/resume_agent/models/job.py`
+- Create: `src/resume_tailor_harness/models/job.py`
 - Test: `tests/test_models_job.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -568,7 +568,7 @@ git commit -m "feat(models): comprehensive ProfileFacts fact-lock schema" -m "Co
 Create `tests/test_models_job.py`:
 
 ```python
-from resume_agent.models.job import JobCriteria, SalaryRange, SponsorshipSignal
+from resume_tailor_harness.models.job import JobCriteria, SalaryRange, SponsorshipSignal
 
 
 def test_sponsorship_defaults_to_silent():
@@ -607,18 +607,18 @@ Run:
 uv run pytest tests/test_models_job.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.job'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.models.job'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/models/job.py`:
+Create `src/resume_tailor_harness/models/job.py`:
 
 ```python
 from enum import Enum
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class SponsorshipSignal(str, Enum):
@@ -661,7 +661,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/job.py tests/test_models_job.py
+git add src/resume_tailor_harness/models/job.py tests/test_models_job.py
 git commit -m "feat(models): JobCriteria extraction schema" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -671,7 +671,7 @@ git commit -m "feat(models): JobCriteria extraction schema" -m "Co-Authored-By: 
 
 **Files:**
 
-- Create: `src/resume_agent/models/resume.py`
+- Create: `src/resume_tailor_harness/models/resume.py`
 - Test: `tests/test_models_resume.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -682,8 +682,8 @@ Create `tests/test_models_resume.py`:
 import pytest
 from pydantic import ValidationError
 
-from resume_agent.models.profile import Contact
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.profile import Contact
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
@@ -738,17 +738,17 @@ Run:
 uv run pytest tests/test_models_resume.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.resume'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.models.resume'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/models/resume.py`:
+Create `src/resume_tailor_harness/models/resume.py`:
 
 ```python
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import Contact, Education
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import Contact, Education
 
 
 class TailoredBullet(ExtensibleModel):
@@ -809,7 +809,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/resume.py tests/test_models_resume.py
+git add src/resume_tailor_harness/models/resume.py tests/test_models_resume.py
 git commit -m "feat(models): ResumeContent with mandatory provenance" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -819,7 +819,7 @@ git commit -m "feat(models): ResumeContent with mandatory provenance" -m "Co-Aut
 
 **Files:**
 
-- Create: `src/resume_agent/models/review.py`
+- Create: `src/resume_tailor_harness/models/review.py`
 - Test: `tests/test_models_review.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -827,7 +827,7 @@ git commit -m "feat(models): ResumeContent with mandatory provenance" -m "Co-Aut
 Create `tests/test_models_review.py`:
 
 ```python
-from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue, Severity
 
 
 def test_blocking_issue_severity():
@@ -868,18 +868,18 @@ Run:
 uv run pytest tests/test_models_review.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.review'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.models.review'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/models/review.py`:
+Create `src/resume_tailor_harness/models/review.py`:
 
 ```python
 from enum import Enum
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class Severity(str, Enum):
@@ -919,7 +919,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/review.py tests/test_models_review.py
+git add src/resume_tailor_harness/models/review.py tests/test_models_review.py
 git commit -m "feat(models): ReviewCritique schema for the Agno review panel" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -929,8 +929,8 @@ git commit -m "feat(models): ReviewCritique schema for the Agno review panel" -m
 
 **Files:**
 
-- Create: `src/resume_agent/tracking/__init__.py`
-- Create: `src/resume_agent/tracking/tables.py`
+- Create: `src/resume_tailor_harness/tracking/__init__.py`
+- Create: `src/resume_tailor_harness/tracking/tables.py`
 - Test: `tests/test_tables.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -940,7 +940,7 @@ Create `tests/test_tables.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tracking.tables import (
     Application,
     ApplicationStatus,
     Job,
@@ -1025,17 +1025,17 @@ Run:
 uv run pytest tests/test_tables.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.tracking'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/tracking/__init__.py`:
+Create `src/resume_tailor_harness/tracking/__init__.py`:
 
 ```python
-"""Persistence layer for Resume Agent."""
+"""Persistence layer for Résumé Tailor Harness."""
 ```
 
-Create `src/resume_agent/tracking/tables.py`:
+Create `src/resume_tailor_harness/tracking/tables.py`:
 
 ```python
 from datetime import datetime, timezone
@@ -1133,7 +1133,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/__init__.py src/resume_agent/tracking/tables.py tests/test_tables.py
+git add src/resume_tailor_harness/tracking/__init__.py src/resume_tailor_harness/tracking/tables.py tests/test_tables.py
 git commit -m "feat(tracking): SQLModel tables with JSON columns + status enums" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -1143,7 +1143,7 @@ git commit -m "feat(tracking): SQLModel tables with JSON columns + status enums"
 
 **Files:**
 
-- Create: `src/resume_agent/config.py`
+- Create: `src/resume_tailor_harness/config.py`
 - Create: `.env.example`
 - Create: `config/search.yaml.example`
 - Create: `config/review.yaml.example`
@@ -1156,7 +1156,7 @@ Create `tests/test_config.py`:
 ```python
 import pytest
 
-from resume_agent.config import Settings, load_yaml
+from resume_tailor_harness.config import Settings, load_yaml
 
 
 def clear_settings_env(monkeypatch):
@@ -1210,11 +1210,11 @@ Run:
 uv run pytest tests/test_config.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.config'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.config'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/config.py`:
+Create `src/resume_tailor_harness/config.py`:
 
 ```python
 from functools import lru_cache
@@ -1237,7 +1237,7 @@ class Settings(BaseSettings):
     github_token: str = ""
     linkedin_email: str = ""
     linkedin_password: str = ""
-    db_url: str = "sqlite:///data/resume_agent.db"
+    db_url: str = "sqlite:///data/resume_tailor_harness.db"
 
 
 @lru_cache
@@ -1266,7 +1266,7 @@ GITHUB_TOKEN=
 # Burner LinkedIn account used for scraping (see design spec §5.2)
 LINKEDIN_EMAIL=
 LINKEDIN_PASSWORD=
-DB_URL=sqlite:///data/resume_agent.db
+DB_URL=sqlite:///data/resume_tailor_harness.db
 ```
 
 Create `config/search.yaml.example`:
@@ -1331,7 +1331,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/config.py .env.example config/search.yaml.example config/review.yaml.example tests/test_config.py
+git add src/resume_tailor_harness/config.py .env.example config/search.yaml.example config/review.yaml.example tests/test_config.py
 git commit -m "feat(config): settings loader + example env/yaml configs" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -1341,7 +1341,7 @@ git commit -m "feat(config): settings loader + example env/yaml configs" -m "Co-
 
 **Files:**
 
-- Create: `src/resume_agent/db.py`
+- Create: `src/resume_tailor_harness/db.py`
 - Test: `tests/test_db.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1351,8 +1351,8 @@ Create `tests/test_db.py`:
 ```python
 from sqlmodel import select
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job
 
 
 def test_make_engine_creates_sqlite_parent_dir(tmp_path):
@@ -1385,11 +1385,11 @@ Run:
 uv run pytest tests/test_db.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.db'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.db'`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/db.py`:
+Create `src/resume_tailor_harness/db.py`:
 
 ```python
 from pathlib import Path
@@ -1397,10 +1397,10 @@ from pathlib import Path
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.config import get_settings
+from resume_tailor_harness.config import get_settings
 
 # Import tables so their metadata is registered before create_all().
-from resume_agent.tracking import tables  # noqa: F401
+from resume_tailor_harness.tracking import tables  # noqa: F401
 
 
 def _ensure_sqlite_dir(url: str) -> None:
@@ -1449,7 +1449,7 @@ Expected: PASS — all tests across Tasks 1–9 green.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/db.py tests/test_db.py
+git add src/resume_tailor_harness/db.py tests/test_db.py
 git commit -m "feat(db): engine factory, init_db, and session helper" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

@@ -1,11 +1,11 @@
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
     ProfileFacts,
     Project,
 )
-from resume_agent.profile.aspect_classifier import (
+from resume_tailor_harness.profile.aspect_classifier import (
     AspectAssignment,
     AspectAssignments,
     classify_aspects,

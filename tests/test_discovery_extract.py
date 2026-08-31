@@ -1,14 +1,14 @@
 import pytest
 
-from resume_agent.llm_runner import AgentRunner
+from resume_tailor_harness.llm_runner import AgentRunner
 
-from resume_agent.models.job import (
+from resume_tailor_harness.models.job import (
     JobCriteria,
     JobCriteriaExtract,
     SalaryRangeExtract,
     SponsorshipSignal,
 )
-from resume_agent.discovery.extract import (
+from resume_tailor_harness.discovery.extract import (
     _INSTRUCTIONS,
     build_extract_agent,
     extract_job_criteria,
@@ -64,7 +64,7 @@ def test_extract_maps_readable_industry_candidate_and_passes_text():
 def test_aextract_job_criteria_uses_arun_and_semaphore():
     import asyncio
 
-    from resume_agent.discovery.extract import aextract_job_criteria
+    from resume_tailor_harness.discovery.extract import aextract_job_criteria
 
     class _AsyncAgent:
         def run(self, prompt):
@@ -227,7 +227,7 @@ def test_build_extract_agent_disables_agno_retry(monkeypatch):
     # agno's own retry is off (retries=0) — AgentRunner retries transient
     # failures itself, behind the is_transient predicate.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    from resume_agent.config import env_settings
+    from resume_tailor_harness.config import env_settings
 
     env_settings.cache_clear()
     try:

@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from resume_agent.agent_trace import (
+from resume_tailor_harness.agent_trace import (
     agent_trace,
     current_trace,
     read_trace,
     record_agent_run,
 )
-from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
-from resume_agent.config import Settings
-from resume_agent.llm_runner import AgentRunner
+from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.llm_runner import AgentRunner
 
 
 class _Agent:
@@ -137,7 +137,7 @@ def test_a_malformed_row_is_skipped_rather_than_raised(tmp_path):
 def test_the_run_manager_gives_each_run_its_own_trace(tmp_path):
     from concurrent.futures import ThreadPoolExecutor
 
-    from resume_agent.api.runs.manager import RunManager
+    from resume_tailor_harness.api.runs.manager import RunManager
 
     executor = ThreadPoolExecutor(max_workers=1)
     manager = RunManager(root=tmp_path, executor=executor)

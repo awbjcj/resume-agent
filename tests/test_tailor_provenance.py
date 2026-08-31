@@ -1,6 +1,6 @@
 from typing import Literal
 
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Bullet,
     Contact,
     Experience,
@@ -8,15 +8,15 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
     TailoredSkill,
 )
-from resume_agent.models.review import Severity
-from resume_agent.tailor.provenance import (
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.tailor.provenance import (
     ProvenanceReport,
     check_provenance,
     index_facts,

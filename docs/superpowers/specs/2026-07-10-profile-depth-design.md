@@ -125,7 +125,7 @@ fragments as well as during metadata enrichment:
   fetch repo list → write changed virtual docs → register new manifest entries →
   remove `origin="github"` entries whose repos disappeared, were delisted, or
   are now superseded by a dossier → then the normal fragment walk runs.
-- Also exposed standalone: `resume-agent profile sync-github` and an API run
+- Also exposed standalone: `resume-tailor-harness profile sync-github` and an API run
   (`POST /api/profile/sync-github`, 202 + run record) so the SourcesPage can
   refresh GitHub sources without paying for a full rebuild.
 - Network failure degrades to a `BuildReport.warnings` entry; the build proceeds
@@ -139,8 +139,8 @@ fragments as well as during metadata enrichment:
 
   ```yaml
   ---
-  repo_url: https://github.com/you/resume-agent
-  repo_name: resume-agent
+  repo_url: https://github.com/you/resume-tailor-harness
+  repo_name: resume-tailor-harness
   role: sole author
   generated_at: 2026-07-10
   ---
@@ -166,11 +166,11 @@ fragments as well as during metadata enrichment:
 ## 5. Material intake additions
 
 - **Quick-add note:** `POST /api/profile/sources/note` `{title, text}` and CLI
-  `resume-agent profile add-note` — writes `note--<slug>.md` as a literal
+  `resume-tailor-harness profile add-note` — writes `note--<slug>.md` as a literal
   source. Lowest-friction path for facts that live in no document ("led the
   on-call rotation for 2 years").
 - **URL ingestion:** `POST /api/profile/sources/url` `{url}` and CLI
-  `resume-agent profile add-url` — fetches the page with httpx, converts via
+  `resume-tailor-harness profile add-url` — fetches the page with httpx, converts via
   `html_to_text`, saves as a literal `.md` source. For portfolio pages,
   published articles, online resumes.
 - Both create ordinary manifest entries (`origin="upload"`, `mode="literal"`)

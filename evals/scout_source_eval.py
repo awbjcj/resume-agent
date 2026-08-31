@@ -12,8 +12,8 @@ from urllib.parse import urlsplit
 
 from pydantic import field_validator
 
-from resume_agent.discovery.source_resolution.models import CompanySourceResolution
-from resume_agent.models.base import ExtensibleModel
+from resume_tailor_harness.discovery.source_resolution.models import CompanySourceResolution
+from resume_tailor_harness.models.base import ExtensibleModel
 
 
 class SourceResolver(Protocol):

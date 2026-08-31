@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.career_skills.agno import run_meta_payload, skill_kwargs
-from resume_agent.career_skills.models import AgentFamily, AgentRunMeta, SkillRef
-from resume_agent.career_skills.registry import CareerSkillRegistry
-from resume_agent.llm_runner import AgentRunner
+from resume_tailor_harness.career_skills.agno import run_meta_payload, skill_kwargs
+from resume_tailor_harness.career_skills.models import AgentFamily, AgentRunMeta, SkillRef
+from resume_tailor_harness.career_skills.registry import CareerSkillRegistry
+from resume_tailor_harness.llm_runner import AgentRunner
 
 
 @pytest.fixture

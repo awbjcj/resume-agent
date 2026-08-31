@@ -1,6 +1,6 @@
 import pytest
 
-from resume_agent.tracking.canonicalize import (
+from resume_tailor_harness.tracking.canonicalize import (
     SkillThemes,
     ThemeGroup,
     build_skill_themer,

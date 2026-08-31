@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.render.templates import (
+from resume_tailor_harness.render.templates import (
     BUNDLED,
     TemplateNotFoundError,
     list_templates,
     resolve_template,
 )
-from resume_agent.render.render_config import RenderConfig
-from resume_agent.services.render_templates import delete_custom_template
+from resume_tailor_harness.render.render_config import RenderConfig
+from resume_tailor_harness.services.render_templates import delete_custom_template
 
 
 def test_classic_is_bundled_and_cwd_independent(tmp_path, monkeypatch) -> None:
@@ -59,7 +59,7 @@ def test_list_templates_is_bundled_then_sorted_custom(tmp_path, monkeypatch) -> 
 
 
 def test_sample_content_matches_current_resume_schema() -> None:
-    from resume_agent.render.sample_content import sample_resume_content
+    from resume_tailor_harness.render.sample_content import sample_resume_content
 
     content = sample_resume_content()
     assert content.contact.name

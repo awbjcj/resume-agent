@@ -1,6 +1,6 @@
-from resume_agent.api.schemas.sources import SourceOut, SourcePreviewOut
-from resume_agent.discovery.connectors.sources import SourceView
-from resume_agent.services.sources import SourcePreview
+from resume_tailor_harness.api.schemas.sources import SourceOut, SourcePreviewOut
+from resume_tailor_harness.discovery.connectors.sources import SourceView
+from resume_tailor_harness.services.sources import SourcePreview
 
 
 def test_source_out_projects_view_with_camel_alias():

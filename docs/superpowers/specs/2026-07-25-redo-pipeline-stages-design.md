@@ -539,17 +539,17 @@ Offline; agents and the browser faked, per the existing suite.
 
 | Path | Change |
 |---|---|
-| `src/resume_agent/tracking/stages.py` | New — rank ladder + `advance`. |
-| `src/resume_agent/services/redo.py` | New — `redo_jobs`, `repull_job`, `StageOutcome`. |
-| `src/resume_agent/discovery/pipeline.py` | `StageScope` replaces `job_ids`; status writes via `advance`; per-job failure logging. |
-| `src/resume_agent/tailor/service.py` | `TailorOutcome`; `advance` in `_persist_rounds`; `attempt`/`tailor_model`; failure logging. |
-| `src/resume_agent/services/tailoring.py` | Carry failures; `fail_on_partial` raises only on total failure, naming the cause. |
-| `src/resume_agent/tracking/tables.py` | `ResumeVersion.attempt`, `.tailor_model`. |
-| `src/resume_agent/api/schemas/runs.py` | `RedoParams`. |
-| `src/resume_agent/api/routers/runs.py` | `POST /api/redo`. |
-| `src/resume_agent/services/errors.py` | `"job"` kind, `StageFailure`, `record_job_failure`, `resolve_job_failures`. |
-| `src/resume_agent/api/schemas/errors.py` | `JobFailureDetails`, `ErrorRecordOut.job_details`, `ErrorRecordsOut.pagination`. |
-| `src/resume_agent/api/routers/errors.py` | `_row()` projects typed job details; `page`/`pageSize` on the list. |
+| `src/resume_tailor_harness/tracking/stages.py` | New — rank ladder + `advance`. |
+| `src/resume_tailor_harness/services/redo.py` | New — `redo_jobs`, `repull_job`, `StageOutcome`. |
+| `src/resume_tailor_harness/discovery/pipeline.py` | `StageScope` replaces `job_ids`; status writes via `advance`; per-job failure logging. |
+| `src/resume_tailor_harness/tailor/service.py` | `TailorOutcome`; `advance` in `_persist_rounds`; `attempt`/`tailor_model`; failure logging. |
+| `src/resume_tailor_harness/services/tailoring.py` | Carry failures; `fail_on_partial` raises only on total failure, naming the cause. |
+| `src/resume_tailor_harness/tracking/tables.py` | `ResumeVersion.attempt`, `.tailor_model`. |
+| `src/resume_tailor_harness/api/schemas/runs.py` | `RedoParams`. |
+| `src/resume_tailor_harness/api/routers/runs.py` | `POST /api/redo`. |
+| `src/resume_tailor_harness/services/errors.py` | `"job"` kind, `StageFailure`, `record_job_failure`, `resolve_job_failures`. |
+| `src/resume_tailor_harness/api/schemas/errors.py` | `JobFailureDetails`, `ErrorRecordOut.job_details`, `ErrorRecordsOut.pagination`. |
+| `src/resume_tailor_harness/api/routers/errors.py` | `_row()` projects typed job details; `page`/`pageSize` on the list. |
 | `web/src/features/runs/RedoDialog.tsx` | New. |
 | `web/src/features/runs/use-redo-run.ts` | New. |
 | `web/src/features/pipeline/PipelineContainer.tsx` | `Redo…` bulk action. |

@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.settings_sections import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.settings_sections import (
     SECTIONS_BY_ID,
     SETTINGS_SECTIONS,
     arcname_for,
@@ -13,8 +13,8 @@ from resume_agent.settings_sections import (
     reset_section,
     section_for,
 )
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import WorkspacePaths
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import WorkspacePaths
 
 
 def _context(paths: WorkspacePaths) -> UserContext:
@@ -56,7 +56,7 @@ def test_registry_never_names_a_credential():
     forbidden = {
         "secrets.env",
         "gmail_token.json",
-        "resume_agent.db",
+        "resume_tailor_harness.db",
         "config/gmail_credentials.json",
     }
     named = {entry for section in SETTINGS_SECTIONS for entry in section.files}

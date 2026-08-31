@@ -1,11 +1,11 @@
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
-from resume_agent.models.review import Severity
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
-from resume_agent.models.review import ReviewCritique, ReviewIssue
-from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.verdict import PanelVerdict, aggregate
-from resume_agent.tailor.workflow import (
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.review import ReviewCritique, ReviewIssue
+from resume_tailor_harness.tailor.review_config import ReviewConfig, ReviewerSpec
+from resume_tailor_harness.tailor.verdict import PanelVerdict, aggregate
+from resume_tailor_harness.tailor.workflow import (
     TailorRound,
     _has_regressed,
     _is_citation_slip,
@@ -126,7 +126,7 @@ def test_rounds_record_stage_seconds_on_the_round_the_content_enters():
 def test_arun_tailor_review_passes_with_async_agents():
     import asyncio
 
-    from resume_agent.tailor.workflow import arun_tailor_review
+    from resume_tailor_harness.tailor.workflow import arun_tailor_review
 
     class _Content:
         def run(self, prompt):
@@ -176,11 +176,11 @@ def test_arun_tailor_review_passes_with_async_agents():
 def test_arun_evidence_portfolio_runs_once_and_reaches_the_writer():
     import asyncio
 
-    from resume_agent.models.evidence_portfolio import (
+    from resume_tailor_harness.models.evidence_portfolio import (
         EvidencePortfolio,
         PortfolioSelection,
     )
-    from resume_agent.tailor.workflow import arun_tailor_review
+    from resume_tailor_harness.tailor.workflow import arun_tailor_review
 
     class _AsyncWriter:
         def __init__(self):
@@ -378,11 +378,11 @@ def test_a_new_gate_failure_is_not_granted_the_provenance_free_retry():
 
 
 def test_evidence_portfolio_runs_once_and_is_normalized():
-    from resume_agent.models.evidence_portfolio import (
+    from resume_tailor_harness.models.evidence_portfolio import (
         EvidencePortfolio,
         PortfolioSelection,
     )
-    from resume_agent.models.profile import Bullet, Experience
+    from resume_tailor_harness.models.profile import Bullet, Experience
 
     class _CapturingTailor(_ContentAgent):
         def __init__(self):
@@ -794,7 +794,7 @@ def test_regressed_round_uses_best_base_with_latest_fact_check_feedback():
 def test_async_regressed_round_uses_best_base_with_latest_fact_check_feedback():
     import asyncio
 
-    from resume_agent.tailor.workflow import arun_tailor_review
+    from resume_tailor_harness.tailor.workflow import arun_tailor_review
 
     reviser = _ClosedLoopReviser("async-revision")
 

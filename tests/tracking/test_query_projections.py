@@ -1,10 +1,10 @@
 from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.known_jobs import build_known_index
-from resume_agent.tracking.repository import _prune_rows
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.known_jobs import build_known_index
+from resume_tailor_harness.tracking.repository import _prune_rows
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _engine_with_job():

@@ -1,6 +1,6 @@
-from resume_agent.llm_runner import AgentRunner
+from resume_tailor_harness.llm_runner import AgentRunner
 
-from resume_agent.tailor.agents import (
+from resume_tailor_harness.tailor.agents import (
     _TAILOR_INSTRUCTIONS,
     _reviewer_instructions,
     build_reviewer_agent,
@@ -81,7 +81,7 @@ def test_reviewer_score_bands_are_opt_in():
 
 
 def test_reviewer_spec_score_bands_default_off():
-    from resume_agent.tailor.review_config import ReviewerSpec
+    from resume_tailor_harness.tailor.review_config import ReviewerSpec
 
     assert ReviewerSpec(name="recruiter").score_bands is False
 
@@ -89,7 +89,7 @@ def test_reviewer_spec_score_bands_default_off():
 def test_tailor_agent_requests_system_prompt_cache(monkeypatch):
     from types import SimpleNamespace
 
-    from resume_agent.tailor import agents as agents_module
+    from resume_tailor_harness.tailor import agents as agents_module
 
     monkeypatch.setattr(
         agents_module,
@@ -104,7 +104,7 @@ def test_tailor_agent_requests_system_prompt_cache(monkeypatch):
 
 
 def test_writer_and_reviser_forbid_merging_two_facts_into_one_skill_entry():
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _REVISER_INSTRUCTIONS,
         _TAILOR_INSTRUCTIONS,
     )
@@ -123,7 +123,7 @@ def test_writer_and_reviser_forbid_merging_two_facts_into_one_skill_entry():
 
 
 def test_writer_and_reviser_forbid_derived_tenure():
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _REVISER_INSTRUCTIONS,
         _TAILOR_INSTRUCTIONS,
     )
@@ -142,7 +142,7 @@ def test_writer_and_reviser_forbid_derived_tenure():
 
 
 def test_writer_and_reviser_forbid_unstated_beneficiaries():
-    from resume_agent.tailor.agents import (
+    from resume_tailor_harness.tailor.agents import (
         _REVISER_INSTRUCTIONS,
         _TAILOR_INSTRUCTIONS,
     )

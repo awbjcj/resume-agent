@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.config import Settings
-from resume_agent.gmail import auth
-from resume_agent.gmail.errors import GmailNotConnected
-from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.workspace import workspace_paths
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.gmail import auth
+from resume_tailor_harness.gmail.errors import GmailNotConnected
+from resume_tailor_harness.tenancy.context import UserContext, use_context
+from resume_tailor_harness.tenancy.workspace import workspace_paths
 
 
 def _context(tmp_path: Path) -> UserContext:

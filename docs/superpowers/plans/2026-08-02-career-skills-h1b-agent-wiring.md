@@ -33,35 +33,35 @@ The registry, `SkillRef`, run metadata, and Agno attachment seam are shared cont
 
 ### New backend modules
 
-- `src/resume_agent/career_skills/__init__.py` — public registry and provenance exports.
-- `src/resume_agent/career_skills/models.py` — closed enums, manifest models, `SkillRef`, `SkillUse`, and agent-run metadata.
-- `src/resume_agent/career_skills/registry.py` — root-confined manifest verification and capability lookup.
-- `src/resume_agent/career_skills/agno.py` — one-skill Agno kwargs and runner metadata attachment.
-- `src/resume_agent/career_lab/models.py` — Career Lab session, turn, route, context-reference, and artifact schemas.
-- `src/resume_agent/career_lab/store.py` — `SessionStore` custody and lifecycle deltas.
-- `src/resume_agent/career_lab/agents.py` — router, skilled persona, and tool-free formatter Agno builders.
-- `src/resume_agent/services/career_lab.py` — tenant-scoped context resolution and streamed turn orchestration.
-- `src/resume_agent/h1b/models.py` — typed configuration-independent evidence and enrichment report models.
-- `src/resume_agent/h1b/mcp.py` — lazy `MCPTools` construction, allowlist, result guard, and lifecycle.
-- `src/resume_agent/h1b/service.py` — cache lookup, company batching, agent calls, validation, and persistence.
-- `src/resume_agent/api/schemas/career_lab.py` — REST input/output schemas.
-- `src/resume_agent/api/routers/career_lab.py` — Career Lab resources and run launch endpoints.
+- `src/resume_tailor_harness/career_skills/__init__.py` — public registry and provenance exports.
+- `src/resume_tailor_harness/career_skills/models.py` — closed enums, manifest models, `SkillRef`, `SkillUse`, and agent-run metadata.
+- `src/resume_tailor_harness/career_skills/registry.py` — root-confined manifest verification and capability lookup.
+- `src/resume_tailor_harness/career_skills/agno.py` — one-skill Agno kwargs and runner metadata attachment.
+- `src/resume_tailor_harness/career_lab/models.py` — Career Lab session, turn, route, context-reference, and artifact schemas.
+- `src/resume_tailor_harness/career_lab/store.py` — `SessionStore` custody and lifecycle deltas.
+- `src/resume_tailor_harness/career_lab/agents.py` — router, skilled persona, and tool-free formatter Agno builders.
+- `src/resume_tailor_harness/services/career_lab.py` — tenant-scoped context resolution and streamed turn orchestration.
+- `src/resume_tailor_harness/h1b/models.py` — typed configuration-independent evidence and enrichment report models.
+- `src/resume_tailor_harness/h1b/mcp.py` — lazy `MCPTools` construction, allowlist, result guard, and lifecycle.
+- `src/resume_tailor_harness/h1b/service.py` — cache lookup, company batching, agent calls, validation, and persistence.
+- `src/resume_tailor_harness/api/schemas/career_lab.py` — REST input/output schemas.
+- `src/resume_tailor_harness/api/routers/career_lab.py` — Career Lab resources and run launch endpoints.
 
 ### Modified backend seams
 
 - `.gitattributes`, `.gitignore`, `skills-lock.json` — tracked, LF-stable v2 skill manifest.
 - `pyproject.toml`, `uv.lock` — install the Agno MCP extra compatible with locked Agno 2.8.x.
-- `src/resume_agent/config.py` — typed career-skill and H-1B settings.
-- `src/resume_agent/llm_runner.py` — attach immutable run metadata without changing run semantics.
-- `src/resume_agent/services/agents.py` — registry-backed purpose-specific bundle construction and keyed reuse.
-- `src/resume_agent/discovery/{extract.py,fit.py,pipeline.py}` — skilled Job Analysis agents and H-1B context between filter and score.
-- `src/resume_agent/profile/project_extractor.py` — internal `project-dossier` skill.
-- `src/resume_agent/tailor/agents.py`, `src/resume_agent/tailor/review_config.py`, `src/resume_agent/tailor/service.py`, `src/resume_agent/services/{tailoring.py,revision.py}` — authoring/review skill selection and provenance.
-- `src/resume_agent/cover_letter/agents.py`, `src/resume_agent/cover_letter/service.py`, `src/resume_agent/services/{cover_letters.py,cover_letter_revision.py}` — cover-letter skills and provenance.
-- `src/resume_agent/interview/{agent.py,store.py}`, `src/resume_agent/services/mock_interview.py` — preparation/mock skills with skill-free formatters.
-- `src/resume_agent/tracking/{tables.py,migrate.py,queries.py}`, `src/resume_agent/db.py` — skill metadata and H-1B cache persistence.
-- `src/resume_agent/api/{app.py,deps.py}`, `src/resume_agent/api/schemas/{jobs.py,runs.py,setup.py}`, `src/resume_agent/api/routers/{jobs.py,runs.py,setup.py}` — additive API/readiness surfaces.
-- `src/resume_agent/tenancy/workspace.py`, `src/resume_agent/cli.py` — Career Lab custody and CLI.
+- `src/resume_tailor_harness/config.py` — typed career-skill and H-1B settings.
+- `src/resume_tailor_harness/llm_runner.py` — attach immutable run metadata without changing run semantics.
+- `src/resume_tailor_harness/services/agents.py` — registry-backed purpose-specific bundle construction and keyed reuse.
+- `src/resume_tailor_harness/discovery/{extract.py,fit.py,pipeline.py}` — skilled Job Analysis agents and H-1B context between filter and score.
+- `src/resume_tailor_harness/profile/project_extractor.py` — internal `project-dossier` skill.
+- `src/resume_tailor_harness/tailor/agents.py`, `src/resume_tailor_harness/tailor/review_config.py`, `src/resume_tailor_harness/tailor/service.py`, `src/resume_tailor_harness/services/{tailoring.py,revision.py}` — authoring/review skill selection and provenance.
+- `src/resume_tailor_harness/cover_letter/agents.py`, `src/resume_tailor_harness/cover_letter/service.py`, `src/resume_tailor_harness/services/{cover_letters.py,cover_letter_revision.py}` — cover-letter skills and provenance.
+- `src/resume_tailor_harness/interview/{agent.py,store.py}`, `src/resume_tailor_harness/services/mock_interview.py` — preparation/mock skills with skill-free formatters.
+- `src/resume_tailor_harness/tracking/{tables.py,migrate.py,queries.py}`, `src/resume_tailor_harness/db.py` — skill metadata and H-1B cache persistence.
+- `src/resume_tailor_harness/api/{app.py,deps.py}`, `src/resume_tailor_harness/api/schemas/{jobs.py,runs.py,setup.py}`, `src/resume_tailor_harness/api/routers/{jobs.py,runs.py,setup.py}` — additive API/readiness surfaces.
+- `src/resume_tailor_harness/tenancy/workspace.py`, `src/resume_tailor_harness/cli.py` — Career Lab custody and CLI.
 - `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` — regenerated contracts.
 
 ### New web feature
@@ -167,12 +167,12 @@ The fixed routing map is:
 - Modify: `.gitignore`
 - Modify and force-add: `skills-lock.json`
 - Modify: `Dockerfile`
-- Create: `src/resume_agent/career_skills/__init__.py`
-- Create: `src/resume_agent/career_skills/models.py`
-- Create: `src/resume_agent/career_skills/registry.py`
-- Modify: `src/resume_agent/config.py`
-- Modify: `src/resume_agent/api/schemas/setup.py`
-- Modify: `src/resume_agent/api/routers/setup.py`
+- Create: `src/resume_tailor_harness/career_skills/__init__.py`
+- Create: `src/resume_tailor_harness/career_skills/models.py`
+- Create: `src/resume_tailor_harness/career_skills/registry.py`
+- Modify: `src/resume_tailor_harness/config.py`
+- Modify: `src/resume_tailor_harness/api/schemas/setup.py`
+- Modify: `src/resume_tailor_harness/api/routers/setup.py`
 - Modify generated: `contracts/openapi.json`
 - Modify generated: `contracts/ts/api.ts`
 - Modify generated: `web/src/lib/api/schema.ts`
@@ -265,7 +265,7 @@ skills/**/SKILL.md text eol=lf
 skills-lock.json text eol=lf
 ```
 
-Remove `skills-lock.json` from `.gitignore`. Review all 35 committed `SKILL.md` files, replace the stale 22 hashes, add the 13 absent entries, set `localVersion` to `2026-08-02`, use the local import commit `fb34e2f26f597bcd90306d9f949ac25a96f6469d` as `reviewedRef` for the 34 unchanged imports and `e85fdb29570bb23dcd89435a869e91630aa0463a` for `project-dossier`, retain existing upstream `source` values where recorded, and use `https://github.com/awbjcj/resume-agent` with `sourceType: "local"` where upstream provenance is not recorded. Encode the exact family/use map from this plan and mark only `project-dossier` internal.
+Remove `skills-lock.json` from `.gitignore`. Review all 35 committed `SKILL.md` files, replace the stale 22 hashes, add the 13 absent entries, set `localVersion` to `2026-08-02`, use the local import commit `fb34e2f26f597bcd90306d9f949ac25a96f6469d` as `reviewedRef` for the 34 unchanged imports and `e85fdb29570bb23dcd89435a869e91630aa0463a` for `project-dossier`, retain existing upstream `source` values where recorded, and use `https://github.com/awbjcj/resume-tailor-harness` with `sourceType: "local"` where upstream provenance is not recorded. Encode the exact family/use map from this plan and mark only `project-dossier` internal.
 
 The ignored local lock recorded `Paramchoudhary/ResumeSkills` as the upstream
 source for exactly these 22 names: `academic-cv-builder`,
@@ -310,17 +310,17 @@ Run: `uv run pytest tests/test_career_skill_registry.py tests/test_config.py tes
 Expected: PASS, including exactly 35 verified entries and the isolated capability-failure cases.
 
 ```bash
-git add .gitattributes .gitignore skills-lock.json Dockerfile src/resume_agent/career_skills src/resume_agent/config.py src/resume_agent/api/schemas/setup.py src/resume_agent/api/routers/setup.py tests/test_career_skill_registry.py tests/test_config.py tests/api/test_setup_status.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add .gitattributes .gitignore skills-lock.json Dockerfile src/resume_tailor_harness/career_skills src/resume_tailor_harness/config.py src/resume_tailor_harness/api/schemas/setup.py src/resume_tailor_harness/api/routers/setup.py tests/test_career_skill_registry.py tests/test_config.py tests/api/test_setup_status.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: verify approved career skills"
 ```
 
 ### Task 2: Persist typed skill and sponsorship provenance
 
 **Files:**
-- Modify: `src/resume_agent/career_skills/models.py`
-- Modify: `src/resume_agent/tracking/tables.py`
-- Modify: `src/resume_agent/tracking/migrate.py`
-- Modify: `src/resume_agent/db.py`
+- Modify: `src/resume_tailor_harness/career_skills/models.py`
+- Modify: `src/resume_tailor_harness/tracking/tables.py`
+- Modify: `src/resume_tailor_harness/tracking/migrate.py`
+- Modify: `src/resume_tailor_harness/db.py`
 - Test: `tests/test_tracking_migrate.py`
 - Test: `tests/test_job_detail_row.py`
 - Test: `tests/test_cover_letter_table.py`
@@ -389,16 +389,16 @@ Run: `uv run pytest tests/test_tracking_migrate.py tests/test_job_detail_row.py 
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/career_skills/models.py src/resume_agent/tracking/tables.py src/resume_agent/tracking/migrate.py src/resume_agent/db.py tests/test_tracking_migrate.py tests/test_job_detail_row.py tests/test_cover_letter_table.py
+git add src/resume_tailor_harness/career_skills/models.py src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/migrate.py src/resume_tailor_harness/db.py tests/test_tracking_migrate.py tests/test_job_detail_row.py tests/test_cover_letter_table.py
 git commit -m "feat: persist agent skill provenance"
 ```
 
 ### Task 3: Add the one-skill Agno runner seam
 
 **Files:**
-- Create: `src/resume_agent/career_skills/agno.py`
-- Modify: `src/resume_agent/llm_runner.py`
-- Modify: `src/resume_agent/services/agents.py`
+- Create: `src/resume_tailor_harness/career_skills/agno.py`
+- Modify: `src/resume_tailor_harness/llm_runner.py`
+- Modify: `src/resume_tailor_harness/services/agents.py`
 - Test: `tests/test_agent_skills.py`
 - Test: `tests/test_llm_runner.py`
 
@@ -474,19 +474,19 @@ Run: `uv run pytest tests/test_agent_skills.py tests/test_llm_runner.py tests/te
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/career_skills/agno.py src/resume_agent/llm_runner.py src/resume_agent/services/agents.py tests/test_agent_skills.py tests/test_llm_runner.py tests/test_agent_prompt_contracts.py
+git add src/resume_tailor_harness/career_skills/agno.py src/resume_tailor_harness/llm_runner.py src/resume_tailor_harness/services/agents.py tests/test_agent_skills.py tests/test_llm_runner.py tests/test_agent_prompt_contracts.py
 git commit -m "feat: attach one verified skill to Agno agents"
 ```
 
 ### Task 4: Wire Job Analysis and internal profile agents
 
 **Files:**
-- Modify: `src/resume_agent/discovery/extract.py`
-- Modify: `src/resume_agent/discovery/fit.py`
-- Modify: `src/resume_agent/discovery/pipeline.py`
-- Modify: `src/resume_agent/profile/project_extractor.py`
-- Modify: `src/resume_agent/services/agents.py`
-- Modify: `src/resume_agent/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/discovery/extract.py`
+- Modify: `src/resume_tailor_harness/discovery/fit.py`
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py`
+- Modify: `src/resume_tailor_harness/profile/project_extractor.py`
+- Modify: `src/resume_tailor_harness/services/agents.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py`
 - Test: `tests/test_discovery_extract.py`
 - Test: `tests/test_discovery_fit.py`
 - Test: `tests/test_discovery_pipeline.py`
@@ -539,26 +539,26 @@ Run: `uv run pytest tests/test_discovery_extract.py tests/test_discovery_fit.py 
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/discovery/extract.py src/resume_agent/discovery/fit.py src/resume_agent/discovery/pipeline.py src/resume_agent/profile/project_extractor.py src/resume_agent/services/agents.py src/resume_agent/api/routers/runs.py tests/test_discovery_extract.py tests/test_discovery_fit.py tests/test_discovery_pipeline.py tests/test_profile_project_extractor.py
+git add src/resume_tailor_harness/discovery/extract.py src/resume_tailor_harness/discovery/fit.py src/resume_tailor_harness/discovery/pipeline.py src/resume_tailor_harness/profile/project_extractor.py src/resume_tailor_harness/services/agents.py src/resume_tailor_harness/api/routers/runs.py tests/test_discovery_extract.py tests/test_discovery_fit.py tests/test_discovery_pipeline.py tests/test_profile_project_extractor.py
 git commit -m "feat: skill job analysis agents"
 ```
 
 ### Task 5: Wire resume and cover-letter skills with additive selection
 
 **Files:**
-- Modify: `src/resume_agent/tailor/agents.py`
-- Modify: `src/resume_agent/tailor/review_config.py`
-- Modify: `src/resume_agent/tailor/service.py`
-- Modify: `src/resume_agent/services/agents.py`
-- Modify: `src/resume_agent/services/tailoring.py`
-- Modify: `src/resume_agent/services/revision.py`
-- Modify: `src/resume_agent/cover_letter/agents.py`
-- Modify: `src/resume_agent/cover_letter/service.py`
-- Modify: `src/resume_agent/services/cover_letters.py`
-- Modify: `src/resume_agent/services/cover_letter_revision.py`
-- Modify: `src/resume_agent/api/schemas/runs.py`
-- Modify: `src/resume_agent/api/routers/runs.py`
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/tailor/agents.py`
+- Modify: `src/resume_tailor_harness/tailor/review_config.py`
+- Modify: `src/resume_tailor_harness/tailor/service.py`
+- Modify: `src/resume_tailor_harness/services/agents.py`
+- Modify: `src/resume_tailor_harness/services/tailoring.py`
+- Modify: `src/resume_tailor_harness/services/revision.py`
+- Modify: `src/resume_tailor_harness/cover_letter/agents.py`
+- Modify: `src/resume_tailor_harness/cover_letter/service.py`
+- Modify: `src/resume_tailor_harness/services/cover_letters.py`
+- Modify: `src/resume_tailor_harness/services/cover_letter_revision.py`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Modify generated: `contracts/openapi.json`
 - Modify generated: `contracts/ts/api.ts`
 - Modify generated: `web/src/lib/api/schema.ts`
@@ -572,7 +572,7 @@ git commit -m "feat: skill job analysis agents"
 **Interfaces:**
 - Adds optional `authoringSkill` to `TailorParams`; default is `resume-customizer`.
 - Adds optional `skill` to `CoverLetterParams`; default is `cover-letter-generator`.
-- Adds `--skill` to `resume-agent tailor` and `resume-agent cover-letter`, validated against the relevant closed enum.
+- Adds `--skill` to `resume-tailor-harness tailor` and `resume-tailor-harness cover-letter`, validated against the relevant closed enum.
 - Writer/reviser/revision functions receive a `VerifiedSkill` selected before entering the workflow.
 - Each persisted resume/cover version appends a validated `SkillUse` only after successful generation/review/revision.
 
@@ -645,16 +645,16 @@ Run: `uv run pytest tests/test_tailor_agents.py tests/test_tailor_service.py tes
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/tailor src/resume_agent/cover_letter src/resume_agent/services/agents.py src/resume_agent/services/tailoring.py src/resume_agent/services/revision.py src/resume_agent/services/cover_letters.py src/resume_agent/services/cover_letter_revision.py src/resume_agent/api/schemas/runs.py src/resume_agent/api/routers/runs.py src/resume_agent/cli.py tests/test_tailor_agents.py tests/test_tailor_service.py tests/test_services_tailoring.py tests/test_cover_letter_service.py tests/test_services_cover_letter_revision.py tests/api/test_runs_launch.py tests/test_cli_tailor.py tests/test_cli_cover_letter.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/tailor src/resume_tailor_harness/cover_letter src/resume_tailor_harness/services/agents.py src/resume_tailor_harness/services/tailoring.py src/resume_tailor_harness/services/revision.py src/resume_tailor_harness/services/cover_letters.py src/resume_tailor_harness/services/cover_letter_revision.py src/resume_tailor_harness/api/schemas/runs.py src/resume_tailor_harness/api/routers/runs.py src/resume_tailor_harness/cli.py tests/test_tailor_agents.py tests/test_tailor_service.py tests/test_services_tailoring.py tests/test_cover_letter_service.py tests/test_services_cover_letter_revision.py tests/api/test_runs_launch.py tests/test_cli_tailor.py tests/test_cli_cover_letter.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: skill resume and cover letter workflows"
 ```
 
 ### Task 6: Wire interview preparation and mock-coaching agents
 
 **Files:**
-- Modify: `src/resume_agent/interview/agent.py`
-- Modify: `src/resume_agent/interview/store.py`
-- Modify: `src/resume_agent/services/mock_interview.py`
+- Modify: `src/resume_tailor_harness/interview/agent.py`
+- Modify: `src/resume_tailor_harness/interview/store.py`
+- Modify: `src/resume_tailor_harness/services/mock_interview.py`
 - Test: `tests/test_interview_agent.py`
 - Test: `tests/test_interview_store.py`
 - Test: `tests/test_mock_interview_service.py`
@@ -701,7 +701,7 @@ Run: `uv run pytest tests/test_interview_agent.py tests/test_interview_store.py 
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/interview src/resume_agent/services/mock_interview.py tests/test_interview_agent.py tests/test_interview_store.py tests/test_mock_interview_service.py tests/api/test_interview_router.py
+git add src/resume_tailor_harness/interview src/resume_tailor_harness/services/mock_interview.py tests/test_interview_agent.py tests/test_interview_store.py tests/test_mock_interview_service.py tests/api/test_interview_router.py
 git commit -m "feat: skill interview agents"
 ```
 
@@ -710,12 +710,12 @@ git commit -m "feat: skill interview agents"
 **Files:**
 - Modify: `pyproject.toml`
 - Modify: `uv.lock`
-- Modify: `src/resume_agent/config.py`
-- Modify: `src/resume_agent/tenancy/workspace.py`
-- Create: `src/resume_agent/h1b/__init__.py`
-- Create: `src/resume_agent/h1b/models.py`
-- Create: `src/resume_agent/h1b/mcp.py`
-- Create: `src/resume_agent/h1b/service.py`
+- Modify: `src/resume_tailor_harness/config.py`
+- Modify: `src/resume_tailor_harness/tenancy/workspace.py`
+- Create: `src/resume_tailor_harness/h1b/__init__.py`
+- Create: `src/resume_tailor_harness/h1b/models.py`
+- Create: `src/resume_tailor_harness/h1b/mcp.py`
+- Create: `src/resume_tailor_harness/h1b/service.py`
 - Create: `tests/fixtures/h1b/company-stats.json`
 - Create: `tests/fixtures/h1b/no-match.json`
 - Create: `tests/fixtures/h1b/malformed.json`
@@ -838,20 +838,20 @@ Run: `uv run pytest tests/test_h1b_config.py tests/test_h1b_mcp.py tests/test_h1
 Expected: PASS.
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/config.py src/resume_agent/tenancy/workspace.py src/resume_agent/h1b tests/fixtures/h1b tests/test_h1b_config.py tests/test_h1b_mcp.py tests/test_h1b_service.py tests/tenancy/test_workspace.py
+git add pyproject.toml uv.lock src/resume_tailor_harness/config.py src/resume_tailor_harness/tenancy/workspace.py src/resume_tailor_harness/h1b tests/fixtures/h1b tests/test_h1b_config.py tests/test_h1b_mcp.py tests/test_h1b_service.py tests/tenancy/test_workspace.py
 git commit -m "feat: add read-only H1B sponsorship research"
 ```
 
 ### Task 8: Insert historical H-1B evidence between filter and fit
 
 **Files:**
-- Modify: `src/resume_agent/discovery/fit.py`
-- Modify: `src/resume_agent/discovery/pipeline.py`
-- Modify: `src/resume_agent/services/discovery.py`
-- Modify: `src/resume_agent/tracking/queries.py`
-- Modify: `src/resume_agent/api/schemas/jobs.py`
-- Modify: `src/resume_agent/api/routers/jobs.py`
-- Modify: `src/resume_agent/api/routers/setup.py`
+- Modify: `src/resume_tailor_harness/discovery/fit.py`
+- Modify: `src/resume_tailor_harness/discovery/pipeline.py`
+- Modify: `src/resume_tailor_harness/services/discovery.py`
+- Modify: `src/resume_tailor_harness/tracking/queries.py`
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py`
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py`
+- Modify: `src/resume_tailor_harness/api/routers/setup.py`
 - Modify generated: `contracts/openapi.json`
 - Modify generated: `contracts/ts/api.ts`
 - Modify generated: `web/src/lib/api/schema.ts`
@@ -963,19 +963,19 @@ Run: `uv run pytest tests/test_discovery_filter.py tests/test_discovery_fit.py t
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/discovery/fit.py src/resume_agent/discovery/pipeline.py src/resume_agent/services/discovery.py src/resume_agent/tracking/queries.py src/resume_agent/api/schemas/jobs.py src/resume_agent/api/routers/jobs.py src/resume_agent/api/routers/setup.py tests/test_discovery_fit.py tests/test_discovery_pipeline.py tests/test_services_discovery.py tests/api/test_job_detail.py tests/api/test_setup_status.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/discovery/fit.py src/resume_tailor_harness/discovery/pipeline.py src/resume_tailor_harness/services/discovery.py src/resume_tailor_harness/tracking/queries.py src/resume_tailor_harness/api/schemas/jobs.py src/resume_tailor_harness/api/routers/jobs.py src/resume_tailor_harness/api/routers/setup.py tests/test_discovery_fit.py tests/test_discovery_pipeline.py tests/test_services_discovery.py tests/api/test_job_detail.py tests/api/test_setup_status.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: enrich silent sponsorship signals"
 ```
 
 ### Task 9: Build Career Lab session, agents, and service
 
 **Files:**
-- Create: `src/resume_agent/career_lab/__init__.py`
-- Create: `src/resume_agent/career_lab/models.py`
-- Create: `src/resume_agent/career_lab/store.py`
-- Create: `src/resume_agent/career_lab/agents.py`
-- Create: `src/resume_agent/services/career_lab.py`
-- Modify: `src/resume_agent/tenancy/workspace.py`
+- Create: `src/resume_tailor_harness/career_lab/__init__.py`
+- Create: `src/resume_tailor_harness/career_lab/models.py`
+- Create: `src/resume_tailor_harness/career_lab/store.py`
+- Create: `src/resume_tailor_harness/career_lab/agents.py`
+- Create: `src/resume_tailor_harness/services/career_lab.py`
+- Modify: `src/resume_tailor_harness/tenancy/workspace.py`
 - Test: `tests/test_career_lab_store.py`
 - Test: `tests/test_career_lab_agents.py`
 - Test: `tests/test_career_lab_service.py`
@@ -1074,17 +1074,17 @@ Run: `uv run pytest tests/test_career_lab_store.py tests/test_career_lab_agents.
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/career_lab src/resume_agent/services/career_lab.py src/resume_agent/tenancy/workspace.py tests/test_career_lab_store.py tests/test_career_lab_agents.py tests/test_career_lab_service.py
+git add src/resume_tailor_harness/career_lab src/resume_tailor_harness/services/career_lab.py src/resume_tailor_harness/tenancy/workspace.py tests/test_career_lab_store.py tests/test_career_lab_agents.py tests/test_career_lab_service.py
 git commit -m "feat: add Career Lab sessions and agents"
 ```
 
 ### Task 10: Expose the Career Lab REST contract and regenerate clients
 
 **Files:**
-- Create: `src/resume_agent/api/schemas/career_lab.py`
-- Create: `src/resume_agent/api/routers/career_lab.py`
-- Modify: `src/resume_agent/api/app.py`
-- Modify: `src/resume_agent/api/deps.py`
+- Create: `src/resume_tailor_harness/api/schemas/career_lab.py`
+- Create: `src/resume_tailor_harness/api/routers/career_lab.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
+- Modify: `src/resume_tailor_harness/api/deps.py`
 - Modify: `tests/api/test_openapi_contract.py`
 - Create: `tests/api/test_career_lab_router.py`
 - Modify generated: `contracts/openapi.json`
@@ -1155,18 +1155,18 @@ Expected: PASS and no diff after rerunning the generation commands.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/career_lab.py src/resume_agent/api/routers/career_lab.py src/resume_agent/api/app.py src/resume_agent/api/deps.py tests/api/test_career_lab_router.py tests/api/test_openapi_contract.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/api/schemas/career_lab.py src/resume_tailor_harness/api/routers/career_lab.py src/resume_tailor_harness/api/app.py src/resume_tailor_harness/api/deps.py tests/api/test_career_lab_router.py tests/api/test_openapi_contract.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: expose Career Lab API"
 ```
 
 ### Task 11: Add the Career Lab CLI
 
 **Files:**
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Create: `tests/test_cli_career_lab.py`
 
 **Interfaces:**
-- Command: `resume-agent career-lab [GOAL] [--skill NAME] [--job-id ID] [--resume-version-id ID] [--offer-application-id ID (repeatable)]`
+- Command: `resume-tailor-harness career-lab [GOAL] [--skill NAME] [--job-id ID] [--resume-version-id ID] [--offer-application-id ID (repeatable)]`
 - Reuses `services.career_lab` and the existing terminal stream sink; it does not call an LLM or MCP client directly.
 
 - [ ] **Step 1: Write failing CLI lifecycle tests**
@@ -1200,7 +1200,7 @@ Run: `uv run pytest tests/test_cli_career_lab.py tests/test_cli_scout.py tests/t
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_career_lab.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_career_lab.py
 git commit -m "feat: add Career Lab CLI"
 ```
 
@@ -1306,12 +1306,12 @@ def test_only_sponsorship_agent_receives_mcp_tools(all_built_agents):
 
 def test_every_affected_model_call_is_an_agno_agent():
     forbidden = find_provider_client_calls([
-        "src/resume_agent/career_lab",
-        "src/resume_agent/h1b",
-        "src/resume_agent/discovery",
-        "src/resume_agent/tailor",
-        "src/resume_agent/cover_letter",
-        "src/resume_agent/interview",
+        "src/resume_tailor_harness/career_lab",
+        "src/resume_tailor_harness/h1b",
+        "src/resume_tailor_harness/discovery",
+        "src/resume_tailor_harness/tailor",
+        "src/resume_tailor_harness/cover_letter",
+        "src/resume_tailor_harness/interview",
     ])
     assert forbidden == []
 ```

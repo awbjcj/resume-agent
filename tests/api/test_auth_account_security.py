@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.system_db import PasswordResetCode, User
+from resume_tailor_harness.tenancy.system_db import PasswordResetCode, User
 
 
 def _login(client):

@@ -1,4 +1,4 @@
-from resume_agent.suggestions.agents import (
+from resume_tailor_harness.suggestions.agents import (
     ProjectIdea,
     RepoRef,
     SuggestionDraft,
@@ -41,7 +41,7 @@ def test_suggestion_draft_roundtrips_nested_models():
 
 
 def test_builders_return_runners(monkeypatch):
-    import resume_agent.suggestions.agents as agents_module
+    import resume_tailor_harness.suggestions.agents as agents_module
 
     monkeypatch.setattr(
         agents_module,

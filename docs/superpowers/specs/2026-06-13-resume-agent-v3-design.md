@@ -1,8 +1,8 @@
-# Resume Agent v3 — House-Style Customization + Match-Gap Intelligence — Design Spec
+# Résumé Tailor Harness v3 — House-Style Customization + Match-Gap Intelligence — Design Spec
 
 - **Date:** 2026-06-13
 - **Status:** Approved (design) — ready for implementation planning
-- **Scope of this document:** Full v3 design. Builds on the v1 spec (`2026-06-08-resume-agent-design.md`) and the v2 spec (`2026-06-11-resume-agent-v2-connectors-design.md`).
+- **Scope of this document:** Full v3 design. Builds on the v1 spec (`2026-06-08-resume-tailor-harness-design.md`) and the v2 spec (`2026-06-11-resume-tailor-harness-v2-connectors-design.md`).
 - **Successor planning:** one spec → two independent component plans (mirrors the v1/v2 spec→multi-plan pattern).
 
 ---
@@ -135,13 +135,13 @@ The two pillars share no code and have no ordering dependency.
 ## 7. Project layout (additions / modifications)
 
 ```
-src/resume_agent/tailor/agents.py        # MODIFY — style_guide param on the 3 builders + labeled append
-src/resume_agent/tailor/style_guide.py   # NEW — load_style_guide(path) -> str | None
-src/resume_agent/tailor/review_config.py # MODIFY — optional style_guide_path key
-src/resume_agent/tracking/match_gap.py    # NEW — pure match_gap() core (+ gap dataclasses)
-src/resume_agent/tracking/canonicalize.py # NEW (optional pillar) — cheap-LLM skill canonicalizer
-src/resume_agent/dashboard/app.py         # MODIFY — Match-gap page
-src/resume_agent/cli.py                   # MODIFY — match-gap command; thread style guide into tailor
+src/resume_tailor_harness/tailor/agents.py        # MODIFY — style_guide param on the 3 builders + labeled append
+src/resume_tailor_harness/tailor/style_guide.py   # NEW — load_style_guide(path) -> str | None
+src/resume_tailor_harness/tailor/review_config.py # MODIFY — optional style_guide_path key
+src/resume_tailor_harness/tracking/match_gap.py    # NEW — pure match_gap() core (+ gap dataclasses)
+src/resume_tailor_harness/tracking/canonicalize.py # NEW (optional pillar) — cheap-LLM skill canonicalizer
+src/resume_tailor_harness/dashboard/app.py         # MODIFY — Match-gap page
+src/resume_tailor_harness/cli.py                   # MODIFY — match-gap command; thread style guide into tailor
 config/style_guide.md(.example)           # NEW — prose house-style guidance
 tests/fixtures/...                         # NEW — seeded jobs/profile for match-gap; style-guide cases
 ```

@@ -1,10 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.auth import hash_password
-from resume_agent.api.deps import refresh_app_settings
-from resume_agent.config import Settings
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.api.deps import refresh_app_settings
+from resume_tailor_harness.config import Settings
 
 
 def _auth_env(tmp_path, extra: str = ""):
@@ -25,7 +25,7 @@ def _client(app) -> TestClient:
 
 @pytest.fixture(autouse=True)
 def _no_login_delay(monkeypatch):
-    from resume_agent.api.routers import auth as auth_router
+    from resume_tailor_harness.api.routers import auth as auth_router
 
     monkeypatch.setattr(auth_router, "FAILED_LOGIN_DELAY_SECONDS", 0.0)
 
@@ -100,7 +100,7 @@ def test_production_can_disable_api_docs_and_reject_unknown_hosts(tmp_path):
 
 
 def test_login_verifies_password_for_unknown_username(tmp_path, monkeypatch):
-    from resume_agent.api.routers import auth as auth_router
+    from resume_tailor_harness.api.routers import auth as auth_router
 
     calls = []
     real_verify = auth_router.auth.verify_password

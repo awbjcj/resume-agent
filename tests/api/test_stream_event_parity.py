@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from resume_agent.sessions.stream import (
+from resume_tailor_harness.sessions.stream import (
     Completed,
     Failed,
     Notice,

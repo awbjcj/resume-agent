@@ -6,16 +6,16 @@ from typing import TypedDict
 
 import pytest
 
-from resume_agent.career_lab.models import CareerLabContextRefs, CareerLabRoute
-from resume_agent.career_lab.store import create_session, load_session
-from resume_agent.career_skills.models import (
+from resume_tailor_harness.career_lab.models import CareerLabContextRefs, CareerLabRoute
+from resume_tailor_harness.career_lab.store import create_session, load_session
+from resume_tailor_harness.career_skills.models import (
     AgentFamily,
     AgentRunMeta,
     CareerLabSkillName,
 )
-from resume_agent.career_skills.registry import CareerSkillRegistry
-from resume_agent.services import career_lab
-from resume_agent.sessions.stream import NullSink
+from resume_tailor_harness.career_skills.registry import CareerSkillRegistry
+from resume_tailor_harness.services import career_lab
+from resume_tailor_harness.sessions.stream import NullSink
 
 
 class _Reporter:
@@ -58,7 +58,7 @@ class _Formatter:
             return _Response(
                 SimpleNamespace(artifact_type="offer_comparison", title="", summary="")
             )
-        from resume_agent.career_lab.models import CareerLabArtifactMeta
+        from resume_tailor_harness.career_lab.models import CareerLabArtifactMeta
 
         return _Response(
             CareerLabArtifactMeta(

@@ -1,10 +1,10 @@
-# Resume Agent v2 — Cover-Letter Generation Implementation Plan
+# Résumé Tailor Harness v2 — Cover-Letter Generation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Generate a **fact-locked cover letter** per job, reusing the resume pipeline's machinery: an LLM drafts `CoverLetterContent` drawing only on `ProfileFacts`, a **deterministic provenance gate** (every paragraph cites real fact ids) blocks fabrication and drives a revise loop, and a Typst template renders it to PDF. A `cover-letter` CLI command runs draft → gate → render.
 
-**Architecture:** This is **Plan 4 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`), an independent leaf depending only on Plan 1's merge and v1's tailor/render/profile modules. The fact-lock gate is **deterministic and pure** (`unsupported_provenance`) — the design's "partially verifiable in plain code before any LLM runs" (§3.1) applied to cover letters; it is the test surface, and it needs no API key. Generation (LLM) and rendering (Typst) are split into separate functions exactly like the resume `tailor`/`render` split, so each is tested in isolation with an injected fake.
+**Architecture:** This is **Plan 4 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-tailor-harness-v2-connectors-design.md`), an independent leaf depending only on Plan 1's merge and v1's tailor/render/profile modules. The fact-lock gate is **deterministic and pure** (`unsupported_provenance`) — the design's "partially verifiable in plain code before any LLM runs" (§3.1) applied to cover letters; it is the test surface, and it needs no API key. Generation (LLM) and rendering (Typst) are split into separate functions exactly like the resume `tailor`/`render` split, so each is tested in isolation with an injected fake.
 
 **Tech Stack:** Python 3.13, uv, Agno (`Agent`/`Claude`), Typst (`typst`), SQLModel, Typer, pytest. No new deps.
 
@@ -25,18 +25,18 @@
 ## File Structure
 
 ```
-src/resume_agent/models/cover_letter.py        # CREATE — CoverLetterContent + paragraph
-src/resume_agent/cover_letter/
+src/resume_tailor_harness/models/cover_letter.py        # CREATE — CoverLetterContent + paragraph
+src/resume_tailor_harness/cover_letter/
   __init__.py                                   # CREATE
   provenance.py                                 # CREATE — collect_fact_ids + unsupported_provenance
   agents.py                                     # CREATE — build draft/reviser agents
   drafting.py                                   # CREATE — compose/draft/revise (pure composition)
   service.py                                    # CREATE — generate_cover_letter (loop + persist)
   render.py                                     # CREATE — render_cover_letter_pdf + render_cover_letter
-src/resume_agent/tracking/tables.py             # MODIFY — CoverLetter table
-src/resume_agent/tracking/repository.py         # MODIFY — save/get cover letter
+src/resume_tailor_harness/tracking/tables.py             # MODIFY — CoverLetter table
+src/resume_tailor_harness/tracking/repository.py         # MODIFY — save/get cover letter
 templates/cover_letter.typ                      # CREATE
-src/resume_agent/cli.py                         # MODIFY — cover-letter command
+src/resume_tailor_harness/cli.py                         # MODIFY — cover-letter command
 tests/test_cover_letter_models.py               # CREATE
 tests/test_cover_letter_table.py                # CREATE
 tests/test_cover_letter_provenance.py           # CREATE
@@ -52,7 +52,7 @@ tests/test_cli_cover_letter.py                  # CREATE
 
 **Files:**
 
-- Create: `src/resume_agent/models/cover_letter.py`
+- Create: `src/resume_tailor_harness/models/cover_letter.py`
 - Test: `tests/test_cover_letter_models.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -60,8 +60,8 @@ tests/test_cli_cover_letter.py                  # CREATE
 Create `tests/test_cover_letter_models.py`:
 
 ```python
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact
 
 
 def test_cover_letter_content_roundtrips():
@@ -81,17 +81,17 @@ def test_cover_letter_content_roundtrips():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cover_letter_models.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.cover_letter'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.models.cover_letter'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/models/cover_letter.py`:
+Create `src/resume_tailor_harness/models/cover_letter.py`:
 
 ```python
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import Contact
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.models.profile import Contact
 
 
 class CoverLetterParagraph(ExtensibleModel):
@@ -119,7 +119,7 @@ Expected: PASS (1 test).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/models/cover_letter.py tests/test_cover_letter_models.py
+git add src/resume_tailor_harness/models/cover_letter.py tests/test_cover_letter_models.py
 git commit -m "feat(cover-letter): CoverLetterContent model" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -129,7 +129,7 @@ git commit -m "feat(cover-letter): CoverLetterContent model" -m "Co-Authored-By:
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py`, `src/resume_agent/tracking/repository.py`
+- Modify: `src/resume_tailor_harness/tracking/tables.py`, `src/resume_tailor_harness/tracking/repository.py`
 - Test: `tests/test_cover_letter_table.py`
 
 > A _new table_ is created automatically by `SQLModel.metadata.create_all` on the next `init_db` — no migration needed (unlike Plan 1's new _column_).
@@ -141,9 +141,9 @@ Create `tests/test_cover_letter_table.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.ingest import add_job
-from resume_agent.tracking.repository import get_cover_letter, save_cover_letter
-from resume_agent.tracking.tables import CoverLetter
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.tracking.repository import get_cover_letter, save_cover_letter
+from resume_tailor_harness.tracking.tables import CoverLetter
 
 
 def _session():
@@ -167,11 +167,11 @@ def test_save_and_get_cover_letter():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cover_letter_table.py -v`
-Expected: FAIL — `ImportError: cannot import name 'CoverLetter' from 'resume_agent.tracking.tables'`.
+Expected: FAIL — `ImportError: cannot import name 'CoverLetter' from 'resume_tailor_harness.tracking.tables'`.
 
 - [ ] **Step 3: Add the table**
 
-In `src/resume_agent/tracking/tables.py`, add after the `Application` class:
+In `src/resume_tailor_harness/tracking/tables.py`, add after the `Application` class:
 
 ```python
 class CoverLetter(SQLModel, table=True):
@@ -189,10 +189,10 @@ class CoverLetter(SQLModel, table=True):
 
 - [ ] **Step 4: Add repository functions**
 
-In `src/resume_agent/tracking/repository.py`, update the import line to include `CoverLetter`:
+In `src/resume_tailor_harness/tracking/repository.py`, update the import line to include `CoverLetter`:
 
 ```python
-from resume_agent.tracking.tables import Application, ApplicationStatus, CoverLetter, Job, ResumeVersion, utcnow
+from resume_tailor_harness.tracking.tables import Application, ApplicationStatus, CoverLetter, Job, ResumeVersion, utcnow
 ```
 
 Add at the end of the file:
@@ -217,7 +217,7 @@ Expected: PASS (1 test).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/tracking/repository.py tests/test_cover_letter_table.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/tracking/repository.py tests/test_cover_letter_table.py
 git commit -m "feat(cover-letter): cover_letters table + repository" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -227,7 +227,7 @@ git commit -m "feat(cover-letter): cover_letters table + repository" -m "Co-Auth
 
 **Files:**
 
-- Create: `src/resume_agent/cover_letter/__init__.py`, `src/resume_agent/cover_letter/provenance.py`
+- Create: `src/resume_tailor_harness/cover_letter/__init__.py`, `src/resume_tailor_harness/cover_letter/provenance.py`
 - Test: `tests/test_cover_letter_provenance.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -235,9 +235,9 @@ git commit -m "feat(cover-letter): cover_letters table + repository" -m "Co-Auth
 Create `tests/test_cover_letter_provenance.py`:
 
 ```python
-from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact, Experience, ProfileFacts, Skill
+from resume_tailor_harness.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts, Skill
 
 
 def _facts():
@@ -274,21 +274,21 @@ def test_fabricated_provenance_is_flagged():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cover_letter_provenance.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_letter'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.cover_letter'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/cover_letter/__init__.py`:
+Create `src/resume_tailor_harness/cover_letter/__init__.py`:
 
 ```python
 """Fact-locked cover-letter generation: draft → deterministic provenance gate → render."""
 ```
 
-Create `src/resume_agent/cover_letter/provenance.py`:
+Create `src/resume_tailor_harness/cover_letter/provenance.py`:
 
 ```python
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 def collect_fact_ids(facts: ProfileFacts) -> set[str]:
@@ -332,7 +332,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cover_letter/__init__.py src/resume_agent/cover_letter/provenance.py tests/test_cover_letter_provenance.py
+git add src/resume_tailor_harness/cover_letter/__init__.py src/resume_tailor_harness/cover_letter/provenance.py tests/test_cover_letter_provenance.py
 git commit -m "feat(cover-letter): deterministic provenance gate" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -342,7 +342,7 @@ git commit -m "feat(cover-letter): deterministic provenance gate" -m "Co-Authore
 
 **Files:**
 
-- Create: `src/resume_agent/cover_letter/agents.py`, `src/resume_agent/cover_letter/drafting.py`
+- Create: `src/resume_tailor_harness/cover_letter/agents.py`, `src/resume_tailor_harness/cover_letter/drafting.py`
 - Test: `tests/test_cover_letter_drafting.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -350,14 +350,14 @@ git commit -m "feat(cover-letter): deterministic provenance gate" -m "Co-Authore
 Create `tests/test_cover_letter_drafting.py`:
 
 ```python
-from resume_agent.cover_letter.drafting import (
+from resume_tailor_harness.cover_letter.drafting import (
     compose_cover_letter_input,
     compose_revise_input,
     draft_cover_letter,
 )
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, Experience, ProfileFacts
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts
 
 
 class _Result:
@@ -402,19 +402,19 @@ def test_revise_input_names_unsupported_ids():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cover_letter_drafting.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_letter.drafting'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.cover_letter.drafting'`.
 
 - [ ] **Step 3: Implement the agents**
 
-Create `src/resume_agent/cover_letter/agents.py`:
+Create `src/resume_tailor_harness/cover_letter/agents.py`:
 
 ```python
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
-from resume_agent.llm_runner import AgentRunner, Runner
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.tailor.agents import model_for_tier
+from resume_tailor_harness.llm_runner import AgentRunner, Runner
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.tailor.agents import model_for_tier
 
 _DRAFT_INSTRUCTIONS = [
     "Write a concise, specific cover letter for the candidate targeting the given job.",
@@ -454,13 +454,13 @@ def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
 
 - [ ] **Step 4: Implement the composition**
 
-Create `src/resume_agent/cover_letter/drafting.py`:
+Create `src/resume_tailor_harness/cover_letter/drafting.py`:
 
 ```python
-from resume_agent.llm_runner import Runner
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
 
 
 def compose_cover_letter_input(jd_text: str, criteria: JobCriteria, profile_facts: ProfileFacts) -> str:
@@ -511,7 +511,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cover_letter/agents.py src/resume_agent/cover_letter/drafting.py tests/test_cover_letter_drafting.py
+git add src/resume_tailor_harness/cover_letter/agents.py src/resume_tailor_harness/cover_letter/drafting.py tests/test_cover_letter_drafting.py
 git commit -m "feat(cover-letter): draft/reviser agents + composition" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -521,7 +521,7 @@ git commit -m "feat(cover-letter): draft/reviser agents + composition" -m "Co-Au
 
 **Files:**
 
-- Create: `src/resume_agent/cover_letter/service.py`
+- Create: `src/resume_tailor_harness/cover_letter/service.py`
 - Test: `tests/test_cover_letter_service.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -531,10 +531,10 @@ Create `tests/test_cover_letter_service.py`:
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.cover_letter.service import generate_cover_letter
-from resume_agent.discovery.ingest import add_job
-from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
-from resume_agent.models.profile import Contact, Experience, ProfileFacts
+from resume_tailor_harness.cover_letter.service import generate_cover_letter
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.models.cover_letter import CoverLetterContent, CoverLetterParagraph
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts
 
 
 def _session():
@@ -591,27 +591,27 @@ def test_generate_marks_unfixed_fabrication_as_failed():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cover_letter_service.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_letter.service'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.cover_letter.service'`.
 
 - [ ] **Step 3: Implement**
 
-Create `src/resume_agent/cover_letter/service.py`:
+Create `src/resume_tailor_harness/cover_letter/service.py`:
 
 ```python
 from sqlmodel import Session
 
-from resume_agent.cover_letter.drafting import (
+from resume_tailor_harness.cover_letter.drafting import (
     compose_cover_letter_input,
     compose_revise_input,
     draft_cover_letter,
     revise_cover_letter,
 )
-from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
-from resume_agent.llm_runner import Runner
-from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.tracking.repository import save_cover_letter
-from resume_agent.tracking.tables import CoverLetter, Job
+from resume_tailor_harness.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_tailor_harness.llm_runner import Runner
+from resume_tailor_harness.models.job import JobCriteria
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.tracking.repository import save_cover_letter
+from resume_tailor_harness.tracking.tables import CoverLetter, Job
 
 
 def generate_cover_letter(
@@ -656,7 +656,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/cover_letter/service.py tests/test_cover_letter_service.py
+git add src/resume_tailor_harness/cover_letter/service.py tests/test_cover_letter_service.py
 git commit -m "feat(cover-letter): generate_cover_letter gate+revise loop" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -666,7 +666,7 @@ git commit -m "feat(cover-letter): generate_cover_letter gate+revise loop" -m "C
 
 **Files:**
 
-- Create: `templates/cover_letter.typ`, `src/resume_agent/cover_letter/render.py`
+- Create: `templates/cover_letter.typ`, `src/resume_tailor_harness/cover_letter/render.py`
 - Test: `tests/test_cover_letter_render.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -678,10 +678,10 @@ from pathlib import Path
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.cover_letter.render import render_cover_letter
-from resume_agent.discovery.ingest import add_job
-from resume_agent.tracking.repository import get_cover_letter, save_cover_letter
-from resume_agent.tracking.tables import CoverLetter
+from resume_tailor_harness.cover_letter.render import render_cover_letter
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.tracking.repository import get_cover_letter, save_cover_letter
+from resume_tailor_harness.tracking.tables import CoverLetter
 
 
 def _session():
@@ -719,7 +719,7 @@ def test_render_missing_cover_letter_returns_none(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cover_letter_render.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_letter.render'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.cover_letter.render'`.
 
 - [ ] **Step 3: Create the template**
 
@@ -761,7 +761,7 @@ Create `templates/cover_letter.typ`:
 
 - [ ] **Step 4: Implement the render module**
 
-Create `src/resume_agent/cover_letter/render.py`:
+Create `src/resume_tailor_harness/cover_letter/render.py`:
 
 ```python
 from pathlib import Path
@@ -770,10 +770,10 @@ from typing import Callable
 import typst
 from sqlmodel import Session
 
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.render.renderer import output_filename
-from resume_agent.tracking.repository import get_cover_letter, get_job, save_cover_letter
-from resume_agent.tracking.tables import utcnow
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.render.renderer import output_filename
+from resume_tailor_harness.tracking.repository import get_cover_letter, get_job, save_cover_letter
+from resume_tailor_harness.tracking.tables import utcnow
 
 TEMPLATE = "templates/cover_letter.typ"
 RenderFn = Callable[[CoverLetterContent, str | Path, str | Path], Path]
@@ -824,7 +824,7 @@ Expected: PASS (2 tests — the injected `fake_render` means no Typst binary is 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add templates/cover_letter.typ src/resume_agent/cover_letter/render.py tests/test_cover_letter_render.py
+git add templates/cover_letter.typ src/resume_tailor_harness/cover_letter/render.py tests/test_cover_letter_render.py
 git commit -m "feat(cover-letter): Typst template + render" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -834,7 +834,7 @@ git commit -m "feat(cover-letter): Typst template + render" -m "Co-Authored-By: 
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py`
+- Modify: `src/resume_tailor_harness/cli.py`
 - Test: `tests/test_cli_cover_letter.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -846,12 +846,12 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from resume_agent import cli
-from resume_agent.db import get_session, make_engine, init_db
-from resume_agent.discovery.ingest import add_job
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import CoverLetter, JobStatus
+from resume_tailor_harness import cli
+from resume_tailor_harness.db import get_session, make_engine, init_db
+from resume_tailor_harness.discovery.ingest import add_job
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import CoverLetter, JobStatus
 
 runner = CliRunner()
 
@@ -883,21 +883,21 @@ def test_cover_letter_command_generates_and_renders(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_cli_cover_letter.py -v`
-Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'generate_cover_letter'`.
+Expected: FAIL — `AttributeError: module 'resume_tailor_harness.cli' has no attribute 'generate_cover_letter'`.
 
 - [ ] **Step 3: Add imports**
 
-In `src/resume_agent/cli.py`, add near the tailor imports:
+In `src/resume_tailor_harness/cli.py`, add near the tailor imports:
 
 ```python
-from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
-from resume_agent.cover_letter.render import render_cover_letter
-from resume_agent.cover_letter.service import generate_cover_letter
+from resume_tailor_harness.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
+from resume_tailor_harness.cover_letter.render import render_cover_letter
+from resume_tailor_harness.cover_letter.service import generate_cover_letter
 ```
 
 - [ ] **Step 4: Add the command**
 
-Add after `tailor_cmd` in `src/resume_agent/cli.py`:
+Add after `tailor_cmd` in `src/resume_tailor_harness/cli.py`:
 
 ```python
 @app.command("cover-letter")
@@ -943,13 +943,13 @@ Expected: PASS (1 test).
 Run: `uv run pytest -q`
 Expected: ALL pass.
 
-Run: `uv run resume-agent cover-letter --help`
+Run: `uv run resume-tailor-harness cover-letter --help`
 Expected: help text, exit 0.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_cover_letter.py
+git add src/resume_tailor_harness/cli.py tests/test_cli_cover_letter.py
 git commit -m "feat(cover-letter): cover-letter CLI command" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -969,4 +969,4 @@ git commit -m "feat(cover-letter): cover-letter CLI command" -m "Co-Authored-By:
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-agent-v2-cover-letters.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. Independent of Plans 5/6. Remaining leaves: **Plan 5 (Gmail auto-status)**, **Plan 6 (analytics)**.
+Plan complete and saved to `docs/superpowers/plans/2026-06-11-resume-tailor-harness-v2-cover-letters.md`. Execute via **superpowers:subagent-driven-development** or **superpowers:executing-plans**. Independent of Plans 5/6. Remaining leaves: **Plan 5 (Gmail auto-status)**, **Plan 6 (analytics)**.

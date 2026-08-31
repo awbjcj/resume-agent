@@ -2,8 +2,8 @@
 
 from typing import cast
 
-from resume_agent.llm_runner import AgentRunner, Runner
-from resume_agent.prompts.registry import PROMPT_SPECS, SPECS_BY_KEY, spec_for
+from resume_tailor_harness.llm_runner import AgentRunner, Runner
+from resume_tailor_harness.prompts.registry import PROMPT_SPECS, SPECS_BY_KEY, spec_for
 
 
 def _instructions(runner: Runner) -> list[str]:
@@ -46,9 +46,9 @@ def test_fact_check_is_the_only_locked_agent() -> None:
 
 
 def test_registry_projects_real_instruction_constants() -> None:
-    from resume_agent.discovery import fit
-    from resume_agent.gmail import classify
-    from resume_agent.tailor import agents as tailor_agents
+    from resume_tailor_harness.discovery import fit
+    from resume_tailor_harness.gmail import classify
+    from resume_tailor_harness.tailor import agents as tailor_agents
 
     assert SPECS_BY_KEY["fit-score"].instructions == tuple(fit._INSTRUCTIONS)
     assert SPECS_BY_KEY["reviewer-fact-check"].instructions == tuple(
@@ -63,15 +63,15 @@ def test_registry_projects_real_instruction_constants() -> None:
 
 
 def test_interviewer_registers_the_persona_core() -> None:
-    from resume_agent.interview.agent import _PERSONA_CORE
+    from resume_tailor_harness.interview.agent import _PERSONA_CORE
 
     assert SPECS_BY_KEY["interviewer"].instructions == tuple(_PERSONA_CORE)
 
 
 def test_composed_registry_entries_match_their_built_agents() -> None:
-    from resume_agent.profile.aspect_classifier import build_aspect_classifier_agent
-    from resume_agent.tailor.agents import build_reviewer_agent, build_tailor_agent
-    from resume_agent.tailor.match_plan import build_match_plan_agent
+    from resume_tailor_harness.profile.aspect_classifier import build_aspect_classifier_agent
+    from resume_tailor_harness.tailor.agents import build_reviewer_agent, build_tailor_agent
+    from resume_tailor_harness.tailor.match_plan import build_match_plan_agent
 
     assert SPECS_BY_KEY["tailor-writer"].instructions == tuple(
         _instructions(build_tailor_agent())

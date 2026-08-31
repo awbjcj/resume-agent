@@ -10,9 +10,9 @@ from evals.judge import (
     judge_prompt_hash,
     validate_judge_verdict,
 )
-from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_tailor_harness.models.cover_letter import CoverLetterContent
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 
 
 def _content() -> ResumeContent:

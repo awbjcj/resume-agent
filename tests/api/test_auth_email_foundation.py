@@ -5,13 +5,13 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-from resume_agent.api import auth, auth_codes
-from resume_agent.api.errors import ApiException
-from resume_agent.api.password_policy import NullBreachChecker, validate_password
-from resume_agent.config import Settings
-from resume_agent.mail.mailer import NullMailer, build_mailer
-from resume_agent.tenancy.migrate_system import migrate_system_db
-from resume_agent.tenancy.system_db import User, init_system_db
+from resume_tailor_harness.api import auth, auth_codes
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.password_policy import NullBreachChecker, validate_password
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.mail.mailer import NullMailer, build_mailer
+from resume_tailor_harness.tenancy.migrate_system import migrate_system_db
+from resume_tailor_harness.tenancy.system_db import User, init_system_db
 
 
 SETTINGS = Settings.model_validate({"session_secret": "secret"})

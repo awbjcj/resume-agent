@@ -1,7 +1,7 @@
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.models.resume import ResumeContent, TailoredSkill
-from resume_agent.models.review import Severity
-from resume_agent.tailor.skill_naming import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.models.resume import ResumeContent, TailoredSkill
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.tailor.skill_naming import (
     SKILL_NAMING_REVIEWER,
     skill_naming_critique,
     split_name,

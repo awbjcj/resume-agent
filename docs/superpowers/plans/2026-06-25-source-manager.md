@@ -15,7 +15,7 @@
 - **Wire format is camelCase.** All API request/response schemas extend `CamelModel` (`api/schemas/base.py`); Python stays snake_case; DTO→schema is `Model.model_validate(row)`.
 - **Source enabled vs pullable are distinct.** `enabled` is the persisted user toggle in `connectors.yaml`; `pullable` is derived runtime readiness (for example Adzuna requires both `enabled` and API credentials). UI rows may be enabled but not pullable, and must disable selection/per-row pull in that state.
 - **Tests are offline.** No API key, no network. Fake every agent/browser/connector seam. Run with `.venv/Scripts/python.exe -m pytest`.
-- **Config models extend `ExtensibleModel`** (`resume_agent/models/base.py`) — keep that base for any new config model.
+- **Config models extend `ExtensibleModel`** (`resume_tailor_harness/models/base.py`) — keep that base for any new config model.
 - **Back-compatibility of `connectors.yaml` is mandatory.** Existing files (bare-string `companies.urls`, boards without `enabled`) must keep loading unchanged.
 - **YAML writes are atomic** (temp file + `os.replace`) and use PyYAML (`yaml.safe_dump(..., sort_keys=False)`). Comment loss on UI write is accepted (per spec decision #9).
 - **Default connectors path:** `config/connectors.yaml` (the existing `DEFAULT_CONNECTORS` constant in `services/discovery.py`).
@@ -28,8 +28,8 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/config.py`
-- Modify: `src/resume_agent/discovery/connectors/registry.py:12-36`
+- Modify: `src/resume_tailor_harness/discovery/connectors/config.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py:12-36`
 - Test: `tests/test_connectors_config.py`, `tests/test_connectors_registry.py`
 
 **Interfaces:**
@@ -41,7 +41,7 @@
 In `tests/test_connectors_config.py`, add:
 
 ```python
-from resume_agent.discovery.connectors.config import (
+from resume_tailor_harness.discovery.connectors.config import (
     CompaniesConfig,
     CompanyUrl,
     GreenhouseConfig,
@@ -73,7 +73,7 @@ Expected: FAIL — `CompanyUrl` does not exist / bare string not coerced.
 
 - [ ] **Step 3: Implement the schema**
 
-In `src/resume_agent/discovery/connectors/config.py`, add `enabled: bool = True` to `GreenhouseBoard` and `LeverBoard`, and replace `CompaniesConfig`:
+In `src/resume_tailor_harness/discovery/connectors/config.py`, add `enabled: bool = True` to `GreenhouseBoard` and `LeverBoard`, and replace `CompaniesConfig`:
 
 ```python
 from pydantic import Field, field_validator
@@ -101,7 +101,7 @@ Add `enabled: bool = True` to `GreenhouseBoard` and `LeverBoard` (keep `token`, 
 
 - [ ] **Step 4: Keep the registry building (companies now holds objects)**
 
-In `src/resume_agent/discovery/connectors/registry.py`, update the three board/url branches to project to enabled entries:
+In `src/resume_tailor_harness/discovery/connectors/registry.py`, update the three board/url branches to project to enabled entries:
 
 ```python
     if config.greenhouse.enabled:
@@ -128,7 +128,7 @@ Expected: PASS (existing registry tests still green — they use boards without 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/config.py src/resume_agent/discovery/connectors/registry.py tests/test_connectors_config.py
+git add src/resume_tailor_harness/discovery/connectors/config.py src/resume_tailor_harness/discovery/connectors/registry.py tests/test_connectors_config.py
 git commit -m "feat(sources): per-entry enabled flag + CompanyUrl object form (back-compat)"
 ```
 
@@ -138,7 +138,7 @@ git commit -m "feat(sources): per-entry enabled flag + CompanyUrl object form (b
 
 **Files:**
 
-- Create: `src/resume_agent/discovery/connectors/sources.py`
+- Create: `src/resume_tailor_harness/discovery/connectors/sources.py`
 - Test: `tests/test_connector_sources.py`
 
 **Interfaces:**
@@ -157,9 +157,9 @@ Create `tests/test_connector_sources.py`:
 ```python
 from typing import Any, cast
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.sources import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.sources import (
     SourceView,
     company_url_id,
     list_source_views,
@@ -226,7 +226,7 @@ Expected: FAIL — module `sources` not found.
 
 - [ ] **Step 3: Implement the helpers**
 
-Create `src/resume_agent/discovery/connectors/sources.py`:
+Create `src/resume_tailor_harness/discovery/connectors/sources.py`:
 
 ```python
 """Source identity + read-only projections over ConnectorsConfig.
@@ -241,9 +241,9 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-from resume_agent.config import Settings
-from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.detect import identify_host
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.discovery.connectors.config import ConnectorsConfig
+from resume_tailor_harness.discovery.connectors.detect import identify_host
 
 
 @dataclass(frozen=True)
@@ -313,7 +313,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/sources.py tests/test_connector_sources.py
+git add src/resume_tailor_harness/discovery/connectors/sources.py tests/test_connector_sources.py
 git commit -m "feat(sources): stable source ids + SourceView projection helpers"
 ```
 
@@ -323,7 +323,7 @@ git commit -m "feat(sources): stable source ids + SourceView projection helpers"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/registry.py`
+- Modify: `src/resume_tailor_harness/discovery/connectors/registry.py`
 - Test: `tests/test_connectors_registry.py`
 
 **Interfaces:**
@@ -336,7 +336,7 @@ git commit -m "feat(sources): stable source ids + SourceView projection helpers"
 Add to `tests/test_connectors_registry.py`:
 
 ```python
-from resume_agent.discovery.connectors.registry import build_source_connectors
+from resume_tailor_harness.discovery.connectors.registry import build_source_connectors
 
 
 def _full_cfg():
@@ -380,10 +380,10 @@ Expected: FAIL — `build_source_connectors` not defined.
 
 - [ ] **Step 3: Implement `build_source_connectors`**
 
-Append to `src/resume_agent/discovery/connectors/registry.py`:
+Append to `src/resume_tailor_harness/discovery/connectors/registry.py`:
 
 ```python
-from resume_agent.discovery.connectors.sources import company_url_id
+from resume_tailor_harness.discovery.connectors.sources import company_url_id
 
 
 def _named(connector: Connector, source_id: str) -> Connector:
@@ -452,7 +452,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/registry.py tests/test_connectors_registry.py
+git add src/resume_tailor_harness/discovery/connectors/registry.py tests/test_connectors_registry.py
 git commit -m "feat(sources): build_source_connectors — one connector per entry with id name"
 ```
 
@@ -462,7 +462,7 @@ git commit -m "feat(sources): build_source_connectors — one connector per entr
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/ingest.py:30-34,127-165`
+- Modify: `src/resume_tailor_harness/discovery/ingest.py:30-34,127-165`
 - Test: `tests/test_discovery_ingest.py`
 
 **Interfaces:**
@@ -475,8 +475,8 @@ Add to `tests/test_discovery_ingest.py` (follow the file's existing fixtures for
 
 ```python
 def test_skipped_outcome_is_counted(session):
-    from resume_agent.discovery.connectors.base import RawJob
-    from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+    from resume_tailor_harness.discovery.connectors.base import RawJob
+    from resume_tailor_harness.discovery.ingest import ingest_jobs_with_outcomes
 
     job = RawJob(source="greenhouse", url="https://x/1", company="Acme",
                  title="AI Engineer", location="Remote", jd_text="Build agents.")
@@ -495,7 +495,7 @@ Expected: FAIL — `IngestCounts` has no attribute `skipped`.
 
 - [ ] **Step 3: Implement the counter**
 
-In `src/resume_agent/discovery/ingest.py`:
+In `src/resume_tailor_harness/discovery/ingest.py`:
 
 Add `skipped: dict[str, int]` to the `IngestCounts` dataclass (after `upgraded`). In `ingest_jobs_with_outcomes`, add `skipped: Counter[str] = Counter()` next to the others, add the branch, and include it in the return:
 
@@ -518,7 +518,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/ingest.py tests/test_discovery_ingest.py
+git add src/resume_tailor_harness/discovery/ingest.py tests/test_discovery_ingest.py
 git commit -m "feat(sources): count skipped (first-seen-wins) ingest outcomes"
 ```
 
@@ -528,7 +528,7 @@ git commit -m "feat(sources): count skipped (first-seen-wins) ingest outcomes"
 
 **Files:**
 
-- Modify: `src/resume_agent/discovery/connectors/runner.py:13-23,60-82`
+- Modify: `src/resume_tailor_harness/discovery/connectors/runner.py:13-23,60-82`
 - Test: `tests/test_connectors_runner.py`
 
 **Interfaces:**
@@ -542,9 +542,9 @@ Add to `tests/test_connectors_runner.py` (mirror the file's existing fake-connec
 
 ```python
 def test_run_pull_reports_upgraded_and_skipped(session, tmp_path):
-    from resume_agent.discovery.connectors.base import FetchResult, RawJob
-    from resume_agent.discovery.connectors.runner import run_pull
-    from resume_agent.discovery.search_config import SearchConfig
+    from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob
+    from resume_tailor_harness.discovery.connectors.runner import run_pull
+    from resume_tailor_harness.discovery.search_config import SearchConfig
 
     job = RawJob(source="greenhouse", url="https://x/1", company="Acme",
                  title="AI Engineer", location="Remote", jd_text="Build agents.")
@@ -568,7 +568,7 @@ Expected: FAIL — `PullReport` has no `skipped`.
 
 - [ ] **Step 3: Implement the report fields**
 
-In `src/resume_agent/discovery/connectors/runner.py`, add to `PullReport`:
+In `src/resume_tailor_harness/discovery/connectors/runner.py`, add to `PullReport`:
 
 ```python
     upgraded: dict[str, int] = field(default_factory=dict)
@@ -645,7 +645,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/runner.py tests/test_connectors_runner.py
+git add src/resume_tailor_harness/discovery/connectors/runner.py tests/test_connectors_runner.py
 git commit -m "feat(sources): PullReport carries per-source upgraded + skipped counts"
 ```
 
@@ -655,7 +655,7 @@ git commit -m "feat(sources): PullReport carries per-source upgraded + skipped c
 
 **Files:**
 
-- Modify: `src/resume_agent/services/discovery.py:105-122`
+- Modify: `src/resume_tailor_harness/services/discovery.py:105-122`
 - Test: `tests/test_services_discovery_pull.py` (create if absent)
 
 **Interfaces:**
@@ -668,7 +668,7 @@ git commit -m "feat(sources): PullReport carries per-source upgraded + skipped c
 Create `tests/test_services_discovery_pull.py`:
 
 ```python
-from resume_agent.services import discovery
+from resume_tailor_harness.services import discovery
 
 
 def test_pull_jobs_passes_source_ids_to_per_entry_build(session, tmp_path, monkeypatch):
@@ -692,10 +692,10 @@ Expected: FAIL — `pull_jobs` has no `source_ids`; `discovery.build_source_conn
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/services/discovery.py`, change the import from `registry` to bring in `build_source_connectors`, and update `pull_jobs`:
+In `src/resume_tailor_harness/services/discovery.py`, change the import from `registry` to bring in `build_source_connectors`, and update `pull_jobs`:
 
 ```python
-from resume_agent.discovery.connectors.registry import build_source_connectors
+from resume_tailor_harness.discovery.connectors.registry import build_source_connectors
 
 
 def pull_jobs(
@@ -727,7 +727,7 @@ Expected: PASS. (`refresh_jobs` calls `pull_jobs` with no `source_ids` → all e
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/discovery.py tests/test_services_discovery_pull.py
+git add src/resume_tailor_harness/services/discovery.py tests/test_services_discovery_pull.py
 git commit -m "feat(sources): pull_jobs(source_ids=...) selects via per-entry fan-out"
 ```
 
@@ -737,7 +737,7 @@ git commit -m "feat(sources): pull_jobs(source_ids=...) selects via per-entry fa
 
 **Files:**
 
-- Create: `src/resume_agent/services/sources.py`
+- Create: `src/resume_tailor_harness/services/sources.py`
 - Test: `tests/test_services_sources.py`
 
 **Interfaces:**
@@ -759,7 +759,7 @@ import textwrap
 
 import pytest
 
-from resume_agent.services import sources as svc
+from resume_tailor_harness.services import sources as svc
 
 
 def _write(tmp_path, body: str) -> str:
@@ -780,7 +780,7 @@ linkedin: {enabled: false}
 
 def test_add_greenhouse_url_writes_typed_board(tmp_path, monkeypatch):
     path = _write(tmp_path, BASE)
-    from resume_agent.discovery.connectors.detect import AtsTarget
+    from resume_tailor_harness.discovery.connectors.detect import AtsTarget
     monkeypatch.setattr(svc, "detect_ats", lambda url: AtsTarget("greenhouse", "cohere"))
     view = svc.add_source("https://job-boards.greenhouse.io/cohere", connectors_path=path)
     assert view.id == "greenhouse:cohere"
@@ -791,7 +791,7 @@ def test_add_greenhouse_url_writes_typed_board(tmp_path, monkeypatch):
 def test_add_unknown_ats_falls_to_companies(tmp_path, monkeypatch):
     path = _write(tmp_path, BASE)
     monkeypatch.setattr(svc, "detect_ats", lambda url: __import__(
-        "resume_agent.discovery.connectors.detect", fromlist=["AtsTarget"]).AtsTarget("workday", tenant="gm", datacenter="wd5", site="Careers"))
+        "resume_tailor_harness.discovery.connectors.detect", fromlist=["AtsTarget"]).AtsTarget("workday", tenant="gm", datacenter="wd5", site="Careers"))
     view = svc.add_source("https://gm.wd5.myworkdayjobs.com/Careers", label="GM", connectors_path=path)
     assert view.detail == "https://gm.wd5.myworkdayjobs.com/Careers"
     assert view.display_name == "GM"
@@ -825,12 +825,12 @@ Expected: FAIL — module `services.sources` not found.
 
 - [ ] **Step 3: Implement the service**
 
-Create `src/resume_agent/services/sources.py`:
+Create `src/resume_tailor_harness/services/sources.py`:
 
 ```python
 """Source Manager use-case layer: read + atomically rewrite connectors.yaml.
 
-The same file the CLI reads, so the UI and `resume-agent pull` agree. Writes are
+The same file the CLI reads, so the UI and `resume-tailor-harness pull` agree. Writes are
 atomic (temp + os.replace) so a concurrent pull never sees a torn file. Comments
 are not preserved (PyYAML) — accepted per design.
 """
@@ -842,21 +842,21 @@ from pathlib import Path
 
 import yaml
 
-from resume_agent.config import Settings, get_settings
-from resume_agent.discovery.connectors.config import (
+from resume_tailor_harness.config import Settings, get_settings
+from resume_tailor_harness.discovery.connectors.config import (
     CompanyUrl,
     ConnectorsConfig,
     GreenhouseBoard,
     LeverBoard,
     load_connectors_config,
 )
-from resume_agent.discovery.connectors.detect import detect_ats
-from resume_agent.discovery.connectors.sources import (
+from resume_tailor_harness.discovery.connectors.detect import detect_ats
+from resume_tailor_harness.discovery.connectors.sources import (
     SourceView,
     company_url_id,
     list_source_views,
 )
-from resume_agent.services.discovery import DEFAULT_CONNECTORS
+from resume_tailor_harness.services.discovery import DEFAULT_CONNECTORS
 
 
 class SourceError(Exception):
@@ -968,7 +968,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/sources.py tests/test_services_sources.py
+git add src/resume_tailor_harness/services/sources.py tests/test_services_sources.py
 git commit -m "feat(sources): list/add/toggle/remove service with atomic YAML write"
 ```
 
@@ -978,7 +978,7 @@ git commit -m "feat(sources): list/add/toggle/remove service with atomic YAML wr
 
 **Files:**
 
-- Modify: `src/resume_agent/services/sources.py`
+- Modify: `src/resume_tailor_harness/services/sources.py`
 - Test: `tests/test_services_sources_preview.py`
 
 **Interfaces:**
@@ -993,9 +993,9 @@ Create `tests/test_services_sources_preview.py`:
 ```python
 import pytest
 
-from resume_agent.services import sources as svc
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
-from resume_agent.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.services import sources as svc
+from resume_tailor_harness.discovery.connectors.base import FetchResult, RawJob
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
 
 
 def test_preview_undetectable_is_not_ok(monkeypatch):
@@ -1039,17 +1039,17 @@ Expected: FAIL — `preview_source` not defined.
 
 - [ ] **Step 3: Implement preview**
 
-Add to `src/resume_agent/services/sources.py`:
+Add to `src/resume_tailor_harness/services/sources.py`:
 
 ```python
 from dataclasses import dataclass
 
-from resume_agent.discovery.connectors.companies import CompaniesConnector
-from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
-from resume_agent.discovery.connectors.lever import LeverConnector
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.services.discovery import DEFAULT_SEARCH
+from resume_tailor_harness.discovery.connectors.companies import CompaniesConnector
+from resume_tailor_harness.discovery.connectors.detect import AtsTarget
+from resume_tailor_harness.discovery.connectors.greenhouse import GreenhouseConnector
+from resume_tailor_harness.discovery.connectors.lever import LeverConnector
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.services.discovery import DEFAULT_SEARCH
 
 _PREVIEW_LIMIT = 50
 
@@ -1133,7 +1133,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/sources.py tests/test_services_sources_preview.py
+git add src/resume_tailor_harness/services/sources.py tests/test_services_sources_preview.py
 git commit -m "feat(sources): preview_source — detect + bounded test-fetch, never raises"
 ```
 
@@ -1143,8 +1143,8 @@ git commit -m "feat(sources): preview_source — detect + bounded test-fetch, ne
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/sources.py`
-- Modify: `src/resume_agent/api/schemas/runs.py:33-34`
+- Create: `src/resume_tailor_harness/api/schemas/sources.py`
+- Modify: `src/resume_tailor_harness/api/schemas/runs.py:33-34`
 - Test: `tests/api/test_schemas_sources.py`
 
 **Interfaces:**
@@ -1157,9 +1157,9 @@ git commit -m "feat(sources): preview_source — detect + bounded test-fetch, ne
 Create `tests/api/test_schemas_sources.py`:
 
 ```python
-from resume_agent.api.schemas.sources import SourceOut, SourcePreviewOut
-from resume_agent.discovery.connectors.sources import SourceView
-from resume_agent.services.sources import SourcePreview
+from resume_tailor_harness.api.schemas.sources import SourceOut, SourcePreviewOut
+from resume_tailor_harness.discovery.connectors.sources import SourceView
+from resume_tailor_harness.services.sources import SourcePreview
 
 
 def test_source_out_projects_view_with_camel_alias():
@@ -1184,14 +1184,14 @@ Expected: FAIL — schema module not found.
 
 - [ ] **Step 3: Implement the schemas**
 
-Create `src/resume_agent/api/schemas/sources.py`:
+Create `src/resume_tailor_harness/api/schemas/sources.py`:
 
 ```python
 """Source Manager wire schemas (camelCase via CamelModel)."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class SourceOut(CamelModel):
@@ -1228,7 +1228,7 @@ class SetEnabledIn(CamelModel):
     enabled: bool
 ```
 
-In `src/resume_agent/api/schemas/runs.py`, extend `PullParams`:
+In `src/resume_tailor_harness/api/schemas/runs.py`, extend `PullParams`:
 
 ```python
 class PullParams(CamelModel):
@@ -1244,7 +1244,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/sources.py src/resume_agent/api/schemas/runs.py tests/api/test_schemas_sources.py
+git add src/resume_tailor_harness/api/schemas/sources.py src/resume_tailor_harness/api/schemas/runs.py tests/api/test_schemas_sources.py
 git commit -m "feat(sources): API schemas + PullParams.sourceIds"
 ```
 
@@ -1254,9 +1254,9 @@ git commit -m "feat(sources): API schemas + PullParams.sourceIds"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/sources.py`
-- Modify: `src/resume_agent/api/routers/runs.py:109-123`
-- Modify: `src/resume_agent/api/app.py:16-22,82-89`
+- Create: `src/resume_tailor_harness/api/routers/sources.py`
+- Modify: `src/resume_tailor_harness/api/routers/runs.py:109-123`
+- Modify: `src/resume_tailor_harness/api/app.py:16-22,82-89`
 - Test: `tests/api/test_sources_router.py`
 
 **Interfaces:**
@@ -1271,8 +1271,8 @@ Create `tests/api/test_sources_router.py`:
 ```python
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.api.routers import sources as sources_router
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.api.routers import sources as sources_router
 
 
 def _client():
@@ -1280,7 +1280,7 @@ def _client():
 
 
 def test_list_sources_returns_views(monkeypatch):
-    from resume_agent.discovery.connectors.sources import SourceView
+    from resume_tailor_harness.discovery.connectors.sources import SourceView
     monkeypatch.setattr(sources_router, "list_sources",
                         lambda **kw: [SourceView("remoteok", "remoteok", "aggregator", "RemoteOK", True, True, "aggregator")])
     client = _client()
@@ -1291,7 +1291,7 @@ def test_list_sources_returns_views(monkeypatch):
 
 
 def test_preview_endpoint(monkeypatch):
-    from resume_agent.services.sources import SourcePreview
+    from resume_tailor_harness.services.sources import SourcePreview
     monkeypatch.setattr(sources_router, "preview_source",
                         lambda url, label=None: SourcePreview(ok=True, url=url, kind="ashby", role_count=7))
     client = _client()
@@ -1301,7 +1301,7 @@ def test_preview_endpoint(monkeypatch):
 
 
 def test_add_source_error_maps_to_400(monkeypatch):
-    from resume_agent.services.sources import SourceError
+    from resume_tailor_harness.services.sources import SourceError
     def boom(url, label=None, **kw):
         raise SourceError("nope")
     monkeypatch.setattr(sources_router, "add_source", boom)
@@ -1319,7 +1319,7 @@ Expected: FAIL — router module not found.
 
 - [ ] **Step 3: Implement the router**
 
-Create `src/resume_agent/api/routers/sources.py`:
+Create `src/resume_tailor_harness/api/routers/sources.py`:
 
 ```python
 """Source Manager CRUD + preview. Thin adapter over services/sources.py."""
@@ -1328,17 +1328,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from resume_agent.api.deps import get_settings_dep
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.sources import (
+from resume_tailor_harness.api.deps import get_settings_dep
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.sources import (
     AddSourceIn,
     SetEnabledIn,
     SourceOut,
     SourcePreviewIn,
     SourcePreviewOut,
 )
-from resume_agent.config import Settings
-from resume_agent.services.sources import (
+from resume_tailor_harness.config import Settings
+from resume_tailor_harness.services.sources import (
     SourceError,
     add_source,
     list_sources,
@@ -1384,7 +1384,7 @@ def remove_source_route(source_id: str):
 
 - [ ] **Step 4: Wire pull `sourceIds` and register the router**
 
-In `src/resume_agent/api/routers/runs.py`, update `launch_pull`'s `work`:
+In `src/resume_tailor_harness/api/routers/runs.py`, update `launch_pull`'s `work`:
 
 ```python
         report = pull_jobs(session, limit=params.limit, source_ids=params.source_ids, reporter=reporter)
@@ -1396,10 +1396,10 @@ In `src/resume_agent/api/routers/runs.py`, update `launch_pull`'s `work`:
         }
 ```
 
-In `src/resume_agent/api/app.py`, add the import beside the other routers and include it with the guarded routers:
+In `src/resume_tailor_harness/api/app.py`, add the import beside the other routers and include it with the guarded routers:
 
 ```python
-from resume_agent.api.routers import sources as sources_router
+from resume_tailor_harness.api.routers import sources as sources_router
 ...
     app.include_router(sources_router.router, prefix="/api", dependencies=guarded)
 ```
@@ -1412,7 +1412,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/sources.py src/resume_agent/api/routers/runs.py src/resume_agent/api/app.py tests/api/test_sources_router.py
+git add src/resume_tailor_harness/api/routers/sources.py src/resume_tailor_harness/api/routers/runs.py src/resume_tailor_harness/api/app.py tests/api/test_sources_router.py
 git commit -m "feat(sources): sources router + pull sourceIds + app registration"
 ```
 
@@ -2296,7 +2296,7 @@ This way the backlog survives the first UI write (which would otherwise drop com
 
 - [ ] **Step 2: Verify it still loads**
 
-Run: `.venv/Scripts/python.exe -c "from resume_agent.discovery.connectors.config import load_connectors_config; print(len(load_connectors_config('config/connectors.yaml').greenhouse.boards))"`
+Run: `.venv/Scripts/python.exe -c "from resume_tailor_harness.discovery.connectors.config import load_connectors_config; print(len(load_connectors_config('config/connectors.yaml').greenhouse.boards))"`
 Expected: prints the new (larger) board count without error.
 
 - [ ] **Step 3: Commit**

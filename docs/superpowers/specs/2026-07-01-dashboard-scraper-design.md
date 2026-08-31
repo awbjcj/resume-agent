@@ -108,7 +108,7 @@ New package `discovery/scraper/` additions (alongside `linkedin.py`):
 - **`connectors/registry.py`** — build `DashboardScraper` in `build_connectors` and
   `build_source_connectors` (source id `scrape:{host}`), gated on `config.scrape.enabled`.
 - **`discovery/source_tier.py`** — add `"scrape"` to `_CANONICAL`.
-- **`cli.py`** — `resume-agent pull --relearn` forces a fresh learn (ignores cached recipe).
+- **`cli.py`** — `resume-tailor-harness pull --relearn` forces a fresh learn (ignores cached recipe).
 
 ## Data flow
 

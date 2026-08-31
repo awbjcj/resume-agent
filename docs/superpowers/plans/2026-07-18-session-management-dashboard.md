@@ -81,7 +81,7 @@ These amendments override conflicting snippets in the tasks below.
 
 **Files:**
 
-- Modify: `src/resume_agent/interview/store.py`
+- Modify: `src/resume_tailor_harness/interview/store.py`
 - Test: `tests/test_interview_store.py` (exists — append tests)
 
 **Interfaces:**
@@ -109,7 +109,7 @@ def _make_session(interview_dir, session_id: str, *, job_id: int) -> None:
 ```
 
 ```python
-from resume_agent.interview.store import (
+from resume_tailor_harness.interview.store import (
     active_session_for_job,
     active_sessions,
     archive_session,
@@ -183,7 +183,7 @@ Expected: ImportError (`active_sessions` not defined).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/interview/store.py`:
+In `src/resume_tailor_harness/interview/store.py`:
 
 1. Add field to `InterviewSession` (after `concluded`):
 
@@ -277,7 +277,7 @@ Expected: all pass. (`tests/api/test_interview_router.py` and `tests/test_mock_i
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/interview/store.py tests/test_interview_store.py
+git add src/resume_tailor_harness/interview/store.py tests/test_interview_store.py
 git commit -m "feat(interview): per-job active sessions + archive/unarchive/delete"
 ```
 
@@ -287,7 +287,7 @@ git commit -m "feat(interview): per-job active sessions + archive/unarchive/dele
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/coach_store.py`
+- Modify: `src/resume_tailor_harness/profile/coach_store.py`
 - Test: `tests/test_coach_store.py` (exists — append tests)
 
 **Interfaces:**
@@ -299,7 +299,7 @@ git commit -m "feat(interview): per-job active sessions + archive/unarchive/dele
 Append to `tests/test_coach_store.py`, reusing its session factory (a `create_session` call with one topic + matching opening turn; assume/add helper `_make_session(tmp_path, "s1")` mirroring existing tests, and end via `end_session(tmp_path, "s1", "recap")`):
 
 ```python
-from resume_agent.profile.coach_store import (
+from resume_tailor_harness.profile.coach_store import (
     archive_session,
     delete_session,
     unarchive_session,
@@ -348,7 +348,7 @@ Expected: ImportError (`archive_session` not defined).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/profile/coach_store.py`:
+In `src/resume_tailor_harness/profile/coach_store.py`:
 
 1. Add to `CoachSession` (after `status`): `archived_at: str | None = None`
 2. Update `list_sessions`:
@@ -408,7 +408,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/coach_store.py tests/test_coach_store.py
+git add src/resume_tailor_harness/profile/coach_store.py tests/test_coach_store.py
 git commit -m "feat(coach): session archive/unarchive/delete with archived_at"
 ```
 
@@ -418,9 +418,9 @@ git commit -m "feat(coach): session archive/unarchive/delete with archived_at"
 
 **Files:**
 
-- Modify: `src/resume_agent/services/mock_interview.py`
-- Modify: `src/resume_agent/api/routers/interview.py`
-- Modify: `src/resume_agent/api/schemas/interview.py`
+- Modify: `src/resume_tailor_harness/services/mock_interview.py`
+- Modify: `src/resume_tailor_harness/api/routers/interview.py`
+- Modify: `src/resume_tailor_harness/api/schemas/interview.py`
 - Test: `tests/api/test_interview_router.py` (append), `tests/test_mock_interview_service.py` (fix imports if any)
 
 **Interfaces:**
@@ -505,7 +505,7 @@ Expected: new tests FAIL (404 on archive route / wrong conflict code); pre-exist
 
 - [ ] **Step 3: Implement**
 
-`src/resume_agent/services/mock_interview.py`:
+`src/resume_tailor_harness/services/mock_interview.py`:
 
 - Add `"archivedAt": session["archived_at"],` to both `_view` (after `"status"`) and each row in `sessions_view`.
 - Change `sessions_view` signature and listing call:
@@ -526,11 +526,11 @@ def sessions_view(
 
 (The per-row dict already exists in this function — keep every existing key and add `"archivedAt": session["archived_at"]`; only the listing/filter lines above are new.)
 
-`src/resume_agent/api/schemas/interview.py`:
+`src/resume_tailor_harness/api/schemas/interview.py`:
 
 - Add `archived_at: str | None = None` to `InterviewSessionOut` and `InterviewSessionSummaryOut`.
 
-`src/resume_agent/api/routers/interview.py`:
+`src/resume_tailor_harness/api/routers/interview.py`:
 
 - Replace the `active_session` import with `active_session_for_job`, and import `archive_session, delete_session, unarchive_session` from the store.
 - Change `_submit` to accept the key: `def _submit(manager, kind, work, *, singleton: str) -> RunOut:` and pass `singleton_key=singleton`. Call sites:
@@ -615,7 +615,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/mock_interview.py src/resume_agent/api/routers/interview.py src/resume_agent/api/schemas/interview.py contracts/ web/src/lib/api/schema.ts tests/
+git add src/resume_tailor_harness/services/mock_interview.py src/resume_tailor_harness/api/routers/interview.py src/resume_tailor_harness/api/schemas/interview.py contracts/ web/src/lib/api/schema.ts tests/
 git commit -m "feat(api): interview session management endpoints + per-job concurrency"
 ```
 
@@ -625,9 +625,9 @@ git commit -m "feat(api): interview session management endpoints + per-job concu
 
 **Files:**
 
-- Modify: `src/resume_agent/services/profile_coach.py` (`sessions_view` at line ~96, `session_view`)
-- Modify: `src/resume_agent/api/routers/coach.py`
-- Modify: `src/resume_agent/api/schemas/coach.py`
+- Modify: `src/resume_tailor_harness/services/profile_coach.py` (`sessions_view` at line ~96, `session_view`)
+- Modify: `src/resume_tailor_harness/api/routers/coach.py`
+- Modify: `src/resume_tailor_harness/api/schemas/coach.py`
 - Test: `tests/api/test_coach_router.py` (append)
 
 **Interfaces:**
@@ -637,7 +637,7 @@ git commit -m "feat(api): interview session management endpoints + per-job concu
 
 - [ ] **Step 1: Write failing tests**
 
-Append to `tests/api/test_coach_router.py`, mirroring its existing client/seed helpers (coach sessions live under `tmp_path / "data" / "profile" / "coach"`; reuse the file's session-factory helper, called `_store_session` below, and `end_session` from `resume_agent.profile.coach_store`):
+Append to `tests/api/test_coach_router.py`, mirroring its existing client/seed helpers (coach sessions live under `tmp_path / "data" / "profile" / "coach"`; reuse the file's session-factory helper, called `_store_session` below, and `end_session` from `resume_tailor_harness.profile.coach_store`):
 
 ```python
 def test_coach_archive_lifecycle(tmp_path):
@@ -676,7 +676,7 @@ Expected: new tests FAIL with 404/405 on the new routes.
 
 - [ ] **Step 3: Implement**
 
-`src/resume_agent/services/profile_coach.py`:
+`src/resume_tailor_harness/services/profile_coach.py`:
 
 - `sessions_view` gains the same keyword filters and an `"archivedAt"` row field:
 
@@ -697,9 +697,9 @@ def sessions_view(
 
 - Add `"archivedAt": session["archived_at"]` to the detail `session_view` projection.
 
-`src/resume_agent/api/schemas/coach.py`: add `archived_at: str | None = None` to `CoachSessionSummaryOut` and `CoachSessionOut`.
+`src/resume_tailor_harness/api/schemas/coach.py`: add `archived_at: str | None = None` to `CoachSessionSummaryOut` and `CoachSessionOut`.
 
-`src/resume_agent/api/routers/coach.py`: import `archive_session, delete_session, unarchive_session` from `resume_agent.profile.coach_store`; extend its `_value_error` conflict tokens with `"archived"` and `"only ended"`; extend the GET list with `includeArchived`/`status` query params exactly as Task 3 did; add:
+`src/resume_tailor_harness/api/routers/coach.py`: import `archive_session, delete_session, unarchive_session` from `resume_tailor_harness.profile.coach_store`; extend its `_value_error` conflict tokens with `"archived"` and `"only ended"`; extend the GET list with `includeArchived`/`status` query params exactly as Task 3 did; add:
 
 ```python
 @router.post("/profile/coach/sessions/{session_id}/archive", response_model=CoachSessionOut)
@@ -739,7 +739,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_coach.py src/resume_agent/api/routers/coach.py src/resume_agent/api/schemas/coach.py contracts/ web/src/lib/api/schema.ts tests/api/test_coach_router.py
+git add src/resume_tailor_harness/services/profile_coach.py src/resume_tailor_harness/api/routers/coach.py src/resume_tailor_harness/api/schemas/coach.py contracts/ web/src/lib/api/schema.ts tests/api/test_coach_router.py
 git commit -m "feat(api): coach session archive/unarchive/delete endpoints"
 ```
 
@@ -749,8 +749,8 @@ git commit -m "feat(api): coach session archive/unarchive/delete endpoints"
 
 **Files:**
 
-- Modify: `src/resume_agent/tracking/tables.py`
-- Create: `src/resume_agent/services/errors.py`
+- Modify: `src/resume_tailor_harness/tracking/tables.py`
+- Create: `src/resume_tailor_harness/services/errors.py`
 - Test: `tests/test_errors_service.py` (new)
 
 **Interfaces:**
@@ -767,8 +767,8 @@ from datetime import timedelta
 import pytest
 from sqlmodel import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services.errors import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services.errors import (
     count_open,
     dismiss_all,
     list_error_records,
@@ -776,7 +776,7 @@ from resume_agent.services.errors import (
     record_source_failures,
     set_error_status,
 )
-from resume_agent.tracking.tables import utcnow
+from resume_tailor_harness.tracking.tables import utcnow
 
 
 @pytest.fixture
@@ -846,11 +846,11 @@ def test_record_source_failures_fans_out(session):
 - [ ] **Step 2: Run to verify failure**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_errors_service.py -q`
-Expected: ImportError (`resume_agent.services.errors` missing).
+Expected: ImportError (`resume_tailor_harness.services.errors` missing).
 
 - [ ] **Step 3: Implement**
 
-Append to `src/resume_agent/tracking/tables.py` (after `SkillSuggestion`):
+Append to `src/resume_tailor_harness/tracking/tables.py` (after `SkillSuggestion`):
 
 ```python
 class ErrorRecord(SQLModel, table=True):
@@ -871,7 +871,7 @@ class ErrorRecord(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow)
 ```
 
-Create `src/resume_agent/services/errors.py`:
+Create `src/resume_tailor_harness/services/errors.py`:
 
 ```python
 """Durable error records: dedup on write, user-driven dismiss/resolve, lazy prune."""
@@ -883,7 +883,7 @@ from typing import Any
 
 from sqlmodel import Session, col, select
 
-from resume_agent.tracking.tables import ErrorRecord, utcnow
+from resume_tailor_harness.tracking.tables import ErrorRecord, utcnow
 
 RETENTION_DAYS = 30
 _TERMINAL = {"dismissed", "resolved"}
@@ -1013,7 +1013,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/tracking/tables.py src/resume_agent/services/errors.py tests/test_errors_service.py
+git add src/resume_tailor_harness/tracking/tables.py src/resume_tailor_harness/services/errors.py tests/test_errors_service.py
 git commit -m "feat(errors): error_records table + dedup/dismiss/resolve service"
 ```
 
@@ -1023,8 +1023,8 @@ git commit -m "feat(errors): error_records table + dedup/dismiss/resolve service
 
 **Files:**
 
-- Modify: `src/resume_agent/api/runs/manager.py`
-- Modify: `src/resume_agent/api/app.py`
+- Modify: `src/resume_tailor_harness/api/runs/manager.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_run_manager.py` (append)
 
 **Interfaces:**
@@ -1088,7 +1088,7 @@ Expected: TypeError — `RunManager.__init__` has no `on_error`.
 
 - [ ] **Step 3: Implement**
 
-`src/resume_agent/api/runs/manager.py`:
+`src/resume_tailor_harness/api/runs/manager.py`:
 
 1. `__init__` gains `on_error: Callable[[dict], None] | None = None` and stores `self.on_error = on_error`. Add a private emitter:
 
@@ -1127,13 +1127,13 @@ Expected: TypeError — `RunManager.__init__` has no `on_error`.
 
 (Match the actual local variable names in that loop when editing.)
 
-`src/resume_agent/api/app.py`, in `create_app` where `app.state.run_manager` is constructed (~line 166):
+`src/resume_tailor_harness/api/app.py`, in `create_app` where `app.state.run_manager` is constructed (~line 166):
 
 ```python
     def _record_run_error(payload: dict) -> None:
         from sqlmodel import Session as DbSession
 
-        from resume_agent.services.errors import record_error
+        from resume_tailor_harness.services.errors import record_error
 
         ctx = current_context()
         engine = ctx.engine if ctx is not None else app.state.engine
@@ -1172,7 +1172,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/runs/manager.py src/resume_agent/api/app.py tests/api/test_run_manager.py
+git add src/resume_tailor_harness/api/runs/manager.py src/resume_tailor_harness/api/app.py tests/api/test_run_manager.py
 git commit -m "feat(runs): on_error hook writes durable run-failure records"
 ```
 
@@ -1182,7 +1182,7 @@ git commit -m "feat(runs): on_error hook writes durable run-failure records"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/routers/runs.py` (`launch_pull` ~line 338, `launch_refresh` ~line 300)
+- Modify: `src/resume_tailor_harness/api/routers/runs.py` (`launch_pull` ~line 338, `launch_refresh` ~line 300)
 - Test: `tests/api/test_runs_launch.py` (append)
 
 **Interfaces:**
@@ -1212,7 +1212,7 @@ def test_pull_failures_become_source_error_records(tmp_path, monkeypatch):
     assert records[0]["sourceLabel"] == "companies:https://x.example"
 ```
 
-Until Task 8 lands the `/api/errors` route, assert through the DB instead — resolve the app engine off the client (`client.app.state.engine`) and query with `resume_agent.services.errors.list_error_records`; switch the assertion to the HTTP form in Task 8 if convenient (either form is acceptable to keep).
+Until Task 8 lands the `/api/errors` route, assert through the DB instead — resolve the app engine off the client (`client.app.state.engine`) and query with `resume_tailor_harness.services.errors.list_error_records`; switch the assertion to the HTTP form in Task 8 if convenient (either form is acceptable to keep).
 
 - [ ] **Step 2: Run to verify failure**
 
@@ -1221,7 +1221,7 @@ Expected: new test FAILS (no records written).
 
 - [ ] **Step 3: Implement**
 
-In `src/resume_agent/api/routers/runs.py`, import `record_source_failures` from `resume_agent.services.errors`. In **both** `launch_pull`'s and `launch_refresh`'s `work(reporter)` functions, after the report is computed and before the return-dict is built, add (adapting the local variable name — `report`):
+In `src/resume_tailor_harness/api/routers/runs.py`, import `record_source_failures` from `resume_tailor_harness.services.errors`. In **both** `launch_pull`'s and `launch_refresh`'s `work(reporter)` functions, after the report is computed and before the return-dict is built, add (adapting the local variable name — `report`):
 
 ```python
         if report.failures:
@@ -1239,7 +1239,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/runs.py tests/api/test_runs_launch.py
+git add src/resume_tailor_harness/api/routers/runs.py tests/api/test_runs_launch.py
 git commit -m "feat(runs): record per-source pull failures as error records"
 ```
 
@@ -1249,8 +1249,8 @@ git commit -m "feat(runs): record per-source pull failures as error records"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/errors.py`, `src/resume_agent/api/schemas/errors.py`
-- Modify: `src/resume_agent/api/routers/dashboard.py`, `src/resume_agent/api/schemas/dashboard.py`, `src/resume_agent/api/app.py` (router include)
+- Create: `src/resume_tailor_harness/api/routers/errors.py`, `src/resume_tailor_harness/api/schemas/errors.py`
+- Modify: `src/resume_tailor_harness/api/routers/dashboard.py`, `src/resume_tailor_harness/api/schemas/dashboard.py`, `src/resume_tailor_harness/api/app.py` (router include)
 - Test: `tests/api/test_errors_router.py` (new), `tests/api/test_dashboard_summary.py` (append)
 
 **Interfaces:**
@@ -1266,8 +1266,8 @@ Create `tests/api/test_errors_router.py` (client helper copied from `tests/api/t
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from resume_agent.api.app import create_app
-from resume_agent.services.errors import record_error
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.services.errors import record_error
 
 
 def _client(tmp_path):
@@ -1342,7 +1342,7 @@ Expected: 404s / missing keys.
 
 - [ ] **Step 3: Implement**
 
-`src/resume_agent/api/schemas/errors.py`:
+`src/resume_tailor_harness/api/schemas/errors.py`:
 
 ```python
 """Error record schemas."""
@@ -1351,7 +1351,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class ErrorRecordOut(CamelModel):
@@ -1375,7 +1375,7 @@ class DismissAllOut(CamelModel):
     dismissed: int = 0
 ```
 
-`src/resume_agent/api/routers/errors.py`:
+`src/resume_tailor_harness/api/routers/errors.py`:
 
 ```python
 """User-clearable error records: list, dismiss, resolve."""
@@ -1385,10 +1385,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.errors import DismissAllOut, ErrorRecordOut, ErrorRecordsOut
-from resume_agent.services.errors import (
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.schemas.errors import DismissAllOut, ErrorRecordOut, ErrorRecordsOut
+from resume_tailor_harness.services.errors import (
     dismiss_all,
     list_error_records,
     set_error_status,
@@ -1450,16 +1450,16 @@ def resolve_error(record_id: int, session: Session = Depends(get_session)):
 
 Route order matters: `dismiss-all` is declared **before** `/{record_id}/dismiss` so it cannot be captured as a record id.
 
-`src/resume_agent/api/schemas/dashboard.py`:
+`src/resume_tailor_harness/api/schemas/dashboard.py`:
 
 ```python
 from __future__ import annotations
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
-from resume_agent.api.schemas.coach import CoachSessionSummaryOut
-from resume_agent.api.schemas.interview import InterviewSessionSummaryOut
+from resume_tailor_harness.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.coach import CoachSessionSummaryOut
+from resume_tailor_harness.api.schemas.interview import InterviewSessionSummaryOut
 
 
 class DashboardSummaryOut(CamelModel):
@@ -1471,7 +1471,7 @@ class DashboardSummaryOut(CamelModel):
     active_coach_session: CoachSessionSummaryOut | None = None
 ```
 
-`src/resume_agent/api/routers/dashboard.py`:
+`src/resume_tailor_harness/api/routers/dashboard.py`:
 
 ```python
 from __future__ import annotations
@@ -1479,14 +1479,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_interview_dir, get_profile_dir, get_session
-from resume_agent.api.schemas.coach import CoachSessionSummaryOut
-from resume_agent.api.schemas.dashboard import DashboardSummaryOut
-from resume_agent.api.schemas.interview import InterviewSessionSummaryOut
-from resume_agent.services.dashboard import summarize_dashboard
-from resume_agent.services.errors import count_open
-from resume_agent.services.mock_interview import sessions_view as interview_sessions_view
-from resume_agent.services.profile_coach import sessions_view as coach_sessions_view
+from resume_tailor_harness.api.deps import get_interview_dir, get_profile_dir, get_session
+from resume_tailor_harness.api.schemas.coach import CoachSessionSummaryOut
+from resume_tailor_harness.api.schemas.dashboard import DashboardSummaryOut
+from resume_tailor_harness.api.schemas.interview import InterviewSessionSummaryOut
+from resume_tailor_harness.services.dashboard import summarize_dashboard
+from resume_tailor_harness.services.errors import count_open
+from resume_tailor_harness.services.mock_interview import sessions_view as interview_sessions_view
+from resume_tailor_harness.services.profile_coach import sessions_view as coach_sessions_view
 
 router = APIRouter()
 
@@ -1511,7 +1511,7 @@ def get_dashboard_summary(request: Request, session: Session = Depends(get_sessi
     )
 ```
 
-`src/resume_agent/api/app.py`: add `errors` to the router imports and include it beside the dashboard router with the same `guarded` dependencies:
+`src/resume_tailor_harness/api/app.py`: add `errors` to the router imports and include it beside the dashboard router with the same `guarded` dependencies:
 
 ```python
     app.include_router(errors.router, prefix="/api", dependencies=guarded)
@@ -1526,7 +1526,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/errors.py src/resume_agent/api/schemas/errors.py src/resume_agent/api/routers/dashboard.py src/resume_agent/api/schemas/dashboard.py src/resume_agent/api/app.py contracts/ web/src/lib/api/schema.ts tests/api/
+git add src/resume_tailor_harness/api/routers/errors.py src/resume_tailor_harness/api/schemas/errors.py src/resume_tailor_harness/api/routers/dashboard.py src/resume_tailor_harness/api/schemas/dashboard.py src/resume_tailor_harness/api/app.py contracts/ web/src/lib/api/schema.ts tests/api/
 git commit -m "feat(api): errors router + dashboard sessions/error-count extension"
 ```
 

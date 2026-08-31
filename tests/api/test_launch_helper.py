@@ -2,15 +2,15 @@ from typing import cast
 
 import pytest
 
-from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.launch import launch, session_work
-from resume_agent.api.runs.manager import (
+from resume_tailor_harness.api.errors import ApiException
+from resume_tailor_harness.api.runs.launch import launch, session_work
+from resume_tailor_harness.api.runs.manager import (
     RunManager,
     RunQuotaError,
     RunResetConflict,
     RunSingletonConflict,
 )
-from resume_agent.progress import ProgressReporter
+from resume_tailor_harness.progress import ProgressReporter
 
 
 class _RecordStub:
@@ -129,7 +129,7 @@ def test_launch_maps_quota_to_429_and_reset_to_409():
 
 
 def test_session_work_opens_its_own_session(tmp_path):
-    from resume_agent.db import init_db, make_engine
+    from resume_tailor_harness.db import init_db, make_engine
 
     engine = make_engine(f"sqlite:///{(tmp_path / 'db.sqlite').as_posix()}")
     init_db(engine)

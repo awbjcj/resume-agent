@@ -95,19 +95,19 @@ npm --prefix web run build
 ## Project Structure
 
 ```text
-src/resume_agent/taxonomy/industries.py
+src/resume_tailor_harness/taxonomy/industries.py
   Normalize labels/company identities; load, merge, and atomically save aliases and company mappings.
-src/resume_agent/discovery/industry.py
+src/resume_tailor_harness/discovery/industry.py
   Structured incremental classifier schema, prompt, and validated output projection.
-src/resume_agent/discovery/extract.py
+src/resume_tailor_harness/discovery/extract.py
   Extract a raw readable business-domain proposal.
-src/resume_agent/discovery/pipeline.py
+src/resume_tailor_harness/discovery/pipeline.py
   Classify unseen proposals after extraction and persist canonical names.
-src/resume_agent/services/agents.py
+src/resume_tailor_harness/services/agents.py
   Add the industry classifier to the shared discovery agent bundle.
-src/resume_agent/models/job.py
+src/resume_tailor_harness/models/job.py
   Keep `industry` as an unrestricted nullable string; remove SIC validation.
-src/resume_agent/tracking/queries.py
+src/resume_tailor_harness/tracking/queries.py
   Project canonical industry strings directly into board/detail rows.
 web/src/lib/filters/industry-label.ts
   Human-readable formatting only; no code-to-title lookup.

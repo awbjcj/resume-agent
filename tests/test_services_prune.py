@@ -1,8 +1,8 @@
 from sqlmodel import select
 
-from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services.prune import prune
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_tailor_harness.db import get_session, init_db, make_engine
+from resume_tailor_harness.services.prune import prune
+from resume_tailor_harness.tracking.tables import Job, JobStatus
 
 
 def _session():

@@ -1,4 +1,4 @@
-from resume_agent.api.auth import (
+from resume_tailor_harness.api.auth import (
     LINK_TOKEN_TTL_SECONDS,
     SESSION_LIFETIME_SECONDS,
     hash_needs_upgrade,
@@ -10,7 +10,7 @@ from resume_agent.api.auth import (
     verify_password,
     verify_user_session,
 )
-from resume_agent.config import Settings
+from resume_tailor_harness.config import Settings
 
 SETTINGS = Settings(_env_file=None, session_secret="secret")  # type: ignore[call-arg]
 

@@ -8,7 +8,7 @@
 
 ## 1. Goal & shape
 
-Replace the Streamlit dashboard (`src/resume_agent/dashboard/`) with a **Vite + React + TypeScript SPA** in a new top-level `web/` directory. The SPA consumes the existing FastAPI backend over HTTP + SSE through the already-generated typed client (`contracts/ts/api.ts`). The aesthetic is modern with subtle editorial personality. It reaches **full feature parity** with all five Streamlit pages **and** becomes a control center that launches the long-running operations (`pull` / `discover` / `tailor` / `cover-letters` / add-from-URL) directly.
+Replace the Streamlit dashboard (`src/resume_tailor_harness/dashboard/`) with a **Vite + React + TypeScript SPA** in a new top-level `web/` directory. The SPA consumes the existing FastAPI backend over HTTP + SSE through the already-generated typed client (`contracts/ts/api.ts`). The aesthetic is modern with subtle editorial personality. It reaches **full feature parity** with all five Streamlit pages **and** becomes a control center that launches the long-running operations (`pull` / `discover` / `tailor` / `cover-letters` / add-from-URL) directly.
 
 The SPA is the **fourth thin adapter** over the `services/` use-case layer — parallel to the CLI, Streamlit, and the API — except it reaches the domain *through* the API rather than importing `services/` directly. It introduces **zero new business logic**: even the rich client-side filtering is a direct port of the existing pure functions in `dashboard/filtering.py`.
 
@@ -23,8 +23,8 @@ The SPA is the **fourth thin adapter** over the `services/` use-case layer — p
 ## 2. Architecture
 
 ```
-resume-agent/
-  src/resume_agent/api/        FastAPI (existing) + 2 new routers (analytics, match-gap)
+resume-tailor-harness/
+  src/resume_tailor_harness/api/        FastAPI (existing) + 2 new routers (analytics, match-gap)
   contracts/openapi.json       generated (existing; drift-gated)
   contracts/ts/api.ts          generated typed client (existing)
   web/                         NEW Vite SPA
@@ -57,7 +57,7 @@ resume-agent/
 
 ### Serving model
 - **Dev:** `vite dev` with a proxy to the uvicorn backend (no CORS friction).
-- **Production:** `vite build` emits static assets that **FastAPI mounts and serves**, so `resume-agent serve` hosts API + UI on one port — one command, common case needs no CORS.
+- **Production:** `vite build` emits static assets that **FastAPI mounts and serves**, so `resume-tailor-harness serve` hosts API + UI on one port — one command, common case needs no CORS.
 - `scripts/gen_ts_client.sh` continues to regenerate the contract; a documented `npm run build` step produces the served bundle.
 
 ---
@@ -179,7 +179,7 @@ Rules:
 
 ## 12. Rollout / Streamlit retirement
 
-Keep Streamlit in place until the SPA reaches parity, then remove `src/resume_agent/dashboard/` and its dependencies in a final cleanup commit. The CLI and API are untouched throughout.
+Keep Streamlit in place until the SPA reaches parity, then remove `src/resume_tailor_harness/dashboard/` and its dependencies in a final cleanup commit. The CLI and API are untouched throughout.
 
 ---
 

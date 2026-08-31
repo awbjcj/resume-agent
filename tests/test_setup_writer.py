@@ -1,9 +1,9 @@
 import os
 
 
-from resume_agent.discovery.search_config import load_search_config
-from resume_agent.setup.state import WizardState
-from resume_agent.setup.writer import atomic_write_all, load_existing_state
+from resume_tailor_harness.discovery.search_config import load_search_config
+from resume_tailor_harness.setup.state import WizardState
+from resume_tailor_harness.setup.writer import atomic_write_all, load_existing_state
 
 
 def _seed_examples(root):
@@ -48,7 +48,7 @@ def test_partial_failure_leaves_no_tmp_litter(tmp_path, monkeypatch):
             raise OSError("disk full")
         return real_replace(src, dst)
 
-    monkeypatch.setattr("resume_agent.setup.writer.os.replace", flaky_replace)
+    monkeypatch.setattr("resume_tailor_harness.setup.writer.os.replace", flaky_replace)
     report = atomic_write_all(state, root=tmp_path)
 
     assert any(status.startswith("error") for status in report.values())

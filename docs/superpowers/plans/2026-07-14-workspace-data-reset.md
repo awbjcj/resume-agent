@@ -20,7 +20,7 @@
 - Wire format is camelCase via `CamelModel` (`api/schemas/base.py`); Python stays snake_case.
 - `config/` and `secrets.env` are NEVER touched by any reset scope.
 - Confirmation literals: API query param `confirm=RESET`; web dialog typed word `RESET`; CLI typed word = the scope value (`jobs`/`profile`/`all`).
-- Never delete `resume_agent.db` or its WAL/SHM sidecars — truncate tables only.
+- Never delete `resume_tailor_harness.db` or its WAL/SHM sidecars — truncate tables only.
 - DB deletes commit in ONE transaction BEFORE any file removal; file-phase errors are collected into `ResetReport.failures`, never raised.
 - After Task 2, regenerate the OpenAPI contract (`bash scripts/gen_ts_client.sh`);
   commit `contracts/openapi.json`, `contracts/ts/api.ts`, and
@@ -73,12 +73,12 @@ these corrections wherever an older code snippet conflicts:
 
 **Files:**
 
-- Create: `src/resume_agent/services/reset.py`
+- Create: `src/resume_tailor_harness/services/reset.py`
 - Test: `tests/test_reset_service.py`
 
 **Interfaces:**
 
-- Consumes: `resume_agent.tracking.tables` models (`Job`, `ResumeVersion`, `Application`, `CoverLetter`, `Notification`, `SkillSuggestion`); `resume_agent.tenancy.paths.resolve_tenant_path`.
+- Consumes: `resume_tailor_harness.tracking.tables` models (`Job`, `ResumeVersion`, `Application`, `CoverLetter`, `Notification`, `SkillSuggestion`); `resume_tailor_harness.tenancy.paths.resolve_tenant_path`.
 - Produces (used by Tasks 2 and 3):
   - `class ResetScope(str, Enum)` with values `jobs`, `profile`, `all`
   - `@dataclass(frozen=True) ResetPaths` with fields `output_dir, runs_dir, progress_dir, profile_dir, taxonomy_file, scraper_recipes_dir, workday_facets_dir, connector_runs_file` (all `Path`) and classmethod `ResetPaths.resolve() -> ResetPaths`
@@ -95,10 +95,10 @@ Create `tests/test_reset_service.py`:
 import pytest
 from sqlmodel import Session, select
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.services import reset as reset_module
-from resume_agent.services.reset import ResetPaths, ResetScope, reset_workspace
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.services import reset as reset_module
+from resume_tailor_harness.services.reset import ResetPaths, ResetScope, reset_workspace
+from resume_tailor_harness.tracking.tables import (
     Application,
     CoverLetter,
     Job,
@@ -302,11 +302,11 @@ def test_missing_directories_are_recreated_empty(session, tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_reset_service.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.services.reset'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'resume_tailor_harness.services.reset'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/services/reset.py`:
+Create `src/resume_tailor_harness/services/reset.py`:
 
 ```python
 """Workspace reset use-case: truncate pipeline tables + clear derived files.
@@ -331,8 +331,8 @@ from pathlib import Path
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.paths import resolve_tenant_path
-from resume_agent.tracking.tables import (
+from resume_tailor_harness.tenancy.paths import resolve_tenant_path
+from resume_tailor_harness.tracking.tables import (
     Application,
     CoverLetter,
     Job,
@@ -485,13 +485,13 @@ Expected: 6 passed
 
 - [ ] **Step 5: Lint**
 
-Run: `ruff check src/resume_agent/services/reset.py tests/test_reset_service.py`
+Run: `ruff check src/resume_tailor_harness/services/reset.py tests/test_reset_service.py`
 Expected: All checks passed
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/services/reset.py tests/test_reset_service.py
+git add src/resume_tailor_harness/services/reset.py tests/test_reset_service.py
 git commit -m "feat: add workspace reset service with tiered scopes"
 ```
 
@@ -501,8 +501,8 @@ git commit -m "feat: add workspace reset service with tiered scopes"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/account.py` (append schemas)
-- Modify: `src/resume_agent/api/routers/account.py` (add endpoint + imports)
+- Modify: `src/resume_tailor_harness/api/schemas/account.py` (append schemas)
+- Modify: `src/resume_tailor_harness/api/routers/account.py` (add endpoint + imports)
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_account_reset.py`
 
@@ -518,11 +518,11 @@ Create `tests/api/test_account_reset.py` (fixtures `mu_app`/`mu_client` come fro
 ```python
 from sqlalchemy.orm import Session
 
-from resume_agent.api.auth import hash_password
-from resume_agent.db import init_db, make_engine
-from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import provision_workspace, workspace_paths
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.api.auth import hash_password
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tenancy.system_db import User
+from resume_tailor_harness.tenancy.workspace import provision_workspace, workspace_paths
+from resume_tailor_harness.tracking.tables import Job
 
 
 def _login(client, username="owner", password="owner-password"):
@@ -635,7 +635,7 @@ Expected: FAIL — all four tests get 404/405 (route does not exist yet)
 
 - [ ] **Step 3: Add the schemas**
 
-Append to `src/resume_agent/api/schemas/account.py`:
+Append to `src/resume_tailor_harness/api/schemas/account.py`:
 
 ```python
 class ResetRequest(CamelModel):
@@ -657,12 +657,12 @@ from typing import Literal
 
 - [ ] **Step 4: Add the endpoint**
 
-In `src/resume_agent/api/routers/account.py`, extend the existing imports:
+In `src/resume_tailor_harness/api/routers/account.py`, extend the existing imports:
 
 ```python
 from fastapi import APIRouter, Depends, Request, Response, UploadFile  # Depends already present
-from resume_agent.api.deps import get_session, get_settings_dep
-from resume_agent.api.schemas.account import (
+from resume_tailor_harness.api.deps import get_session, get_settings_dep
+from resume_tailor_harness.api.schemas.account import (
     AccountUsage,
     PasswordChangeRequest,
     ResetRequest,
@@ -672,8 +672,8 @@ from resume_agent.api.schemas.account import (
     TokenInfo,
     TokenList,
 )
-from resume_agent.services.reset import ResetPaths, ResetScope, reset_workspace
-from resume_agent.tenancy.context import current_context, require_context
+from resume_tailor_harness.services.reset import ResetPaths, ResetScope, reset_workspace
+from resume_tailor_harness.tenancy.context import current_context, require_context
 ```
 
 (Only `get_session`, `ResetRequest`, `ResetReportOut`, the `services.reset` line, and `current_context` are new; keep every existing import.) Then add the endpoint after `change_password`:
@@ -719,29 +719,29 @@ Expected: PASS; `git status` shows `contracts/openapi.json`,
 
 - [ ] **Step 7: Lint**
 
-Run: `ruff check src/resume_agent/api/routers/account.py src/resume_agent/api/schemas/account.py tests/api/test_account_reset.py`
+Run: `ruff check src/resume_tailor_harness/api/routers/account.py src/resume_tailor_harness/api/schemas/account.py tests/api/test_account_reset.py`
 Expected: All checks passed
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/account.py src/resume_agent/api/routers/account.py tests/api/test_account_reset.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/api/schemas/account.py src/resume_tailor_harness/api/routers/account.py tests/api/test_account_reset.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: add POST /api/account/reset with confirm gate and run guard"
 ```
 
 ---
 
-### Task 3: CLI `resume-agent reset`
+### Task 3: CLI `resume-tailor-harness reset`
 
 **Files:**
 
-- Modify: `src/resume_agent/cli.py` (new command, place directly after the `prune` command around line 860)
+- Modify: `src/resume_tailor_harness/cli.py` (new command, place directly after the `prune` command around line 860)
 - Test: `tests/test_reset_cli.py`
 
 **Interfaces:**
 
 - Consumes (from Task 1): `ResetPaths.resolve()`, `ResetScope`, `count_rows`, `scope_areas`, `reset_workspace`. Also `cli.py`'s existing `_engine(db_url)` helper and `get_session` (already imported there for `prune`).
-- Produces: command `resume-agent reset --scope jobs|profile|all [--yes] [--db-url URL]`.
+- Produces: command `resume-tailor-harness reset --scope jobs|profile|all [--yes] [--db-url URL]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -751,9 +751,9 @@ Create `tests/test_reset_cli.py`:
 from sqlmodel import Session, select
 from typer.testing import CliRunner
 
-from resume_agent.cli import app
-from resume_agent.db import init_db, make_engine
-from resume_agent.tracking.tables import Job
+from resume_tailor_harness.cli import app
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tracking.tables import Job
 
 runner = CliRunner()
 
@@ -827,7 +827,7 @@ Expected: FAIL — `No such command 'reset'` (non-zero exit, missing output asse
 
 - [ ] **Step 3: Add the command**
 
-In `src/resume_agent/cli.py`, directly after the `prune` command:
+In `src/resume_tailor_harness/cli.py`, directly after the `prune` command:
 
 ```python
 @app.command("reset")
@@ -845,7 +845,7 @@ def reset_cmd(
     Config files and secrets.env always survive. Jobs with progress
     (applications, tailored resumes) are deleted too — export a backup first.
     """
-    from resume_agent.services.reset import (
+    from resume_tailor_harness.services.reset import (
         ResetPaths,
         ResetScope,
         count_rows,
@@ -886,14 +886,14 @@ Expected: 4 passed
 
 - [ ] **Step 5: Lint**
 
-Run: `ruff check src/resume_agent/cli.py tests/test_reset_cli.py`
+Run: `ruff check src/resume_tailor_harness/cli.py tests/test_reset_cli.py`
 Expected: All checks passed
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/cli.py tests/test_reset_cli.py
-git commit -m "feat: add resume-agent reset command with typed confirmation"
+git add src/resume_tailor_harness/cli.py tests/test_reset_cli.py
+git commit -m "feat: add resume-tailor-harness reset command with typed confirmation"
 ```
 
 ---

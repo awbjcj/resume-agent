@@ -5,24 +5,24 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-import resume_agent.api.routers.match_gap as router_mod
-import resume_agent.tracking.canonicalize as canonicalize
-from resume_agent.api.app import create_app
-from resume_agent.db import get_session
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.matrix import load_matrix
-from resume_agent.profile.store import save_facts
-from resume_agent.tracking.canonicalize import (
+import resume_tailor_harness.api.routers.match_gap as router_mod
+import resume_tailor_harness.tracking.canonicalize as canonicalize
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.db import get_session
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.matrix import load_matrix
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness.tracking.canonicalize import (
     IncrementalDomainGroup,
     IncrementalSkillDomains,
     SkillClusters,
     TaxonomyMaintenanceAction,
     TaxonomyMaintenancePlan,
 )
-from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import Job, JobStatus
-from resume_agent.taxonomy.groups import group_map_path, save_group_map
-from resume_agent.taxonomy.clusters import (
+from resume_tailor_harness.tracking.repository import save_job
+from resume_tailor_harness.tracking.tables import Job, JobStatus
+from resume_tailor_harness.taxonomy.groups import group_map_path, save_group_map
+from resume_tailor_harness.taxonomy.clusters import (
     ClusterMap,
     load_cluster_map,
     save_cluster_map,
@@ -282,7 +282,7 @@ def test_maintenance_and_undo_runs_are_exposed_by_the_match_gap_api(
         canonicalize, "build_taxonomy_maintenance_agent", _MaintenanceJudge
     )
     monkeypatch.setattr(
-        "resume_agent.taxonomy.embeddings._provider_from_settings", lambda: None
+        "resume_tailor_harness.taxonomy.embeddings._provider_from_settings", lambda: None
     )
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))
@@ -307,7 +307,7 @@ def test_retired_skills_are_visible_and_restorable(monkeypatch, tmp_path):
     would be both invisible and permanent.
     """
 
-    from resume_agent.taxonomy.state import load_taxonomy_state, set_grouping_statuses
+    from resume_tailor_harness.taxonomy.state import load_taxonomy_state, set_grouping_statuses
 
     cluster_path = tmp_path / "cluster_map.json"
     save_cluster_map(ClusterMap(aliases={"python": "python"}), cluster_path)

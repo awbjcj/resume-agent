@@ -14,7 +14,7 @@
 
 - All tests run offline — no API key, no network: `.venv/Scripts/python.exe -m pytest`, lint with `ruff check`.
 - Frontend tests: `cd web && npx vitest run <file>`; lint with `cd web && npm run lint`.
-- Group slugs are the fixed 13-slug vocabulary `SKILL_GROUPS` in `src/resume_agent/taxonomy/groups.py`; never invent slugs.
+- Group slugs are the fixed 13-slug vocabulary `SKILL_GROUPS` in `src/resume_tailor_harness/taxonomy/groups.py`; never invent slugs.
 - Wire format is camelCase (`CamelModel`); Python stays snake_case. After any schema change regenerate contracts with `bash scripts/gen_ts_client.sh` — `tests/api/test_openapi_contract.py` gates drift.
 - Precedence (spec §2): **correction ledger > `overrides.yaml` `group:` map > LLM taxonomy**. Corrections never alter `facts.json`, categories, or fact-lock.
 - "Profile not built" maps to HTTP 400 `SETUP_INCOMPLETE` (matches every manual-skills endpoint); unknown slug → 422; unknown skill / missing correction → 404.
@@ -58,7 +58,7 @@ snippets below:
 
 **Files:**
 
-- Create: `src/resume_agent/profile/group_corrections.py`
+- Create: `src/resume_tailor_harness/profile/group_corrections.py`
 - Test: `tests/test_group_corrections.py`
 
 **Interfaces:**
@@ -76,7 +76,7 @@ snippets below:
 Create `tests/test_group_corrections.py`:
 
 ```python
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.profile.group_corrections import (
     GroupCorrection,
     GroupCorrections,
     corrections_path,
@@ -118,11 +118,11 @@ def test_round_trip_normalizes_tokens_and_drops_unknown_slugs(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_group_corrections.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.group_corrections'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.profile.group_corrections'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/profile/group_corrections.py`:
+Create `src/resume_tailor_harness/profile/group_corrections.py`:
 
 ```python
 """Durable ledger of user skill-group corrections.
@@ -144,9 +144,9 @@ from pathlib import Path
 
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.taxonomy.groups import SKILL_GROUPS
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.models.base import ExtensibleModel
+from resume_tailor_harness.taxonomy.groups import SKILL_GROUPS
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 
 def corrections_path(profile_dir: str | Path) -> Path:
@@ -207,13 +207,13 @@ def save_group_corrections(ledger: GroupCorrections, path: str | Path) -> None:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_group_corrections.py -q && ruff check src/resume_agent/profile/group_corrections.py tests/test_group_corrections.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_group_corrections.py -q && ruff check src/resume_tailor_harness/profile/group_corrections.py tests/test_group_corrections.py`
 Expected: 4 passed, ruff clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/profile/group_corrections.py tests/test_group_corrections.py
+git add src/resume_tailor_harness/profile/group_corrections.py tests/test_group_corrections.py
 git commit -m "feat: add skill-group corrections ledger"
 ```
 
@@ -223,10 +223,10 @@ git commit -m "feat: add skill-group corrections ledger"
 
 **Files:**
 
-- Modify: `src/resume_agent/profile/matrix.py` (`MatrixRow`, `apply_skill_groups`, new `decorate_matrix_groups` / `rebuild_saved_matrix`)
-- Modify: `src/resume_agent/services/profile_build.py` (use `decorate_matrix_groups`)
-- Modify: `src/resume_agent/services/profile_skills.py` (replace `_rebuild_matrix` with `rebuild_saved_matrix`)
-- Modify: `src/resume_agent/api/routers/match_gap.py` (use `decorate_matrix_groups`)
+- Modify: `src/resume_tailor_harness/profile/matrix.py` (`MatrixRow`, `apply_skill_groups`, new `decorate_matrix_groups` / `rebuild_saved_matrix`)
+- Modify: `src/resume_tailor_harness/services/profile_build.py` (use `decorate_matrix_groups`)
+- Modify: `src/resume_tailor_harness/services/profile_skills.py` (replace `_rebuild_matrix` with `rebuild_saved_matrix`)
+- Modify: `src/resume_tailor_harness/api/routers/match_gap.py` (use `decorate_matrix_groups`)
 - Test: `tests/test_profile_matrix.py` (append)
 
 **Interfaces:**
@@ -243,14 +243,14 @@ git commit -m "feat: add skill-group corrections ledger"
 Append to `tests/test_profile_matrix.py` (add any missing imports at the top; the file already imports `MatrixRow`, `SkillMatrix`, `Overrides`, `apply_skill_groups`, `load_matrix`):
 
 ```python
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.group_corrections import (
     GroupCorrection,
     GroupCorrections,
     corrections_path,
     save_group_corrections,
 )
-from resume_agent.profile.matrix import rebuild_saved_matrix
+from resume_tailor_harness.profile.matrix import rebuild_saved_matrix
 
 
 def test_apply_groups_correction_beats_override_and_taxonomy():
@@ -332,24 +332,24 @@ def test_rebuild_saved_matrix_applies_correction_ledger(tmp_path):
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_matrix.py -q`
 Expected: new tests FAIL (`group_source` unknown field / `TypeError: apply_skill_groups() got an unexpected keyword argument 'corrections'` / `ImportError: cannot import name 'rebuild_saved_matrix'`). Pre-existing tests still pass.
 
-- [ ] **Step 3: Implement in `src/resume_agent/profile/matrix.py`**
+- [ ] **Step 3: Implement in `src/resume_tailor_harness/profile/matrix.py`**
 
 3a. Update imports (top of file). Replace:
 
 ```python
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.groups import SKILL_GROUPS, sanitize_group_map
+from resume_tailor_harness.taxonomy.clusters import ClusterMap
+from resume_tailor_harness.taxonomy.groups import SKILL_GROUPS, sanitize_group_map
 ```
 
 with:
 
 ```python
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.profile.group_corrections import (
     corrections_path,
     load_group_corrections,
 )
-from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
-from resume_agent.taxonomy.groups import (
+from resume_tailor_harness.taxonomy.clusters import ClusterMap, load_cluster_map
+from resume_tailor_harness.taxonomy.groups import (
     SKILL_GROUPS,
     group_map_path,
     load_group_map,
@@ -431,7 +431,7 @@ def rebuild_saved_matrix(profile_dir: str | Path, facts: ProfileFacts) -> SkillM
 
 - [ ] **Step 4: Switch the three call sites**
 
-4a. `src/resume_agent/services/profile_build.py` — in `run_corpus_build`, replace:
+4a. `src/resume_tailor_harness/services/profile_build.py` — in `run_corpus_build`, replace:
 
 ```python
         taxonomy_path = skill_groups.group_map_path(profile_dir)
@@ -466,21 +466,21 @@ with:
 
 and in the same file's imports change `apply_skill_groups` to `decorate_matrix_groups` (keep the other `profile.matrix` imports the file already uses).
 
-4b. `src/resume_agent/services/profile_skills.py` — delete the `_rebuild_matrix` function; replace its three call sites (`add_skill`, `add_alias`, `remove_manual_entry`) with `rebuild_saved_matrix(profile_dir, updated_facts)`, and replace the import line
+4b. `src/resume_tailor_harness/services/profile_skills.py` — delete the `_rebuild_matrix` function; replace its three call sites (`add_skill`, `add_alias`, `remove_manual_entry`) with `rebuild_saved_matrix(profile_dir, updated_facts)`, and replace the import line
 
 ```python
-from resume_agent.profile.matrix import apply_skill_groups, build_matrix, load_overrides, save_matrix
+from resume_tailor_harness.profile.matrix import apply_skill_groups, build_matrix, load_overrides, save_matrix
 ```
 
 with
 
 ```python
-from resume_agent.profile.matrix import rebuild_saved_matrix
+from resume_tailor_harness.profile.matrix import rebuild_saved_matrix
 ```
 
-Also remove the now-unused imports `from resume_agent.taxonomy import groups as skill_groups` and `from resume_agent.taxonomy.clusters import load_cluster_map` (ruff will flag any leftovers).
+Also remove the now-unused imports `from resume_tailor_harness.taxonomy import groups as skill_groups` and `from resume_tailor_harness.taxonomy.clusters import load_cluster_map` (ruff will flag any leftovers).
 
-4c. `src/resume_agent/api/routers/match_gap.py` — in the refresh worker, replace:
+4c. `src/resume_tailor_harness/api/routers/match_gap.py` — in the refresh worker, replace:
 
 ```python
         apply_skill_groups(
@@ -496,7 +496,7 @@ with:
         decorate_matrix_groups(matrix, facts_path.parent, overrides)
 ```
 
-Update the imports: in the `from resume_agent.profile.matrix import (...)` block replace `apply_skill_groups` with `decorate_matrix_groups`, and delete the line `from resume_agent.taxonomy.groups import group_map_path, load_group_map`.
+Update the imports: in the `from resume_tailor_harness.profile.matrix import (...)` block replace `apply_skill_groups` with `decorate_matrix_groups`, and delete the line `from resume_tailor_harness.taxonomy.groups import group_map_path, load_group_map`.
 
 - [ ] **Step 5: Run focused matrix/call-site tests and lint touched files**
 
@@ -507,7 +507,7 @@ suite for the final gate.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/profile/matrix.py src/resume_agent/services/profile_build.py src/resume_agent/services/profile_skills.py src/resume_agent/api/routers/match_gap.py tests/test_profile_matrix.py
+git add src/resume_tailor_harness/profile/matrix.py src/resume_tailor_harness/services/profile_build.py src/resume_tailor_harness/services/profile_skills.py src/resume_tailor_harness/api/routers/match_gap.py tests/test_profile_matrix.py
 git commit -m "feat: correction-aware group precedence with group_source provenance"
 ```
 
@@ -517,7 +517,7 @@ git commit -m "feat: correction-aware group precedence with group_source provena
 
 **Files:**
 
-- Create: `src/resume_agent/services/profile_groups.py`
+- Create: `src/resume_tailor_harness/services/profile_groups.py`
 - Test: `tests/test_profile_groups_service.py`
 
 **Interfaces:**
@@ -535,24 +535,24 @@ Create `tests/test_profile_groups_service.py`:
 ```python
 import pytest
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.group_corrections import (
     corrections_path,
     load_group_corrections,
 )
-from resume_agent.profile.matrix import load_matrix, rebuild_saved_matrix
-from resume_agent.profile.store import load_facts, save_facts
-from resume_agent.services.profile_groups import (
+from resume_tailor_harness.profile.matrix import load_matrix, rebuild_saved_matrix
+from resume_tailor_harness.profile.store import load_facts, save_facts
+from resume_tailor_harness.services.profile_groups import (
     GroupCorrectionNotFoundError,
     UnknownGroupError,
     clear_group,
     set_group,
 )
-from resume_agent.services.profile_skills import (
+from resume_tailor_harness.services.profile_skills import (
     ProfileNotBuiltError,
     SkillNotFoundError,
 )
-from resume_agent.taxonomy.groups import group_map_path, save_group_map
+from resume_tailor_harness.taxonomy.groups import group_map_path, save_group_map
 
 
 @pytest.fixture()
@@ -635,11 +635,11 @@ def test_clear_group_without_correction_raises(profile_dir):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_groups_service.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.services.profile_groups'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'resume_tailor_harness.services.profile_groups'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `src/resume_agent/services/profile_groups.py`:
+Create `src/resume_tailor_harness/services/profile_groups.py`:
 
 ```python
 """Set or clear a durable skill-group correction and refresh matrix.json.
@@ -655,22 +655,22 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.group_corrections import (
+from resume_tailor_harness.models.profile import ProfileFacts
+from resume_tailor_harness.profile.group_corrections import (
     GroupCorrection,
     corrections_path,
     load_group_corrections,
     save_group_corrections,
 )
-from resume_agent.profile.manual_skills import manual_skills_lock
-from resume_agent.profile.matrix import MatrixRow, SkillMatrix, rebuild_saved_matrix
-from resume_agent.profile.store import load_facts
-from resume_agent.services.profile_skills import (
+from resume_tailor_harness.profile.manual_skills import manual_skills_lock
+from resume_tailor_harness.profile.matrix import MatrixRow, SkillMatrix, rebuild_saved_matrix
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.services.profile_skills import (
     ProfileNotBuiltError,
     SkillNotFoundError,
 )
-from resume_agent.taxonomy.groups import SKILL_GROUPS
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.taxonomy.groups import SKILL_GROUPS
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 
 class UnknownGroupError(ValueError):
@@ -739,13 +739,13 @@ def clear_group(profile_dir: str | Path, key: str) -> None:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_groups_service.py -q && ruff check src/resume_agent/services/profile_groups.py tests/test_profile_groups_service.py`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_groups_service.py -q && ruff check src/resume_tailor_harness/services/profile_groups.py tests/test_profile_groups_service.py`
 Expected: 8 passed, ruff clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/services/profile_groups.py tests/test_profile_groups_service.py
+git add src/resume_tailor_harness/services/profile_groups.py tests/test_profile_groups_service.py
 git commit -m "feat: profile_groups service for durable group corrections"
 ```
 
@@ -755,8 +755,8 @@ git commit -m "feat: profile_groups service for durable group corrections"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/profile.py` (`MatrixRowOut.group_source`, new `SetGroupIn`)
-- Modify: `src/resume_agent/api/routers/profile.py` (two endpoints)
+- Modify: `src/resume_tailor_harness/api/schemas/profile.py` (`MatrixRowOut.group_source`, new `SetGroupIn`)
+- Modify: `src/resume_tailor_harness/api/routers/profile.py` (two endpoints)
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_profile_groups_router.py`
 
@@ -773,10 +773,10 @@ Create `tests/api/test_profile_groups_router.py`:
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.store import save_facts
-from resume_agent.taxonomy.groups import group_map_path, save_group_map
+from resume_tailor_harness.api.app import create_app
+from resume_tailor_harness.models.profile import Contact, ProfileFacts, Skill
+from resume_tailor_harness.profile.store import save_facts
+from resume_tailor_harness.taxonomy.groups import group_map_path, save_group_map
 
 
 @pytest.fixture()
@@ -872,7 +872,7 @@ Expected: FAIL — 405/404 responses (routes don't exist yet).
 
 - [ ] **Step 3: Implement schemas and routes**
 
-3a. `src/resume_agent/api/schemas/profile.py` — add `group_source` to `MatrixRowOut` and a `SetGroupIn` model:
+3a. `src/resume_tailor_harness/api/schemas/profile.py` — add `group_source` to `MatrixRowOut` and a `SetGroupIn` model:
 
 ```python
 class MatrixRowOut(CamelModel):
@@ -892,7 +892,7 @@ class SetGroupIn(CamelModel):
     ]
 ```
 
-3b. `src/resume_agent/api/routers/profile.py` — import `SetGroupIn` in the schemas import block, add `profile_groups` to the services import (`from resume_agent.services import profile_build, profile_groups, profile_skills`), and add after `delete_manual_skill`:
+3b. `src/resume_tailor_harness/api/routers/profile.py` — import `SetGroupIn` in the schemas import block, add `profile_groups` to the services import (`from resume_tailor_harness.services import profile_build, profile_groups, profile_skills`), and add after `delete_manual_skill`:
 
 ```python
 @router.put("/profile/skills/{key}/group", response_model=MatrixRowOut)
@@ -936,7 +936,7 @@ Python files. Expected: all three generated contract artifacts show the new path
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/profile.py src/resume_agent/api/routers/profile.py tests/api/test_profile_groups_router.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
+git add src/resume_tailor_harness/api/schemas/profile.py src/resume_tailor_harness/api/routers/profile.py tests/api/test_profile_groups_router.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: PUT/DELETE skill-group correction endpoints with groupSource on matrix rows"
 ```
 

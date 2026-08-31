@@ -2,9 +2,9 @@ import os
 
 import pytest
 
-import resume_agent.profile.store as store
-from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.store import load_facts, save_facts
+import resume_tailor_harness.profile.store as store
+from resume_tailor_harness.models.profile import Contact, ProfileFacts
+from resume_tailor_harness.profile.store import load_facts, save_facts
 
 
 def test_save_creates_parent_dirs_and_round_trips(tmp_path):

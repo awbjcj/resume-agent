@@ -25,7 +25,7 @@
 
 **Files:**
 
-- Create: `src/resume_agent/services/board_query.py`
+- Create: `src/resume_tailor_harness/services/board_query.py`
 - Test: `tests/test_services_board_query.py`
 
 **Interfaces:**
@@ -39,7 +39,7 @@ read only the subset that board supports (Task 2). Sets default to empty; scalar
 
 ```python
 # tests/test_services_board_query.py
-from resume_agent.services.board_query import BoardFilter, parse_csv, to_filter_state
+from resume_tailor_harness.services.board_query import BoardFilter, parse_csv, to_filter_state
 
 
 def test_parse_csv_splits_trims_and_drops_empties():
@@ -61,12 +61,12 @@ def test_to_filter_state_maps_scalars_and_sets():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_board_query.py -v`
-Expected: FAIL with `ModuleNotFoundError: resume_agent.services.board_query`.
+Expected: FAIL with `ModuleNotFoundError: resume_tailor_harness.services.board_query`.
 
 - [ ] **Step 3: Write the module**
 
 ```python
-# src/resume_agent/services/board_query.py
+# src/resume_tailor_harness/services/board_query.py
 """Cross-board filter contract (BoardFilter) + helpers shared by services/board.
 
 Pure: no FastAPI, no Streamlit. The rich Shortlist facet predicate is reused from
@@ -78,7 +78,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from resume_agent.dashboard.filtering import FilterState
+from resume_tailor_harness.dashboard.filtering import FilterState
 
 
 @dataclass
@@ -139,8 +139,8 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-ruff check src/resume_agent/services/board_query.py tests/test_services_board_query.py
-git add src/resume_agent/services/board_query.py tests/test_services_board_query.py
+ruff check src/resume_tailor_harness/services/board_query.py tests/test_services_board_query.py
+git add src/resume_tailor_harness/services/board_query.py tests/test_services_board_query.py
 git commit -m "feat(board): BoardFilter contract + query-param helpers"
 ```
 
@@ -150,8 +150,8 @@ git commit -m "feat(board): BoardFilter contract + query-param helpers"
 
 **Files:**
 
-- Create: `src/resume_agent/services/board_query.py` (extend — add cross-cutting predicate + sorters)
-- Modify: `src/resume_agent/services/board.py` (`list_shortlist`, `list_pipeline`, `list_triage`)
+- Create: `src/resume_tailor_harness/services/board_query.py` (extend — add cross-cutting predicate + sorters)
+- Modify: `src/resume_tailor_harness/services/board.py` (`list_shortlist`, `list_pipeline`, `list_triage`)
 - Test: `tests/test_services_board.py` (append cases)
 
 **Interfaces:**
@@ -169,7 +169,7 @@ functions switch to a single `filter: BoardFilter` argument.
 # tests/test_services_board.py  (append)
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.services.board_query import BoardFilter
+from resume_tailor_harness.services.board_query import BoardFilter
 
 
 def test_list_triage_filters_source_status_and_stale():
@@ -218,7 +218,7 @@ Expected: FAIL — `list_triage`/`list_shortlist` do not accept `filter=`.
 - [ ] **Step 3: Add the cross-cutting predicate to `board_query.py`**
 
 ```python
-# src/resume_agent/services/board_query.py  (append)
+# src/resume_tailor_harness/services/board_query.py  (append)
 from datetime import datetime, timezone
 
 
@@ -272,8 +272,8 @@ Replace `list_shortlist`, `list_pipeline`, `list_triage` (`services/board.py:45-
 ```python
 from datetime import datetime, timezone
 
-from resume_agent.dashboard.filtering import apply_filters, sort_rows
-from resume_agent.services.board_query import (
+from resume_tailor_harness.dashboard.filtering import apply_filters, sort_rows
+from resume_tailor_harness.services.board_query import (
     BoardFilter,
     matches_common,
     sort_by_fit_desc,
@@ -337,8 +337,8 @@ Expected: PASS — new cases plus the existing `test_list_pipeline_filters_by_st
 - [ ] **Step 6: Lint + commit**
 
 ```bash
-ruff check src/resume_agent/services/board_query.py src/resume_agent/services/board.py tests/test_services_board.py
-git add src/resume_agent/services/board_query.py src/resume_agent/services/board.py tests/test_services_board.py
+ruff check src/resume_tailor_harness/services/board_query.py src/resume_tailor_harness/services/board.py tests/test_services_board.py
+git add src/resume_tailor_harness/services/board_query.py src/resume_tailor_harness/services/board.py tests/test_services_board.py
 git commit -m "feat(board): server-side BoardFilter filter+sort on every board list"
 ```
 
@@ -348,8 +348,8 @@ git commit -m "feat(board): server-side BoardFilter filter+sort on every board l
 
 **Files:**
 
-- Modify: `src/resume_agent/services/board_query.py` (add `compute_facets`)
-- Modify: `src/resume_agent/services/board.py` (add `board_facets`)
+- Modify: `src/resume_tailor_harness/services/board_query.py` (add `compute_facets`)
+- Modify: `src/resume_tailor_harness/services/board.py` (add `board_facets`)
 - Test: `tests/test_services_board.py` (append)
 
 **Interfaces:**
@@ -386,11 +386,11 @@ Expected: FAIL — `board_facets` undefined.
 - [ ] **Step 3: Add `compute_facets` to `board_query.py`**
 
 ```python
-# src/resume_agent/services/board_query.py  (append)
+# src/resume_tailor_harness/services/board_query.py  (append)
 import copy
 from collections.abc import Callable
 
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_tailor_harness.tracking.match_gap import normalize_skill
 
 # facet name -> the BoardFilter set-attribute it clears + how to read row values.
 TRIAGE_FACETS: dict[str, str] = {"source": "source", "status": "status"}
@@ -447,8 +447,8 @@ def compute_facets(
 - [ ] **Step 4: Add `board_facets` to `board.py`**
 
 ```python
-# src/resume_agent/services/board.py  (append near the list_* functions)
-from resume_agent.services.board_query import (
+# src/resume_tailor_harness/services/board.py  (append near the list_* functions)
+from resume_tailor_harness.services.board_query import (
     SHORTLIST_FACETS, TRIAGE_FACETS, _SHORTLIST_ROW_ATTR, compute_facets, matches_common,
 )
 
@@ -492,8 +492,8 @@ Expected: PASS.
 - [ ] **Step 6: Lint + commit**
 
 ```bash
-ruff check src/resume_agent/services/board_query.py src/resume_agent/services/board.py
-git add src/resume_agent/services/board_query.py src/resume_agent/services/board.py tests/test_services_board.py
+ruff check src/resume_tailor_harness/services/board_query.py src/resume_tailor_harness/services/board.py
+git add src/resume_tailor_harness/services/board_query.py src/resume_tailor_harness/services/board.py tests/test_services_board.py
 git commit -m "feat(board): excluding-self facet counts for triage + shortlist"
 ```
 
@@ -503,9 +503,9 @@ git commit -m "feat(board): excluding-self facet counts for triage + shortlist"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/base.py` (add `BoardPage`)
-- Modify: `src/resume_agent/api/mappers.py` (add `to_board_page`)
-- Modify: `src/resume_agent/api/routers/boards.py` (filter params + facets)
+- Modify: `src/resume_tailor_harness/api/schemas/base.py` (add `BoardPage`)
+- Modify: `src/resume_tailor_harness/api/mappers.py` (add `to_board_page`)
+- Modify: `src/resume_tailor_harness/api/routers/boards.py` (filter params + facets)
 - Test: `tests/api/test_boards.py` (append)
 
 **Interfaces:**
@@ -548,7 +548,7 @@ Expected: FAIL — no `total`/`facets` keys; `source`/`q` ignored.
 - [ ] **Step 3: Add `BoardPage` to `base.py`**
 
 ```python
-# src/resume_agent/api/schemas/base.py  (append; add Field to the pydantic import)
+# src/resume_tailor_harness/api/schemas/base.py  (append; add Field to the pydantic import)
 class BoardPage(CamelModel, Generic[T]):
     data: list[T]
     pagination: Pagination
@@ -559,8 +559,8 @@ class BoardPage(CamelModel, Generic[T]):
 - [ ] **Step 4: Add `to_board_page` to `mappers.py`**
 
 ```python
-# src/resume_agent/api/mappers.py  (append)
-from resume_agent.api.schemas.base import BoardPage
+# src/resume_tailor_harness/api/mappers.py  (append)
+from resume_tailor_harness.api.schemas.base import BoardPage
 
 
 def to_board_page(service_page, item_model, facets: dict) -> BoardPage:
@@ -578,7 +578,7 @@ def to_board_page(service_page, item_model, facets: dict) -> BoardPage:
 - [ ] **Step 5: Rewrite `boards.py` with the filter dependency**
 
 ```python
-# src/resume_agent/api/routers/boards.py  (full replacement)
+# src/resume_tailor_harness/api/routers/boards.py  (full replacement)
 """Read-only board lists: shortlist, pipeline, triage. Server-side filter + facets."""
 
 from __future__ import annotations
@@ -586,12 +586,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.mappers import to_board_page
-from resume_agent.api.schemas.base import BoardPage
-from resume_agent.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
-from resume_agent.services import board
-from resume_agent.services.board_query import BoardFilter, parse_csv
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.mappers import to_board_page
+from resume_tailor_harness.api.schemas.base import BoardPage
+from resume_tailor_harness.api.schemas.jobs import PipelineItem, ShortlistItem, TriageItem
+from resume_tailor_harness.services import board
+from resume_tailor_harness.services.board_query import BoardFilter, parse_csv
 
 router = APIRouter()
 
@@ -672,8 +672,8 @@ Expected: PASS — new cases plus the existing pagination/status/bearer tests (t
 - [ ] **Step 7: Lint + commit**
 
 ```bash
-ruff check src/resume_agent/api
-git add src/resume_agent/api/schemas/base.py src/resume_agent/api/mappers.py src/resume_agent/api/routers/boards.py tests/api/test_boards.py
+ruff check src/resume_tailor_harness/api
+git add src/resume_tailor_harness/api/schemas/base.py src/resume_tailor_harness/api/mappers.py src/resume_tailor_harness/api/routers/boards.py tests/api/test_boards.py
 git commit -m "feat(api): BoardPage envelope (facets+total) + filter query params"
 ```
 
@@ -683,9 +683,9 @@ git commit -m "feat(api): BoardPage envelope (facets+total) + filter query param
 
 **Files:**
 
-- Modify: `src/resume_agent/services/board.py` (add `resolve_ids`, `bulk_apply`)
-- Create: `src/resume_agent/api/schemas/bulk.py`
-- Modify: `src/resume_agent/api/routers/jobs.py` (add the endpoint)
+- Modify: `src/resume_tailor_harness/services/board.py` (add `resolve_ids`, `bulk_apply`)
+- Create: `src/resume_tailor_harness/api/schemas/bulk.py`
+- Modify: `src/resume_tailor_harness/api/routers/jobs.py` (add the endpoint)
 - Test: `tests/test_services_board.py`, `tests/api/test_job_mutations.py` (append)
 
 **Interfaces:**
@@ -702,8 +702,8 @@ Actions: `archive`, `restore`, `delete`, `approve` (= setStatus `approved`), `se
 
 ```python
 # tests/test_services_board.py  (append)
-from resume_agent.services.board import bulk_apply
-from resume_agent.tracking.tables import ResumeVersion
+from resume_tailor_harness.services.board import bulk_apply
+from resume_tailor_harness.tracking.tables import ResumeVersion
 
 
 def test_bulk_delete_by_query_skips_progress_and_reports():
@@ -727,7 +727,7 @@ def test_bulk_archive_dry_run_mutates_nothing():
         jid = _job(session, status=JobStatus.rejected.value, fit_score=10).id
         res = bulk_apply(session, board="triage", action="archive", scope="ids",
                          ids=[jid], dry_run=True)
-        from resume_agent.tracking.repository import get_job
+        from resume_tailor_harness.tracking.repository import get_job
         assert get_job(session, jid).archived_at is None
     assert res.affected == 1
 ```
@@ -740,10 +740,10 @@ Expected: FAIL — `bulk_apply` undefined.
 - [ ] **Step 3: Implement `resolve_ids` + `bulk_apply` in `board.py`**
 
 ```python
-# src/resume_agent/services/board.py  (append)
+# src/resume_tailor_harness/services/board.py  (append)
 from dataclasses import dataclass, field
 
-from resume_agent.tracking.tables import JobStatus
+from resume_tailor_harness.tracking.tables import JobStatus
 
 
 @dataclass
@@ -813,14 +813,14 @@ def bulk_apply(
 - [ ] **Step 4: Create `api/schemas/bulk.py`**
 
 ```python
-# src/resume_agent/api/schemas/bulk.py
+# src/resume_tailor_harness/api/schemas/bulk.py
 """Request/response for the act-by-query bulk endpoint."""
 
 from __future__ import annotations
 
 from pydantic import Field
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class BulkRequest(CamelModel):
@@ -863,10 +863,10 @@ clashing with the `status` **action argument** for `setStatus`.
 - [ ] **Step 5: Add the endpoint to `jobs.py`**
 
 ```python
-# src/resume_agent/api/routers/jobs.py  (append; add imports at top)
-from resume_agent.api.schemas.bulk import BulkRequest, BulkResultOut
-from resume_agent.services.board import bulk_apply
-from resume_agent.services.board_query import BoardFilter
+# src/resume_tailor_harness/api/routers/jobs.py  (append; add imports at top)
+from resume_tailor_harness.api.schemas.bulk import BulkRequest, BulkResultOut
+from resume_tailor_harness.services.board import bulk_apply
+from resume_tailor_harness.services.board_query import BoardFilter
 
 _VALID_ACTIONS = {"archive", "restore", "delete", "approve", "setStatus"}
 _VALID_BOARDS = {"triage", "shortlist", "pipeline"}
@@ -931,8 +931,8 @@ Expected: PASS.
 - [ ] **Step 7: Lint + commit**
 
 ```bash
-ruff check src/resume_agent tests
-git add src/resume_agent/services/board.py src/resume_agent/api/schemas/bulk.py src/resume_agent/api/routers/jobs.py tests
+ruff check src/resume_tailor_harness tests
+git add src/resume_tailor_harness/services/board.py src/resume_tailor_harness/api/schemas/bulk.py src/resume_tailor_harness/api/routers/jobs.py tests
 git commit -m "feat(api): act-by-query bulk endpoint (archive/restore/delete/approve/setStatus)"
 ```
 
@@ -942,7 +942,7 @@ git commit -m "feat(api): act-by-query bulk endpoint (archive/restore/delete/app
 
 **Files:**
 
-- Modify: `src/resume_agent/db.py` (`init_db` — add `ensure_indexes`)
+- Modify: `src/resume_tailor_harness/db.py` (`init_db` — add `ensure_indexes`)
 - Test: `tests/test_db_indexes.py` (create)
 
 **Interfaces:**
@@ -958,7 +958,7 @@ gain the indexes without a migration framework.
 # tests/test_db_indexes.py
 from sqlalchemy import text
 
-from resume_agent.db import get_session, init_db, make_engine
+from resume_tailor_harness.db import get_session, init_db, make_engine
 
 
 def test_job_filter_indexes_exist():
@@ -979,7 +979,7 @@ Expected: FAIL — indexes absent.
 
 - [ ] **Step 3: Add `ensure_indexes` and call it from `init_db`**
 
-In `src/resume_agent/db.py`, add and call at the end of `init_db(engine)` (after
+In `src/resume_tailor_harness/db.py`, add and call at the end of `init_db(engine)` (after
 `SQLModel.metadata.create_all(engine)`):
 
 ```python
@@ -1011,8 +1011,8 @@ Expected: PASS.
 - [ ] **Step 5: Lint + commit**
 
 ```bash
-ruff check src/resume_agent/db.py tests/test_db_indexes.py
-git add src/resume_agent/db.py tests/test_db_indexes.py
+ruff check src/resume_tailor_harness/db.py tests/test_db_indexes.py
+git add src/resume_tailor_harness/db.py tests/test_db_indexes.py
 git commit -m "perf(db): idempotent indexes on job filter/sort columns"
 ```
 

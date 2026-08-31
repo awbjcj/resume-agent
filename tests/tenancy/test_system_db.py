@@ -1,8 +1,8 @@
 from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
-from resume_agent.db import init_db, make_engine
-from resume_agent.tenancy.system_db import (
+from resume_tailor_harness.db import init_db, make_engine
+from resume_tailor_harness.tenancy.system_db import (
     UsageEvent,
     User,
     init_system_db,

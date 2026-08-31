@@ -1,6 +1,6 @@
-from resume_agent.models.profile import Contact, Experience, ProfileFacts, Project
-from resume_agent.profile.corpus import SourceDoc
-from resume_agent.profile.synthesis import (
+from resume_tailor_harness.models.profile import Contact, Experience, ProfileFacts, Project
+from resume_tailor_harness.profile.corpus import SourceDoc
+from resume_tailor_harness.profile.synthesis import (
     ClaimVerdict,
     ClaimVerdicts,
     SynthesizedClaim,

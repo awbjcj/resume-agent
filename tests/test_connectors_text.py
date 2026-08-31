@@ -1,5 +1,5 @@
-from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import (
+from resume_tailor_harness.discovery.connectors.base import RawJob
+from resume_tailor_harness.discovery.connectors.text import (
     clean_job_description_text,
     filter_by_search,
     html_to_text,
@@ -7,7 +7,7 @@ from resume_agent.discovery.connectors.text import (
     primary_search_term,
     relevance_gate,
 )
-from resume_agent.discovery.search_config import SearchConfig
+from resume_tailor_harness.discovery.search_config import SearchConfig
 
 
 def test_html_to_text_unescapes_and_strips_tags():
@@ -108,7 +108,7 @@ def test_primary_location_returns_first_nonempty_location():
 
 
 def test_html_to_markdown_preserves_lists_and_headings():
-    from resume_agent.discovery.connectors.text import html_to_markdown
+    from resume_tailor_harness.discovery.connectors.text import html_to_markdown
 
     html = "<h2>Responsibilities</h2><ul><li>Build APIs</li><li>Ship features</li></ul>"
     md = html_to_markdown(html)
@@ -118,13 +118,13 @@ def test_html_to_markdown_preserves_lists_and_headings():
 
 
 def test_html_to_markdown_passes_plain_text_through():
-    from resume_agent.discovery.connectors.text import html_to_markdown
+    from resume_tailor_harness.discovery.connectors.text import html_to_markdown
 
     assert html_to_markdown("Just plain text").strip() == "Just plain text"
 
 
 def test_html_to_markdown_empty():
-    from resume_agent.discovery.connectors.text import html_to_markdown
+    from resume_tailor_harness.discovery.connectors.text import html_to_markdown
 
     assert html_to_markdown("") == ""
 

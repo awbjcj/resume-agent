@@ -1,4 +1,4 @@
-from resume_agent.models.profile import (
+from resume_tailor_harness.models.profile import (
     Award,
     Bullet,
     Contact,
@@ -6,15 +6,15 @@ from resume_agent.models.profile import (
     ProfileFacts,
     Project,
 )
-from resume_agent.models.resume import (
+from resume_tailor_harness.models.resume import (
     ResumeContent,
     TailoredAward,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
 )
-from resume_agent.models.review import Severity
-from resume_agent.tailor.numeric_evidence import (
+from resume_tailor_harness.models.review import Severity
+from resume_tailor_harness.tailor.numeric_evidence import (
     NUMERIC_EVIDENCE_REVIEWER,
     claim_numbers,
     fact_numbers,
