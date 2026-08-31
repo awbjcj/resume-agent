@@ -30,7 +30,7 @@
 
 **Files:**
 
-- Modify: `src/resume_agent/api/schemas/jobs.py:17-34`
+- Modify: `src/resume_tailor_harness/api/schemas/jobs.py:17-34`
 - Test: `tests/api/test_boards.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -58,7 +58,7 @@ Expected: FAIL with `KeyError`/assertion — keys absent.
 
 - [ ] **Step 3: Add the fields to the schema**
 
-In `src/resume_agent/api/schemas/jobs.py`, add to `ShortlistItem` (after `skills: list[SkillTagOut]`):
+In `src/resume_tailor_harness/api/schemas/jobs.py`, add to `ShortlistItem` (after `skills: list[SkillTagOut]`):
 
 ```python
     sic_major: str | None = None
@@ -79,7 +79,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/jobs.py tests/api/test_boards.py
+git add src/resume_tailor_harness/api/schemas/jobs.py tests/api/test_boards.py
 git commit -m "feat(api): widen ShortlistItem with location + sic facet fields"
 ```
 
@@ -89,7 +89,7 @@ git commit -m "feat(api): widen ShortlistItem with location + sic facet fields"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/analytics.py`
+- Create: `src/resume_tailor_harness/api/schemas/analytics.py`
 - Test: `tests/api/test_schemas_analytics.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -97,8 +97,8 @@ git commit -m "feat(api): widen ShortlistItem with location + sic facet fields"
 Create `tests/api/test_schemas_analytics.py`:
 
 ```python
-from resume_agent.api.schemas.analytics import AnalyticsOut, CohortOut
-from resume_agent.tracking.analytics import CohortStat
+from resume_tailor_harness.api.schemas.analytics import AnalyticsOut, CohortOut
+from resume_tailor_harness.tracking.analytics import CohortStat
 
 
 def test_cohort_out_projects_rates_from_dto():
@@ -128,14 +128,14 @@ Expected: FAIL — module does not exist.
 
 - [ ] **Step 3: Create the schema**
 
-Create `src/resume_agent/api/schemas/analytics.py`:
+Create `src/resume_tailor_harness/api/schemas/analytics.py`:
 
 ```python
 """Analytics API schemas: conversion cohorts by source and fit-band."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class CohortOut(CamelModel):
@@ -164,7 +164,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/analytics.py tests/api/test_schemas_analytics.py
+git add src/resume_tailor_harness/api/schemas/analytics.py tests/api/test_schemas_analytics.py
 git commit -m "feat(api): add analytics cohort schemas"
 ```
 
@@ -174,8 +174,8 @@ git commit -m "feat(api): add analytics cohort schemas"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/analytics.py`
-- Modify: `src/resume_agent/api/app.py:14-18,71-75`
+- Create: `src/resume_tailor_harness/api/routers/analytics.py`
+- Modify: `src/resume_tailor_harness/api/app.py:14-18,71-75`
 - Test: `tests/api/test_analytics.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -199,7 +199,7 @@ Expected: FAIL — 404 (route absent).
 
 - [ ] **Step 3: Create the router and register it**
 
-Create `src/resume_agent/api/routers/analytics.py`:
+Create `src/resume_tailor_harness/api/routers/analytics.py`:
 
 ```python
 """Read-only conversion analytics: by source and by fit-band."""
@@ -209,9 +209,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.schemas.analytics import AnalyticsOut, CohortOut
-from resume_agent.tracking.analytics import fit_band_stats, source_stats
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.schemas.analytics import AnalyticsOut, CohortOut
+from resume_tailor_harness.tracking.analytics import fit_band_stats, source_stats
 
 router = APIRouter()
 
@@ -224,10 +224,10 @@ def get_analytics(session: Session = Depends(get_session)):
     )
 ```
 
-In `src/resume_agent/api/app.py`, add the import alongside the other routers:
+In `src/resume_tailor_harness/api/app.py`, add the import alongside the other routers:
 
 ```python
-from resume_agent.api.routers import analytics as analytics_router
+from resume_tailor_harness.api.routers import analytics as analytics_router
 ```
 
 and register it (in the guarded block, after the runs router):
@@ -244,7 +244,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/analytics.py src/resume_agent/api/app.py tests/api/test_analytics.py
+git add src/resume_tailor_harness/api/routers/analytics.py src/resume_tailor_harness/api/app.py tests/api/test_analytics.py
 git commit -m "feat(api): add GET /api/analytics router"
 ```
 
@@ -254,7 +254,7 @@ git commit -m "feat(api): add GET /api/analytics router"
 
 **Files:**
 
-- Create: `src/resume_agent/api/schemas/match_gap.py`
+- Create: `src/resume_tailor_harness/api/schemas/match_gap.py`
 - Test: `tests/api/test_schemas_match_gap.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -262,8 +262,8 @@ git commit -m "feat(api): add GET /api/analytics router"
 Create `tests/api/test_schemas_match_gap.py`:
 
 ```python
-from resume_agent.api.schemas.match_gap import GapOut, MatchGapOut
-from resume_agent.tracking.match_gap import GapRow
+from resume_tailor_harness.api.schemas.match_gap import GapOut, MatchGapOut
+from resume_tailor_harness.tracking.match_gap import GapRow
 
 
 def test_gap_out_projects_demand_share():
@@ -291,14 +291,14 @@ Expected: FAIL — module absent.
 
 - [ ] **Step 3: Create the schema**
 
-Create `src/resume_agent/api/schemas/match_gap.py`:
+Create `src/resume_tailor_harness/api/schemas/match_gap.py`:
 
 ```python
 """Match-gap API schemas: missing-skill demand across target jobs."""
 
 from __future__ import annotations
 
-from resume_agent.api.schemas.base import CamelModel
+from resume_tailor_harness.api.schemas.base import CamelModel
 
 
 class GapOut(CamelModel):
@@ -323,7 +323,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/match_gap.py tests/api/test_schemas_match_gap.py
+git add src/resume_tailor_harness/api/schemas/match_gap.py tests/api/test_schemas_match_gap.py
 git commit -m "feat(api): add match-gap schemas"
 ```
 
@@ -333,11 +333,11 @@ git commit -m "feat(api): add match-gap schemas"
 
 **Files:**
 
-- Create: `src/resume_agent/api/routers/match_gap.py`
-- Modify: `src/resume_agent/api/app.py`
+- Create: `src/resume_tailor_harness/api/routers/match_gap.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_match_gap.py`
 
-The domain function `match_gap(session, facts)` needs `ProfileFacts`. Load them from `data/profile/facts.json` via `resume_agent.profile.store.load_facts`; when the file is absent, return an empty report (parity with the Streamlit page's "No profile yet" guard).
+The domain function `match_gap(session, facts)` needs `ProfileFacts`. Load them from `data/profile/facts.json` via `resume_tailor_harness.profile.store.load_facts`; when the file is absent, return an empty report (parity with the Streamlit page's "No profile yet" guard).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -359,7 +359,7 @@ Expected: FAIL — 404.
 
 - [ ] **Step 3: Create the router and register it**
 
-Create `src/resume_agent/api/routers/match_gap.py`:
+Create `src/resume_tailor_harness/api/routers/match_gap.py`:
 
 ```python
 """Read-only match-gap: skills target jobs demand that the profile lacks."""
@@ -371,10 +371,10 @@ from pathlib import Path
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
-from resume_agent.api.schemas.match_gap import GapOut, MatchGapOut
-from resume_agent.profile.store import load_facts
-from resume_agent.tracking.match_gap import match_gap
+from resume_tailor_harness.api.deps import get_session
+from resume_tailor_harness.api.schemas.match_gap import GapOut, MatchGapOut
+from resume_tailor_harness.profile.store import load_facts
+from resume_tailor_harness.tracking.match_gap import match_gap
 
 router = APIRouter()
 
@@ -392,10 +392,10 @@ def get_match_gap(session: Session = Depends(get_session)):
     )
 ```
 
-Register in `src/resume_agent/api/app.py`:
+Register in `src/resume_tailor_harness/api/app.py`:
 
 ```python
-from resume_agent.api.routers import match_gap as match_gap_router
+from resume_tailor_harness.api.routers import match_gap as match_gap_router
 ```
 
 ```python
@@ -410,7 +410,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/routers/match_gap.py src/resume_agent/api/app.py tests/api/test_match_gap.py
+git add src/resume_tailor_harness/api/routers/match_gap.py src/resume_tailor_harness/api/app.py tests/api/test_match_gap.py
 git commit -m "feat(api): add GET /api/match-gap router"
 ```
 
@@ -420,7 +420,7 @@ git commit -m "feat(api): add GET /api/match-gap router"
 
 **Files:**
 
-- Modify: `src/resume_agent/api/app.py`
+- Modify: `src/resume_tailor_harness/api/app.py`
 - Test: `tests/api/test_static_spa.py`
 
 Mount `web/dist` as static files at `/` when the directory exists, with SPA fallback (unknown non-`/api` paths return `index.html`). Absent build dir → no mount (tests/dev without a build still pass).
@@ -434,14 +434,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from resume_agent.api.app import create_app
+from resume_tailor_harness.api.app import create_app
 
 
 def test_spa_served_when_dist_exists(tmp_path, monkeypatch):
     dist = tmp_path / "web" / "dist"
     dist.mkdir(parents=True)
     (dist / "index.html").write_text("<!doctype html><title>app</title>", encoding="utf-8")
-    monkeypatch.setattr("resume_agent.api.app.spa_dist_dir", lambda: dist)
+    monkeypatch.setattr("resume_tailor_harness.api.app.spa_dist_dir", lambda: dist)
     app = create_app(db_url="sqlite://")
     with TestClient(app) as client:
         # API still works
@@ -453,7 +453,7 @@ def test_spa_served_when_dist_exists(tmp_path, monkeypatch):
 
 
 def test_no_spa_mount_without_dist(tmp_path, monkeypatch):
-    monkeypatch.setattr("resume_agent.api.app.spa_dist_dir", lambda: tmp_path / "missing")
+    monkeypatch.setattr("resume_tailor_harness.api.app.spa_dist_dir", lambda: tmp_path / "missing")
     app = create_app(db_url="sqlite://")
     with TestClient(app) as client:
         assert client.get("/api/health").status_code == 200
@@ -467,7 +467,7 @@ Expected: FAIL — `spa_dist_dir` undefined / no fallback.
 
 - [ ] **Step 3: Implement the mount**
 
-In `src/resume_agent/api/app.py`, add near the top:
+In `src/resume_tailor_harness/api/app.py`, add near the top:
 
 ```python
 from fastapi.responses import FileResponse
@@ -475,7 +475,7 @@ from fastapi.staticfiles import StaticFiles
 
 
 def spa_dist_dir() -> Path:
-    # repo_root/web/dist — app.py is src/resume_agent/api/app.py
+    # repo_root/web/dist — app.py is src/resume_tailor_harness/api/app.py
     return Path(__file__).resolve().parents[3] / "web" / "dist"
 ```
 
@@ -507,7 +507,7 @@ Expected: PASS (health unaffected).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/api/app.py tests/api/test_static_spa.py
+git add src/resume_tailor_harness/api/app.py tests/api/test_static_spa.py
 git commit -m "feat(api): serve built SPA from web/dist with SPA fallback"
 ```
 
@@ -555,7 +555,7 @@ git commit -m "chore(contracts): regenerate after analytics/match-gap + shortlis
 Run:
 
 ```bash
-cd D:/Fun/resume-agent
+cd D:/Fun/resume-tailor-harness
 npm create vite@latest web -- --template react-ts
 cd web && npm install
 ```
@@ -779,7 +779,7 @@ Create `web/src/lib/api/client.ts`:
 import createClient from "openapi-fetch";
 import type { paths } from "./schema";
 
-const TOKEN_KEY = "resume-agent-token";
+const TOKEN_KEY = "resume-tailor-harness-token";
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -943,7 +943,7 @@ export function AppLayout() {
       <Sidebar>
         <SidebarHeader className="p-4">
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--primary)]">
-            Resume Agent
+            Résumé Tailor Harness
           </div>
           <div className="font-serif text-2xl font-bold leading-tight">
             The Broadsheet
@@ -1235,7 +1235,7 @@ Expected: FAIL — module missing.
 Create `web/src/lib/filters/normalize.ts`:
 
 ```ts
-// Port of resume_agent.tracking.match_gap.normalize_skill
+// Port of resume_tailor_harness.tracking.match_gap.normalize_skill
 const PUNCT = /[^a-z0-9+#. ]+/g;
 const WS = /\s+/g;
 
@@ -4528,7 +4528,7 @@ export function watchRun(
 }
 ```
 
-Note: confirm the SSE event names/payload shape against `src/resume_agent/api/runs/sse.py` (`run_events`) — adapt the `data` field names (`percent`, `phase`) to whatever `record_to_run`/the event serializer emits. Read that file before implementing and match exactly.
+Note: confirm the SSE event names/payload shape against `src/resume_tailor_harness/api/runs/sse.py` (`run_events`) — adapt the `data` field names (`percent`, `phase`) to whatever `record_to_run`/the event serializer emits. Read that file before implementing and match exactly.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -5550,28 +5550,28 @@ git commit -m "chore(contracts): copy generated client into web/ on regen"
 
 ### Task 8.5: Retire Streamlit
 
-**Files:** Delete `src/resume_agent/dashboard/`; modify `pyproject.toml` (drop the `dashboard`/`streamlit` entrypoint + dep); modify `CLAUDE.md`.
+**Files:** Delete `src/resume_tailor_harness/dashboard/`; modify `pyproject.toml` (drop the `dashboard`/`streamlit` entrypoint + dep); modify `CLAUDE.md`.
 
-Do this ONLY after the SPA is verified at parity in a manual run (`resume-agent serve`, build present, click through all five pages + launch a run).
+Do this ONLY after the SPA is verified at parity in a manual run (`resume-tailor-harness serve`, build present, click through all five pages + launch a run).
 
 - [ ] **Step 1: Confirm parity manually**
 
-Run: `cd web && npm run build && cd .. && .venv/Scripts/python.exe -m resume_agent serve` (or `resume-agent serve`), open `http://127.0.0.1:8000`, verify all five pages render, a job drawer opens, and a Pull run streams progress.
+Run: `cd web && npm run build && cd .. && .venv/Scripts/python.exe -m resume_tailor_harness serve` (or `resume-tailor-harness serve`), open `http://127.0.0.1:8000`, verify all five pages render, a job drawer opens, and a Pull run streams progress.
 
 - [ ] **Step 2: Remove the Streamlit code + entrypoint**
 
 ```bash
-git rm -r src/resume_agent/dashboard
+git rm -r src/resume_tailor_harness/dashboard
 ```
 
 Remove the Streamlit dependency and any `dashboard` script/entrypoint from `pyproject.toml`. Search for residual imports:
 
-Run: `grep -rn "resume_agent.dashboard\|streamlit" src tests pyproject.toml`
+Run: `grep -rn "resume_tailor_harness.dashboard\|streamlit" src tests pyproject.toml`
 Expected after edits: no hits in `src`/`pyproject.toml` (delete or port any test that imported the dashboard).
 
 - [ ] **Step 3: Update docs**
 
-In `CLAUDE.md`, update the "third thin adapter" wording to reflect that the SPA (`web/`) replaces Streamlit as the human UI over the API; note `web/` build + `resume-agent serve` serving it.
+In `CLAUDE.md`, update the "third thin adapter" wording to reflect that the SPA (`web/`) replaces Streamlit as the human UI over the API; note `web/` build + `resume-tailor-harness serve` serving it.
 
 - [ ] **Step 4: Verify**
 
