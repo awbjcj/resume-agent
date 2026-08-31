@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { AuthLayout } from "./AuthLayout";
 
 describe("AuthLayout", () => {
-  it("renders one main landmark and keeps the generated brand art decorative", () => {
+  it("renders one main landmark and keeps the brand story decorative", () => {
     const { container } = render(
       <AuthLayout title="Sign in" description="Welcome back">
         <p>Form</p>
@@ -16,16 +16,14 @@ describe("AuthLayout", () => {
       "aria-hidden",
       "true",
     );
-    expect(
-      container.querySelector("[data-slot='auth-brand'] img")?.getAttribute("src"),
-    ).toContain("auth-evidence-command-center");
+    const story = container.querySelector("[data-slot='auth-brand-story']");
     const visual = container.querySelector("[data-slot='auth-brand-visual']");
     const copy = container.querySelector("[data-slot='auth-brand-copy']");
+    expect(story).toBeInTheDocument();
     expect(visual).toBeInTheDocument();
     expect(copy).toBeInTheDocument();
-    expect(visual?.nextElementSibling).toBe(copy);
-    expect(visual?.querySelector("img")).toHaveClass("object-contain");
-    expect(copy?.querySelector("img")).toBeNull();
-    expect(screen.getByText("Secure workspace")).toBeInTheDocument();
+    expect(copy?.nextElementSibling).toBe(visual);
+    expect(container.querySelector("[data-slot='auth-brand'] img")).toBeNull();
+    expect(screen.getAllByText("Secure workspace")).toHaveLength(2);
   });
 });

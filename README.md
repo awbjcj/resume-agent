@@ -294,7 +294,7 @@ weight becomes tractable:
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
 | **Profile Coach**        | Evidence you never wrote down. Interviews you one question at a time and drafts only what you said. |
 | **Mock interviews**      | Rehearsing blind. Practises against a *specific* tailored role and scores the debrief.            |
-| **Career Lab**           | Negotiation prep, pivots, portfolio write-ups — 35 approved procedures, output stays a draft.     |
+| **Career Lab**           | Negotiation prep, pivots, portfolio write-ups — one verified skill per turn, output stays a draft. |
 | **Match-gap**            | Guessing what to learn next. Ranks the skills your target jobs demand and your profile lacks.     |
 | **Sponsorship evidence** | Applying blind to visa-hostile employers, using historical filings as a signal — never a promise. |
 | **Company intelligence** | Unprepared interviews. A cited employer brief, refreshed only when you ask.                       |

@@ -108,8 +108,8 @@
 .shell-action-rail::-webkit-scrollbar { display: none; }
 
 /* Authentication is a quiet product moment rather than a generic form page.
-   The generated illustration carries the narrative; the form surface stays
-   calm and legible so the artwork never competes with the task. */
+   The editorial promise and evidence preview read as one continuous story;
+   the form surface stays calm and legible beside it. */
 .auth-shell {
   isolation: isolate;
 }
@@ -117,31 +117,117 @@
 .auth-brand-panel {
   background: #061d26;
   background-image:
-    radial-gradient(circle at 52% 32%, rgba(91, 216, 231, 0.13), transparent 42%),
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    radial-gradient(circle at 72% 47%, rgba(91, 216, 231, 0.14), transparent 38%),
     linear-gradient(180deg, #061d26 0%, #041820 100%);
+  background-size: 4rem 4rem, 4rem 4rem, auto, auto;
 }
 
-.auth-brand-visual {
-  isolation: isolate;
-}
-
-.auth-brand-visual::after {
+.auth-brand-panel::after {
   position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(
-    180deg,
-    rgba(6, 29, 38, 0.08) 0%,
-    transparent 14%,
-    transparent 82%,
-    rgba(6, 29, 38, 0.28) 100%
-  );
+  right: -10rem;
+  bottom: -13rem;
+  width: 32rem;
+  height: 32rem;
+  border: 1px solid rgba(165, 243, 252, 0.08);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 4rem rgba(165, 243, 252, 0.018),
+    0 0 0 8rem rgba(165, 243, 252, 0.012);
   content: "";
   pointer-events: none;
 }
 
-.auth-brand-art {
-  filter: saturate(0.88) contrast(1.03);
+.auth-brand-copy,
+.auth-workspace-preview {
+  animation: auth-story-enter 280ms var(--ease-out-strong) both;
+}
+
+.auth-workspace-preview {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.125rem;
+  background: rgba(4, 24, 32, 0.72);
+  box-shadow:
+    0 28px 70px -34px rgba(0, 0, 0, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(14px);
+  animation-delay: 50ms;
+}
+
+.auth-evidence-line {
+  display: grid;
+  grid-template-columns: 0.375rem 1fr;
+  gap: 0.625rem;
+  align-items: center;
+}
+
+.auth-evidence-line > span {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: rgba(103, 232, 249, 0.72);
+  box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.08);
+}
+
+.auth-evidence-line > i {
+  height: 0.3rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.3) 0 74%, rgba(255, 255, 255, 0.08) 74%);
+}
+
+.auth-evidence-line:nth-child(2) > i { width: 88%; }
+.auth-evidence-line:nth-child(3) > i { width: 68%; }
+
+.auth-flow-step {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.72rem;
+}
+
+.auth-flow-step > span {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.auth-flow-step svg { width: 0.8rem; height: 0.8rem; }
+.auth-flow-step strong { font-weight: 550; }
+
+.auth-flow-step.is-current {
+  color: rgba(207, 250, 254, 0.92);
+}
+
+.auth-flow-step.is-current > span {
+  border-color: rgba(103, 232, 249, 0.2);
+  background: rgba(103, 232, 249, 0.1);
+  box-shadow: 0 8px 22px -14px rgba(103, 232, 249, 0.8);
+}
+
+.auth-flow-arrow {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: 0.35rem 0 0.35rem 0.58rem;
+  transform: rotate(90deg);
+  color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes auth-story-enter {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (min-width: 64rem) and (max-height: 51.25rem) {
@@ -149,17 +235,32 @@
     padding: 1.5rem;
   }
 
-  .auth-brand-copy {
-    padding: 1rem 1.125rem;
-  }
-
   .auth-brand-copy-heading {
-    margin-top: 0.5rem;
-    font-size: 1.6rem;
+    margin-top: 0.65rem;
+    font-size: 2rem;
   }
 
-  .auth-brand-copy-summary,
-  .auth-brand-copy-flow {
+  .auth-brand-copy-summary {
+    margin-top: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .auth-workspace-preview {
+    margin-top: 1.25rem;
+  }
+
+  .auth-workspace-preview .auth-preview-bar,
+  .auth-workspace-preview .auth-preview-note {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .auth-evidence-document {
+    padding: 0.8rem;
+  }
+
+  .auth-evidence-document > :nth-child(4),
+  .auth-evidence-document > :nth-child(5) {
     margin-top: 0.75rem;
   }
 }
@@ -230,7 +331,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-card {
+  .auth-card,
+  .auth-brand-copy,
+  .auth-workspace-preview {
     animation: none;
   }
 }
