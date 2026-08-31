@@ -36,7 +36,7 @@ describe("SetupGate", () => {
 
   it("does not redirect when the user dismissed setup", async () => {
     server.use(http.get("/api/setup/status", () => HttpResponse.json(INCOMPLETE)));
-    localStorage.setItem("resume-agent-setup-dismissed", "1");
+    localStorage.setItem("resume-tailor-harness-setup-dismissed", "1");
     renderGate();
     await waitFor(() => expect(screen.getByText("dashboard")).toBeInTheDocument());
   });

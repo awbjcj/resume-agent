@@ -83,7 +83,7 @@ function renderPage(entry = "/interview?session=s1") {
 beforeEach(() => {
   vi.clearAllMocks();
   FakeEventSource.last = null;
-  localStorage.setItem("resume-agent-token", "token");
+  localStorage.setItem("resume-tailor-harness-token", "token");
   mocks.sessions.mockReturnValue({ data: { sessions: [] }, isLoading: false, isError: false });
   mocks.session.mockReturnValue({ data: activeSession(), isLoading: false, isError: false, refetch: vi.fn() });
   mocks.send.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false });

@@ -24,13 +24,13 @@ evals/reports/*
 # The bundled SIC reference table is package data, not local state — keep it
 # tracked despite the broad data/ ignore above (it is loaded at import time and
 # force-included into the wheel).
-!src/resume_agent/taxonomy/data/
-!src/resume_agent/taxonomy/data/sic_codes.json
+!src/resume_tailor_harness/taxonomy/data/
+!src/resume_tailor_harness/taxonomy/data/sic_codes.json
 # Same story for the password-policy common-passwords wordlist: package data
 # read via importlib.resources at request time, not local state.
-!src/resume_agent/api/data/
-!src/resume_agent/api/data/__init__.py
-!src/resume_agent/api/data/common_passwords.txt
+!src/resume_tailor_harness/api/data/
+!src/resume_tailor_harness/api/data/__init__.py
+!src/resume_tailor_harness/api/data/common_passwords.txt
 *.pdf
 
 # Local browser sessions / calibration captures

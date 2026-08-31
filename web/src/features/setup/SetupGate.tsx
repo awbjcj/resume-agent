@@ -7,8 +7,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
   const { data, isError } = useSetupStatus();
   if (isError) return <>{children}</>; // fail open — never lock a working app
   if (!data) return <>{children}</>;   // loading: render normally, no flash-gate
-  const dismissed = (localStorage.getItem("resume-tailor-harness-setup-dismissed")
-    ?? localStorage.getItem("resume-agent-setup-dismissed")) === "1";
+  const dismissed = localStorage.getItem("resume-tailor-harness-setup-dismissed") === "1";
   if (!data.complete && !dismissed) return <Navigate to="/setup" replace />;
   return <>{children}</>;
 }

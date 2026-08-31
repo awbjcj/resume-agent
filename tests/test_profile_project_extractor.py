@@ -32,8 +32,8 @@ class FakeAgent:
 def project_doc() -> ProjectDocFacts:
     project = Project.model_validate(
         {
-            "name": "resume-agent",
-            "repo_url": "https://github.com/me/resume-agent",
+            "name": "resume-tailor-harness",
+            "repo_url": "https://github.com/me/resume-tailor-harness",
             "tech": ["Python"],
             "highlights": [{"text": "Automated releases"}],
             "experience": [{"company": "Injected"}],
@@ -44,7 +44,7 @@ def project_doc() -> ProjectDocFacts:
             "name": "FastAPI",
             "category": "hard",
             "inferred": True,
-            "evidence_fact_ids": ["project:resume-agent:highlight:1"],
+            "evidence_fact_ids": ["project:resume-tailor-harness:highlight:1"],
             "employer": "Injected",
         }
     )

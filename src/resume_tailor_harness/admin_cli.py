@@ -8,15 +8,12 @@ import httpx
 import typer
 
 CREDENTIALS_PATH = Path.home() / ".resume-tailor-harness" / "credentials.json"
-LEGACY_CREDENTIALS_PATH = Path.home() / ".resume-agent" / "credentials.json"
 DEFAULT_URL = "http://localhost:8000"
 admin_app = typer.Typer(help="Manage users on a deployed Résumé Tailor Harness instance.")
 
 
 def api_url() -> str:
-    return os.environ.get(
-        "RESUME_TAILOR_HARNESS_URL", os.environ.get("RESUME_AGENT_URL", DEFAULT_URL)
-    ).rstrip("/")
+    return os.environ.get("RESUME_TAILOR_HARNESS_URL", DEFAULT_URL).rstrip("/")
 
 
 def _make_client(base_url: str) -> httpx.Client:
@@ -27,10 +24,7 @@ def load_credentials() -> dict[str, str] | None:
     try:
         value = json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        try:
-            value = json.loads(LEGACY_CREDENTIALS_PATH.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
+        return None
     required = {"apiUrl", "username", "token"}
     return value if isinstance(value, dict) and required <= value.keys() else None
 

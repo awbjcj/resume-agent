@@ -121,7 +121,7 @@ describe("CoachPage", () => {
     coachState.useDefaultSession = true;
     coachState.sessions = [];
     FakeEventSource.last = null;
-    localStorage.setItem("resume-agent-token", "token");
+    localStorage.setItem("resume-tailor-harness-token", "token");
     sendMessage.mockImplementation(async ({ onDone }) => {
       onDone?.({ status: "succeeded" });
       return { runId: "run-1" };

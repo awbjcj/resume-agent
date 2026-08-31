@@ -32,7 +32,7 @@ describe("useChatStream", () => {
     FakeEventSource.last = null;
     FakeEventSource.instances = [];
     resetSseLinkTokenCache();
-    localStorage.setItem("resume-agent-token", "token");
+    localStorage.setItem("resume-tailor-harness-token", "token");
   });
 
   it("accumulates valid events and ignores malformed rows without advancing", async () => {
@@ -79,7 +79,7 @@ describe("useChatStream", () => {
   });
 
   it("reuses one unexpired link token across consecutive runs", async () => {
-    localStorage.removeItem("resume-agent-token");
+    localStorage.removeItem("resume-tailor-harness-token");
     let requests = 0;
     server.use(http.post("/api/auth/link-token", () => {
       requests += 1;
@@ -95,7 +95,7 @@ describe("useChatStream", () => {
   });
 
   it("re-mints a cached token once when its first connection fails", async () => {
-    localStorage.removeItem("resume-agent-token");
+    localStorage.removeItem("resume-tailor-harness-token");
     let requests = 0;
     server.use(http.post("/api/auth/link-token", () => {
       requests += 1;
