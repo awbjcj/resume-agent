@@ -317,7 +317,7 @@ have left out, and drafts only claims grounded in what you actually answered:
 specific tailored role, then turns the conversation into a scored debrief you
 can act on:
 
-![Mock interviews — focused rehearsal and scored debrief](docs/screenshots/mock-interview.png)
+![Mock interviews — set up a rehearsal against a tailored role](docs/screenshots/mock-interview.png)
 
 **Career Lab** (`/career-lab`) is a draft-only workspace also available
 through the `career-lab` CLI command and the `/api/career-lab` REST
