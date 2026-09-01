@@ -60,8 +60,8 @@ that Claude auto-discovers once you're working inside that directory. Read
 the linked file before touching that area; don't duplicate its content back
 into this one.
 
-| Area                                                                              | Lives in                                          |
-| --------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Area                                                                              | Lives in                                                   |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | API layer, runs, auth, job-scoped surfaces                                        | `src/resume_tailor_harness/api/CLAUDE.md`                  |
 | Core package: `llm_runner.py` provider seam, deployment, cross-cutting infra      | `src/resume_tailor_harness/CLAUDE.md`                      |
 | Tenancy (ADR-0003, ADR-0009)                                                      | `src/resume_tailor_harness/tenancy/CLAUDE.md`              |
@@ -81,7 +81,7 @@ into this one.
 | Gmail integration                                                                 | `src/resume_tailor_harness/gmail/CLAUDE.md`                |
 | Calendar export (`.ics`, RFC 5545, reminder lead-time split)                      | `src/resume_tailor_harness/calendar/CLAUDE.md`             |
 | Services layer: settings bundle                                                   | `src/resume_tailor_harness/services/CLAUDE.md`             |
-| Agent-quality evals: how to run them, what the numbers mean                       | `evals/README.md`                                 |
+| Agent-quality evals: how to run them, what the numbers mean                       | `evals/README.md`                                          |
 
 ## Core invariants (never break these)
 
@@ -126,7 +126,7 @@ before changing code near the invariant.
   aggregator; user progress is never touched. → `discovery/CLAUDE.md`
 - **Archive, delete, prune.** `has_progress()` (status in
   {approved, tailored, rendered} OR any ResumeVersion/CoverLetter OR an
-  Application carrying *real investment* — ADR-0013) is the single gate for
+  Application carrying _real investment_ — ADR-0013) is the single gate for
   irreversible paths; `delete_job` refuses jobs with progress. A bare `ready`
   Application does not count: opening the Tracking tab writes one
   unconditionally. → `tracking/CLAUDE.md`
@@ -137,8 +137,8 @@ before changing code near the invariant.
 
 ## Hot paths (most-edited files)
 
-| Path                                                 | Role                                                                                                                      |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| Path                                                          | Role                                                                                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------- |
 | `src/resume_tailor_harness/llm_runner.py`                     | `build_model` provider seam + `AgentRunner` adapter                                                                       |
 | `src/resume_tailor_harness/profile/corpus.py`                 | Source registry: manifest + add/remove + legacy migration                                                                 |
 | `src/resume_tailor_harness/profile/matrix.py`                 | Derived skill matrix + overrides (ban/alias/forbid/category)                                                              |
@@ -165,10 +165,10 @@ before changing code near the invariant.
 | `src/resume_tailor_harness/concurrency.py`                    | `gather_isolated` — ordered, error-isolated async fan-out                                                                 |
 | `src/resume_tailor_harness/discovery/ingest.py`               | `save_or_upgrade`, source-priority logic                                                                                  |
 | `src/resume_tailor_harness/tracking/dedup.py`                 | `compute_dedup_key` — `company                                                                                            | normalized_title` |
-| `tests/test_discovery_ingest.py`                     | Ingest + dedup + priority tests                                                                                           |
+| `tests/test_discovery_ingest.py`                              | Ingest + dedup + priority tests                                                                                           |
 | `src/resume_tailor_harness/settings_sections.py`              | Single enumeration of customizable settings: bundle scope + reset targets                                                 |
 | `src/resume_tailor_harness/tracking/event_vocab.py`           | Closed event vocabularies + kind→status mapping + funnel order                                                            |
-| `src/resume_tailor_harness/tracking/status_rules.py`          | Progression-vs-terminal application status (ADR-0012)                                                                    |
-| `src/resume_tailor_harness/services/application_events.py`    | Timeline event validation, sequencing, status advancement                                                                |
-| `src/resume_tailor_harness/tracking/timeline_pivot.py`        | Event log → application rows; the one source for grid, CSVs, exports                                                     |
-| `src/resume_tailor_harness/tracking/funnel.py`                | Sankey flow edges + median stage cycle times                                                                             |
+| `src/resume_tailor_harness/tracking/status_rules.py`          | Progression-vs-terminal application status (ADR-0012)                                                                     |
+| `src/resume_tailor_harness/services/application_events.py`    | Timeline event validation, sequencing, status advancement                                                                 |
+| `src/resume_tailor_harness/tracking/timeline_pivot.py`        | Event log → application rows; the one source for grid, CSVs, exports                                                      |
+| `src/resume_tailor_harness/tracking/funnel.py`                | Sankey flow edges + median stage cycle times                                                                              |
