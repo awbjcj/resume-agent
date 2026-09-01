@@ -5,12 +5,15 @@
 `dev` is the integration branch: all feature work branches from `dev` and
 returns to `dev` by PR. `main` only ever receives merges from `dev` — never
 directly from a feature branch — and is the only branch Railway deploys
-from. `main` is protected (PR required, no direct pushes/force-pushes,
-required status checks: `ci / python-quality`, `ci / web-quality`,
-`ci / security-audit`, `require-dev-base`); the last of those
+from. The one exception is `hotfix/*`: a branch named `hotfix/*` may PR
+directly into `main` for an urgent out-of-band fix; merge it back into `dev`
+right after so `dev` doesn't drift from what's deployed. `main` is protected
+(PR required, no direct pushes/force-pushes, required status checks:
+`ci / python-quality`, `ci / web-quality`, `ci / security-audit`,
+`require-dev-base`); the last of those
 (`.github/workflows/require-dev-base.yml`) fails any PR into `main` whose
-head branch isn't `dev`, since GitHub branch protection has no native
-"only allow merges from branch X" rule. Dependabot
+head branch isn't `dev` or `hotfix/*`, since GitHub branch protection has no
+native "only allow merges from branch X (or pattern Y)" rule. Dependabot
 (`.github/dependabot.yml`) targets `dev` for the same reason — dependency
 bumps land on `dev` and ride the normal `dev` → `main` promotion PR like
 everything else.
