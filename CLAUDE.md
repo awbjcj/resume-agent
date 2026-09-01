@@ -18,11 +18,23 @@ native "only allow merges from branch X (or pattern Y)" rule. Dependabot
 bumps land on `dev` and ride the normal `dev` → `main` promotion PR like
 everything else.
 
-The repo only allows squash merging (merge commits and rebase merges are
-disabled at the GitHub repo level), with a blank squash-commit message —
-GitHub won't append the list of individual commits under the title. This
-keeps `dev` → `main` promotion PRs, and every other PR, as one clean commit
-instead of a merge commit plus an auto-generated commit-list body.
+The repo only allows rebase merging (merge commits and squash merges are
+disabled at the GitHub repo level): every PR's commits land on the base
+branch as-is, with their original messages, instead of a synthetic merge or
+squash commit. Because GitHub's rebase-and-merge replays each commit onto
+the base's current tip, the replayed commits get fresh SHAs even though
+their content is unchanged — so after a `dev` → `main` promotion, `dev` and
+`main` hold identical content under *different* commit hashes and would
+drift a little further apart on every single promotion if left alone.
+`.github/workflows/sync-dev-with-main.yml` runs on every push to `main` and
+force-updates `dev`'s ref to `main`'s new tip whenever their trees already
+match (verified via `git diff`, so it never fires when it would lose
+commits) — keeping the two branches genuinely in sync, not just
+content-equivalent. It intentionally does nothing when the trees differ
+(e.g. right after a `hotfix/*` merge, or if new work landed on `dev` while
+the promotion PR was merging); the documented manual "merge hotfix back into
+dev" step (above) still applies for that path, after which the next push to
+`main` fast-forwards `dev` normally.
 
 CI is split by branch so `dev` gets fast feedback and `main` gets the full
 gate before a deploy-triggering merge: `.github/workflows/_reusable-ci.yml`

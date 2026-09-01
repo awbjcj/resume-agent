@@ -1,0 +1,61 @@
+name: Sync dev with main
+
+# main only receives rebase-merges (see CLAUDE.md > Branching), which replay
+# each commit with a fresh SHA onto main's tip without touching the source
+# branch. After a normal dev -> main promotion, dev and main hold identical
+# content under different commit hashes, so left alone they'd diverge a little
+# more on every single promotion. This job resets dev's ref to main's new tip
+# whenever their trees already match, keeping the two branches truly in sync
+# instead of just content-equivalent.
+#
+# It is deliberately conservative: if dev's tree differs from the new main
+# (e.g. someone pushed new work to dev in the window between the promotion
+# PR merging and this job running, or a hotfix/* branch just landed on main
+# without dev having it yet), it does nothing and leaves a note in the job
+# summary instead of forcing anything. A hotfix still needs its documented
+# manual merge back into dev; once that merge makes the trees match, the
+# next push to main (or a manual rerun) fast-forwards dev normally.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync-dev:
+    name: sync-dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward dev to main if content already matches
+        run: |
+          git fetch origin dev main
+          dev_sha="$(git rev-parse origin/dev)"
+          main_sha="$(git rev-parse origin/main)"
+          if git diff --quiet origin/dev origin/main; then
+            if [ "$dev_sha" = "$main_sha" ]; then
+              echo "dev is already at main's tip; nothing to do." >>"$GITHUB_STEP_SUMMARY"
+            else
+              # Rebase-merge gives main's commits fresh SHAs, so dev's old tip
+              # is never a git ancestor of the new main even though the tree
+              # content matches (checked above) — a plain push would be
+              # rejected as non-fast-forward. --force-with-lease is still safe
+              # here: it fails closed if dev moved past $dev_sha between our
+              # fetch and this push, instead of silently clobbering it.
+              git push --force-with-lease="refs/heads/dev:$dev_sha" origin "$main_sha:refs/heads/dev"
+              echo "Fast-forwarded dev to main ($main_sha)." >>"$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            {
+              echo "dev and main have diverged content, so dev was NOT touched."
+              echo "This is expected right after a hotfix/* merge (dev doesn't"
+              echo "have the hotfix yet) or if new commits landed on dev while"
+              echo "the promotion PR was merging. Merge main back into dev to"
+              echo "reconcile; the next push to main will then fast-forward"
+              echo "dev automatically."
+            } >>"$GITHUB_STEP_SUMMARY"
+          fi
