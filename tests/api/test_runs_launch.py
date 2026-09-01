@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from threading import Event
 from types import SimpleNamespace
@@ -9,6 +10,21 @@ from resume_tailor_harness.api.app import create_app
 from resume_tailor_harness.api.routers import runs as runs_router
 from resume_tailor_harness.progress import ProgressReporter
 from resume_tailor_harness.services.errors import list_error_records
+
+
+def _wait_for_run_done(client: TestClient, run_id: str, *, timeout: float = 5) -> None:
+    # Lifespan shutdown disposes the app's DB engine right after the `with
+    # client:` block exits. A run's terminal callback writes to that engine
+    # from its own executor thread, so the test must not let the block exit
+    # until the run has actually reached a terminal state — otherwise engine
+    # disposal can race that write (RuntimeError: Set changed size during
+    # iteration in SQLAlchemy's pool teardown).
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if client.get(f"/api/runs/{run_id}").json()["state"] == "done":
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"run {run_id} did not reach state 'done' in time")
 
 
 class InlineExecutor(Executor):
@@ -165,6 +181,7 @@ def test_duplicate_resume_revise_returns_conflict_with_active_run(
                 "details": {"runId": first.json()["runId"]},
             }
             release.set()
+            _wait_for_run_done(client, first.json()["runId"])
     finally:
         release.set()
         executor.shutdown(wait=True)
@@ -281,6 +298,7 @@ def test_cover_letter_launch_rejects_overlapping_active_jobs(monkeypatch, tmp_pa
                 "runId": first.json()["runId"]
             }
             release.set()
+            _wait_for_run_done(client, first.json()["runId"])
     finally:
         release.set()
         executor.shutdown(wait=True)
