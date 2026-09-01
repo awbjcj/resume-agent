@@ -18,6 +18,12 @@ native "only allow merges from branch X (or pattern Y)" rule. Dependabot
 bumps land on `dev` and ride the normal `dev` → `main` promotion PR like
 everything else.
 
+The repo only allows squash merging (merge commits and rebase merges are
+disabled at the GitHub repo level), with a blank squash-commit message —
+GitHub won't append the list of individual commits under the title. This
+keeps `dev` → `main` promotion PRs, and every other PR, as one clean commit
+instead of a merge commit plus an auto-generated commit-list body.
+
 CI is split by branch so `dev` gets fast feedback and `main` gets the full
 gate before a deploy-triggering merge: `.github/workflows/_reusable-ci.yml`
 holds the actual jobs (`python-quality`, `web-quality`, `security-audit`)
