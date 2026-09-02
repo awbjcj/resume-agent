@@ -13,7 +13,7 @@ dependencies = [
     "openai>=1.0.0",
     # agno 2.6.x's Gemini Interactions import expects the `step_delta` submodule,
     # which google-genai renamed to `stepdelta` in 2.9.0 — cap below it.
-    "google-genai>=2.5.0,<2.19.0",
+    "google-genai>=2.5.0,<2.21.0",
     "beautifulsoup4>=4.15.0",
     "google-api-python-client>=2.197.0",
     "google-auth>=2.53.0",
