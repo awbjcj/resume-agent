@@ -75,3 +75,14 @@ test("keeps match-gap filters and taxonomy actions contained on a narrow device"
   expect(actionWidths.scrollWidth).toBeGreaterThan(actionWidths.clientWidth);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("keeps match-gap filters in document flow on desktop", async ({ page }) => {
+  await mockMatchGap(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/match-gap");
+
+  await expect(page.getByRole("region", { name: "Dashboard controls" })).toHaveCSS(
+    "position",
+    "static",
+  );
+});

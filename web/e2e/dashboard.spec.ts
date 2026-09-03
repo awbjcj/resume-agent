@@ -70,6 +70,7 @@ test("mobile chrome keeps launch actions compact and horizontally contained", as
 
   const chrome = page.locator("header.app-chrome");
   await expect(chrome.getByText("Résumé Tailor Harness", { exact: true })).toBeVisible();
+  await expect(chrome.getByText("Command Center", { exact: true })).toHaveCount(0);
 
   const chromeBox = await chrome.boundingBox();
   expect(chromeBox).not.toBeNull();

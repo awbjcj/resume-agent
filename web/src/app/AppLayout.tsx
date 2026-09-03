@@ -158,18 +158,8 @@ export function AppLayout() {
       <Sidebar className="border-r border-sidebar-border/80 bg-sidebar">
         <div className="command-panel flex min-h-0 flex-1 flex-col">
           <SidebarHeader className="relative gap-5 border-b border-sidebar-border/70 p-5 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="command-panel-mark flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                <Sparkles className="size-4.5" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-primary">
-                  Résumé Tailor Harness
-                </div>
-                <div className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.025em]">
-                  {t("shell.commandCenter")}
-                </div>
-              </div>
+            <div className="text-lg font-semibold leading-tight tracking-[-0.025em]">
+              Résumé Tailor Harness
             </div>
 
             <div className="command-sidebar-brief rounded-xl border border-sidebar-border/80 p-3.5">
@@ -245,14 +235,8 @@ export function AppLayout() {
         <header className="app-chrome sticky top-0 z-10 border-b bg-background/88 backdrop-blur-md">
           <div className="flex min-h-16 items-center gap-3 px-5 py-3 md:px-8 lg:px-10">
             <SidebarTrigger className="md:hidden" />
-            <div className="flex min-w-0 items-center gap-2.5 md:hidden">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-                <Sparkles className="size-4" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold leading-tight">Résumé Tailor Harness</div>
-                <div className="truncate text-[0.68rem] text-muted-foreground">{t("shell.commandCenter")}</div>
-              </div>
+            <div className="min-w-0 md:hidden">
+              <div className="truncate text-sm font-semibold leading-tight">Résumé Tailor Harness</div>
             </div>
             <div className="hidden min-w-0 md:block">
               <div className="text-sm font-medium">{t("shell.operations")}</div>
