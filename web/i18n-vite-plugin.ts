@@ -29,7 +29,20 @@ export function i18nTransform(): Plugin {
         sourceFileName: filename,
       });
       if (!result?.code) return null;
-      return { code: result.code, map: result.map ?? null };
+      const map = result.map;
+      // @babel/core's map type (via @jridgewell/gen-mapping) marks these arrays
+      // readonly; Vite's rollup-derived SourceMapInput expects them mutable.
+      return {
+        code: result.code,
+        map: map
+          ? {
+              ...map,
+              names: [...map.names],
+              sources: [...map.sources],
+              sourcesContent: map.sourcesContent ? [...map.sourcesContent] : undefined,
+            }
+          : null,
+      };
     },
   };
 }
