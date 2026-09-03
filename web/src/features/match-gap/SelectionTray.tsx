@@ -178,7 +178,7 @@ export function SelectionTray(props: SelectionTrayProps) {
       <aside
         data-testid="desktop-selection-tray"
         aria-labelledby="selection-tray-title"
-        className="sticky top-4 hidden max-h-[calc(100vh-2rem)] min-h-96 flex-col border bg-card xl:flex"
+        className="sticky top-4 hidden max-h-[calc(100dvh-2rem)] min-h-96 flex-col border bg-card xl:flex"
       >
         <div className="border-b px-5 py-5">
           <h2 id="selection-tray-title" className="text-sm font-semibold">

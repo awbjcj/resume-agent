@@ -76,7 +76,7 @@ export function ChatThread({
             </div>
           ))}
           {streaming?.length ? (
-            <div aria-live="polite" aria-label="Assistant response streaming">
+            <div role="status" aria-label="Assistant response streaming">
               <ChatMessage
                 message={{ id: "streaming", role: "assistant", parts: streaming }}
                 showReasoning={showReasoning}

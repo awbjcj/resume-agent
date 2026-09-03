@@ -115,7 +115,7 @@ export function AccountUsageCard({
           </div>
         </dl>
         {quota ? (
-          <p className={`text-xs ${quota.overageMicros > 0 ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+          <p className={`text-xs ${quota.overageMicros > 0 ? "font-medium text-warning" : "text-muted-foreground"}`}>
             {quota.overageMicros > 0 ? `${money(quota.overageMicros)} overage · ` : ""}
             Resets {new Date(quota.nextResetAt).toLocaleString()}.
           </p>

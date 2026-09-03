@@ -33,7 +33,7 @@ import {
 import type { components } from "@/lib/api/schema";
 import { useCheckH1BSponsorship } from "./use-job-mutations";
 import { ACTIVE_RUN_STATUSES, latestArtifactRun, useArtifactRunIndex } from "./artifact-runs";
-import { ResearchNotice, ResearchPanelHeader } from "./ResearchPanel";
+import { ResearchNotice, ResearchPanelHeader, type NoticeTone } from "./ResearchPanel";
 import type { JobDetail } from "./use-job-detail";
 
 type SponsorshipResult = components["schemas"]["H1BSponsorshipOut"];
@@ -52,7 +52,7 @@ type StatusMeta = {
   label: string;
   description: string;
   icon: LucideIcon;
-  tone: string;
+  tone: NoticeTone;
 };
 
 const STATUS_META: Record<EvidenceStatus, StatusMeta> = {
@@ -60,19 +60,19 @@ const STATUS_META: Record<EvidenceStatus, StatusMeta> = {
     label: "Historical filings found",
     description: "The H-1B history contains filings associated with this company.",
     icon: BadgeCheck,
-    tone: "border-emerald-200/80 bg-emerald-50/80 text-emerald-950 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100",
+    tone: "success",
   },
   no_match: {
     label: "No historical filings matched",
     description: "The research did not find a matching historical filing record.",
     icon: CircleX,
-    tone: "border-rose-200/80 bg-rose-50/80 text-rose-950 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-100",
+    tone: "danger",
   },
   unavailable: {
     label: "Research unavailable",
     description: "The H-1B source did not return usable evidence for this check.",
     icon: CircleAlert,
-    tone: "border-amber-200/80 bg-amber-50/80 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100",
+    tone: "warning",
   },
 };
 
@@ -359,8 +359,8 @@ export function H1BSponsorshipPanel({
       <Card className="gap-0 p-5">
         <ResearchNotice
           icon={<StatusIcon className="size-4" />}
-          className={meta?.tone ?? "border-border bg-muted/20"}
-      >
+          tone={meta?.tone ?? "neutral"}
+        >
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold">
               {meta?.label ??
@@ -384,7 +384,7 @@ export function H1BSponsorshipPanel({
       {evidence && result?.stale && (
         <ResearchNotice
           icon={<CalendarClock className="size-4" />}
-          className="mt-4 border-amber-300/60 bg-amber-50/70 text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"
+          className="mt-4" tone="warning"
         >
           Checked {formatDate(evidence.retrievedAt)} — may be out of date
         </ResearchNotice>
@@ -430,7 +430,7 @@ export function H1BSponsorshipPanel({
       {evidence?.status === "unavailable" && message && (
         <ResearchNotice
           icon={<CircleAlert className="size-4" />}
-          className="mt-4 border-amber-200 bg-amber-50/70 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100"
+          className="mt-4" tone="warning"
         >
           {message}
         </ResearchNotice>
@@ -439,7 +439,7 @@ export function H1BSponsorshipPanel({
       {failed && (
         <ResearchNotice
           icon={<CircleAlert className="size-4" />}
-          className="mt-4 border-destructive/30 bg-destructive/5 text-destructive"
+          className="mt-4" tone="danger"
           role="alert"
         >
           {errorMessage}

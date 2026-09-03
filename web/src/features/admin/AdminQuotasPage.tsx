@@ -273,7 +273,7 @@ function Metric({
   warning?: boolean;
 }) {
   return (
-    <div className={`border-l-2 px-4 py-2 ${warning ? "border-amber-500" : "border-primary/50"}`}>
+    <div className={`border-l-2 px-4 py-2 ${warning ? "border-warning" : "border-primary/50"}`}>
       <dt className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </dt>
@@ -799,8 +799,9 @@ function QuotaOperationCard({
         </div>
 
         {preview ? (
-          <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/[0.04] p-3 duration-150 ease-out-strong animate-in fade-in-0 slide-in-from-top-1 motion-reduce:animate-none sm:flex-row sm:items-center">
-            <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden="true" />
+          <div className="tone-panel flex flex-col gap-3 rounded-lg p-3 duration-150 ease-out-strong animate-in fade-in-0 slide-in-from-top-1 motion-reduce:animate-none sm:flex-row sm:items-center"
+            data-tone="warning">
+            <AlertTriangle className="tone-accent size-5 shrink-0" aria-hidden="true" />
             <div className="flex-1">
               <div className="text-sm font-medium">
                 {`${preview.affectedCount} account${preview.affectedCount === 1 ? "" : "s"} frozen for review`}
@@ -1670,7 +1671,7 @@ export function AdminQuotasPage() {
                 <CardDescription>Models are grouped into one block and their immutable versions stay newest-first. Sort any column to rank model groups by the latest version.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="flex flex-wrap gap-x-4 gap-y-2 border-y bg-muted/15 px-4 py-2.5 text-xs text-muted-foreground" aria-label="Rate card color legend">
+                <div className="flex flex-wrap gap-x-4 gap-y-2 border-y bg-muted/15 px-4 py-2.5 text-xs text-muted-foreground" role="group" aria-label="Rate card color legend">
                   {(Object.entries(RATE_COST_BAND_STYLES) as [RateCostBand, typeof RATE_COST_BAND_STYLES[RateCostBand]][]).map(([band, tone]) => (
                     <span key={band} className="inline-flex items-center gap-1.5">
                       <i aria-hidden="true" className={cn("size-2 rounded-full", tone.rail)} />

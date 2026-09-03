@@ -41,7 +41,7 @@ export function TriageCard({
           <span className="text-xs font-medium text-muted-foreground">{fieldLabel(row.source)}</span>
         </div>
         {(row.status === "rejected" || row.status === "filtered") && row.rejectReason && (
-          <span className="mt-2.5 block text-sm leading-snug text-rose-700 dark:text-rose-300">
+          <span className="mt-2.5 block text-sm leading-snug text-destructive">
             <span className="font-medium">
               {row.status === "filtered" || row.rejectCategory === "filtered"
                 ? "Filtered out:"

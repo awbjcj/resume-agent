@@ -87,7 +87,7 @@ export function StageFlowChart({ flows }: { flows: Flow[] }) {
           </Sankey>
         </ResponsiveContainer>
       </div>
-      <div aria-label="Stage-flow rates" className="grid gap-2 sm:grid-cols-2">
+      <div role="group" aria-label="Stage-flow rates" className="grid gap-2 sm:grid-cols-2">
         {data.links.map((link) => (
           <div
             key={`${link.sourceKind}-${link.targetKind}`}

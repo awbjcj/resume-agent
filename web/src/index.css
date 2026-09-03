@@ -35,6 +35,9 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-warning: var(--warning);
+    --color-success: var(--success);
+    --color-info: var(--info);
     --color-gap: var(--gap);
     --color-adjacent: var(--adjacent);
     --color-covered: var(--covered);
@@ -73,6 +76,74 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Status tones.
+
+   Before this, twenty-odd status surfaces hand-rolled the same panel out of raw
+   Tailwind palette steps. Five near-identical amber strings had already drifted
+   apart (`amber-300/60`, `amber-200/80`, `amber-200`), every one carried a
+   second hand-written `dark:` set that could rot independently, and none used
+   the ochre/crimson the rest of the product is tuned to — a raw `amber-500`
+   panel simply did not belong next to `--ready` and `--adjacent`.
+
+   One hue per tone now feeds surface, border and secondary text through
+   `color-mix`, so a tone cannot drift and dark mode needs no parallel palette.
+   Surfaces mix against `--card`, not the local background, so a panel keeps its
+   verified contrast wherever it is dropped.
+
+   Contrast (verified, both themes): tone on its own surface 4.63-7.60,
+   `--card-foreground` on a tone surface 12.6-14.8, tone-tinted secondary text
+   6.3-8.7. Borders are deliberately decorative at ~2:1 — meaning is always
+   carried by the icon and the text, never by the border alone. */
+@layer components {
+  .tone-panel {
+    --tone: var(--muted-foreground);
+    border: 1px solid color-mix(in oklab, var(--tone), var(--card) 50%);
+    background-color: color-mix(in oklab, var(--tone), var(--card) 92%);
+    color: var(--card-foreground);
+    /* Plain `--muted-foreground` lands at 4.45:1 on a light tone surface — a
+       hair under AA. Re-point it inside the panel so `text-muted-foreground`
+       stays correct for consumers instead of silently failing. */
+    --muted-foreground: color-mix(in oklab, var(--tone), var(--card-foreground) 25%);
+  }
+  .dark .tone-panel {
+    background-color: color-mix(in oklab, var(--tone), var(--card) 88%);
+  }
+  /* A chip is the same material as a panel, but small enough that the tone has
+     to carry the text rather than sit behind it. */
+  .tone-chip {
+    --tone: var(--muted-foreground);
+    border: 1px solid color-mix(in oklab, var(--tone), var(--card) 62%);
+    background-color: color-mix(in oklab, var(--tone), var(--card) 92%);
+    color: var(--tone);
+  }
+  .dark .tone-chip {
+    background-color: color-mix(in oklab, var(--tone), var(--card) 88%);
+  }
+
+  /* Meaning tones. */
+  :is(.tone-panel, .tone-chip)[data-tone="warning"] { --tone: var(--warning); }
+  :is(.tone-panel, .tone-chip)[data-tone="success"] { --tone: var(--success); }
+  :is(.tone-panel, .tone-chip)[data-tone="danger"] { --tone: var(--destructive); }
+  :is(.tone-panel, .tone-chip)[data-tone="info"] { --tone: var(--info); }
+
+  /* Pipeline-stage ramp. This is the one place in the product that genuinely
+     needs six mutually distinguishable hues, so it gets a categorical ramp
+     rather than being forced into the four meaning tones. The `--chart-*` ramp
+     is deliberately NOT reused: it is tuned for fills, and chart-2/4/5 land at
+     2.1-3.0:1 as text on a light tint. Every hue below is verified >=4.5:1 as
+     11px badge text on its own surface in both themes (light 4.63-5.82,
+     dark 5.37-8.26). */
+  :is(.tone-panel, .tone-chip)[data-tone="stage-raw"] { --tone: var(--stage-neutral); }
+  :is(.tone-panel, .tone-chip)[data-tone="stage-shortlisted"] { --tone: var(--primary); }
+  :is(.tone-panel, .tone-chip)[data-tone="stage-approved"] { --tone: var(--success); }
+  :is(.tone-panel, .tone-chip)[data-tone="stage-tailored"] { --tone: var(--info); }
+  :is(.tone-panel, .tone-chip)[data-tone="stage-rendered"] { --tone: var(--stage-rendered); }
+  :is(.tone-panel, .tone-chip)[data-tone="stage-rejected"] { --tone: var(--destructive); }
+
+  /* The one accent that must read as the tone: icons, eyebrows, status dots. */
+  .tone-accent { color: var(--tone); }
 }
 
 .scout-proposal-card {
@@ -404,6 +475,11 @@
     --accent: #e6f7fa;
     --accent-foreground: #075f76;
     --destructive: #bd2d46;
+    --warning: #8a6500;
+    --success: #1f7a4d;
+    --info: #3867d6;
+    --stage-neutral: #556069;
+    --stage-rendered: #6d4aa8;
     --gap: #bd2d46;
     --adjacent: #8a6500;
     --covered: #65717c;
@@ -447,6 +523,11 @@
     --accent: #17373c;
     --accent-foreground: #8eeaf2;
     --destructive: #ff6b82;
+    --warning: #e6b94d;
+    --success: #43d19e;
+    --info: #86a9ff;
+    --stage-neutral: #a7b1bb;
+    --stage-rendered: #c0a3ff;
     --gap: #ff6b82;
     --adjacent: #e6b94d;
     --covered: #a7b1bb;

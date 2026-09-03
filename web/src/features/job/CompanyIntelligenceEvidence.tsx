@@ -61,7 +61,7 @@ function InsightCard({ insight, sources }: { insight: Insight; sources: readonly
         </p>
       )}
       {insight.conflictingEvidence && (
-        <p className="mt-3 text-sm leading-6 text-amber-800 dark:text-amber-200">
+        <p className="mt-3 text-sm leading-6 text-warning">
           <span className="font-semibold">Conflicting evidence: </span>
           {insight.conflictingEvidence}
         </p>
@@ -158,7 +158,7 @@ export function CompanyIntelligenceEvidence({
       {isStale && (
         <ResearchNotice
           icon={<AlertTriangle className="size-4" />}
-          className="border-amber-300/60 bg-amber-50/70 text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"
+          tone="warning"
         >
           This saved research is past its freshness window. It remains visible until you choose to refresh it.
         </ResearchNotice>
@@ -213,7 +213,6 @@ export function CompanyIntelligenceEvidence({
 
       <ResearchNotice
         icon={<CircleAlert className="size-4" />}
-        className="border-border bg-muted/40 text-muted-foreground"
       >
         {evidence.caveat}
       </ResearchNotice>

@@ -6,11 +6,9 @@ import { FitMeter } from "./FitMeter";
 import { locationLabel, metaLine } from "@/lib/format";
 import type { ShortlistItem } from "@/lib/filters/types";
 
-const SPONSORSHIP_PILL: Record<string, string> = {
-  offered:
-    "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
-  denied:
-    "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
+const SPONSORSHIP_TONE: Record<string, string> = {
+  offered: "success",
+  denied: "danger",
 };
 
 const SKILL_CAP = 7;
@@ -38,8 +36,8 @@ export function JobCard({
   const overflow = sorted.length - shown.length;
   const meta = metaLine(row);
   const location = locationLabel(row);
-  const sponsorPill =
-    row.sponsorshipSignal && SPONSORSHIP_PILL[row.sponsorshipSignal];
+  const sponsorTone =
+    row.sponsorshipSignal && SPONSORSHIP_TONE[row.sponsorshipSignal];
 
   return (
     <Card className="job-card min-w-0 flex min-h-0 flex-col gap-4 p-4 transition-[box-shadow,transform] duration-150 ease-out-strong hover:-translate-y-0.5 hover:shadow-card-raised hover:ring-primary/40 motion-reduce:hover:translate-y-0 sm:p-5">
@@ -67,7 +65,7 @@ export function JobCard({
               {row.company ?? "—"} · {location ?? "location n/a"}
             </div>
 
-            {(meta.length > 0 || sponsorPill) && (
+            {(meta.length > 0 || sponsorTone) && (
               <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
                 {meta.map((part, i) => (
                   <span key={part} className="flex items-center gap-1.5">
@@ -75,9 +73,10 @@ export function JobCard({
                     {part}
                   </span>
                 ))}
-                {sponsorPill && (
+                {sponsorTone && (
                   <span
-                    className={`ml-1 rounded-full border px-2 py-0.5 text-[0.66rem] font-semibold uppercase tracking-wide ${sponsorPill}`}
+                    className="tone-chip ml-1 rounded-full px-2 py-0.5 text-[0.66rem] font-semibold uppercase tracking-wide"
+                    data-tone={sponsorTone}
                   >
                     {row.sponsorshipSignal === "offered" ? "sponsors" : "no sponsor"}
                   </span>
