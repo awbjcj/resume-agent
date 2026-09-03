@@ -133,7 +133,7 @@ export function MatchGapContainer() {
         <div className="space-y-6">
           <section
             aria-label="Dashboard controls"
-            className="flex flex-col items-stretch gap-3 rounded-lg border bg-card/95 p-3 backdrop-blur sm:p-4 lg:sticky lg:top-20 lg:z-20 2xl:flex-row 2xl:items-center 2xl:justify-between"
+            className="flex flex-col items-stretch gap-3 rounded-lg border bg-card p-3 sm:p-4 2xl:flex-row 2xl:items-center 2xl:justify-between"
           >
             <Filters
               value={filters}
