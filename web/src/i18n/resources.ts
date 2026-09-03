@@ -150,7 +150,6 @@ const en = {
     inProgress: "in progress",
   },
   shell: {
-    commandCenter: "Command Center",
     productSummary: "Review, tailor, and track high-fit jobs from one operational desk.",
     operationalFlow: "Operational flow",
     operationalFlowBody: "Move each strong fit from evidence to a finished application.",
@@ -808,7 +807,6 @@ const zhCN = {
     inProgress: "进行中",
   },
   shell: {
-    commandCenter: "求职指挥中心",
     productSummary: "在一个工作台中审核、定制并跟踪高匹配度职位。",
     operationalFlow: "求职流程",
     operationalFlowBody: "将每个高匹配职位从事实依据推进到完成申请。",

@@ -367,12 +367,6 @@
     linear-gradient(180deg, color-mix(in oklab, var(--sidebar), var(--sidebar-accent) 10%), var(--sidebar) 38%);
 }
 
-.command-panel-mark {
-  box-shadow:
-    0 10px 24px -14px color-mix(in oklab, var(--sidebar-primary), transparent 22%),
-    inset 0 1px 0 color-mix(in oklab, var(--sidebar-primary-foreground), transparent 78%);
-}
-
 .command-sidebar-brief {
   background-color: color-mix(in oklab, var(--sidebar), transparent 4%);
   background-image: radial-gradient(

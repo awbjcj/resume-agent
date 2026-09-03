@@ -95,6 +95,16 @@ describe("MatchGapContainer", () => {
     expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure" })).toBeChecked();
   });
 
+  it("keeps the filter controls in document flow", async () => {
+    server.use(http.get("/api/match-gap", () => HttpResponse.json(populated)));
+    wrap(<MatchGapContainer />);
+
+    const controls = await screen.findByRole("region", { name: "Dashboard controls" });
+    expect(controls).not.toHaveClass("sticky");
+    expect(controls).not.toHaveClass("fixed");
+    expect(controls).not.toHaveClass("backdrop-blur");
+  });
+
   it("focuses one domain and hides unrelated branches until returning to the overview", async () => {
     const backendSkill = {
       key: "python",
