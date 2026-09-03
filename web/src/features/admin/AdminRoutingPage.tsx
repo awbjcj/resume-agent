@@ -44,7 +44,7 @@ function hostOf(baseUrl: string): string {
 
 function RoutingSkeleton() {
   return (
-    <div className="flex flex-col gap-8" aria-busy="true" aria-label="Loading provider routing">
+    <div className="flex flex-col gap-8" role="status" aria-busy="true" aria-label="Loading provider routing">
       <Skeleton className="h-28 w-full" />
       <Skeleton className="h-32 w-full" />
       <div className="grid gap-4 lg:grid-cols-2">

@@ -6,8 +6,8 @@ import { industryLabel } from "@/lib/filters/industry-label";
 import type { JobDetail } from "@/features/job/use-job-detail";
 
 const SPONSORSHIP_TONE: Record<string, string> = {
-  offered: "text-emerald-600 dark:text-emerald-400",
-  denied: "text-rose-600 dark:text-rose-400",
+  offered: "text-success",
+  denied: "text-destructive",
   silent: "text-muted-foreground",
 };
 

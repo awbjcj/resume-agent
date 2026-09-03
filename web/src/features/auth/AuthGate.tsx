@@ -26,7 +26,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (me.isPending) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center p-6"
+        className="flex min-h-dvh items-center justify-center p-6"
         aria-label="Checking session"
         aria-busy="true"
         role="status"
@@ -37,7 +37,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
   if (me.isError) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6">
+      <main className="flex min-h-dvh items-center justify-center p-6">
         <Empty>
           <EmptyHeader>
             <EmptyTitle>Could not verify your session</EmptyTitle>

@@ -177,7 +177,7 @@ export function EvidencePortfolioDisclosure({
                   </Badge>
                 </div>
                 {highlightTerms.length ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Terms emphasized">
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Terms emphasized">
                     <span className="mr-1 text-xs font-medium text-muted-foreground">Emphasized:</span>
                     {visibleTerms.map((term) => (
                       <Badge key={term} variant="secondary">{term}</Badge>
@@ -193,10 +193,11 @@ export function EvidencePortfolioDisclosure({
 
               {data.warning ? (
                 <p
-                  className="m-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-900 dark:text-amber-200"
+                  className="tone-panel m-4 flex items-start gap-2 rounded-md p-3"
+                  data-tone="warning"
                   role="status"
                 >
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <AlertTriangle className="tone-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   {evidencePortfolioWarningLabel(t, data.warning)}
                 </p>
               ) : null}

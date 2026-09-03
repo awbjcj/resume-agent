@@ -117,7 +117,7 @@ export function ChatSessionHistory({
       </CardHeader>
       <CardContent className="pt-1">
         {isLoading ? (
-          <div className="space-y-2 py-3" aria-label="Loading sessions">
+          <div className="space-y-2 py-3" role="status" aria-label="Loading sessions">
             <Skeleton className="h-14 w-full" />
             <Skeleton className="h-14 w-full" />
           </div>

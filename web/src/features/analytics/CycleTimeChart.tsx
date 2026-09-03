@@ -31,7 +31,7 @@ export function CycleTimeChart({ cycleTimes }: { cycleTimes: CycleTime[] }) {
   const rows = toCycleRows(cycleTimes, t);
   return (
     <div className="space-y-3">
-      <div className="h-[min(28rem,70vh)] min-h-64 min-w-0" aria-label="Median days between application stages">
+      <div className="h-[min(28rem,70vh)] min-h-64 min-w-0" role="img" aria-label="Median days between application stages">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} layout="vertical" margin={{ left: 12, right: 24 }}>
             <XAxis type="number" unit="d" {...axisProps} />

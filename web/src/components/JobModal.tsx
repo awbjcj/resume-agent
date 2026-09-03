@@ -262,14 +262,14 @@ export function JobModal({
 
                     {(job.status === "rejected" || job.status === "filtered") &&
                       job.rejectReason && (
-                        <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900 dark:bg-rose-950/40">
-                          <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+                        <div className="tone-panel mt-6 rounded-xl p-5" data-tone="danger">
+                          <span className="tone-accent block text-xs font-semibold uppercase tracking-[0.16em]">
                             {job.status === "filtered" ||
                             job.rejectCategory === "filtered"
                               ? "Filtered out during discovery"
                               : "Rejected during discovery"}
                           </span>
-                          <p className="mt-1.5 text-[15px] leading-7 text-rose-900 dark:text-rose-100">
+                          <p className="mt-1.5 text-[15px] leading-7">
                             {job.rejectReason}
                           </p>
                         </div>

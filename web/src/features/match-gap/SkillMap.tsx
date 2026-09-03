@@ -193,7 +193,7 @@ export function SkillMap({
               {activeView.level === "domain" ? focusedCategory?.label : "All categories"}
             </Button>
           )}
-          <div className="flex gap-1" aria-label="Map zoom controls">
+          <div className="flex gap-1" role="group" aria-label="Map zoom controls">
             <Button size="icon-sm" variant="outline" aria-label="Zoom out" onClick={() => applyZoom("out")}>
               <MinusIcon data-icon="inline-start" />
             </Button>

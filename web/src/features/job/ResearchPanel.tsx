@@ -50,27 +50,37 @@ export function ResearchPanelHeader({
   );
 }
 
+/* Every caller used to spell its own status colours inline, which produced four
+   different amber panels (`amber-300/60`, `amber-200/80`, `amber-200`) that were
+   meant to be the same thing. `tone` names the meaning instead; `.tone-panel`
+   owns the colour, so the surfaces cannot drift apart again and dark mode is
+   derived rather than hand-maintained. */
+export type NoticeTone = "neutral" | "warning" | "success" | "danger" | "info";
+
 export function ResearchNotice({
   icon,
   children,
   className,
   role = "status",
+  tone = "neutral",
 }: {
   icon: ReactNode;
   children: ReactNode;
   className?: string;
   role?: "alert" | "status";
+  tone?: NoticeTone;
 }) {
   return (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-lg border px-4 py-3 text-sm",
+        "tone-panel flex items-start gap-3 rounded-lg px-4 py-3 text-sm",
         className,
       )}
+      data-tone={tone === "neutral" ? undefined : tone}
       role={role}
       aria-live={role === "alert" ? "assertive" : "polite"}
     >
-      <span className="mt-0.5 shrink-0" aria-hidden="true">
+      <span className="tone-accent mt-0.5 shrink-0" aria-hidden="true">
         {icon}
       </span>
       <div className="min-w-0 flex-1">{children}</div>

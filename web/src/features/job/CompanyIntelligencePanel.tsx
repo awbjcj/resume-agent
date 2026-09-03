@@ -117,7 +117,7 @@ export function CompanyIntelligencePanel({
       {failed && (
         <ResearchNotice
           icon={<AlertTriangle className="size-4" />}
-          className="border-destructive/30 bg-destructive/5 text-destructive"
+          tone="danger"
           role="alert"
         >
           {run?.error ??

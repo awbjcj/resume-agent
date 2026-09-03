@@ -15,7 +15,7 @@ export function ShortlistDetails({ row }: { row: ShortlistDetailsRow }) {
     {
       label: "Compensation",
       value: salaryLabel(row.salaryMin, row.salaryMax, row.salaryCurrency),
-      className: "font-medium text-emerald-700 dark:text-emerald-300",
+      className: "font-medium text-success",
     },
     {
       label: "Industry",

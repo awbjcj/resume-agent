@@ -71,7 +71,7 @@ export function RolePreparationPanel({ jobId }: { jobId: number }) {
       {run?.status === "failed" && (
         <ResearchNotice
           icon={<AlertTriangle className="size-4" />}
-          className="border-destructive/30 bg-destructive/5 text-destructive"
+          tone="danger"
           role="alert"
         >
           {run.error ?? "Role preparation failed. The last saved brief is unchanged."}
@@ -103,7 +103,7 @@ export function RolePreparationPanel({ jobId }: { jobId: number }) {
           {resource?.state === "ready" && resource.inputsChanged && (
             <ResearchNotice
               icon={<AlertTriangle className="size-4" />}
-              className="border-amber-300/60 bg-amber-50/70 text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"
+              tone="warning"
             >
               The job, selected documents, company dossier, or interview notes changed after this brief was generated. The saved brief remains unchanged until you regenerate it.
             </ResearchNotice>
@@ -183,7 +183,6 @@ export function RolePreparationPanel({ jobId }: { jobId: number }) {
 
           <ResearchNotice
             icon={<CircleAlert className="size-4" />}
-            className="border-border bg-muted/40 text-muted-foreground"
           >
             {brief.caveat}
           </ResearchNotice>

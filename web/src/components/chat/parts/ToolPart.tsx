@@ -19,7 +19,7 @@ export function ToolPart({ part }: { part: ToolChatPart }) {
         {!part.done ? (
           <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden="true" />
         ) : part.ok ? (
-          <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+          <Check className="size-3.5 text-success" aria-hidden="true" />
         ) : (
           <X className="size-3.5 text-destructive" aria-hidden="true" />
         )}

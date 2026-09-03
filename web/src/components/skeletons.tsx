@@ -34,7 +34,7 @@ export function BoardSkeleton({ count = 6 }: { count?: number }) {
 
 export function DrawerSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading job" className="mt-8 space-y-3">
+    <div role="status" aria-busy="true" aria-label="Loading job" className="mt-8 space-y-3">
       <Skeleton className="h-7 w-2/3 rounded-md" />
       <Skeleton className="h-4 w-1/2 rounded-md" />
       <Skeleton className="mt-6 h-40 w-full rounded-lg" />
